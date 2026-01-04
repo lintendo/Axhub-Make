@@ -1,5 +1,9 @@
 # 开发规范
 
+**⚠️ 重要：AI Agent 必须完整阅读本文档后再开始开发工作**
+
+**开发流程**：理解需求 → 阅读参考资料 → 编写代码 → 运行验收脚本 → 根据状态修复或调试
+
 本文档定义 Axhub 元素和页面原型的代码编写规范。
 
 ## 📁 项目结构
@@ -251,7 +255,5 @@ node scripts/check-app-ready.mjs /pages/[页面名]
 **状态为 READY**：使用 Chrome DevTools MCP（或 Playwright MCP）访问 `url` 进行功能验收，检查控制台是否有错误。如有错误或功能不符合预期，**此时才需要阅读 `debugging-guide.md` 进行自动化调试和修复**
 
 ## 📚 参考资源
-
-- 参考案例：`/src/elements/` 和 `/src/pages/` 目录下以 `ref-` 开头的文件
 - **axure-api-guide.md** - Axure API 使用指南（如需使用 Axure API 必读）
 - **debugging-guide.md** - 调试方法（开发验收失败或用户反馈 bug 时使用）
