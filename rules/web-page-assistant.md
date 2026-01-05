@@ -27,6 +27,10 @@
 - 结构化数据提取需求
 - 用户明确要求
 
+**页面加载等待**：如遇抓取错误或数据不完整，添加等待参数（建议 2000-5000ms）：
+- Axhub MCP：`waitTime` 参数
+- Firecrawl MCP：`waitFor` 参数
+
 ## 📋 工作流程
 
 ### 阶段 0：环境检测
@@ -99,9 +103,7 @@
 
 #### 5.2 提取页面内容
 
-使用 `get_page_markdown` 提取页面内容。
-
-如需批量操作（> 5 个页面）或结构化提取，可使用 Firecrawl 的 `batch_scrape` 或 `extract`。
+使用 `get_page_markdown` 提取页面内容。如需批量操作（> 5 个页面）或结构化提取，可使用 Firecrawl 的 `batch_scrape` 或 `extract`。
 
 #### 5.3 分析数据结构
 
