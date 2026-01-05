@@ -14,6 +14,8 @@
     /* 为底部导航留出空间 */
     position: relative;
     overflow-x: hidden;
+    max-width: 420px;
+    margin: 0 auto;
 }
 
 /* 头部区域 */
@@ -300,6 +302,16 @@
     align-items: center;
     border-top: 1px solid #333;
     z-index: 100;
+    box-sizing: border-box;
+}
+
+@media (min-width: 421px) {
+    .demo-app-home-tab-bar {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        width: 420px;
+    }
 }
 
 .demo-app-home-tab-item {
@@ -343,6 +355,12 @@
     cursor: pointer;
     z-index: 90;
     transition: transform 0.2s;
+}
+
+@media (min-width: 421px) {
+    .demo-app-home-fab {
+        right: calc(50% - 190px);
+    }
 }
 
 .demo-app-home-fab:active {

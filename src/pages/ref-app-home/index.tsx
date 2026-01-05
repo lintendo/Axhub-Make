@@ -26,7 +26,10 @@ import './style.css';
 // 直接从 'react' 导入所需的 Hooks，不使用解构
 import React, { useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 
-// 3. 导入类型定义（必需）
+// 3. 导入图标库
+import { Flame, Timer, Zap, Activity } from 'lucide-react';
+
+// 4. 导入类型定义（必需）
 // 从 axhub-types 导入所有必要的类型
 import type {
     KeyDesc,
@@ -197,7 +200,7 @@ const Component = forwardRef<AxhubHandle, AxhubProps>(function FitnessHome(inner
                 <h1 className="demo-app-home-greeting">
                     Hi, <span style={{ color: accentColor }}>{userName}</span>
                     <div style={{ fontSize: 14, color: '#888', fontWeight: 'normal', marginTop: 4 }}>
-                        今天也要加油哦 💪
+                        今天也要加油哦
                     </div>
                 </h1>
                 <div className="demo-app-home-avatar">
@@ -208,17 +211,23 @@ const Component = forwardRef<AxhubHandle, AxhubProps>(function FitnessHome(inner
             {/* 统计数据 */}
             <div className="demo-app-home-stats">
                 <div className="demo-app-home-stat-card">
-                    <div className="demo-app-home-stat-icon">🔥</div>
+                    <div className="demo-app-home-stat-icon">
+                        <Flame size={20} />
+                    </div>
                     <div className="demo-app-home-stat-value">328</div>
                     <div className="demo-app-home-stat-label">千卡消耗</div>
                 </div>
                 <div className="demo-app-home-stat-card">
-                    <div className="demo-app-home-stat-icon">⏱️</div>
+                    <div className="demo-app-home-stat-icon">
+                        <Timer size={20} />
+                    </div>
                     <div className="demo-app-home-stat-value">45</div>
                     <div className="demo-app-home-stat-label">运动分钟</div>
                 </div>
                 <div className="demo-app-home-stat-card">
-                    <div className="demo-app-home-stat-icon">⚡</div>
+                    <div className="demo-app-home-stat-icon">
+                        <Zap size={20} />
+                    </div>
                     <div className="demo-app-home-stat-value">3</div>
                     <div className="demo-app-home-stat-label">连续天数</div>
                 </div>
@@ -248,7 +257,9 @@ const Component = forwardRef<AxhubHandle, AxhubProps>(function FitnessHome(inner
                                 style={{ strokeDashoffset, stroke: accentColor }}
                             />
                         </svg>
-                        <div className="demo-app-home-plan-icon">🏃</div>
+                        <div className="demo-app-home-plan-icon">
+                            <Activity size={24} />
+                        </div>
                     </div>
                     <div className="demo-app-home-plan-info">
                         <div className="demo-app-home-plan-title">每日目标</div>
