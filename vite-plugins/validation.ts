@@ -30,17 +30,24 @@ export function validateRequired(value: any, fieldName: string): void {
 
 /**
  * Validate file name format
- * File names can only contain letters, numbers, underscores, and hyphens
+ * File names can contain letters, numbers, underscores, hyphens, and Chinese characters
  */
 export function validateFileName(fileName: string): void {
   if (!fileName || typeof fileName !== 'string') {
     throw new ValidationError('Invalid fileName parameter', 'fileName');
   }
   
-  // Check for invalid characters in file name
-  if (!/^[a-zA-Z0-9_-]+$/.test(fileName)) {
+  // Trim whitespace
+  const trimmed = fileName.trim();
+  if (trimmed === '') {
+    throw new ValidationError('fileName cannot be empty', 'fileName');
+  }
+  
+  // Check for invalid characters in file name (allow Chinese characters)
+  // Disallow: / \ : * ? " < > |
+  if (/[/\\:*?"<>|]/.test(trimmed)) {
     throw new ValidationError(
-      'fileName can only contain letters, numbers, underscores, and hyphens',
+      'fileName cannot contain the following characters: / \\ : * ? " < > |',
       'fileName'
     );
   }

@@ -165,26 +165,30 @@ export function dataManagementApiPlugin(): Plugin {
           // Route: POST /api/data/tables - Create new table
           if (pathname === '/api/data/tables' && req.method === 'POST') {
             const body = await parseBody(req);
-            const { fileName, tableName } = body;
+            const { tableName } = body;
 
-            validateRequiredField(fileName, 'fileName');
+            validateRequiredField(tableName, 'tableName');
+
+            // Generate fileName from tableName if not provided
+            // Use tableName directly as fileName (supports Chinese)
+            const fileName = tableName.trim();
             validateFileNameParam(fileName);
 
             // Check if table already exists
             const exists = await lowdbService.tableExists(fileName);
             if (exists) {
-              throw new APIError(400, 'TABLE_EXISTS', `Table '${fileName}' already exists`);
+              throw new APIError(400, 'TABLE_EXISTS', `Table '${tableName}' already exists`);
             }
 
             await lowdbService.createTable(fileName, tableName);
-            sendJSON(res, 201, { success: true, fileName, tableName: tableName || fileName });
+            sendJSON(res, 201, { success: true, fileName, tableName });
             return;
           }
 
           // Route: PUT /api/data/tables/:fileName - Update table info (e.g., tableName)
           const updateTableMatch = pathname.match(/^\/api\/data\/tables\/([^/]+)$/);
           if (updateTableMatch && req.method === 'PUT') {
-            const fileName = updateTableMatch[1];
+            const fileName = decodeURIComponent(updateTableMatch[1]);
             validateFileNameParam(fileName);
 
             const exists = await lowdbService.tableExists(fileName);
@@ -206,7 +210,7 @@ export function dataManagementApiPlugin(): Plugin {
           // Route: DELETE /api/data/tables/:fileName - Delete table
           const deleteTableMatch = pathname.match(/^\/api\/data\/tables\/([^/]+)$/);
           if (deleteTableMatch && req.method === 'DELETE') {
-            const fileName = deleteTableMatch[1];
+            const fileName = decodeURIComponent(deleteTableMatch[1]);
             validateFileNameParam(fileName);
 
             const exists = await lowdbService.tableExists(fileName);
@@ -222,7 +226,7 @@ export function dataManagementApiPlugin(): Plugin {
           // Route: GET /api/data/:fileName/export - CSV Export (must be before :id route)
           const exportMatch = pathname.match(/^\/api\/data\/([^/]+)\/export$/);
           if (exportMatch && req.method === 'GET') {
-            const fileName = exportMatch[1];
+            const fileName = decodeURIComponent(exportMatch[1]);
             validateFileNameParam(fileName);
 
             const exists = await lowdbService.tableExists(fileName);
@@ -250,7 +254,7 @@ export function dataManagementApiPlugin(): Plugin {
           // Route: GET /api/data/:fileName - Get all data from table
           const getTableMatch = pathname.match(/^\/api\/data\/([^/]+)$/);
           if (getTableMatch && req.method === 'GET') {
-            const fileName = getTableMatch[1];
+            const fileName = decodeURIComponent(getTableMatch[1]);
             validateFileNameParam(fileName);
 
             const exists = await lowdbService.tableExists(fileName);
@@ -266,8 +270,8 @@ export function dataManagementApiPlugin(): Plugin {
           // Route: GET /api/data/:fileName/:id - Get single record
           const getRecordMatch = pathname.match(/^\/api\/data\/([^/]+)\/([^/]+)$/);
           if (getRecordMatch && req.method === 'GET') {
-            const fileName = getRecordMatch[1];
-            const id = getRecordMatch[2];
+            const fileName = decodeURIComponent(getRecordMatch[1]);
+            const id = decodeURIComponent(getRecordMatch[2]);
             validateFileNameParam(fileName);
 
             const exists = await lowdbService.tableExists(fileName);
@@ -287,7 +291,7 @@ export function dataManagementApiPlugin(): Plugin {
           // Route: POST /api/data/:fileName - Insert new record
           const insertMatch = pathname.match(/^\/api\/data\/([^/]+)$/);
           if (insertMatch && req.method === 'POST') {
-            const fileName = insertMatch[1];
+            const fileName = decodeURIComponent(insertMatch[1]);
             validateFileNameParam(fileName);
 
             const exists = await lowdbService.tableExists(fileName);
@@ -306,8 +310,8 @@ export function dataManagementApiPlugin(): Plugin {
           // Route: PUT /api/data/:fileName/:id - Update record
           const updateMatch = pathname.match(/^\/api\/data\/([^/]+)\/([^/]+)$/);
           if (updateMatch && req.method === 'PUT') {
-            const fileName = updateMatch[1];
-            const id = updateMatch[2];
+            const fileName = decodeURIComponent(updateMatch[1]);
+            const id = decodeURIComponent(updateMatch[2]);
             validateFileNameParam(fileName);
 
             const exists = await lowdbService.tableExists(fileName);
@@ -333,8 +337,8 @@ export function dataManagementApiPlugin(): Plugin {
           // Route: DELETE /api/data/:fileName/:id - Delete record
           const deleteMatch = pathname.match(/^\/api\/data\/([^/]+)\/([^/]+)$/);
           if (deleteMatch && req.method === 'DELETE') {
-            const fileName = deleteMatch[1];
-            const id = deleteMatch[2];
+            const fileName = decodeURIComponent(deleteMatch[1]);
+            const id = decodeURIComponent(deleteMatch[2]);
             validateFileNameParam(fileName);
 
             const exists = await lowdbService.tableExists(fileName);
@@ -357,7 +361,7 @@ export function dataManagementApiPlugin(): Plugin {
           // Route: POST /api/data/:fileName/import - CSV Import
           const importMatch = pathname.match(/^\/api\/data\/([^/]+)\/import$/);
           if (importMatch && req.method === 'POST') {
-            const fileName = importMatch[1];
+            const fileName = decodeURIComponent(importMatch[1]);
             validateFileNameParam(fileName);
 
             const exists = await lowdbService.tableExists(fileName);
