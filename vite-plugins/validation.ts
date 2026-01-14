@@ -54,20 +54,28 @@ export function validateFileName(fileName: string): void {
 }
 
 /**
- * Validate that ID field exists and is a valid string
+ * Validate that ID field exists and is a valid string or number
  * Requirement 3.2: Validate the required id field before persisting
+ * Updated to support both string and number IDs
  */
 export function validateIdField(id: any): void {
   if (id === undefined || id === null) {
     throw new ValidationError('Missing required field: id', 'id');
   }
   
-  if (typeof id !== 'string') {
-    throw new ValidationError('Invalid id: must be a string', 'id');
+  // Accept both string and number types
+  if (typeof id !== 'string' && typeof id !== 'number') {
+    throw new ValidationError('Invalid id: must be a string or number', 'id');
   }
   
-  if (id.trim() === '') {
+  // For string IDs, check if empty
+  if (typeof id === 'string' && id.trim() === '') {
     throw new ValidationError('Invalid id: cannot be empty', 'id');
+  }
+  
+  // For number IDs, check if valid (not NaN, not Infinity)
+  if (typeof id === 'number' && (!Number.isFinite(id))) {
+    throw new ValidationError('Invalid id: must be a finite number', 'id');
   }
 }
 
@@ -131,14 +139,16 @@ export function validateDataTypes(data: any): void {
 /**
  * Check for duplicate ID in existing records
  * Requirement 3.3: Detect duplicate IDs
+ * Updated to support both string and number IDs using loose equality
  */
-export function checkDuplicateId(id: string, existingRecords: DataRecord[], excludeId?: string): void {
+export function checkDuplicateId(id: string | number, existingRecords: DataRecord[], excludeId?: string | number): void {
   const duplicate = existingRecords.find(record => {
     // If excludeId is provided (for updates), skip that record
-    if (excludeId && record.id === excludeId) {
+    if (excludeId !== undefined && record.id == excludeId) {
       return false;
     }
-    return record.id === id;
+    // Use loose equality to match both string and number IDs
+    return record.id == id;
   });
   
   if (duplicate) {
@@ -196,7 +206,7 @@ export function validateCSVData(csvData: any[]): void {
     try {
       validateDataTypes(row);
       
-      // If row has id, validate it
+      // If row has id, validate it (support both string and number)
       if (row.id !== undefined && row.id !== null && row.id !== '') {
         validateIdField(row.id);
       }

@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <title>{{TITLE}} - Spec</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="/assets/spec-template-bootstrap.css">
+  <link rel="stylesheet" href="/assets/vendor.css">
   <style>
     /* 全局样式 */
     * {
@@ -33,7 +33,6 @@
 
     /* 加载状态 */
     .loading {
-      /*text-align: center;*/
       padding: 60px 20px;
       color: #8c8c8c;
     }
@@ -44,18 +43,13 @@
     }
 
     @keyframes loading {
-
-      0%,
-      20% {
+      0%, 20% {
         content: '.';
       }
-
       40% {
         content: '..';
       }
-
-      60%,
-      100% {
+      60%, 100% {
         content: '...';
       }
     }
@@ -81,79 +75,6 @@
 
   <!-- 加载 bootstrap JS（会自动挂载到 window.SpecTemplateBootstrap） -->
   <script type="module" src="/assets/spec-template-bootstrap.js"></script>
-
-  <script type="module">
-    function decodeHtmlEntities(str) {
-      const textarea = document.createElement('textarea');
-      textarea.innerHTML = str;
-      return textarea.value;
-    }
-
-    function waitForBootstrap() {
-      if (window.SpecTemplateBootstrap) {
-        console.log('[Spec Template] Bootstrap 已就绪');
-        console.log('[Spec Template] 可用方法:', Object.keys(window.SpecTemplateBootstrap));
-
-        const isMultiDoc = '{{MULTI_DOC}}' === 'true';
-        const docsConfigStr = decodeHtmlEntities('{{DOCS_CONFIG}}');
-        
-        console.log('[Spec Template] 多文档模式:', isMultiDoc);
-        console.log('[Spec Template] 文档配置字符串:', docsConfigStr);
-
-        if (isMultiDoc && docsConfigStr && docsConfigStr !== '[]') {
-          try {
-            const docsConfig = JSON.parse(docsConfigStr);
-            console.log('[Spec Template] 多文档模式，加载文档:', docsConfig);
-            
-            if (window.SpecTemplateBootstrap.loadMarkdownDocumentsFromUrls) {
-              window.SpecTemplateBootstrap.loadMarkdownDocumentsFromUrls(docsConfig).catch(err => {
-                console.error('[Spec Template] 加载失败:', err);
-              });
-            } else {
-              console.error('[Spec Template] loadMarkdownDocumentsFromUrls 方法不存在');
-            }
-          } catch (err) {
-            console.error('[Spec Template] 解析文档配置失败:', err);
-            console.error('[Spec Template] 原始字符串:', docsConfigStr);
-            
-            const urlParams = new URLSearchParams(window.location.search);
-            const specUrl = urlParams.get('url') || '{{SPEC_URL}}';
-            console.log('[Spec Template] 降级到单文档模式，加载 Spec:', specUrl);
-            
-            // 检查是否是有效的 URL（不是占位符）
-            if (specUrl && !specUrl.includes('{{') && !specUrl.includes('}}') && window.SpecTemplateBootstrap.loadMarkdownFromUrl) {
-              window.SpecTemplateBootstrap.loadMarkdownFromUrl(specUrl).catch(err => {
-                console.error('[Spec Template] 加载失败:', err);
-              });
-            }
-          }
-        } else {
-          const urlParams = new URLSearchParams(window.location.search);
-          const specUrl = urlParams.get('url') || '{{SPEC_URL}}';
-
-          console.log('[Spec Template] 单文档模式，加载 Spec:', specUrl);
-
-          // 检查是否是有效的 URL（不是占位符）
-          if (specUrl && !specUrl.includes('{{') && !specUrl.includes('}}')) {
-            console.log('[Spec Template] 开始加载文档');
-            window.SpecTemplateBootstrap.loadMarkdownFromUrl(specUrl).catch(err => {
-              console.error('[Spec Template] 加载失败:', err);
-            });
-          } else {
-            console.error('[Spec Template] 没有有效的文档 URL, specUrl:', specUrl);
-          }
-        }
-      } else {
-        setTimeout(waitForBootstrap, 10);
-      }
-    }
-
-    waitForBootstrap();
-  </script>
-
-</body>
-
-</html>
 
   <script type="module">
     function decodeHtmlEntities(str) {

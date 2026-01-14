@@ -107,6 +107,9 @@ storybook-static/
 tmp/
 temp/
 
+# Git version management temporary files
+.git-versions/
+
 # Database files (keep directory structure and initial data)
 # assets/database/*.json
 # !assets/database/.gitkeep

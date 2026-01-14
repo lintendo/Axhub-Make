@@ -18,6 +18,9 @@ import { mediaManagementApiPlugin } from './vite-plugins/mediaManagementApiPlugi
 import { codeReviewPlugin } from './vite-plugins/codeReviewPlugin';
 import { mcpInstallPlugin } from './vite-plugins/mcpInstallPlugin';
 import { autoDebugPlugin } from './vite-plugins/autoDebugPlugin';
+import { configApiPlugin } from './vite-plugins/configApiPlugin';
+import { aiCliPlugin } from './vite-plugins/aiCliPlugin';
+import { gitVersionApiPlugin } from './vite-plugins/gitVersionApiPlugin';
 
 /**
  * ⚠️ 运行时配置注入说明
@@ -213,6 +216,53 @@ function serveAdminPlugin(): Plugin {
             return;
           }
         }
+
+        // 处理 /assets/docs/*/spec.html 请求（文档预览）
+        if (req.url && req.url.match(/^\/assets\/docs\/[^/]+\/spec\.html$/)) {
+          const encodedDocName = req.url.match(/^\/assets\/docs\/([^/]+)\/spec\.html$/)?.[1];
+          if (encodedDocName) {
+            const specTemplatePath = path.join(adminDir, 'spec-template.html');
+            if (fs.existsSync(specTemplatePath)) {
+              let html = fs.readFileSync(specTemplatePath, 'utf8');
+              // 解码文档名并添加 .md 扩展名
+              const docName = decodeURIComponent(encodedDocName);
+              const docFileName = docName.endsWith('.md') ? docName : `${docName}.md`;
+              // 替换 spec.html 中的占位符 - 使用 API 路径
+              const specUrl = `/api/docs/${encodeURIComponent(docFileName)}`;
+              html = html.replace(/\{\{SPEC_URL\}\}/g, specUrl);
+              html = html.replace(/\{\{TITLE\}\}/g, docName);
+              html = html.replace(/\{\{MULTI_DOC\}\}/g, 'false');
+              html = html.replace(/\{\{DOCS_CONFIG\}\}/g, '[]');
+              // 注入项目路径配置和局域网 IP
+              html = html.replace('</head>', `${injectScript}\n</head>`);
+              res.setHeader('Content-Type', 'text/html; charset=utf-8');
+              res.end(html);
+              return;
+            }
+          }
+        }
+
+        // 处理 /assets/libraries/*/spec.html 请求（前端库预览）
+        if (req.url && req.url.match(/^\/assets\/libraries\/[^/]+\/spec\.html$/)) {
+          const libraryName = req.url.match(/^\/assets\/libraries\/([^/]+)\/spec\.html$/)?.[1];
+          if (libraryName) {
+            const specTemplatePath = path.join(adminDir, 'spec-template.html');
+            if (fs.existsSync(specTemplatePath)) {
+              let html = fs.readFileSync(specTemplatePath, 'utf8');
+              // 替换 spec.html 中的占位符 - 使用 API 路径
+              const specUrl = `/api/libraries/${libraryName}.md`;
+              html = html.replace(/\{\{SPEC_URL\}\}/g, specUrl);
+              html = html.replace(/\{\{TITLE\}\}/g, libraryName);
+              html = html.replace(/\{\{MULTI_DOC\}\}/g, 'false');
+              html = html.replace(/\{\{DOCS_CONFIG\}\}/g, '[]');
+              // 注入项目路径配置和局域网 IP
+              html = html.replace('</head>', `${injectScript}\n</head>`);
+              res.setHeader('Content-Type', 'text/html; charset=utf-8');
+              res.end(html);
+              return;
+            }
+          }
+        }
         
         next();
       });
@@ -321,18 +371,137 @@ function docsApiPlugin(): Plugin {
     name: 'docs-api-plugin',
     configureServer(server: any) {
       server.middlewares.use((req: any, res: any, next: any) => {
-        if (req.method !== 'GET' || !req.url.startsWith('/api/docs')) {
+        if (!req.url.startsWith('/api/docs') && !req.url.startsWith('/api/libraries')) {
           return next();
         }
 
-        // 处理 /api/docs/:name 端点用于获取单个文档内容
-        if (req.url !== '/api/docs' && req.url !== '/api/docs/') {
+        // DELETE /api/docs/:name - 删除文档
+        if (req.method === 'DELETE' && req.url.startsWith('/api/docs/')) {
           try {
             const docName = req.url.replace('/api/docs/', '').split('?')[0];
             if (!docName) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: 'Missing document name' }));
+              return;
+            }
+
+            const docsDir = path.resolve(__dirname, 'assets/docs');
+            const docPath = path.join(docsDir, docName);
+
+            // 安全检查
+            if (!docPath.startsWith(docsDir)) {
+              res.statusCode = 403;
+              res.end(JSON.stringify({ error: 'Forbidden' }));
+              return;
+            }
+
+            if (!fs.existsSync(docPath)) {
+              res.statusCode = 404;
+              res.end(JSON.stringify({ error: 'Document not found' }));
+              return;
+            }
+
+            fs.unlinkSync(docPath);
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: true }));
+          } catch (error: any) {
+            console.error('Error deleting doc:', error);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: error.message }));
+          }
+          return;
+        }
+
+        // DELETE /api/libraries/:name - 删除前端库
+        if (req.method === 'DELETE' && req.url.startsWith('/api/libraries/')) {
+          try {
+            const libraryName = req.url.replace('/api/libraries/', '').split('?')[0];
+            if (!libraryName) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: 'Missing library name' }));
+              return;
+            }
+
+            const librariesDir = path.resolve(__dirname, 'assets/libraries');
+            const libraryPath = path.join(librariesDir, `${libraryName}.md`);
+
+            // 安全检查
+            if (!libraryPath.startsWith(librariesDir)) {
+              res.statusCode = 403;
+              res.end(JSON.stringify({ error: 'Forbidden' }));
+              return;
+            }
+
+            if (!fs.existsSync(libraryPath)) {
+              res.statusCode = 404;
+              res.end(JSON.stringify({ error: 'Library not found' }));
+              return;
+            }
+
+            fs.unlinkSync(libraryPath);
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: true }));
+          } catch (error: any) {
+            console.error('Error deleting library:', error);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: error.message }));
+          }
+          return;
+        }
+
+        // GET 请求处理
+        if (req.method !== 'GET') {
+          return next();
+        }
+
+        // 处理 /api/libraries/:name.md 端点用于获取单个前端库内容
+        if (req.url.startsWith('/api/libraries/') && req.url !== '/api/libraries' && req.url !== '/api/libraries/') {
+          try {
+            const encodedLibraryFile = req.url.replace('/api/libraries/', '').split('?')[0];
+            if (!encodedLibraryFile) {
               return next();
             }
 
+            // 解码 URL 编码的文件名
+            const libraryFile = decodeURIComponent(encodedLibraryFile);
+            const librariesDir = path.resolve(__dirname, 'assets/libraries');
+            const libraryPath = path.join(librariesDir, libraryFile);
+
+            // 安全检查：确保路径在 assets/libraries 目录内
+            if (!libraryPath.startsWith(librariesDir)) {
+              res.statusCode = 403;
+              res.end(JSON.stringify({ error: 'Forbidden' }));
+              return;
+            }
+
+            if (fs.existsSync(libraryPath)) {
+              const content = fs.readFileSync(libraryPath, 'utf8');
+              res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+              res.end(content);
+            } else {
+              res.statusCode = 404;
+              res.end(JSON.stringify({ error: 'Library not found' }));
+            }
+          } catch (error: any) {
+            console.error('Error loading library:', error);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: error.message }));
+          }
+          return;
+        }
+
+        // 处理 /api/docs/:name 端点用于获取单个文档内容
+        if (req.url.startsWith('/api/docs/') && req.url !== '/api/docs' && req.url !== '/api/docs/') {
+          try {
+            const encodedDocName = req.url.replace('/api/docs/', '').split('?')[0];
+            if (!encodedDocName) {
+              return next();
+            }
+
+            // 解码 URL 编码的文件名
+            const docName = decodeURIComponent(encodedDocName);
             const docsDir = path.resolve(__dirname, 'assets/docs');
             // 直接使用文件名（已包含扩展名）
             const docPath = path.join(docsDir, docName);
@@ -371,89 +540,95 @@ function docsApiPlugin(): Plugin {
         }
 
         // 处理 /api/docs 端点用于获取文档列表
-        try {
-          const docsDir = path.resolve(__dirname, 'assets/docs');
-          const docs: any[] = [];
-          // 支持的文档格式
-          const supportedExtensions = ['.md', '.csv', '.json', '.yaml', '.yml', '.txt'];
+        if (req.url === '/api/docs' || req.url === '/api/docs/') {
+          try {
+            const docsDir = path.resolve(__dirname, 'assets/docs');
+            const docs: any[] = [];
+            // 支持的文档格式
+            const supportedExtensions = ['.md', '.csv', '.json', '.yaml', '.yml', '.txt'];
 
-          if (fs.existsSync(docsDir)) {
-            const items = fs.readdirSync(docsDir, { withFileTypes: true });
-            
-            items.forEach(item => {
-              // 读取支持的文件格式
-              if (item.isFile()) {
-                const ext = path.extname(item.name);
-                if (supportedExtensions.includes(ext)) {
-                  // 保留完整文件名（包含扩展名）
-                  docs.push({
-                    name: item.name,
-                    displayName: item.name
-                  });
-                }
-              }
-            });
-          }
-
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify(docs));
-        } catch (error: any) {
-          console.error('Error loading docs:', error);
-          res.statusCode = 500;
-          res.end(JSON.stringify({ error: error.message }));
-        }
-      });
-
-      // 处理 /api/libraries 端点用于获取前端库列表
-      server.middlewares.use('/api/libraries', (_req: any, res: any) => {
-        try {
-          const librariesDir = path.resolve(__dirname, 'assets/libraries');
-          const libraries: any[] = [];
-
-          if (fs.existsSync(librariesDir)) {
-            const items = fs.readdirSync(librariesDir, { withFileTypes: true });
-            
-            items.forEach(item => {
-              // 只读取 .md 文件
-              if (item.isFile() && item.name.endsWith('.md')) {
-                const name = item.name.replace('.md', '');
-                const filePath = path.join(librariesDir, item.name);
-                const content = fs.readFileSync(filePath, 'utf8');
-                
-                // 尝试从文件内容中提取标题
-                let displayName = name;
-                const titleMatch = content.match(/^#\s+(.+)$/m);
-                if (titleMatch) {
-                  displayName = titleMatch[1].trim();
-                }
-
-                // 提取第一段作为描述
-                let description = '';
-                const lines = content.split('\n');
-                for (let i = 0; i < lines.length; i++) {
-                  const line = lines[i].trim();
-                  if (line && !line.startsWith('#')) {
-                    description = line;
-                    break;
+            if (fs.existsSync(docsDir)) {
+              const items = fs.readdirSync(docsDir, { withFileTypes: true });
+              
+              items.forEach(item => {
+                // 读取支持的文件格式
+                if (item.isFile()) {
+                  const ext = path.extname(item.name);
+                  if (supportedExtensions.includes(ext)) {
+                    // 保留完整文件名（包含扩展名）
+                    docs.push({
+                      name: item.name,
+                      displayName: item.name
+                    });
                   }
                 }
+              });
+            }
 
-                libraries.push({
-                  name,
-                  displayName,
-                  description
-                });
-              }
-            });
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(docs));
+          } catch (error: any) {
+            console.error('Error loading docs:', error);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: error.message }));
           }
-
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify(libraries));
-        } catch (error: any) {
-          console.error('Error loading libraries:', error);
-          res.statusCode = 500;
-          res.end(JSON.stringify({ error: error.message }));
+          return;
         }
+
+        // 处理 /api/libraries 端点用于获取前端库列表
+        if (req.url === '/api/libraries' || req.url === '/api/libraries/') {
+          try {
+            const librariesDir = path.resolve(__dirname, 'assets/libraries');
+            const libraries: any[] = [];
+
+            if (fs.existsSync(librariesDir)) {
+              const items = fs.readdirSync(librariesDir, { withFileTypes: true });
+              
+              items.forEach(item => {
+                // 只读取 .md 文件
+                if (item.isFile() && item.name.endsWith('.md')) {
+                  const name = item.name.replace('.md', '');
+                  const filePath = path.join(librariesDir, item.name);
+                  const content = fs.readFileSync(filePath, 'utf8');
+                  
+                  // 尝试从文件内容中提取标题
+                  let displayName = name;
+                  const titleMatch = content.match(/^#\s+(.+)$/m);
+                  if (titleMatch) {
+                    displayName = titleMatch[1].trim();
+                  }
+
+                  // 提取第一段作为描述
+                  let description = '';
+                  const lines = content.split('\n');
+                  for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (line && !line.startsWith('#')) {
+                      description = line;
+                      break;
+                    }
+                  }
+
+                  libraries.push({
+                    name,
+                    displayName,
+                    description
+                  });
+                }
+              });
+            }
+
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(libraries));
+          } catch (error: any) {
+            console.error('Error loading libraries:', error);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: error.message }));
+          }
+          return;
+        }
+
+        next();
       });
     }
   };
@@ -683,7 +858,50 @@ function themesApiPlugin(): Plugin {
     name: 'themes-api-plugin',
     configureServer(server: any) {
       server.middlewares.use((req: any, res: any, next: any) => {
-        if (req.method !== 'GET' || !req.url.startsWith('/api/themes')) {
+        if (!req.url.startsWith('/api/themes')) {
+          return next();
+        }
+
+        // DELETE /api/themes/:name - 删除主题
+        if (req.method === 'DELETE' && req.url !== '/api/themes' && req.url !== '/api/themes/') {
+          try {
+            const themeName = req.url.replace('/api/themes/', '').split('?')[0];
+            if (!themeName) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: 'Missing theme name' }));
+              return;
+            }
+
+            const themesDir = path.resolve(__dirname, 'src/themes');
+            const themeDir = path.join(themesDir, themeName);
+
+            // 安全检查
+            if (!themeDir.startsWith(themesDir)) {
+              res.statusCode = 403;
+              res.end(JSON.stringify({ error: 'Forbidden' }));
+              return;
+            }
+
+            if (!fs.existsSync(themeDir)) {
+              res.statusCode = 404;
+              res.end(JSON.stringify({ error: 'Theme not found' }));
+              return;
+            }
+
+            fs.rmSync(themeDir, { recursive: true, force: true });
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: true }));
+          } catch (error: any) {
+            console.error('Error deleting theme:', error);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: error.message }));
+          }
+          return;
+        }
+
+        // GET 请求处理
+        if (req.method !== 'GET') {
           return next();
         }
 
@@ -789,7 +1007,7 @@ function themesApiPlugin(): Plugin {
 
 // 读取配置文件
 const configPath = path.resolve(process.cwd(), 'axhub.config.json');
-let axhubConfig = { server: { host: 'localhost', port: 51720 } };
+let axhubConfig = { server: { host: 'localhost', port: 51720, allowLAN: true } };
 if (fs.existsSync(configPath)) {
   try {
     axhubConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
@@ -841,6 +1059,9 @@ const config: any = {
     codeReviewPlugin(), // 提供 /api/code-review 端点
     mcpInstallPlugin(), // 提供 /api/install-mcp 端点
     autoDebugPlugin(), // 提供自动调试 API 端点
+    configApiPlugin(), // 提供 /api/config 端点
+    aiCliPlugin(), // 提供 /api/ai 端点
+    gitVersionApiPlugin(), // 提供 /api/git 端点（Git 版本管理）
     forceInlineDynamicImportsOff(isIifeBuild),
     isIifeBuild
       ? react({
@@ -895,7 +1116,7 @@ const config: any = {
 
   server: {
     port: axhubConfig.server?.port || 51720,
-    host: '0.0.0.0', // 监听所有网络接口，支持局域网访问
+    host: axhubConfig.server?.allowLAN !== false ? '0.0.0.0' : 'localhost', // 根据配置决定是否允许局域网访问
     open: true, // 启动时自动打开浏览器
     cors: true,
     headers: {
@@ -909,6 +1130,7 @@ const config: any = {
     outDir: path.resolve(process.cwd(), 'dist'),
     emptyOutDir: !isIifeBuild,
     target: isIifeBuild ? 'es2015' : 'esnext',
+    assetsInlineLimit: 512 * 1024, // 512KB - 小于此大小的图片会被内联为 Base64
 
     rollupOptions: {
       input: rollupInput,

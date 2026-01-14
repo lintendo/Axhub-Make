@@ -7,17 +7,37 @@ export function handleSpecHtml(req: IncomingMessage, res: ServerResponse, specTe
     return false;
   }
 
-  const urlWithoutQuery = req.url.split('?')[0];
+  // 解析 URL 和查询参数
+  const [urlWithoutQuery, queryString] = req.url.split('?');
   const urlPath = urlWithoutQuery.replace('/spec.html', '');
   const pathParts = urlPath.split('/').filter(Boolean);
+  
+  // 解析版本参数
+  const params = new URLSearchParams(queryString || '');
+  const versionId = params.get('ver');
 
-  console.log('[虚拟HTML] Spec 请求路径:', req.url, '解析部分:', pathParts);
+  console.log('[虚拟HTML] Spec 请求路径:', req.url, '解析部分:', pathParts, '版本:', versionId);
 
   // 处理 /pages/* 或 /elements/* 的 spec.html 请求
   if (pathParts.length >= 2 && ['elements', 'pages'].includes(pathParts[0])) {
-    const basePath = path.resolve(process.cwd(), 'src' + urlPath);
-    const specMdPath = path.join(basePath, 'spec.md');
-    const prdMdPath = path.join(basePath, 'prd.md');
+    let basePath: string;
+    let specMdPath: string;
+    let prdMdPath: string;
+    
+    // 如果有版本参数，从 Git 版本目录读取
+    if (versionId) {
+      const gitVersionsDir = path.resolve(process.cwd(), '.git-versions', versionId);
+      basePath = path.join(gitVersionsDir, 'src', urlPath);
+      specMdPath = path.join(basePath, 'spec.md');
+      prdMdPath = path.join(basePath, 'prd.md');
+      console.log('[虚拟HTML] 从 Git 版本读取:', versionId, basePath);
+    } else {
+      // 否则从当前工作目录读取
+      basePath = path.join(process.cwd(), 'src', urlPath);
+      specMdPath = path.join(basePath, 'spec.md');
+      prdMdPath = path.join(basePath, 'prd.md');
+    }
+    
     const name = pathParts[1];
     const type = pathParts[0] === 'elements' ? 'Element' : 'Page';
 
@@ -31,23 +51,31 @@ export function handleSpecHtml(req: IncomingMessage, res: ServerResponse, specTe
     const docs: Array<{ key: string; label: string; url: string }> = [];
     
     if (fs.existsSync(specMdPath)) {
+      const docUrl = versionId 
+        ? `/api/git/version-file/${versionId}${urlPath}/spec.md`
+        : `${urlPath}/spec.md`;
       docs.push({
         key: 'spec',
         label: 'Spec',
-        url: `${urlPath}/spec.md`
+        url: docUrl
       });
     }
     
     if (fs.existsSync(prdMdPath)) {
+      const docUrl = versionId 
+        ? `/api/git/version-file/${versionId}${urlPath}/prd.md`
+        : `${urlPath}/prd.md`;
       docs.push({
         key: 'prd',
         label: 'PRD',
-        url: `${urlPath}/prd.md`
+        url: docUrl
       });
     }
 
     if (docs.length > 0) {
-      const title = `${type}: ${name}`;
+      const title = versionId 
+        ? `${type}: ${name} (版本: ${versionId})`
+        : `${type}: ${name}`;
       const isMultiDoc = docs.length > 1;
       
       // 使用 spec-template.html 模板

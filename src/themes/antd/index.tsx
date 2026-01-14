@@ -2,7 +2,7 @@
  * @name Ant Design Tokens 演示
  */
 
-import React, { forwardRef, useImperativeHandle, useState } from 'react';
+import React, { useState } from 'react';
 import { 
   Card, 
   Row, 
@@ -24,7 +24,6 @@ import {
   FontSizeOutlined,
   BorderOutlined
 } from '@ant-design/icons';
-import type { AxhubProps, AxhubHandle } from '../../common/axhub-types';
 import tokens from './designToken.json';
 
 const { Title, Text, Paragraph } = Typography;
@@ -97,17 +96,7 @@ const TokenSection = ({ title, icon, children }: { title: string, icon?: React.R
   </Card>
 );
 
-const Component = forwardRef<AxhubHandle, AxhubProps>((_props, ref) => {
-  useImperativeHandle(ref, () => ({
-    getVar: () => ({}),
-    fireAction: () => {},
-    eventList: [],
-    actionList: [],
-    varList: [],
-    configList: [],
-    dataList: []
-  }));
-
+function Component() {
   const tokenMap = tokens as unknown as Record<string, any>;
 
   // Core Brand Colors
@@ -249,6 +238,6 @@ const Component = forwardRef<AxhubHandle, AxhubProps>((_props, ref) => {
       </div>
     </ConfigProvider>
   );
-});
+}
 
 export default Component;

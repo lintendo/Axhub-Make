@@ -10,6 +10,8 @@ import { handleIndexHtml } from './handlers/indexHtmlHandler';
 import { handleAssetsRequest } from './handlers/assetsHandler';
 import { handleBuildRequest } from './handlers/buildHandler';
 import { handleDocsMarkdown } from './handlers/docsMarkdownHandler';
+import { handleTextReplaceCount } from './handlers/textReplaceCountHandler';
+import { handleTextReplace } from './handlers/textReplaceHandler';
 
 /**
  * 虚拟 HTML 插件 - 在内存中生成 HTML，不写入文件系统
@@ -69,6 +71,12 @@ export function virtualHtmlPlugin(): Plugin {
 
         // Handle hack.css clear POST request
         if (handleHackCssClear(req, res)) return;
+
+        // Handle text replace count POST request
+        if (handleTextReplaceCount(req, res)) return;
+
+        // Handle text replace POST request
+        if (handleTextReplace(req, res)) return;
 
         // Handle root path
         if (req.url === '/' || req.url === '/index.html') {

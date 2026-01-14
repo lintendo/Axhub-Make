@@ -12,13 +12,12 @@
 
 ## 📋 生成模式
 
-系统支持三种生成模式，由用户根据项目需求选择：
+系统支持两种生成模式，由用户根据项目需求选择：
 
 | 模式 | 流程 | 使用模板 |
 |------|------|----------|
 | 模式 1：直接生成 | 用户需求 → spec.md + index.tsx（同时生成） | `assets/templates/all-in-spec-template.md` |
-| 模式 2：规格优先 | 用户需求 → spec.md（确认）→ index.tsx | `assets/templates/spec-template.md` |
-| 模式 3：完整流程 | 用户需求 → prd.md（确认）→ spec.md（确认）→ index.tsx | PRD: `assets/templates/prd-template.md`<br>Spec: `assets/templates/spec-template.md` |
+| 模式 2：规格优先 | 用户需求 → spec.md（确认）→ index.tsx | `assets/templates/all-in-spec-template.md` |
 
 ## 📝 沟通流程
 
@@ -46,7 +45,7 @@
 **在提问之前，必须充分阅读用户提供的所有资料**：
 
 - [ ] 检查用户是否提供了参考文档、设计稿、原型链接
-- [ ] 如 Prompt 中包含“关联内容”，必须先阅读这些页面/元素的 `spec.md` 与 `index.tsx`
+- [ ] 如 Prompt 中包含"关联内容"，必须先阅读这些页面/元素的 `spec.md` 与 `index.tsx`
 - [ ] 仔细阅读所有提供的资料，理解已有信息
 - [ ] 识别资料中已经明确的需求点
 - [ ] 只针对资料中未明确的部分进行提问
@@ -73,7 +72,7 @@
 
 ## 🔗 关联内容使用规则
 
-当 Prompt 提供了“关联内容”（页面/元素列表）时，视为强约束与重要上下文：
+当 Prompt 提供了"关联内容"（页面/元素列表）时，视为强约束与重要上下文：
 
 - **同步修改**：若新需求会影响关联内容（数据结构、组件 API、样式 Token、公共状态等），需要同步评估并在实现中一起修改，避免引入不一致或破坏性变更
 - **引用与复用**：优先复用关联内容中已经存在的组件、工具函数、样式写法与交互模式，减少重复实现
@@ -82,20 +81,16 @@
 
 ## 📄 文档模板
 
-根据选择的生成模式，使用对应的模板：
+使用统一的规格文档模板：
 
 | 模式 | 文档类型 | 模板路径 |
 |------|----------|----------|
 | 直接生成 | Spec | `assets/templates/all-in-spec-template.md` |
-| 规格优先 | Spec | `assets/templates/spec-template.md` |
-| 完整流程 | PRD | `assets/templates/prd-template.md` |
-| 完整流程 | Spec | `assets/templates/spec-template.md` |
+| 规格优先 | Spec | `assets/templates/all-in-spec-template.md` |
 
 ### 模板使用说明
 
 - **all-in-spec-template.md**：包含业务需求和技术规格的一体化模板
-- **prd-template.md**：专注于业务需求，不涉及技术实现
-- **spec-template.md**：专注于技术规格，可选地引用 PRD
 
 ## ✅ 检查清单
 
@@ -135,7 +130,7 @@
 - **使用示例**：提供类似组件的参考，用具体场景举例说明，展示数据结构示例
 - **确认理解**：复述用户需求确认理解正确，对模糊需求主动提出澄清问题，对冲突需求指出并协商解决方案
 - **管理预期**：明确技术限制和实现难度，对复杂需求提出分阶段实现建议，说明可能的性能影响
-- **文档链接规范**：在生成的文档中不要使用 Markdown 链接格式（如 `[文档](./path.md)`），直接使用纯文本提及文档名称（如 `详见 prd.md`）
+- **文档链接规范**：在生成的文档中不要使用 Markdown 链接格式（如 `[文档](./path.md)`），直接使用纯文本提及文档名称（如 `详见 spec.md`）
 - **可视化流程**：涉及复杂流程、状态转换或多步骤交互时，使用 Mermaid 图表（flowchart、stateDiagram、sequenceDiagram 等）辅助说明
 
 ## 常见错误

@@ -1,6 +1,6 @@
 {
   "name": "axhub-make",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "private": true,
   "description": "Axhub Make（AI 辅助生成原型工具）",
   "type": "module",
@@ -40,8 +40,10 @@
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-slot": "^1.2.4",
+    "@types/adm-zip": "^0.5.7",
     "@types/formidable": "^3.4.6",
     "@types/papaparse": "^5.5.2",
+    "adm-zip": "^0.5.16",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "extract-colors": "^4.2.1",

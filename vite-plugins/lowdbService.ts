@@ -14,9 +14,10 @@ import {
 
 /**
  * Data record interface - all records must have an id field
+ * ID can be either string or number to support both UUID and integer IDs
  */
 export interface DataRecord {
-  id: string;
+  id: string | number;
   [key: string]: any;
 }
 
@@ -147,9 +148,10 @@ export class LowDBService {
   /**
    * Get a single record by id
    */
-  async getRecord(fileName: string, id: string): Promise<DataRecord | undefined> {
+  async getRecord(fileName: string, id: string | number): Promise<DataRecord | undefined> {
     const db = await this.getDB(fileName);
-    return db.data.records.find(record => record.id === id);
+    // Support both string and number comparison
+    return db.data.records.find(record => record.id == id);
   }
 
   /**
@@ -225,7 +227,7 @@ export class LowDBService {
   /**
    * Update an existing record
    */
-  async updateData(fileName: string, id: string, data: Partial<DataRecord>): Promise<DataRecord> {
+  async updateData(fileName: string, id: string | number, data: Partial<DataRecord>): Promise<DataRecord> {
     return this.withLock(fileName, async () => {
       const db = await this.getDB(fileName);
       
@@ -233,12 +235,12 @@ export class LowDBService {
       validateRecordForUpdate(data);
       
       // If trying to change ID, validate and check for duplicates
-      if (data.id && data.id !== id) {
+      if (data.id && data.id != id) {
         validateIdField(data.id);
         checkDuplicateId(data.id, db.data.records, id);
       }
       
-      const index = db.data.records.findIndex(record => record.id === id);
+      const index = db.data.records.findIndex(record => record.id == id);
       if (index === -1) {
         throw new Error(`Record with id ${id} not found`);
       }
@@ -259,11 +261,11 @@ export class LowDBService {
   /**
    * Delete a record
    */
-  async deleteData(fileName: string, id: string): Promise<void> {
+  async deleteData(fileName: string, id: string | number): Promise<void> {
     return this.withLock(fileName, async () => {
       const db = await this.getDB(fileName);
       
-      const index = db.data.records.findIndex(record => record.id === id);
+      const index = db.data.records.findIndex(record => record.id == id);
       if (index === -1) {
         throw new Error(`Record with id ${id} not found`);
       }
@@ -346,19 +348,28 @@ export class LowDBService {
       
       // Process each row from CSV
       const records: DataRecord[] = csvData.map((row, index) => {
-        if (row.id && typeof row.id === 'string' && row.id.trim() !== '') {
+        // Check if row has a valid ID (string or number)
+        const hasValidId = row.id !== undefined && 
+                          row.id !== null && 
+                          row.id !== '' &&
+                          (typeof row.id === 'string' || typeof row.id === 'number');
+        
+        if (hasValidId) {
           // Has ID - validate it
           validateIdField(row.id);
           
+          // Convert ID to string for comparison to avoid type issues
+          const idStr = String(row.id);
+          
           // Check for duplicate within CSV
-          if (seenIds.has(row.id)) {
+          if (seenIds.has(idStr)) {
             throw new Error(`Duplicate id '${row.id}' found in CSV at row ${index + 1}`);
           }
-          seenIds.add(row.id);
+          seenIds.add(idStr);
           
           return {
             ...row,
-            id: row.id
+            id: row.id // Keep original type (string or number)
           };
         } else {
           // No ID or empty ID - generate new UUID

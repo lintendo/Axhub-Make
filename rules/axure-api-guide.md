@@ -168,10 +168,11 @@ const fireActionHandler = useCallback(function (name: string, params?: string) {
 ```typescript
 import type { KeyDesc } from '../../common/axhub-types';
 
+// ⚠️ name 必须使用小写 + 下划线（snake_case），详见 KeyDesc 说明
 const VAR_LIST: KeyDesc[] = [
   { name: 'value', desc: '当前输入值（字符串）' },
-  { name: 'isValid', desc: '表单是否有效（布尔值）' },
-  { name: 'errorMessage', desc: '错误信息（字符串）' }
+  { name: 'is_valid', desc: '表单是否有效（布尔值）' },
+  { name: 'error_message', desc: '错误信息（字符串）' }
 ];
 ```
 
@@ -323,8 +324,9 @@ const ACTION_LIST: Action[] = [
   { name: 'setData', desc: '设置表单数据，参数格式：JSON 字符串', params: 'JSON string' }
 ];
 
+// ⚠️ name 必须使用小写 + 下划线（snake_case），详见 KeyDesc 说明
 const VAR_LIST: KeyDesc[] = [
-  { name: 'formData', desc: '当前表单数据（对象）' }
+  { name: 'form_data', desc: '当前表单数据（对象）' }
 ];
 
 const CONFIG_LIST: ConfigItem[] = [

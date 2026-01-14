@@ -187,14 +187,22 @@
           error: event.error,
           filename: event.filename,
           lineno: event.lineno,
-          colno: event.colno
+          colno: event.colno,
+          target: event.target
         });
 
         try {
           let message = event.message || '发生了一个未知错误';
           let stack = '';
 
-          if (event.error && event.error.stack) {
+          // 检查是否是资源加载错误
+          if (event.target !== window && event.target instanceof HTMLElement) {
+            const tagName = event.target.tagName;
+            const resourceUrl = event.target.src || event.target.href || '未知资源';
+            message = `资源加载失败: ${tagName} - ${resourceUrl}`;
+            stack = `标签: <${tagName.toLowerCase()}>\nURL: ${resourceUrl}\n类型: 资源加载错误`;
+            originalConsoleError.call(console, '资源加载失败:', { tagName, resourceUrl });
+          } else if (event.error && event.error.stack) {
             stack = event.error.stack;
           } else if (event.error && event.error.message) {
             message = event.error.message;
@@ -231,6 +239,9 @@
         event.preventDefault();
       });
 
+      // 全局开关：是否启用错误捕获
+      let errorCaptureEnabled = true;
+
       // 拦截 console.error（可选，捕获库的错误输出）
       console.error = function () {
         const args = Array.prototype.slice.call(arguments);
@@ -238,6 +249,11 @@
 
         // 先调用原始的 console.error
         originalConsoleError.apply(console, args);
+
+        // 如果错误捕获被禁用，直接返回
+        if (!errorCaptureEnabled) {
+          return;
+        }
 
         // 检查是否是重要错误
         const lowerMessage = message.toLowerCase();
@@ -255,7 +271,7 @@
         }
       };
 
-      // 暴露 React 就绪标记
+      // 暴露 React 就绪标记和控制接口
       window.__ERROR_SYSTEM__ = {
         markReactReady: function() {
           reactReady = true;
@@ -282,6 +298,14 @@
             document.body.removeChild(overlay);
             fallbackUIShown = false;
           }
+        },
+        // 新增：启用/禁用错误捕获
+        setErrorCaptureEnabled: function(enabled) {
+          errorCaptureEnabled = enabled;
+          console.log('%c[Error System] 错误捕获已' + (enabled ? '启用' : '禁用'), 'color: ' + (enabled ? '#52c41a' : '#faad14') + '; font-weight: bold;');
+        },
+        isErrorCaptureEnabled: function() {
+          return errorCaptureEnabled;
         }
       };
 
