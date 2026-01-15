@@ -1120,6 +1120,15 @@ const config: any = {
     // strictPort: false 是默认值，端口被占用时会自动尝试下一个端口
     open: true, // 启动时自动打开浏览器
     cors: true,
+    // HMR 配置
+    hmr: {
+      // 禁用 Vite 的错误覆盖层（Error Overlay）
+      // 原因：项目使用多入口架构（pages、elements 等），Vite 的 Error Overlay 会在所有打开的页面上显示错误
+      // 这导致用户在访问页面 A 时，如果页面 B 出现构建错误，错误会跨页面显示在页面 A 上，造成困扰
+      // 解决方案：禁用 Vite 的 Error Overlay，使用 dev-template.html 中已实现的自定义错误捕获和显示系统
+      // 优点：避免跨页面错误显示，保持错误提示的页面隔离性，风险最小
+      overlay: false
+    },
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',

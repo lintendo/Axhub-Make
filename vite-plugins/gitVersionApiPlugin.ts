@@ -11,12 +11,30 @@ const execAsync = promisify(exec);
  * 提供基于 Git 的版本控制功能，用于页面和元素的文件夹级别版本管理
  */
 export function gitVersionApiPlugin(): Plugin {
+  let gitAvailable = false;
+  let gitCheckError: string | null = null;
+
   return {
     name: 'git-version-api',
     
     configureServer(server) {
-      // 服务器启动时清理临时版本文件
       const projectRoot = process.cwd();
+      
+      // 检查 Git 是否可用
+      (async () => {
+        try {
+          await execAsync('git --version', { cwd: projectRoot });
+          gitAvailable = true;
+          console.log('[Git 版本管理] ✅ Git 已就绪');
+        } catch (error: any) {
+          gitAvailable = false;
+          gitCheckError = error.message;
+          console.warn('[Git 版本管理] ⚠️  Git 未安装或不可用');
+          console.warn('[Git 版本管理] 💡 请安装 Git 以使用版本管理功能: https://git-scm.com/downloads');
+        }
+      })();
+      
+      // 服务器启动时清理临时版本文件
       const gitVersionsDir = path.join(projectRoot, '.git-versions');
       
       if (fs.existsSync(gitVersionsDir)) {
@@ -52,13 +70,30 @@ export function gitVersionApiPlugin(): Plugin {
         res.end(JSON.stringify(data));
       };
 
+      // Helper function to check git availability and return error response if not available
+      const checkGitAvailable = (res: any): boolean => {
+        if (!gitAvailable) {
+          sendJSON(res, 503, { 
+            error: 'Git 未安装或不可用',
+            message: '版本管理功能需要 Git 支持。请先安装 Git 后重启开发服务器。',
+            details: gitCheckError || undefined
+          });
+          return false;
+        }
+        return true;
+      };
+
       // Helper function to execute git command
       const execGit = async (command: string, cwd: string) => {
         try {
           const { stdout, stderr } = await execAsync(command, { cwd, maxBuffer: 1024 * 1024 * 10 });
           return { stdout: stdout.trim(), stderr: stderr.trim() };
         } catch (error: any) {
-          throw new Error(`Git command failed: ${error.message}`);
+          // 提供更友好的错误信息
+          if (error.message.includes('not a git repository')) {
+            throw new Error('当前项目不是 Git 仓库。请先运行 "git init" 初始化仓库。');
+          }
+          throw new Error(`Git 命令执行失败: ${error.message}`);
         }
       };
 
@@ -75,6 +110,8 @@ export function gitVersionApiPlugin(): Plugin {
 
           // Route: GET /api/git/history - Get git history for a folder
           if (pathname === '/api/git/history' && req.method === 'GET') {
+            if (!checkGitAvailable(res)) return;
+            
             const targetPath = url.searchParams.get('path'); // e.g., 'pages/home' or 'elements/button'
             
             if (!targetPath) {
@@ -128,6 +165,8 @@ export function gitVersionApiPlugin(): Plugin {
 
           // Route: POST /api/git/restore - Restore folder to a specific commit
           if (pathname === '/api/git/restore' && req.method === 'POST') {
+            if (!checkGitAvailable(res)) return;
+            
             const body = await parseBody(req);
             const { path: targetPath, commitHash } = body;
 
@@ -169,6 +208,8 @@ export function gitVersionApiPlugin(): Plugin {
 
           // Route: POST /api/git/commit - Commit changes for a folder
           if (pathname === '/api/git/commit' && req.method === 'POST') {
+            if (!checkGitAvailable(res)) return;
+            
             const body = await parseBody(req);
             const { path: targetPath, message } = body;
 
@@ -213,6 +254,8 @@ export function gitVersionApiPlugin(): Plugin {
 
           // Route: GET /api/git/diff - Get diff for uncommitted changes
           if (pathname === '/api/git/diff' && req.method === 'GET') {
+            if (!checkGitAvailable(res)) return;
+            
             const targetPath = url.searchParams.get('path');
             
             if (!targetPath) {
@@ -254,6 +297,8 @@ export function gitVersionApiPlugin(): Plugin {
 
           // Route: POST /api/git/build-version - Extract version files (no build)
           if (pathname === '/api/git/build-version' && req.method === 'POST') {
+            if (!checkGitAvailable(res)) return;
+            
             const body = await parseBody(req);
             const { path: targetPath, commitHash } = body;
 
@@ -398,6 +443,18 @@ export function gitVersionApiPlugin(): Plugin {
 
           // Route: GET /api/git/status - Check git repository status
           if (pathname === '/api/git/status' && req.method === 'GET') {
+            // 对于 status 接口，即使 Git 不可用也要返回状态信息
+            if (!gitAvailable) {
+              sendJSON(res, 200, { 
+                initialized: false, 
+                isGitRepo: false,
+                gitAvailable: false,
+                error: 'Git 未安装或不可用',
+                message: '版本管理功能需要 Git 支持。请先安装 Git 后重启开发服务器。'
+              });
+              return;
+            }
+
             const projectRoot = process.cwd();
 
             try {
@@ -413,13 +470,18 @@ export function gitVersionApiPlugin(): Plugin {
                 initialized: true, 
                 currentBranch,
                 hasChanges,
-                isGitRepo: true
+                isGitRepo: true,
+                gitAvailable: true
               });
-            } catch (error) {
+            } catch (error: any) {
               sendJSON(res, 200, { 
                 initialized: false, 
                 isGitRepo: false,
-                error: 'Git repository not initialized'
+                gitAvailable: true,
+                error: 'Git 仓库未初始化',
+                message: error.message.includes('not a git repository') 
+                  ? '当前项目不是 Git 仓库。请先运行 "git init" 初始化仓库。'
+                  : error.message
               });
             }
             return;
