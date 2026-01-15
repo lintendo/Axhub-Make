@@ -2,7 +2,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { glob } from 'glob';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +19,29 @@ function ensureDir(dirPath) {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
   }
+}
+
+// 递归查找所有 .tsx/.ts 文件
+function findFiles(dir, extensions = ['.tsx', '.ts']) {
+  const results = [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    
+    if (entry.isDirectory()) {
+      // 跳过 node_modules 和 .next
+      if (entry.name === 'node_modules' || entry.name === '.next') continue;
+      results.push(...findFiles(fullPath, extensions));
+    } else {
+      const ext = path.extname(entry.name);
+      if (extensions.includes(ext)) {
+        results.push(fullPath);
+      }
+    }
+  }
+  
+  return results;
 }
 
 function copyDirectory(src, dest) {
@@ -45,9 +67,9 @@ console.log('V0 Converter - Preprocessing Mode\n');
 
 function analyzeProject(pageDir) {
   const analysis = { files: [], pathAliases: [], nextjsImports: [], dependencies: {}, structure: {} };
-  const files = glob.sync(path.join(pageDir, '**/*.{tsx,ts}'), {
-    ignore: ['**/node_modules/**', '**/.next/**']
-  });
+  
+  // 使用自定义的 findFiles 函数替代 glob
+  const files = findFiles(pageDir, ['.tsx', '.ts']);
   
   files.forEach(file => {
     const relativePath = path.relative(pageDir, file);

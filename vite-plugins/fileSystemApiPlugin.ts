@@ -4,7 +4,7 @@ import fs from 'fs';
 import { IncomingMessage } from 'http';
 import formidable from 'formidable';
 import AdmZip from 'adm-zip';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 
 /**
  * 文件系统 API 插件
@@ -462,7 +462,7 @@ export function fileSystemApiPlugin(): Plugin {
                   zip.extractAllTo(extractDir, true);
                   fs.unlinkSync(tempFilePath);
 
-                  // V0 项目：自动执行预处理脚本
+                  // V0 项目：自动执行预处理脚本（同步等待完成）
                   if (uploadType === 'v0') {
                     const scriptPath = path.join(projectRoot, 'scripts', 'v0-converter.mjs');
                     const pageName = basename
@@ -475,28 +475,49 @@ export function fileSystemApiPlugin(): Plugin {
                     
                     console.log('[V0 转换] 执行预处理脚本:', command);
                     
-                    exec(command, (error: any, stdout: any, stderr: any) => {
-                      if (error) {
-                        console.error('[V0 转换] 执行失败:', error);
-                      } else {
-                        console.log('[V0 转换] 完成:', stdout);
+                    // 使用 execSync 同步执行，等待完成
+                    try {
+                      const output = execSync(command, {
+                        cwd: projectRoot,
+                        encoding: 'utf8',
+                        stdio: 'pipe'
+                      });
+                      
+                      console.log('[V0 转换] 执行成功:', output);
+                      
+                      // 验证任务文档是否生成
+                      const tasksFilePath = path.join(projectRoot, 'src', targetType, pageName, '.v0-tasks.md');
+                      if (!fs.existsSync(tasksFilePath)) {
+                        throw new Error('任务文档生成失败');
                       }
-                      if (stderr) console.error('[V0 转换] 错误:', stderr);
-                    });
-
-                    // 返回任务文档路径
-                    const tasksFilePath = `src/${targetType}/${pageName}/.v0-tasks.md`;
-                    const ruleFile = '/rules/v0-project-converter.md';
-                    
-                    return sendJSON(res, 200, {
-                      success: true,
-                      uploadType,
-                      pageName,
-                      tasksFile: tasksFilePath,
-                      ruleFile,
-                      prompt: `V0 项目已上传并预处理完成。\n\n请阅读以下文件：\n1. 任务清单: ${tasksFilePath}\n2. 转换规范: ${ruleFile}\n\n然后根据任务清单完成转换工作。`,
-                      message: '预处理脚本已执行，请查看任务文档'
-                    });
+                      
+                      // 返回任务文档路径
+                      const tasksFileRelPath = `src/${targetType}/${pageName}/.v0-tasks.md`;
+                      const ruleFile = '/rules/v0-project-converter.md';
+                      
+                      return sendJSON(res, 200, {
+                        success: true,
+                        uploadType,
+                        pageName,
+                        tasksFile: tasksFileRelPath,
+                        ruleFile,
+                        prompt: `V0 项目已上传并预处理完成。\n\n请阅读以下文件：\n1. 任务清单: ${tasksFileRelPath}\n2. 转换规范: ${ruleFile}\n\n然后根据任务清单完成转换工作。`,
+                        message: '预处理完成，请查看任务文档'
+                      });
+                    } catch (scriptError: any) {
+                      console.error('[V0 转换] 执行失败:', scriptError);
+                      
+                      // 清理已创建的目录
+                      const pageDir = path.join(projectRoot, 'src', targetType, pageName);
+                      if (fs.existsSync(pageDir)) {
+                        fs.rmSync(pageDir, { recursive: true, force: true });
+                      }
+                      
+                      return sendJSON(res, 500, { 
+                        error: `预处理脚本执行失败: ${scriptError.message}`,
+                        details: scriptError.stderr || scriptError.stdout || scriptError.message
+                      });
+                    }
                   }
 
                   // Google AI Studio 项目
