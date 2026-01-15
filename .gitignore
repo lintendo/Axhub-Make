@@ -24,6 +24,8 @@ vite.config.*.timestamp-*
 
 # Local configuration
 axhub.config.json
+components.json
+entries.json
 
 # Dev server info (for AI debugging)
 .dev-server-info.json
