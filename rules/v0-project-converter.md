@@ -85,20 +85,25 @@ export default Component;
 
 ```typescript
 // ❌ 需要移除
-"use client"
-import { useRouter } from 'next/navigation'
-import Image from 'next/image'
-import Link from 'next/link'
-import type { Metadata } from 'next'
-import { Analytics } from '@vercel/analytics/next'
+"use client"                                    // Next.js 客户端组件指令，Axhub 不需要
+import { useRouter } from 'next/navigation'    // Next.js 路由
+import Image from 'next/image'                 // Next.js 图片组件
+import Link from 'next/link'                   // Next.js 链接组件
+import type { Metadata } from 'next'           // Next.js 元数据类型
+import { Analytics } from '@vercel/analytics/next'  // Vercel 分析
 
 // ✅ 替换为
-// 删除 "use client"
+// 删除 "use client" 指令
 // 删除 useRouter 相关代码
 <img> 替代 <Image>
 <a> 替代 <Link>
 // 删除 Metadata 和 Analytics
 ```
+
+**关于 "use client"**：
+- 这是 Next.js 13+ 的指令，用于标记客户端组件
+- Axhub 不使用 Next.js，所有组件都是客户端渲染
+- **必须删除**，否则会导致语法错误
 
 ### 路径别名转换
 

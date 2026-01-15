@@ -16,7 +16,7 @@ export function configApiPlugin(): Plugin {
       server.middlewares.use((req: any, res: any, next: any) => {
         if (req.method === 'GET' && req.url === '/api/config') {
           try {
-            let config = { server: { host: 'localhost', port: 51720, allowLAN: true } };
+            let config = { server: { host: 'localhost', allowLAN: true } };
             
             if (fs.existsSync(configPath)) {
               const fileContent = fs.readFileSync(configPath, 'utf8');
@@ -24,11 +24,16 @@ export function configApiPlugin(): Plugin {
               
               // 确保有默认值
               if (!config.server) {
-                config.server = { host: 'localhost', port: 51720, allowLAN: true };
+                config.server = { host: 'localhost', allowLAN: true };
               }
               if (config.server.allowLAN === undefined) {
                 config.server.allowLAN = true;
               }
+            }
+            
+            // 移除 port 字段（不对外暴露，固定使用 51720 起始）
+            if (config.server && 'port' in config.server) {
+              delete config.server.port;
             }
 
             res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -72,15 +77,9 @@ export function configApiPlugin(): Plugin {
                 return;
               }
 
-              // 验证端口号
-              if (newConfig.server.port !== undefined) {
-                const port = Number(newConfig.server.port);
-                if (!Number.isInteger(port) || port < 1 || port > 65535) {
-                  res.statusCode = 400;
-                  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-                  res.end(JSON.stringify({ error: 'Invalid port number' }));
-                  return;
-                }
+              // 移除 port 字段（不允许配置，固定使用 51720 起始）
+              if (newConfig.server && 'port' in newConfig.server) {
+                delete newConfig.server.port;
               }
 
               // 保存配置文件

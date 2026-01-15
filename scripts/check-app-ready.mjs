@@ -51,7 +51,6 @@ const pagePath = args.find(arg => !arg.startsWith('--')) || '/';
 const CONFIG = {
   devCommand: 'npm run dev',        // 启动 Vite 的命令
   devServerInfoPath: path.resolve(__dirname, '../.dev-server-info.json'), // 开发服务器信息文件
-  defaultPort: 51720,               // 默认端口（从 axhub.config.json 读取）
   pagePath,                         // 目标页面路径（从命令行参数获取）
   pollIntervalMs: 500,              // 页面轮询间隔
   stableCheckMs: 1000,              // 错误稳定判断时间
@@ -139,14 +138,14 @@ async function isServerAlive(url) {
 
 /**
  * 读取开发服务器信息
- * 优先从 .dev-server-info.json 读取，如果不存在则使用默认配置
+ * 优先从 .dev-server-info.json 读取实际运行的端口
  */
 function getServerInfo() {
   try {
     if (fs.existsSync(CONFIG.devServerInfoPath)) {
       const info = JSON.parse(fs.readFileSync(CONFIG.devServerInfoPath, 'utf8'))
       return {
-        port: info.port || CONFIG.defaultPort,
+        port: info.port,
         host: info.host || 'localhost',
         localIP: info.localIP || 'localhost'
       }
@@ -155,26 +154,8 @@ function getServerInfo() {
     logs.push(`Failed to read .dev-server-info.json: ${err.message}`)
   }
 
-  // 尝试从 axhub.config.json 读取
-  try {
-    const configPath = path.resolve(__dirname, '../axhub.config.json')
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
-      return {
-        port: config.server?.port || CONFIG.defaultPort,
-        host: 'localhost',
-        localIP: 'localhost'
-      }
-    }
-  } catch (err) {
-    logs.push(`Failed to read axhub.config.json: ${err.message}`)
-  }
-
-  return {
-    port: CONFIG.defaultPort,
-    host: 'localhost',
-    localIP: 'localhost'
-  }
+  // 如果没有端口信息，返回 null 表示需要等待服务器启动
+  return null
 }
 
 /**
@@ -434,12 +415,69 @@ async function main() {
   try {
     // 获取服务器信息
     const serverInfo = getServerInfo()
-    const accessibleHost = getAccessibleHost(serverInfo)
-    const pageUrl = `http://${accessibleHost}:${serverInfo.port}${CONFIG.pagePath}`
     
-    logs.push(`Target URL: ${pageUrl}`)
-    logs.push(`Server info: port=${serverInfo.port}, host=${serverInfo.host}`)
-    
+    // 如果没有端口信息，等待服务器启动
+    if (!serverInfo) {
+      logs.push('Waiting for server to start...')
+      // 启动服务器并等待
+      const viteProcess = startOrAttachVite()
+      
+      // 等待 .dev-server-info.json 文件生成
+      const maxWait = 10000 // 10秒
+      const startTime = Date.now()
+      let newServerInfo = null
+      
+      while (Date.now() - startTime < maxWait) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+        newServerInfo = getServerInfo()
+        if (newServerInfo) break
+      }
+      
+      if (!newServerInfo) {
+        return jsonExit({
+          status: 'ERROR',
+          phase: 'server',
+          message: 'Server failed to start - no port information available',
+          url: CONFIG.pagePath,
+          errors: ['Server did not write port information within timeout'],
+          logs
+        }, 1)
+      }
+      
+      // 使用新获取的服务器信息
+      const accessibleHost = getAccessibleHost(newServerInfo)
+      const pageUrl = `http://${accessibleHost}:${newServerInfo.port}${CONFIG.pagePath}`
+      
+      logs.push(`Target URL: ${pageUrl}`)
+      logs.push(`Server info: port=${newServerInfo.port}, host=${newServerInfo.host}`)
+      
+      // 继续后续流程...
+      await continueWithServerInfo(newServerInfo, pageUrl, viteProcess)
+    } else {
+      const accessibleHost = getAccessibleHost(serverInfo)
+      const pageUrl = `http://${accessibleHost}:${serverInfo.port}${CONFIG.pagePath}`
+      
+      logs.push(`Target URL: ${pageUrl}`)
+      logs.push(`Server info: port=${serverInfo.port}, host=${serverInfo.host}`)
+      
+      // 继续后续流程...
+      await continueWithServerInfo(serverInfo, pageUrl, null)
+    }
+  } catch (err) {
+    const serverInfo = getServerInfo()
+    jsonExit(addHomeUrl({
+      status: 'ERROR',
+      phase: 'server',
+      message: err.message,
+      url: CONFIG.pagePath,
+      errors: [String(err)],
+      logs
+    }, serverInfo), 1)
+  }
+}
+
+async function continueWithServerInfo(serverInfo, pageUrl, viteProcess) {
+  try {
     // 步骤 1: 执行构建校验（除非指定 --skip-build）
     let buildResult = null
     if (!CONFIG.skipBuild) {
@@ -464,11 +502,13 @@ async function main() {
     }
     
     // 步骤 2: 开发服务器校验
+    const accessibleHost = getAccessibleHost(serverInfo)
+    
     // 检查服务器是否已经在运行
     const serverAlreadyRunning = await isServerAlive(`http://${accessibleHost}:${serverInfo.port}`)
     
-    let viteChild = null
-    if (!serverAlreadyRunning) {
+    let viteChild = viteProcess
+    if (!serverAlreadyRunning && !viteChild) {
       logs.push('Server not running, starting Vite...')
       viteChild = startOrAttachVite()
     } else {
@@ -504,7 +544,6 @@ async function main() {
     
     jsonExit(addHomeUrl(finalResult, serverInfo), result.status === 'READY' ? 0 : 1)
   } catch (err) {
-    const serverInfo = getServerInfo()
     jsonExit(addHomeUrl({
       status: 'ERROR',
       phase: 'server',

@@ -1007,7 +1007,7 @@ function themesApiPlugin(): Plugin {
 
 // 读取配置文件
 const configPath = path.resolve(__dirname, 'axhub.config.json');
-let axhubConfig = { server: { host: 'localhost', port: 51720, allowLAN: true } };
+let axhubConfig: any = { server: { host: 'localhost', allowLAN: true } };
 if (fs.existsSync(configPath)) {
   try {
     axhubConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
@@ -1115,7 +1115,7 @@ const config: any = {
   },
 
   server: {
-    port: axhubConfig.server?.port || 51720,
+    port: 51720, // 默认从 51720 开始，如果被占用会自动尝试 51721, 51722...
     host: axhubConfig.server?.allowLAN !== false ? '0.0.0.0' : 'localhost', // 根据配置决定是否允许局域网访问
     // strictPort: false 是默认值，端口被占用时会自动尝试下一个端口
     open: true, // 启动时自动打开浏览器

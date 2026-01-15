@@ -1,4 +1,16 @@
 #!/usr/bin/env node
+
+/**
+ * V0 项目预处理器（最小化处理模式）
+ * 
+ * 只做 100% 有把握的操作：
+ * 1. 完整复制项目
+ * 2. 分析项目结构
+ * 3. 生成任务文档
+ * 
+ * 不做任何代码修改，全部留给 AI 处理
+ */
+
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,7 +19,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const CONFIG = {
   projectRoot: path.resolve(__dirname, '..'),
-  pagesDir: path.resolve(__dirname, '../src/pages')
+  pagesDir: path.resolve(__dirname, '../src/pages'),
+  tempDir: path.resolve(__dirname, '../temp')
 };
 
 function log(message, type = 'info') {
@@ -24,6 +37,9 @@ function ensureDir(dirPath) {
 // 递归查找所有 .tsx/.ts 文件
 function findFiles(dir, extensions = ['.tsx', '.ts']) {
   const results = [];
+  
+  if (!fs.existsSync(dir)) return results;
+  
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   
   for (const entry of entries) {
@@ -63,7 +79,55 @@ function copyDirectory(src, dest) {
   return count;
 }
 
-console.log('V0 Converter - Preprocessing Mode\n');
+console.log('V0 Converter - Minimal Processing Mode\n');
+
+/**
+ * 批量处理文件：删除 "use client" 和转换路径别名
+ * 这些是 100% 确定需要做的转换
+ */
+function processFiles(pageDir) {
+  const files = findFiles(pageDir, ['.tsx', '.ts', '.jsx', '.js']);
+  let processedCount = 0;
+  
+  files.forEach(file => {
+    let content = fs.readFileSync(file, 'utf8');
+    let modified = false;
+    
+    // 1. 删除 "use client" 指令（100% 确定需要删除）
+    const newContent1 = content.replace(/['"]use client['"]\s*;?\s*\n?/g, '');
+    if (newContent1 !== content) {
+      content = newContent1;
+      modified = true;
+    }
+    
+    // 2. 转换路径别名 @/ 为相对路径（100% 确定需要转换）
+    if (content.includes('@/')) {
+      const fileDir = path.dirname(file);
+      const relativePath = path.relative(fileDir, pageDir);
+      
+      // 替换 from '@/...'
+      content = content.replace(
+        /from\s+['"]@\//g,
+        `from '${relativePath}/`
+      );
+      
+      // 替换 import type ... from '@/...'
+      content = content.replace(
+        /import\s+type\s+(.*from\s+)['"]@\//g,
+        `import type $1'${relativePath}/`
+      );
+      
+      modified = true;
+    }
+    
+    if (modified) {
+      fs.writeFileSync(file, content);
+      processedCount++;
+    }
+  });
+  
+  return processedCount;
+}
 
 function analyzeProject(pageDir) {
   const analysis = { files: [], pathAliases: [], nextjsImports: [], dependencies: {}, structure: {} };
@@ -143,7 +207,7 @@ function analyzeProject(pageDir) {
   return analysis;
 }
 
-function generateTasksDocument(analysis, outputDir, pageName) {
+function generateTasksDocument(analysis, outputDir, pageName, tempDir) {
   const report = {
     summary: {
       totalFiles: analysis.files.length,
@@ -163,117 +227,88 @@ function generateTasksDocument(analysis, outputDir, pageName) {
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
   
   let markdown = `# V0 项目转换任务清单\n\n`;
-  markdown += `> **重要**: 请先阅读 \`/rules/v0-project-converter.md\` 了解转换规范和示例\n\n`;
+  markdown += `> **重要**: 请先阅读 \`/rules/v0-project-converter.md\` 了解转换规范\n\n`;
   markdown += `**页面名称**: ${pageName}\n`;
   markdown += `**项目位置**: \`src/pages/${pageName}/\`\n`;
+  markdown += `**原始文件**: \`${tempDir}\` (仅供参考，不要修改)\n`;
   markdown += `**生成时间**: ${new Date().toLocaleString()}\n\n`;
   
   markdown += `## 📊 项目概况\n\n`;
   markdown += `- 总文件数: ${report.summary.totalFiles}\n`;
-  markdown += `- 包含 'use client': ${report.summary.filesWithUseClient} 个文件\n`;
-  markdown += `- 路径别名 (@/): ${report.summary.pathAliasCount} 处\n`;
-  markdown += `- Next.js imports: ${report.summary.nextjsImportCount} 处\n`;
+  markdown += `- ~~包含 'use client': ${report.summary.filesWithUseClient} 个文件~~ ✓ 已由脚本删除\n`;
+  markdown += `- ~~路径别名 (@/): ${report.summary.pathAliasCount} 处~~ ✓ 已由脚本转换\n`;
+  markdown += `- Next.js imports: ${report.summary.nextjsImportCount} 处（需要处理）\n`;
   markdown += `- 需要安装的依赖: ${report.summary.dependenciesToInstall} 个\n\n`;
   
-  markdown += `## ✅ 任务清单\n\n`;
+  markdown += `## ✅ 转换任务\n\n`;
+  
   markdown += `### 任务 1: 创建 index.tsx\n\n`;
-  markdown += `**目标**: 将 \`app/page.tsx\` 包装为 Axhub 组件格式\n\n`;
-  markdown += `**操作**:\n`;
-  markdown += `1. 读取 \`src/pages/${pageName}/app/page.tsx\`\n`;
-  markdown += `2. 提取组件逻辑和 JSX\n`;
-  markdown += `3. 使用 Axhub 组件模板包装（参考 \`/rules/v0-project-converter.md\` 中的示例）\n`;
-  markdown += `4. 创建 \`src/pages/${pageName}/index.tsx\`\n\n`;
-  markdown += `**注意**: 保留原 \`app/page.tsx\` 文件不删除\n\n`;
+  markdown += `**目标**: 将 \`app/page.tsx\` 包装为 Axhub 组件\n\n`;
+  markdown += `**参考文件**: \`src/pages/${pageName}/app/page.tsx\`\n\n`;
+  markdown += `**操作**: 按照 \`/rules/v0-project-converter.md\` 中的 Axhub 组件规范创建 \`index.tsx\`\n\n`;
   
   markdown += `### 任务 2: 创建 style.css\n\n`;
-  markdown += `**目标**: 基于 \`app/globals.css\` 创建 Axhub 样式文件\n\n`;
-  markdown += `**操作**:\n`;
+  markdown += `**目标**: 基于 \`app/globals.css\` 创建样式文件\n\n`;
   if (report.structure.hasGlobalsCss) {
-    markdown += `1. 复制 \`src/pages/${pageName}/app/globals.css\` 的内容\n`;
-    markdown += `2. 在开头添加 \`@import "tailwindcss";\`（如果没有）\n`;
-    markdown += `3. 保存为 \`src/pages/${pageName}/style.css\`\n\n`;
+    markdown += `**参考文件**: \`src/pages/${pageName}/app/globals.css\`\n\n`;
+    markdown += `**操作**: 复制内容，确保开头有 \`@import "tailwindcss";\`\n\n`;
   } else {
-    markdown += `1. 创建 \`src/pages/${pageName}/style.css\`\n`;
-    markdown += `2. 内容为: \`@import "tailwindcss";\`\n\n`;
-  }
-  markdown += `**注意**: 保留原 \`app/globals.css\` 文件不删除\n\n`;
-  
-  markdown += `### 任务 3: 转换路径别名\n\n`;
-  markdown += `**目标**: 将所有 \`@/\` 路径别名转换为相对路径\n\n`;
-  if (report.pathAliases.length > 0) {
-    markdown += `**共 ${report.pathAliases.length} 处需要转换**，参考转换表:\n\n`;
-    markdown += `| 文件 | 原路径 | 转换为 |\n`;
-    markdown += `|------|--------|--------|\n`;
-    report.pathAliases.slice(0, 15).forEach(alias => {
-      markdown += `| \`${alias.file}\` | \`${alias.original}\` | \`${alias.relative}\` |\n`;
-    });
-    if (report.pathAliases.length > 15) {
-      markdown += `\n*...还有 ${report.pathAliases.length - 15} 处，详见 .v0-analysis.json*\n`;
-    }
-    markdown += `\n**操作**: 批量替换所有文件中的 \`@/\` 为对应的相对路径\n\n`;
-  } else {
-    markdown += `✓ 未发现路径别名使用，跳过此任务\n\n`;
+    markdown += `**操作**: 创建基础样式文件，内容为 \`@import "tailwindcss";\`\n\n`;
   }
   
-  markdown += `### 任务 4: 清理 Next.js 代码\n\n`;
-  markdown += `**目标**: 移除所有 Next.js 特定代码\n\n`;
-  markdown += `**操作**:\n`;
-  markdown += `1. 删除所有 \`"use client"\` 指令 (${report.summary.filesWithUseClient} 个文件)\n`;
-  markdown += `2. 移除 Next.js imports (${report.nextjsImports.length} 处)\n`;
-  markdown += `3. 替换组件: \`<Image>\` → \`<img>\`, \`<Link>\` → \`<a>\`\n`;
-  markdown += `4. 删除 \`Metadata\` 类型声明\n\n`;
+  markdown += `### 任务 3: 清理 Next.js 代码\n\n`;
+  markdown += `**目标**: 移除 Next.js 特定的 imports 和组件\n\n`;
+  markdown += `**需要处理**:\n`;
+  markdown += `- ~~删除 \`"use client"\` 指令~~ ✓ 已由脚本处理\n`;
+  markdown += `- ~~转换路径别名 \`@/\`~~ ✓ 已由脚本处理\n`;
+  markdown += `- 移除 Next.js imports (${report.nextjsImports.length} 处)\n`;
+  markdown += `- 替换组件: \`<Image>\` → \`<img>\`, \`<Link>\` → \`<a>\`\n`;
+  markdown += `- 删除 \`Metadata\` 类型声明\n\n`;
   
   if (report.nextjsImports.length > 0) {
-    markdown += `**需要处理的 Next.js imports**:\n\n`;
+    markdown += `**Next.js imports 需要移除**:\n`;
     const grouped = {};
     report.nextjsImports.forEach(item => {
       if (!grouped[item.import]) grouped[item.import] = [];
       grouped[item.import].push(item.file);
     });
-    Object.entries(grouped).forEach(([imp, files]) => {
-      markdown += `- \`${imp}\` (${files.length} 个文件)\n`;
+    Object.entries(grouped).slice(0, 5).forEach(([imp, files]) => {
+      markdown += `- \`${imp}\` (${(files as string[]).length} 个文件)\n`;
     });
+    if (Object.keys(grouped).length > 5) {
+      markdown += `- *...还有 ${Object.keys(grouped).length - 5} 种 imports*\n`;
+    }
     markdown += `\n`;
   }
   
-  markdown += `### 任务 5: 安装依赖\n\n`;
-  markdown += `**目标**: 安装项目所需的依赖包\n\n`;
+  markdown += `### 任务 4: 安装依赖\n\n`;
   if (report.dependencies.toInstall && report.dependencies.toInstall.length > 0) {
     markdown += `**执行命令**:\n`;
     markdown += `\`\`\`bash\n`;
     markdown += `cd apps/axhub-make\n`;
     markdown += `pnpm add ${report.dependencies.toInstall.join(' ')}\n`;
     markdown += `\`\`\`\n\n`;
-    markdown += `**依赖列表** (${report.dependencies.toInstall.length} 个):\n`;
-    report.dependencies.toInstall.forEach(dep => {
-      markdown += `- ${dep}\n`;
-    });
-    markdown += `\n`;
   } else {
     markdown += `✓ 无需安装额外依赖\n\n`;
   }
   
-  markdown += `### 任务 6: 验收测试\n\n`;
-  markdown += `**目标**: 确认转换成功\n\n`;
+  markdown += `### 任务 5: 验收测试\n\n`;
   markdown += `**执行命令**:\n`;
   markdown += `\`\`\`bash\n`;
   markdown += `node scripts/check-app-ready.mjs /pages/${pageName}\n`;
   markdown += `\`\`\`\n\n`;
-  markdown += `**验收标准**:\n`;
-  markdown += `- 状态为 READY\n`;
-  markdown += `- 页面能正常渲染\n`;
-  markdown += `- 无控制台错误\n`;
-  markdown += `- 交互功能正常\n`;
-  markdown += `- 样式显示正确\n\n`;
+  markdown += `**验收标准**: 状态为 READY，页面正常渲染，无控制台错误\n\n`;
   
   markdown += `## 📚 参考资料\n\n`;
   markdown += `- **转换规范**: \`/rules/v0-project-converter.md\`\n`;
-  markdown += `- **开发规范**: \`/rules/development-standards.md\`\n`;
-  markdown += `- **调试指南**: \`/rules/debugging-guide.md\`\n`;
+  markdown += `- **原始项目**: \`${tempDir}\` (仅供参考)\n`;
   markdown += `- **详细数据**: \`.v0-analysis.json\`\n\n`;
   
-  markdown += `## 🎯 开始转换\n\n`;
-  markdown += `请按照上述任务清单依次完成转换工作。如遇问题，参考规则文档中的示例和说明。\n`;
+  markdown += `## 💡 注意事项\n\n`;
+  markdown += `1. ~~**"use client"**: Next.js 指令，必须删除~~ ✓ 已由脚本处理\n`;
+  markdown += `2. ~~**路径别名**: \`@/\` 需转换为相对路径~~ ✓ 已由脚本处理\n`;
+  markdown += `3. **原始文件**: \`${tempDir}\` 目录保留作为参考，不要修改\n`;
+  markdown += `4. **验证**: 完成后务必运行验收脚本确认\n`;
   
   const mdPath = path.join(outputDir, '.v0-tasks.md');
   fs.writeFileSync(mdPath, markdown);
@@ -326,13 +361,17 @@ V0 项目预处理器
   try {
     log('开始预处理 V0 项目...', 'info');
     
-    log('步骤 1/2: 复制项目文件...', 'progress');
+    log('步骤 1/3: 复制项目文件...', 'progress');
     const fileCount = copyDirectory(v0Dir, outputDir);
     log(`已复制 ${fileCount} 个文件`, 'info');
     
-    log('步骤 2/2: 分析项目并生成任务文档...', 'progress');
+    log('步骤 2/3: 处理确定性转换（删除 "use client"，转换路径别名）...', 'progress');
+    const processedCount = processFiles(outputDir);
+    log(`已处理 ${processedCount} 个文件`, 'info');
+    
+    log('步骤 3/3: 分析项目并生成任务文档...', 'progress');
     const analysis = analyzeProject(outputDir);
-    const { reportPath, mdPath } = generateTasksDocument(analysis, outputDir, outputName);
+    const { reportPath, mdPath } = generateTasksDocument(analysis, outputDir, outputName, `temp/${path.basename(v0Dir)}`);
     
     log('✅ 预处理完成！', 'info');
     log('', 'info');
