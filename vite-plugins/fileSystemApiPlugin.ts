@@ -7,6 +7,48 @@ import AdmZip from 'adm-zip';
 import { exec, execSync } from 'child_process';
 
 /**
+ * 递归复制目录（用于 Windows 权限问题的备用方案）
+ * 
+ * 当 fs.renameSync() 因权限问题失败时（EPERM 错误），使用此函数作为 fallback。
+ * 
+ * 为什么 copy 比 rename 更可靠？
+ * - rename：只修改文件系统元数据（inode），对权限和文件占用非常敏感
+ * - copy：实际读取和写入数据，只要文件可读就能复制，绕过了很多权限限制
+ * 
+ * 常见触发场景：
+ * - Windows 杀毒软件扫描导致文件被锁定
+ * - 跨驱动器移动文件（rename 不支持）
+ * - 文件索引服务占用文件句柄
+ * - 路径包含中文字符导致的编码问题
+ * 
+ * @param src - 源目录路径
+ * @param dest - 目标目录路径
+ */
+function copyDirRecursive(src: string, dest: string) {
+  // 确保目标目录存在
+  if (!fs.existsSync(dest)) {
+    fs.mkdirSync(dest, { recursive: true });
+  }
+  
+  // 读取源目录的所有内容
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+  
+  // 逐个处理文件和子目录
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    
+    if (entry.isDirectory()) {
+      // 递归处理子目录
+      copyDirRecursive(srcPath, destPath);
+    } else {
+      // 复制文件
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+/**
  * 文件系统 API 插件
  * 提供文件和目录的基本操作功能：删除、重命名、复制等
  */
@@ -387,18 +429,42 @@ export function fileSystemApiPlugin(): Plugin {
                   const tempExtractDir = path.join(projectRoot, 'temp', `extract-${Date.now()}`);
                   zip.extractAllTo(tempExtractDir, true);
 
-                  // 移动到目标目录
+                  // 🔧 Windows 兼容性修复：等待杀毒软件释放文件
+                  // 在 Windows 上，解压后杀毒软件（如 Windows Defender）会立即扫描新文件
+                  // 导致文件被短暂锁定，此时执行 rename 会触发 EPERM 错误
+                  // 延迟 500ms 让杀毒软件完成扫描，大幅降低权限错误的概率
+                  await new Promise(resolve => setTimeout(resolve, 500));
+
+                  // 移动到目标目录（使用复制+删除方式作为 fallback，避免 Windows 权限问题）
                   if (hasRootFolder) {
                     // 有根目录：移动根目录
                     const extractedRoot = path.join(tempExtractDir, rootFolderName);
                     if (fs.existsSync(extractedRoot)) {
-                      fs.renameSync(extractedRoot, targetDir);
+                      try {
+                        // 优先尝试 rename（快速路径，毫秒级完成）
+                        // rename 只修改文件系统元数据，不移动实际数据，性能最优
+                        fs.renameSync(extractedRoot, targetDir);
+                      } catch (renameError: any) {
+                        // rename 失败则使用复制+删除（兼容路径，秒级完成）
+                        // 虽然慢，但能处理跨驱动器、权限问题等 rename 无法处理的情况
+                        console.warn('[文件系统] rename 失败，使用复制方式:', renameError.message);
+                        copyDirRecursive(extractedRoot, targetDir);
+                        fs.rmSync(extractedRoot, { recursive: true, force: true });
+                      }
                     } else {
                       throw new Error('解压后找不到根目录');
                     }
                   } else {
                     // 没有根目录：直接移动整个解压目录
-                    fs.renameSync(tempExtractDir, targetDir);
+                    try {
+                      // 优先尝试 rename（快速路径）
+                      fs.renameSync(tempExtractDir, targetDir);
+                    } catch (renameError: any) {
+                      // rename 失败则使用复制+删除（兼容路径）
+                      console.warn('[文件系统] rename 失败，使用复制方式:', renameError.message);
+                      copyDirRecursive(tempExtractDir, targetDir);
+                      fs.rmSync(tempExtractDir, { recursive: true, force: true });
+                    }
                   }
 
                   // 清理临时文件

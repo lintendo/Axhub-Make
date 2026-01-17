@@ -204,7 +204,7 @@ import type { ConfigItem } from '../../common/axhub-types';
 const CONFIG_LIST: ConfigItem[] = [
   {
     type: 'input',
-    attributeId: 'title',
+     : 'title',
     displayName: '标题',
     info: '组件顶部显示的标题文本',
     initialValue: '默认标题'

@@ -2,7 +2,7 @@ import type { Plugin } from 'vite';
 import { spawn, spawnSync } from 'node:child_process';
 import { platform } from 'node:os';
 
-type AIType = 'claude' | 'gemini' | 'opencode' | 'cursor';
+type AIType = 'claude' | 'gemini' | 'opencode' | 'cursor' | 'codex';
 
 interface RunAIOptions {
   cli: AIType;
@@ -54,6 +54,15 @@ const CLI_ADAPTERS: Record<AIType, (opts: RunAIOptions) => { command: string; ar
     }
     // 非交互模式（打印模式）：agent -p "prompt" --output-format text
     return { command: 'agent', args: ['-p', prompt, '--output-format', 'text'], useStdin: false };
+  },
+  codex: ({ prompt, interactive }) => {
+    if (interactive) {
+      // 启动 Codex 交互式 TUI
+      return { command: 'codex', args: [prompt], useStdin: false };
+    }
+    // 非交互模式：codex exec "prompt" --full-auto
+    // --full-auto: 低摩擦自动化模式（workspace-write sandbox + on-request approvals）
+    return { command: 'codex', args: ['exec', prompt, '--full-auto'], useStdin: false };
   },
 };
 
@@ -207,8 +216,8 @@ export function aiCliPlugin(): Plugin {
             const interactive = urlObj.searchParams.get('interactive') === 'true'; // 默认 false
 
             // Validate required fields
-            if (!cli || !['claude', 'gemini', 'opencode', 'cursor'].includes(cli)) {
-              return sendError(res, 400, 'Invalid or missing "cli" parameter. Must be "claude", "gemini", "opencode", or "cursor"');
+            if (!cli || !['claude', 'gemini', 'opencode', 'cursor', 'codex'].includes(cli)) {
+              return sendError(res, 400, 'Invalid or missing "cli" parameter. Must be "claude", "gemini", "opencode", "cursor", or "codex"');
             }
 
             if (!prompt || typeof prompt !== 'string') {
@@ -298,6 +307,7 @@ export function aiCliPlugin(): Plugin {
               gemini: hasCommand('gemini'),
               opencode: hasCommand('opencode'),
               cursor: hasCommand('agent'), // Cursor CLI 使用 'agent' 命令
+              codex: hasCommand('codex'),
               runningTasks: runningTasks.size,
               timestamp: new Date().toISOString(),
             };
