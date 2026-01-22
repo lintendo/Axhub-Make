@@ -155,14 +155,23 @@ export class LowDBService {
   }
 
   /**
-   * Create a new table
+   * Create a new table with a sample record
    */
   async createTable(fileName: string, tableName?: string): Promise<void> {
     return this.withLock(fileName, async () => {
       const db = await this.getDB(fileName);
+      
+      // Create a sample record to demonstrate the format
+      const sampleRecord: DataRecord = {
+        id: uuidv4(),
+        name: '示例数据',
+        description: '这是一条示例数据，用于演示数据格式',
+        createdAt: new Date().toISOString()
+      };
+      
       db.data = {
         tableName: tableName || fileName,
-        records: []
+        records: [sampleRecord]
       };
       await db.write();
     });

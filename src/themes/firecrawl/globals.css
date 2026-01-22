@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+/* Firecrawl Design Tokens - Light theme */
+:root {
+  /* Background Colors */
+  --background: #f9f9f9;
+  --foreground: #262626;
+
+  /* Surface Colors */
+  --card: #ffffff;
+  --card-foreground: #262626;
+  --popover: #ffffff;
+  --popover-foreground: #262626;
+
+  /* Primary - Firecrawl Orange */
+  --primary: #fa5d19;
+  --primary-foreground: #ffffff;
+
+  /* Secondary */
+  --secondary: #ededed;
+  --secondary-foreground: #262626;
+
+  /* Muted */
+  --muted: rgba(0, 0, 0, 0.04);
+  --muted-foreground: rgba(38, 38, 38, 0.64);
+
+  /* Accent */
+  --accent: #fa5d19;
+  --accent-foreground: #ffffff;
+
+  /* Subtle */
+  --subtle: rgba(38, 38, 38, 0.48);
+
+  /* Destructive */
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  /* Border */
+  --border: #e5e7eb;
+  --border-subtle: #ededed;
+  --input: rgba(0, 0, 0, 0.1);
+  --ring: #fa5d19;
+
+  /* Radius */
+  --radius: 0.5rem;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-full: 999px;
+
+  /* Spacing */
+  --spacing-1: 2px;
+  --spacing-2: 4px;
+  --spacing-3: 6px;
+  --spacing-4: 8px;
+  --spacing-6: 12px;
+  --spacing-8: 16px;
+  --spacing-10: 20px;
+  --spacing-12: 24px;
+  --spacing-20: 40px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 12px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.56);
+}
+
+@theme inline {
+  --font-sans: "Suisse", "Suisse Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "GeistMono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-subtle: var(--subtle);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+  --radius-full: var(--radius-full);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

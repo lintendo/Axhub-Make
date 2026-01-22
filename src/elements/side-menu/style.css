@@ -1,0 +1,35 @@
+.axhub-side-menu {
+  box-sizing: border-box;
+}
+
+.axhub-side-menu__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  height: 48px;
+  box-sizing: border-box;
+}
+
+.axhub-side-menu__header--collapsed {
+  justify-content: center;
+  padding: 0;
+}
+
+.axhub-side-menu__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.axhub-side-menu__collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}

@@ -12,6 +12,7 @@ import { handleBuildRequest } from './handlers/buildHandler';
 import { handleDocsMarkdown } from './handlers/docsMarkdownHandler';
 import { handleTextReplaceCount } from './handlers/textReplaceCountHandler';
 import { handleTextReplace } from './handlers/textReplaceHandler';
+import { handlePathRedirect } from './handlers/pathNormalizer';
 
 /**
  * 虚拟 HTML 插件 - 在内存中生成 HTML，不写入文件系统
@@ -62,6 +63,9 @@ export function virtualHtmlPlugin(): Plugin {
         if (!req.url) {
           return next();
         }
+
+        // 🔥 处理旧路径重定向（必须在最前面）
+        if (handlePathRedirect(req, res)) return;
 
         // Handle hack.css GET request
         if (handleHackCssRequest(req, res)) return;

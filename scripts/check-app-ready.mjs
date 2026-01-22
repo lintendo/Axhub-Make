@@ -27,7 +27,13 @@
  *   url: "http://localhost:51720/elements/button",
  *   errors: [...],
  *   logs: [...],
- *   buildCheck?: { status: "SUCCESS" | "FAILED", errors: [...], logs: [...] }
+ *   buildCheck?: { status: "SUCCESS" | "FAILED" | "SKIPPED", errors: [...], logs: [...] }
+ *   lintCheck?: { status: "SUCCESS" | "FAILED" | "SKIPPED", errors: [...], logs: [...] }
+ *   typeCheck?: { status: "SUCCESS" | "FAILED" | "SKIPPED", errors: [...], logs: [...] }
+ *   checks?: [{ name: "lint|typecheck|build", status: "...", message: "...", errors: [...] }]
+ *   homeUrl?: "http://localhost:51720"
+ *   targetUrl?: "http://localhost:51720/elements/button"
+ *   targetPath?: "http://localhost:51720/pages/ref-app-home/index.html"
  * }
  * =====================================================
  */
@@ -41,6 +47,7 @@ import { fileURLToPath } from 'node:url'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const APP_ROOT = path.resolve(__dirname, '..')
 
 /* ================= 配置 ================= */
 // 解析命令行参数
@@ -176,6 +183,18 @@ function getAccessibleHost(serverInfo) {
   return serverInfo.host === '0.0.0.0' ? 'localhost' : serverInfo.host
 }
 
+function getTargetUrl(serverInfo, targetPath) {
+  const host = getAccessibleHost(serverInfo)
+  return `http://${host}:${serverInfo.port}${targetPath}`
+}
+
+function getEntryHtmlPath(targetPath) {
+  const normalized = targetPath.startsWith('/') ? targetPath : `/${targetPath}`
+  if (normalized.endsWith('.html')) return normalized
+  if (normalized.endsWith('/')) return `${normalized}index.html`
+  return `${normalized}/index.html`
+}
+
 /* ================= 全局状态 ================= */
 let logs = []
 let errors = []
@@ -188,7 +207,7 @@ function startOrAttachVite() {
   const child = spawn(CONFIG.devCommand, {
     shell: true,
     stdio: ['ignore', 'pipe', 'pipe'],
-    cwd: path.resolve(__dirname, '..')
+    cwd: APP_ROOT
   })
 
   child.stdout.on('data', (data) => {
@@ -324,11 +343,198 @@ async function waitForStable(pageUrl) {
 /**
  * 为结果添加服务器首页信息
  */
-function addHomeUrl(result, serverInfo) {
+function addUrls(result, serverInfo) {
+  if (!serverInfo) {
+    return {
+      ...result,
+      homeUrl: null,
+      targetUrl: null,
+      targetPath: null
+    }
+  }
+
+  const entryHtmlPath = getEntryHtmlPath(CONFIG.pagePath)
+
   return {
     ...result,
-    homeUrl: getHomeUrl(serverInfo)
+    homeUrl: getHomeUrl(serverInfo),
+    targetUrl: getTargetUrl(serverInfo, CONFIG.pagePath),
+    targetPath: getTargetUrl(serverInfo, entryHtmlPath)
   }
+}
+
+function readPackageJson() {
+  const pkgPath = path.resolve(APP_ROOT, 'package.json')
+  try {
+    return JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+  } catch (err) {
+    logs.push(`Failed to read package.json: ${err.message}`)
+    return null
+  }
+}
+
+function getScriptCommand(pkgJson, scriptName) {
+  if (!pkgJson || !pkgJson.scripts) return null
+  return pkgJson.scripts[scriptName] || null
+}
+
+function hasEslintConfig(pkgJson) {
+  if (pkgJson && pkgJson.eslintConfig) return true
+  const configFiles = [
+    '.eslintrc',
+    '.eslintrc.js',
+    '.eslintrc.cjs',
+    '.eslintrc.json',
+    '.eslintrc.yaml',
+    '.eslintrc.yml',
+    'eslint.config.js',
+    'eslint.config.cjs',
+    'eslint.config.mjs'
+  ]
+  return configFiles.some((file) => fs.existsSync(path.resolve(APP_ROOT, file)))
+}
+
+function hasTsConfig() {
+  return fs.existsSync(path.resolve(APP_ROOT, 'tsconfig.json'))
+}
+
+function toCheckItem(name, result) {
+  if (!result) return null
+  return {
+    name,
+    status: result.status,
+    message: result.message,
+    errors: result.errors || []
+  }
+}
+
+function buildChecksSummary({ lintResult, typeCheckResult, buildResult }) {
+  return [
+    toCheckItem('lint', lintResult),
+    toCheckItem('typecheck', typeCheckResult),
+    toCheckItem('build', buildResult)
+  ].filter(Boolean)
+}
+
+async function runCommandCheck({ label, command, args = [], env = {}, logTag }) {
+  logs.push(`${label} check started`)
+
+  return new Promise((resolve) => {
+    const checkErrors = []
+    const checkLogs = []
+
+    const proc = spawn(command, args, {
+      cwd: APP_ROOT,
+      env: { ...process.env, ...env },
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+
+    const appendLog = (line, isError = false) => {
+      if (!line) return
+      checkLogs.push(line)
+      logs.push(`[${logTag}] ${line}`)
+      if (isError && !/deprecated|experimental/i.test(line)) {
+        checkErrors.push(line)
+      }
+    }
+
+    proc.stdout.on('data', (data) => {
+      appendLog(data.toString().trim(), false)
+    })
+
+    proc.stderr.on('data', (data) => {
+      appendLog(data.toString().trim(), true)
+    })
+
+    proc.on('close', (code) => {
+      if (code === 0 && checkErrors.length === 0) {
+        resolve({
+          status: 'SUCCESS',
+          message: `${label} completed successfully`,
+          errors: [],
+          logs: checkLogs
+        })
+        return
+      }
+
+      resolve({
+        status: 'FAILED',
+        message: `${label} failed (exit code: ${code})`,
+        errors: checkErrors.length > 0 ? checkErrors : [`${label} exited with code ${code}`],
+        logs: checkLogs
+      })
+    })
+
+    proc.on('error', (err) => {
+      logs.push(`${label} process error: ${err.message}`)
+      resolve({
+        status: 'FAILED',
+        message: `${label} process error: ${err.message}`,
+        errors: [err.message],
+        logs: checkLogs
+      })
+    })
+  })
+}
+
+async function runLintCheck() {
+  const pkgJson = readPackageJson()
+  const lintScript = getScriptCommand(pkgJson, 'lint')
+
+  if (lintScript) {
+    return runCommandCheck({
+      label: 'Lint',
+      command: 'npm',
+      args: ['run', 'lint'],
+      logTag: 'LINT'
+    })
+  }
+
+  if (!hasEslintConfig(pkgJson)) {
+    return {
+      status: 'SKIPPED',
+      message: 'Lint skipped: no eslint config or lint script found',
+      errors: [],
+      logs: []
+    }
+  }
+
+  return runCommandCheck({
+    label: 'Lint',
+    command: 'npx',
+    args: ['eslint', '.'],
+    logTag: 'LINT'
+  })
+}
+
+async function runTypeCheck() {
+  const pkgJson = readPackageJson()
+  const typecheckScript = getScriptCommand(pkgJson, 'typecheck')
+
+  if (typecheckScript) {
+    return runCommandCheck({
+      label: 'Typecheck',
+      command: 'npm',
+      args: ['run', 'typecheck'],
+      logTag: 'TYPECHECK'
+    })
+  }
+
+  if (!hasTsConfig()) {
+    return {
+      status: 'SKIPPED',
+      message: 'Typecheck skipped: no tsconfig.json or typecheck script found',
+      errors: [],
+      logs: []
+    }
+  }
+
+  return runCommandCheck({
+    label: 'Typecheck',
+    command: 'npx',
+    args: ['tsc', '--noEmit'],
+    logTag: 'TYPECHECK'
+  })
 }
 
 /**
@@ -340,7 +546,7 @@ async function scanEntries() {
   
   return new Promise((resolve) => {
     const scanProcess = spawn('node', ['scripts/scan-entries.js'], {
-      cwd: path.resolve(__dirname, '..'),
+      cwd: APP_ROOT,
       stdio: ['ignore', 'pipe', 'pipe']
     })
     
@@ -395,7 +601,7 @@ async function runBuildCheck(entryKey) {
     
     // 使用 ENTRY_KEY 环境变量触发单独构建
     const buildProcess = spawn('npx', ['vite', 'build'], {
-      cwd: path.resolve(__dirname, '..'),
+      cwd: APP_ROOT,
       env: { ...process.env, ENTRY_KEY: entryKey },
       stdio: ['ignore', 'pipe', 'pipe']
     })
@@ -485,14 +691,14 @@ async function main() {
       }
       
       if (!newServerInfo) {
-        return jsonExit({
+        return jsonExit(addUrls({
           status: 'ERROR',
           phase: 'server',
           message: 'Server failed to start - no port information available',
           url: CONFIG.pagePath,
           errors: ['Server did not write port information within timeout'],
           logs
-        }, 1)
+        }, null), 1)
       }
       
       // 使用新获取的服务器信息
@@ -516,7 +722,7 @@ async function main() {
     }
   } catch (err) {
     const serverInfo = getServerInfo()
-    jsonExit(addHomeUrl({
+    jsonExit(addUrls({
       status: 'ERROR',
       phase: 'server',
       message: err.message,
@@ -529,7 +735,38 @@ async function main() {
 
 async function continueWithServerInfo(serverInfo, pageUrl, viteProcess) {
   try {
-    // 步骤 1: 执行构建校验（除非指定 --skip-build）
+    // 步骤 1: 执行 lint 检查
+    const lintResult = await runLintCheck()
+    if (lintResult.status === 'FAILED') {
+      return jsonExit(addUrls({
+        status: 'ERROR',
+        phase: 'lint',
+        message: lintResult.message,
+        url: pageUrl,
+        errors: lintResult.errors,
+        logs,
+        lintCheck: lintResult,
+        checks: buildChecksSummary({ lintResult })
+      }, serverInfo), 1)
+    }
+
+    // 步骤 2: 执行 typecheck 检查
+    const typeCheckResult = await runTypeCheck()
+    if (typeCheckResult.status === 'FAILED') {
+      return jsonExit(addUrls({
+        status: 'ERROR',
+        phase: 'typecheck',
+        message: typeCheckResult.message,
+        url: pageUrl,
+        errors: typeCheckResult.errors,
+        logs,
+        lintCheck: lintResult,
+        typeCheck: typeCheckResult,
+        checks: buildChecksSummary({ lintResult, typeCheckResult })
+      }, serverInfo), 1)
+    }
+
+    // 步骤 3: 执行构建校验（除非指定 --skip-build）
     let buildResult = null
     if (!CONFIG.skipBuild) {
       const entryKey = getEntryKeyFromPath(CONFIG.pagePath)
@@ -538,21 +775,30 @@ async function continueWithServerInfo(serverInfo, pageUrl, viteProcess) {
       
       // 如果构建失败，直接返回错误
       if (buildResult.status === 'FAILED') {
-        return jsonExit(addHomeUrl({
+        return jsonExit(addUrls({
           status: 'ERROR',
           phase: 'build',
           message: buildResult.message,
           url: pageUrl,
           errors: buildResult.errors,
           logs,
-          buildCheck: buildResult
+          buildCheck: buildResult,
+          lintCheck: lintResult,
+          typeCheck: typeCheckResult,
+          checks: buildChecksSummary({ lintResult, typeCheckResult, buildResult })
         }, serverInfo), 1)
       }
     } else {
       logs.push('Build check skipped (--skip-build flag)')
+      buildResult = {
+        status: 'SKIPPED',
+        message: 'Build check skipped (--skip-build flag)',
+        errors: [],
+        logs: []
+      }
     }
     
-    // 步骤 2: 开发服务器校验
+    // 步骤 4: 开发服务器校验
     const accessibleHost = getAccessibleHost(serverInfo)
     
     // 检查服务器是否已经在运行
@@ -570,14 +816,17 @@ async function continueWithServerInfo(serverInfo, pageUrl, viteProcess) {
     const pageReachable = await waitForPage(pageUrl)
     if (!pageReachable) {
       if (viteChild) viteChild.kill()
-      return jsonExit(addHomeUrl({
+      return jsonExit(addUrls({
         status: 'TIMEOUT',
         phase: 'page',
         message: 'Page never became reachable',
         url: pageUrl,
         errors,
         logs,
-        buildCheck: buildResult
+        buildCheck: buildResult,
+        lintCheck: lintResult,
+        typeCheck: typeCheckResult,
+        checks: buildChecksSummary({ lintResult, typeCheckResult, buildResult })
       }, serverInfo), 1)
     }
     
@@ -590,12 +839,15 @@ async function continueWithServerInfo(serverInfo, pageUrl, viteProcess) {
     // 添加构建结果到最终输出
     const finalResult = {
       ...result,
-      buildCheck: buildResult
+      buildCheck: buildResult,
+      lintCheck: lintResult,
+      typeCheck: typeCheckResult,
+      checks: buildChecksSummary({ lintResult, typeCheckResult, buildResult })
     }
     
-    jsonExit(addHomeUrl(finalResult, serverInfo), result.status === 'READY' ? 0 : 1)
+    jsonExit(addUrls(finalResult, serverInfo), result.status === 'READY' ? 0 : 1)
   } catch (err) {
-    jsonExit(addHomeUrl({
+    jsonExit(addUrls({
       status: 'ERROR',
       phase: 'server',
       message: err.message,

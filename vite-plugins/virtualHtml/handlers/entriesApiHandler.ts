@@ -48,8 +48,8 @@ export function handleEntriesApi(req: IncomingMessage, res: ServerResponse): boo
           result.elements.push({
             name,
             displayName: displayName || name,
-            demoUrl: `/${key}/index.html`,
-            specUrl: `/${key}/spec.html`,
+            demoUrl: `/${key}`,              // 新格式：/elements/button
+            specUrl: `/${key}/spec`,         // 新格式：/elements/button/spec
             jsUrl: `/build/${key}.js`,
             isReference
           });
@@ -65,8 +65,8 @@ export function handleEntriesApi(req: IncomingMessage, res: ServerResponse): boo
           result.pages.push({
             name,
             displayName: displayName || name,
-            demoUrl: `/${key}/index.html`,
-            specUrl: `/${key}/spec.html`,
+            demoUrl: `/${key}`,              // 新格式：/pages/ref-antd
+            specUrl: `/${key}/spec`,         // 新格式：/pages/ref-antd/spec
             jsUrl: `/build/${key}.js`,
             isReference
           });

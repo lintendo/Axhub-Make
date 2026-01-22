@@ -82,6 +82,84 @@ export function fileSystemApiPlugin(): Plugin {
         res.end(JSON.stringify(data));
       };
 
+      const normalizePath = (filePath: string) => filePath.split(path.sep).join('/');
+
+      const scanThemeReferences = (themeName: string) => {
+        const referenceDirs = [
+          path.join(projectRoot, 'src', 'elements'),
+          path.join(projectRoot, 'src', 'pages'),
+        ];
+        const allowedExt = new Set(['.ts', '.tsx', '.js', '.jsx', '.md', '.css']);
+        const needles = [
+          `themes/${themeName}/designToken.json`,
+          `themes/${themeName}/globals.css`,
+        ];
+        const references = new Set<string>();
+
+        const walkDir = (dirPath: string) => {
+          if (!fs.existsSync(dirPath)) return;
+          const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+          for (const entry of entries) {
+            const entryPath = path.join(dirPath, entry.name);
+            if (entry.isDirectory()) {
+              walkDir(entryPath);
+              continue;
+            }
+
+            const ext = path.extname(entry.name);
+            if (!allowedExt.has(ext)) continue;
+
+            const content = fs.readFileSync(entryPath, 'utf8');
+            if (needles.some(needle => content.includes(needle))) {
+              references.add(normalizePath(path.relative(projectRoot, entryPath)));
+            }
+          }
+        };
+
+        referenceDirs.forEach(walkDir);
+
+        return Array.from(references).sort();
+      };
+
+      const scanItemReferences = (itemType: 'elements' | 'pages', itemName: string) => {
+        const referenceDirs = [
+          path.join(projectRoot, 'src', 'elements'),
+          path.join(projectRoot, 'src', 'pages'),
+        ];
+        const allowedExt = new Set(['.ts', '.tsx', '.js', '.jsx', '.md', '.css']);
+        const references = new Set<string>();
+        const escapedName = itemName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const nameRegex = new RegExp(`(?:^|[\\\\/])${escapedName}(?:$|[\\\\/'"\\s])`);
+        const targetDir = path.resolve(projectRoot, 'src', itemType, itemName);
+
+        const walkDir = (dirPath: string) => {
+          if (!fs.existsSync(dirPath)) return;
+          const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+          for (const entry of entries) {
+            const entryPath = path.join(dirPath, entry.name);
+            if (entry.isDirectory()) {
+              if (path.resolve(entryPath) === targetDir) {
+                continue;
+              }
+              walkDir(entryPath);
+              continue;
+            }
+
+            const ext = path.extname(entry.name);
+            if (!allowedExt.has(ext)) continue;
+
+            const content = fs.readFileSync(entryPath, 'utf8');
+            if (nameRegex.test(content)) {
+              references.add(normalizePath(path.relative(projectRoot, entryPath)));
+            }
+          }
+        };
+
+        referenceDirs.forEach(walkDir);
+
+        return Array.from(references).sort();
+      };
+
       // Helper function to update entries.json
       const updateEntriesJson = (oldKey?: string, newKey?: string, remove: boolean = false) => {
         const entriesPath = path.join(projectRoot, 'entries.json');
@@ -143,6 +221,109 @@ export function fileSystemApiPlugin(): Plugin {
           }
         }
       };
+
+      // ==================== /api/themes/check-references ====================
+      server.middlewares.use('/api/themes/check-references', async (req: any, res: any) => {
+        if (req.method !== 'POST') {
+          return sendJSON(res, 405, { error: 'Method not allowed' });
+        }
+
+        try {
+          const { themeName } = await parseBody(req);
+          if (!themeName || typeof themeName !== 'string') {
+            return sendJSON(res, 400, { error: 'Missing themeName parameter' });
+          }
+
+          const themeDir = path.join(projectRoot, 'src', 'themes', themeName);
+          if (!fs.existsSync(themeDir)) {
+            return sendJSON(res, 404, { error: 'Theme not found' });
+          }
+
+          const references = scanThemeReferences(themeName);
+          const designTokenPath = path.join(themeDir, 'designToken.json');
+          const globalsPath = path.join(themeDir, 'globals.css');
+
+          return sendJSON(res, 200, {
+            themeName,
+            references,
+            hasReferences: references.length > 0,
+            themeAssets: {
+              hasDesignToken: fs.existsSync(designTokenPath),
+              hasGlobals: fs.existsSync(globalsPath),
+            },
+          });
+        } catch (e: any) {
+          console.error('[文件系统 API] 检查主题引用失败:', e);
+          return sendJSON(res, 500, { error: e.message || 'Check references failed' });
+        }
+      });
+
+      server.middlewares.use('/api/themes/get-contents', async (req: any, res: any) => {
+        if (req.method !== 'POST') {
+          return sendJSON(res, 405, { error: 'Method not allowed' });
+        }
+
+        try {
+          const { themeName } = await parseBody(req);
+          if (!themeName || typeof themeName !== 'string') {
+            return sendJSON(res, 400, { error: 'Missing themeName parameter' });
+          }
+
+          const themeDir = path.join(projectRoot, 'src', 'themes', themeName);
+          if (!fs.existsSync(themeDir)) {
+            return sendJSON(res, 404, { error: 'Theme not found' });
+          }
+
+          const designTokenPath = path.join(themeDir, 'designToken.json');
+          const globalsPath = path.join(themeDir, 'globals.css');
+          const specPath = path.join(themeDir, 'DESIGN-SPEC.md');
+
+          return sendJSON(res, 200, {
+            themeName,
+            designToken: fs.existsSync(designTokenPath) ? fs.readFileSync(designTokenPath, 'utf8') : null,
+            globalsCss: fs.existsSync(globalsPath) ? fs.readFileSync(globalsPath, 'utf8') : null,
+            designSpec: fs.existsSync(specPath) ? fs.readFileSync(specPath, 'utf8') : null,
+          });
+        } catch (e: any) {
+          console.error('[文件系统 API] 获取主题内容失败:', e);
+          return sendJSON(res, 500, { error: e.message || 'Get theme contents failed' });
+        }
+      });
+
+      // ==================== /api/items/check-references ====================
+      server.middlewares.use('/api/items/check-references', async (req: any, res: any) => {
+        if (req.method !== 'POST') {
+          return sendJSON(res, 405, { error: 'Method not allowed' });
+        }
+
+        try {
+          const { itemType, itemName } = await parseBody(req);
+          if (!itemType || !itemName || typeof itemType !== 'string' || typeof itemName !== 'string') {
+            return sendJSON(res, 400, { error: 'Missing itemType or itemName parameter' });
+          }
+
+          if (itemType !== 'elements' && itemType !== 'pages') {
+            return sendJSON(res, 400, { error: 'Invalid itemType' });
+          }
+
+          const itemDir = path.join(projectRoot, 'src', itemType, itemName);
+          if (!fs.existsSync(itemDir)) {
+            return sendJSON(res, 404, { error: 'Item not found' });
+          }
+
+          const references = scanItemReferences(itemType, itemName);
+
+          return sendJSON(res, 200, {
+            itemType,
+            itemName,
+            references,
+            hasReferences: references.length > 0,
+          });
+        } catch (e: any) {
+          console.error('[文件系统 API] 检查元素/页面引用失败:', e);
+          return sendJSON(res, 500, { error: e.message || 'Check references failed' });
+        }
+      });
 
       // ==================== /api/delete ====================
       server.middlewares.use('/api/delete', async (req: any, res: any) => {

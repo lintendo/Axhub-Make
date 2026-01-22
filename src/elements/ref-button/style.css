@@ -1,122 +1,212 @@
 /**
- * 【重要提示】
- * 本 CSS 文件仅用于演示规范代码结构，样式设计仅供参考
- * 实际开发时，请根据您的具体需求设计和实现样式
- * 不要直接复制本演示的设计风格，应该创建符合您项目需求的独特设计
+ * @name 按钮元素样式
+ * 设计风格：简约、现代化、产品级
  */
 
+/* 容器：卡片式设计，适配容器宽高 */
 .axhub-button-container {
-  padding: 24px;
-  border: 1px solid #e8e8e8;
-  border-radius: 12px;
-  background-color: #ffffff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  max-width: 520px;
+  display: flex;
+  flex-direction: column;
   width: 100%;
+  height: 100%;
+  padding: 16px; /* 减小内边距以适应小尺寸 */
+  border: 1px solid #e5e7eb;
+  border-radius: 8px; /* 稍微减小圆角 */
+  background-color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   box-sizing: border-box;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
+  overflow: hidden; /* 防止溢出 */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .axhub-button-container:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  transform: translateY(-2px);
+  border-color: #d1d5db; /* Cool gray 300 */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+/* 头部区域 */
+.axhub-button-header {
+  flex-shrink: 0; /* 防止压缩 */
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f3f4f6;
 }
 
 .axhub-button-title {
-  font-size: 20px;
+  margin: 0;
+  font-size: 16px; /* 稍微减小字号 */
   font-weight: 600;
-  margin-bottom: 20px;
-  color: #1f1f1f;
-  letter-spacing: -0.5px;
+  color: #111827;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* 控制区域：按钮组 */
 .axhub-button-controls {
+  flex-shrink: 0; /* 防止压缩 */
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
-.axhub-button-primary {
-  padding: 10px 20px;
-  color: #ffffff;
-  border: none;
+/* 基础按钮样式 */
+.axhub-button-primary,
+.axhub-button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 20px;
   border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
   font-size: 14px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  transition: all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
-  background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 100%);
-  background-size: 200% 200%;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  white-space: nowrap;
+}
+
+/* 主按钮 */
+.axhub-button-primary {
+  /* 背景色由内联样式控制 */
+  color: #ffffff;
+  border: 1px solid transparent;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .axhub-button-primary:hover {
-  opacity: 0.9;
+  filter: brightness(110%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .axhub-button-primary:active {
   transform: translateY(0);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  filter: brightness(95%);
 }
 
+.axhub-button-primary svg {
+  width: 16px;
+  height: 16px;
+  opacity: 0.9;
+}
+
+/* 计数徽标 */
+.axhub-button-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  margin-left: 4px;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* 次要按钮 */
 .axhub-button-secondary {
-  padding: 9px 19px;
   background-color: #ffffff;
-  color: #595959;
-  border: 1px solid #d9d9d9;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 14px;
-  transition: all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
+  color: #374151; /* Gray 700 */
+  border: 1px solid #d1d5db; /* Gray 300 */
 }
 
 .axhub-button-secondary:hover {
-  color: #262626;
-  border-color: #b0b0b0;
-  background-color: #fafafa;
-  transform: translateY(-1px);
+  background-color: #f9fafb; /* Gray 50 */
+  border-color: #9ca3af; /* Gray 400 */
+  color: #111827; /* Gray 900 */
 }
 
 .axhub-button-secondary:active {
-  transform: translateY(0);
-  background-color: #f5f5f5;
+  background-color: #f3f4f6; /* Gray 100 */
 }
 
-.axhub-button-message {
-  margin-top: 12px;
-  padding: 16px;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  border: 1px solid #f0f0f0;
-  color: #595959;
+/* 内容区域 */
+.axhub-button-content {
+  flex: 1; /* 占据剩余空间 */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto; /* 内容过多时滚动 */
+  min-height: 0; /* 允许 flex 子项收缩 */
+  padding-right: 4px; /* 为滚动条预留空间 */
+}
+
+/* 滚动条样式优化 */
+.axhub-button-content::-webkit-scrollbar {
+  width: 4px;
+}
+.axhub-button-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.axhub-button-content::-webkit-scrollbar-thumb {
+  background-color: #d1d5db;
+  border-radius: 2px;
+}
+.axhub-button-content::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af;
+}
+
+/* 消息框 & 数据列表容器 - 使用 Box Logic */
+.axhub-button-message,
+.axhub-button-data-container {
+  flex-shrink: 0; /* 防止内部内容被压缩 */
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background-color: #f9fafb;
+  border: 1px solid #f3f4f6;
+  border-radius: 6px;
+}
+
+/* 标签样式 */
+.axhub-button-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  color: #6b7280; /* Gray 500 */
+}
+
+/* 值样式 */
+.axhub-button-value {
   font-size: 14px;
+  color: #1f2937; /* Gray 800 */
   line-height: 1.5;
 }
 
-.axhub-button-message strong {
-  color: #262626;
-  font-weight: 600;
-  margin-right: 4px;
+/* 数据列表 */
+.axhub-button-data-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.axhub-button-data-container {
-  margin-top: 16px;
-  padding: 16px;
-  background-color: #f0f7ff;
-  border-radius: 8px;
-  border: 1px solid #e6f7ff;
-  color: #595959;
+.axhub-button-data-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
   font-size: 13px;
 }
 
-.axhub-button-data-container strong {
-  color: #1890ff;
-  font-weight: 600;
-  margin-right: 4px;
+.axhub-button-data-name {
+  color: #6b7280;
+}
+
+.axhub-button-data-val {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #111827;
+  font-weight: 500;
 }

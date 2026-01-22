@@ -340,6 +340,33 @@ function serveAdminPlugin(): Plugin {
           }
         }
 
+        // 处理 /admin/* 静态资源（如 auto-debug-client.js）
+        if (req.url && req.url.startsWith('/admin/')) {
+          const adminFilePath = path.join(adminDir, req.url.replace('/admin/', ''));
+          if (fs.existsSync(adminFilePath)) {
+            const ext = path.extname(adminFilePath);
+            const contentTypes: Record<string, string> = {
+              '.js': 'application/javascript; charset=utf-8',
+              '.css': 'text/css; charset=utf-8',
+              '.json': 'application/json; charset=utf-8',
+              '.html': 'text/html; charset=utf-8'
+            };
+            res.setHeader('Content-Type', contentTypes[ext] || 'application/octet-stream');
+            res.end(fs.readFileSync(adminFilePath));
+            return;
+          }
+        }
+
+        // 处理根目录下的 .js 文件（如 /auto-debug-client.js）
+        if (req.url && req.url.match(/^\/[^/]+\.js$/)) {
+          const jsPath = path.join(adminDir, req.url);
+          if (fs.existsSync(jsPath)) {
+            res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+            res.end(fs.readFileSync(jsPath));
+            return;
+          }
+        }
+
         // 处理 /assets/docs/*/spec.html 请求（文档预览）
         if (req.url && req.url.match(/^\/assets\/docs\/[^/]+\/spec\.html$/)) {
           const encodedDocName = req.url.match(/^\/assets\/docs\/([^/]+)\/spec\.html$/)?.[1];
@@ -980,6 +1007,27 @@ function themesApiPlugin(): Plugin {
   return {
     name: 'themes-api-plugin',
     configureServer(server: any) {
+      const readJsonBody = (req: any): Promise<any> => {
+        return new Promise((resolve, reject) => {
+          let body = '';
+          req.on('data', (chunk: Buffer) => {
+            body += chunk.toString('utf8');
+          });
+          req.on('end', () => {
+            if (!body) {
+              resolve({});
+              return;
+            }
+            try {
+              resolve(JSON.parse(body));
+            } catch (error) {
+              reject(error);
+            }
+          });
+          req.on('error', reject);
+        });
+      };
+
       server.middlewares.use((req: any, res: any, next: any) => {
         if (!req.url.startsWith('/api/themes')) {
           return next();
@@ -1020,6 +1068,67 @@ function themesApiPlugin(): Plugin {
             res.statusCode = 500;
             res.end(JSON.stringify({ error: error.message }));
           }
+          return;
+        }
+
+        // PUT /api/themes/:name - 更新主题显示名称
+        if (req.method === 'PUT' && req.url !== '/api/themes' && req.url !== '/api/themes/') {
+          (async () => {
+            try {
+              const themeName = req.url.replace('/api/themes/', '').split('?')[0];
+              if (!themeName) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: 'Missing theme name' }));
+                return;
+              }
+
+              const body = await readJsonBody(req);
+              const displayName = (body?.displayName || '').trim();
+              if (!displayName) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: 'Missing displayName' }));
+                return;
+              }
+
+              const themesDir = path.resolve(__dirname, 'src/themes');
+              const themeDir = path.join(themesDir, themeName);
+
+              if (!themeDir.startsWith(themesDir)) {
+                res.statusCode = 403;
+                res.end(JSON.stringify({ error: 'Forbidden' }));
+                return;
+              }
+
+              if (!fs.existsSync(themeDir)) {
+                res.statusCode = 404;
+                res.end(JSON.stringify({ error: 'Theme not found' }));
+                return;
+              }
+
+              const designTokenPath = path.join(themeDir, 'designToken.json');
+              let designToken: any = {};
+              if (fs.existsSync(designTokenPath)) {
+                try {
+                  designToken = JSON.parse(fs.readFileSync(designTokenPath, 'utf8'));
+                } catch (error: any) {
+                  res.statusCode = 400;
+                  res.end(JSON.stringify({ error: error.message || 'Invalid designToken.json' }));
+                  return;
+                }
+              }
+
+              designToken.name = displayName;
+              fs.writeFileSync(designTokenPath, JSON.stringify(designToken, null, 2));
+
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: true }));
+            } catch (error: any) {
+              console.error('Error updating theme name:', error);
+              res.statusCode = 500;
+              res.end(JSON.stringify({ error: error.message }));
+            }
+          })();
           return;
         }
 
@@ -1108,9 +1217,37 @@ function themesApiPlugin(): Plugin {
                   }
                 }
 
+                // 尝试读取主题描述（如果有 README.md 或 DESIGN-SPEC.md）
+                let description = '';
+                let hasDoc = false;
+                const readmePath = path.join(themeDir, 'README.md');
+                const designSpecPath = path.join(themeDir, 'DESIGN-SPEC.md');
+
+                if (fs.existsSync(readmePath)) {
+                  try {
+                    const content = fs.readFileSync(readmePath, 'utf8');
+                    const firstLine = content.split('\n')[0];
+                    description = firstLine.replace(/^#\s*/, '').trim();
+                    hasDoc = true;
+                  } catch (error) {
+                    console.warn(`Failed to read README.md for ${item.name}:`, error);
+                  }
+                } else if (fs.existsSync(designSpecPath)) {
+                  try {
+                    const content = fs.readFileSync(designSpecPath, 'utf8');
+                    const firstLine = content.split('\n')[0];
+                    description = firstLine.replace(/^#\s*/, '').trim();
+                    hasDoc = true;
+                  } catch (error) {
+                    console.warn(`Failed to read DESIGN-SPEC.md for ${item.name}:`, error);
+                  }
+                }
+
                 themes.push({
                   name: item.name,
-                  displayName: displayName
+                  displayName: displayName,
+                  description,
+                  hasDoc
                 });
               }
             });

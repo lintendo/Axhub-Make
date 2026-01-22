@@ -38,6 +38,22 @@ import type {
   AxhubHandle
 } from '../../common/axhub-types';
 
+// 图标组件（内部使用）
+const IconPlus = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"></line>
+    <line x1="5" y1="12" x2="19" y2="12"></line>
+  </svg>
+);
+
+const IconRefresh = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M23 4v6h-6"></path>
+    <path d="M1 20v-6h6"></path>
+    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+  </svg>
+);
+
 // 【规范说明】事件列表定义
 // 必须清晰描述每个事件的触发时机和用途
 const EVENT_LIST: EventItem[] = [
@@ -228,31 +244,53 @@ const Component = forwardRef<AxhubHandle, AxhubProps>(function AxhubButton(inner
   // 避免在 JSX 中直接定义函数，使用预定义的 useCallback 函数
   return (
     <div className="axhub-button-container">
-      <h2 className="axhub-button-title" style={{ color: primaryColor }}>{titleText}</h2>
+      <div className="axhub-button-header">
+        <h2 className="axhub-button-title">{titleText}</h2>
+      </div>
+      
       <div className="axhub-button-controls">
-        <button type="button" className="axhub-button-primary" style={{ backgroundColor: primaryColor }} onClick={handlePrimaryClick}>
-          {buttonText + ' (计数: ' + count + ')'}
+        <button 
+          type="button" 
+          className="axhub-button-primary" 
+          style={{ backgroundColor: primaryColor }} 
+          onClick={handlePrimaryClick}
+        >
+          <IconPlus />
+          <span>{buttonText}</span>
+          <span className="axhub-button-count-badge">{count}</span>
         </button>
-        <button type="button" className="axhub-button-secondary" onClick={handleResetClick}>
-          重置
+        <button 
+          type="button" 
+          className="axhub-button-secondary" 
+          onClick={handleResetClick}
+        >
+          <IconRefresh />
+          <span>重置</span>
         </button>
       </div>
-      <div className="axhub-button-message">
-        <strong>消息:</strong> {message}
-      </div>
-      {dataListSource.length > 0 && (
-        <div className="axhub-button-data-container">
-          <strong>数据1:</strong>{' '}
-          {dataListSource.map(function (item: any, index: number) {
-            return (
-              <span key={index}>
-                {item.name}: {item.value}
-                {index < dataListSource.length - 1 ? ', ' : ''}
-              </span>
-            );
-          })}
+
+      <div className="axhub-button-content">
+        <div className="axhub-button-message">
+          <div className="axhub-button-label">消息</div>
+          <div className="axhub-button-value">{message}</div>
         </div>
-      )}
+        
+        {dataListSource.length > 0 && (
+          <div className="axhub-button-data-container">
+            <div className="axhub-button-label">数据列表</div>
+            <div className="axhub-button-data-list">
+              {dataListSource.map(function (item: any, index: number) {
+                return (
+                  <div key={index} className="axhub-button-data-item">
+                    <span className="axhub-button-data-name">{item.name}</span>
+                    <span className="axhub-button-data-val">{item.value}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 });

@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/* TRAE Design Tokens - 深色主题配色 */
+:root {
+  /* Background Colors */
+  --background: #0a0b0d;
+  --foreground: #f5f9fe;
+
+  /* Surface Colors */
+  --card: #121314;
+  --card-foreground: #f5f9fe;
+  --popover: #171a1c;
+  --popover-foreground: #f5f9fe;
+
+  /* Primary - TRAE Brand Green */
+  --primary: #32f08c;
+  --primary-foreground: #0a0b0d;
+
+  /* Secondary */
+  --secondary: rgba(237, 239, 242, 0.18);
+  --secondary-foreground: #f5f9fe;
+
+  /* Muted */
+  --muted: #1e1f23;
+  --muted-foreground: #a6aab5;
+
+  /* Accent */
+  --accent: #32f08c;
+  --accent-foreground: #0a0b0d;
+
+  /* Subtle - 更浅的文本 */
+  --subtle: #787d87;
+
+  /* Destructive */
+  --destructive: #ef4444;
+  --destructive-foreground: #fef2f2;
+
+  /* Border */
+  --border: rgba(255, 255, 255, 0.2);
+  --border-subtle: rgba(237, 239, 242, 0.13);
+  --input: rgba(255, 255, 255, 0.2);
+  --ring: #32f08c;
+
+  /* Chart Colors */
+  --chart-1: #32f08c;
+  --chart-2: #a6aab5;
+  --chart-3: #787d87;
+  --chart-4: #171a1c;
+  --chart-5: #121314;
+
+  /* Radius - TRAE uses smaller radius */
+  --radius: 0.25rem;
+
+  /* Sidebar */
+  --sidebar: #121314;
+  --sidebar-foreground: #f5f9fe;
+  --sidebar-primary: #32f08c;
+  --sidebar-primary-foreground: #0a0b0d;
+  --sidebar-accent: #171a1c;
+  --sidebar-accent-foreground: #f5f9fe;
+  --sidebar-border: rgba(255, 255, 255, 0.2);
+  --sidebar-ring: #32f08c;
+}
+
+/* 移除 .dark 变体，因为 TRAE 默认就是深色主题 */
+
+@theme inline {
+  /* 使用 Inter 和 JetBrains Mono 字体 */
+  --font-sans: "Inter", "PingFang SC", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-subtle: var(--subtle);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* TRAE 使用更小的圆角 */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

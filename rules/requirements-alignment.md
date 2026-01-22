@@ -16,8 +16,8 @@
 
 | 模式 | 流程 | 使用模板 |
 |------|------|----------|
-| 模式 1：直接生成 | 用户需求 → spec.md + index.tsx（同时生成） | `assets/templates/all-in-spec-template.md` |
-| 模式 2：规格优先 | 用户需求 → spec.md（确认）→ index.tsx | `assets/templates/all-in-spec-template.md` |
+| 模式 1：直接生成 | 用户需求 → spec.md + index.tsx（同时生成） | `assets/templates/spec-template.md` |
+| 模式 2：规格优先 | 用户需求 → spec.md（确认）→ index.tsx | `assets/templates/spec-template.md` |
 
 ## 📝 沟通流程
 
@@ -85,12 +85,12 @@
 
 | 模式 | 文档类型 | 模板路径 |
 |------|----------|----------|
-| 直接生成 | Spec | `assets/templates/all-in-spec-template.md` |
-| 规格优先 | Spec | `assets/templates/all-in-spec-template.md` |
+| 直接生成 | Spec | `assets/templates/spec-template.md` |
+| 规格优先 | Spec | `assets/templates/spec-template.md` |
 
 ### 模板使用说明
 
-- **all-in-spec-template.md**：包含业务需求和技术规格的一体化模板
+- **spec-template.md**：包含简要概述、功能说明和技术规格的模板
 
 ## ✅ 检查清单
 

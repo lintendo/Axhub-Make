@@ -1,63 +1,63 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import fs from 'fs';
 import path from 'path';
+import { normalizePath } from './pathNormalizer';
 
 export function handleIndexHtml(req: IncomingMessage, res: ServerResponse, devTemplate: string, htmlTemplate: string): boolean {
-  if (req.url?.includes('/index.html')) {
-    // 解析 URL 和查询参数
-    const [urlWithoutQuery, queryString] = req.url.split('?');
-    const urlPath = urlWithoutQuery.replace('/index.html', '');
-    const pathParts = urlPath.split('/').filter(Boolean);
-    
-    // 解析版本参数
-    const params = new URLSearchParams(queryString || '');
-    const versionId = params.get('ver');
+  if (!req.url) return false;
 
-    console.log('[虚拟HTML] 请求路径:', req.url, '解析部分:', pathParts, '版本:', versionId);
+  // 先尝试标准化路径
+  const normalized = normalizePath(req.url);
 
-    if (pathParts.length >= 2 && ['elements', 'pages', 'themes'].includes(pathParts[0])) {
+  // 只处理预览请求（action === 'preview'）
+  if (normalized && normalized.action === 'preview') {
+    const { type, name, versionId } = normalized;
+
+    console.log('[虚拟HTML] 预览请求:', normalized.originalUrl, '→', normalized.normalizedUrl);
+
+    if (['elements', 'pages', 'themes'].includes(type)) {
+      const urlPath = `/${type}/${name}`;
       let tsxPath: string;
       let basePath: string;
-      
+
       // 如果有版本参数，从 Git 版本目录读取
       if (versionId) {
         const gitVersionsDir = path.resolve(process.cwd(), '.git-versions', versionId);
-        basePath = path.join(gitVersionsDir, 'src' + urlPath);
+        basePath = path.join(gitVersionsDir, 'src', type, name);
         tsxPath = path.join(basePath, 'index.tsx');
         console.log('[虚拟HTML] 从 Git 版本读取:', versionId, tsxPath);
       } else {
         // 否则从当前工作目录读取
-        basePath = path.resolve(process.cwd(), 'src' + urlPath);
+        basePath = path.resolve(process.cwd(), 'src', type, name);
         tsxPath = path.join(basePath, 'index.tsx');
       }
-      
+
       console.log('[虚拟HTML] 检查 TSX 文件:', tsxPath, '存在:', fs.existsSync(tsxPath));
 
       if (fs.existsSync(tsxPath)) {
-        const type = pathParts[0];
-        const name = pathParts[1];
+        const typeLabel = type === 'elements' ? 'Element' : type === 'pages' ? 'Page' : 'Theme';
         const title = versionId
-          ? `${type === 'elements' ? 'Element' : type === 'pages' ? 'Page' : 'Theme'}: ${name} (版本: ${versionId}) - Dev Preview`
-          : `${type === 'elements' ? 'Element' : type === 'pages' ? 'Page' : 'Theme'}: ${name} - Dev Preview`;
+          ? `${typeLabel}: ${name} (版本: ${versionId}) - Dev Preview`
+          : `${typeLabel}: ${name} - Dev Preview`;
 
         let html = devTemplate.replace(/\{\{TITLE\}\}/g, title);
-        
+
         // 如果是版本化访问，使用 @fs 加载绝对路径
         if (versionId) {
           html = html.replace(/\{\{ENTRY\}\}/g, `/@fs/${tsxPath}`);
+        } else {
+          // 正常的当前版本访问
+          // Vite root 是 'src'，所以路径应该相对于 src 目录
+          html = html.replace(/\{\{ENTRY\}\}/g, `${urlPath}/index.tsx`);
         }
-        
-        // 正常的当前版本访问
-        // Vite root 是 'src'，所以路径应该相对于 src 目录
-        html = html.replace(/\{\{ENTRY\}\}/g, `${urlPath}/index.tsx`);
 
-        const hackCssPath = path.resolve(process.cwd(), 'src' + urlPath + '/hack.css');
+        const hackCssPath = path.resolve(process.cwd(), 'src', type, name, 'hack.css');
         if (fs.existsSync(hackCssPath)) {
           console.log('[虚拟HTML] 注入 hack.css:', hackCssPath);
           html = html.replace('</head>', '  <link rel="stylesheet" href="./hack.css">\n  </head>');
         }
 
-        console.log('[虚拟HTML] ✅ 返回虚拟 HTML:', req.url);
+        console.log('[虚拟HTML] ✅ 返回虚拟 HTML:', normalized.normalizedUrl);
 
         res.setHeader('Content-Type', 'text/html');
         res.statusCode = 200;
@@ -117,8 +117,26 @@ export function handleIndexHtml(req: IncomingMessage, res: ServerResponse, devTe
         return true;
       }
     }
+    return false;
   }
-  
+
+  // 兼容旧的 .html 路径检查（如果标准化失败）
+  if (req.url?.includes('/index.html')) {
+    const [urlWithoutQuery, queryString] = req.url.split('?');
+    const urlPath = urlWithoutQuery.replace('/index.html', '');
+    const pathParts = urlPath.split('/').filter(Boolean);
+
+    const params = new URLSearchParams(queryString || '');
+    const versionId = params.get('ver');
+
+    console.log('[虚拟HTML] 旧格式请求路径:', req.url, '解析部分:', pathParts);
+
+    if (pathParts.length >= 2 && ['elements', 'pages', 'themes'].includes(pathParts[0])) {
+      // 这种情况应该已经被标准化处理了，如果到这里说明有问题
+      console.warn('[虚拟HTML] ⚠️ 未被标准化处理的路径:', req.url);
+    }
+  }
+
   return false;
 }
 

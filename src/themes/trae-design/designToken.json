@@ -1,0 +1,65 @@
+{
+  "name": "TRAE Design",
+  "description": "TRAE 智能 AI IDE 设计系统 - 深色主题，以亮绿色为品牌主色调，强调科技感与专业性",
+  "token": {
+    "colorPrimary": "var(--primary)",
+    "colorBgBase": "var(--background)",
+    "colorTextBase": "var(--foreground)",
+    "colorBgContainer": "var(--card)",
+    "colorBgElevated": "var(--popover)",
+    "colorBgLayout": "var(--muted)",
+    "colorTextSecondary": "var(--muted-foreground)",
+    "colorTextTertiary": "var(--subtle)",
+    "colorBorder": "var(--border)",
+    "colorBorderSecondary": "var(--border-subtle)",
+    "colorError": "var(--destructive)",
+    "colorSuccess": "var(--primary)",
+    "borderRadius": 4,
+    "borderRadiusSM": 2,
+    "borderRadiusLG": 6,
+    "fontFamily": "Inter, PingFang SC, system-ui, sans-serif",
+    "fontFamilyCode": "JetBrains Mono, monospace"
+  },
+  "colors": {
+    "primary": "#32F08C",
+    "background": "#0A0B0D",
+    "foreground": "#F5F9FE",
+    "card": "#121314",
+    "popover": "#171A1C",
+    "muted": "#1E1F23",
+    "mutedForeground": "#A6AAB5",
+    "subtle": "#787D87",
+    "border": "rgba(255, 255, 255, 0.2)",
+    "borderSubtle": "rgba(237, 239, 242, 0.13)",
+    "destructive": "#EF4444"
+  },
+  "typography": {
+    "fontSans": "Inter, PingFang SC, system-ui, sans-serif",
+    "fontMono": "JetBrains Mono, monospace",
+    "sizes": {
+      "display": "72px",
+      "h1": "56px",
+      "h2": "40px",
+      "h3": "24px",
+      "h4": "20px",
+      "bodyLarge": "18px",
+      "body": "16px",
+      "bodySmall": "14px"
+    }
+  },
+  "spacing": {
+    "1": "4px",
+    "2": "8px",
+    "3": "12px",
+    "4": "16px",
+    "6": "24px",
+    "8": "32px",
+    "12": "48px"
+  },
+  "radius": {
+    "sm": "2px",
+    "md": "4px",
+    "lg": "6px",
+    "xl": "8px"
+  }
+}

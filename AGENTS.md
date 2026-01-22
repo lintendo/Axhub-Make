@@ -4,9 +4,9 @@
 
 ## 🧭 工作流程
 
-1. **需求对齐** → 与用户沟通，根据模式产出文档（prd.md / spec.md）
-2. **生成代码** → 根据 spec 实现组件/页面
-3. **自动验收** → 运行验收脚本检查构建状态，使用 Playwright MCP 验收功能
+1. **需求对齐** → 与用户沟通，根据模式产出文档（spec.md）
+2. **生成代码** → 根据 spec 实现元素/页面
+3. **自动验收** → 运行验收脚本检查构建状态
 4. **协作调试** → 必要时修复问题（详见 debugging-guide.md）
 
 ## 📄 详细文档
@@ -17,17 +17,15 @@
 | 代码开发 | `rules/development-standards.md` | 代码规范和验收流程 |
 | 问题调试 | `rules/debugging-guide.md` | 开发验收失败或用户反馈 bug 时使用 |
 
-## 🎯 关键要点
-
-### 技术栈
-- TypeScript（编译为 es2015）
-- 构建产物：单个 IIFE 格式 JS 文件
-
-### 项目结构
+## 项目结构
 ```
-src/
-├── common/          # 公共类型和工具
-├── elements/        # 原型元素
-├── pages/           # 原型页面
-└── themes/          # 主题配置
+├── src/
+│   ├── common/      # 公共类型和工具
+│   ├── elements/    # 原型元素
+│   ├── pages/       # 原型页面
+│   └── themes/      # 主题配置
+└── assets/          # 原型资产
+    ├── docs/        # 文档
+    ├── database/    # 数据库
+    └── themes/      # 主题库
 ```
