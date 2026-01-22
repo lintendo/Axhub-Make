@@ -42,6 +42,12 @@ export function handleIndexHtml(req: IncomingMessage, res: ServerResponse, devTe
 
         let html = devTemplate.replace(/\{\{TITLE\}\}/g, title);
 
+        // 🔥 添加 <base> 标签来修正相对路径基准（重要！）
+        // 新路径格式 /pages/ref-antd 会被浏览器当作目录，导致相对路径解析错误
+        // 添加 <base href="/pages/ref-antd/"> 可以修正这个问题
+        const baseHref = `${urlPath}/`;
+        html = html.replace('</head>', `  <base href="${baseHref}">\n  </head>`);
+
         // 如果是版本化访问，使用 @fs 加载绝对路径
         if (versionId) {
           html = html.replace(/\{\{ENTRY\}\}/g, `/@fs/${tsxPath}`);
