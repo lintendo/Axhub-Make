@@ -16,7 +16,6 @@ import { fileSystemApiPlugin } from './vite-plugins/fileSystemApiPlugin';
 import { dataManagementApiPlugin } from './vite-plugins/dataManagementApiPlugin';
 import { mediaManagementApiPlugin } from './vite-plugins/mediaManagementApiPlugin';
 import { codeReviewPlugin } from './vite-plugins/codeReviewPlugin';
-import { mcpInstallPlugin } from './vite-plugins/mcpInstallPlugin';
 import { autoDebugPlugin } from './vite-plugins/autoDebugPlugin';
 import { configApiPlugin } from './vite-plugins/configApiPlugin';
 import { aiCliPlugin } from './vite-plugins/aiCliPlugin';
@@ -1318,7 +1317,6 @@ const config: any = {
     dataManagementApiPlugin(), // 提供 /api/data 端点
     mediaManagementApiPlugin(), // 提供 /api/media 端点
     codeReviewPlugin(), // 提供 /api/code-review 端点
-    mcpInstallPlugin(), // 提供 /api/install-mcp 端点
     autoDebugPlugin(), // 提供自动调试 API 端点
     configApiPlugin(), // 提供 /api/config 端点
     aiCliPlugin(), // 提供 /api/ai 端点

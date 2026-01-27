@@ -388,7 +388,19 @@ export function fileSystemApiPlugin(): Plugin {
 
           // 验证新名称格式
           const trimmedNewName = String(newName).trim();
-          if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(trimmedNewName)) {
+          if (!trimmedNewName) {
+            return sendJSON(res, 400, { error: 'Invalid newName format' });
+          }
+          if (trimmedNewName === '.' || trimmedNewName === '..') {
+            return sendJSON(res, 400, { error: 'Invalid newName format' });
+          }
+          if (/[\r\n]/.test(trimmedNewName)) {
+            return sendJSON(res, 400, { error: 'Invalid newName format' });
+          }
+          if (trimmedNewName.includes('*/')) {
+            return sendJSON(res, 400, { error: 'Invalid newName format' });
+          }
+          if (/[/\\:*?"<>|]/.test(trimmedNewName)) {
             return sendJSON(res, 400, { error: 'Invalid newName format' });
           }
 
@@ -399,60 +411,39 @@ export function fileSystemApiPlugin(): Plugin {
           }
 
           const group = parts[0];
-          const oldName = parts[1];
-          
-          if (oldName === trimmedNewName) {
-            return sendJSON(res, 200, { success: true });
-          }
+          const itemName = parts[1];
+          const itemDir = path.join(projectRoot, 'src', group, itemName);
 
-          const oldDir = path.join(projectRoot, 'src', group, oldName);
-          const newDir = path.join(projectRoot, 'src', group, trimmedNewName);
-
-          if (!fs.existsSync(oldDir)) {
+          if (!fs.existsSync(itemDir)) {
             return sendJSON(res, 404, { error: 'Directory not found' });
           }
 
-          if (fs.existsSync(newDir)) {
-            return sendJSON(res, 409, { error: 'Target name already exists' });
+          const indexFiles = ['index.tsx', 'index.ts', 'index.jsx', 'index.js'];
+          let indexFilePath: string | null = null;
+          for (const fileName of indexFiles) {
+            const filePath = path.join(itemDir, fileName);
+            if (fs.existsSync(filePath)) {
+              indexFilePath = filePath;
+              break;
+            }
           }
 
-          // 重命名目录
-          fs.renameSync(oldDir, newDir);
+          if (!indexFilePath) {
+            return sendJSON(res, 404, { error: 'Entry file not found' });
+          }
 
-          // 更新 entries.json
-          const oldKey = `${group}/${oldName}`;
-          const newKey = `${group}/${trimmedNewName}`;
-          
-          const entriesPath = path.join(projectRoot, 'entries.json');
-          if (fs.existsSync(entriesPath)) {
-            try {
-              const entries = JSON.parse(fs.readFileSync(entriesPath, 'utf8'));
-              let changed = false;
+          const nameLineRegex = /(^\s*\*\s*@(?:name|displayName)\s+)(.+)$/m;
+          const content = fs.readFileSync(indexFilePath, 'utf8');
+          let updatedContent = content;
 
-              if (entries.js && entries.js[oldKey]) {
-                const oldVal = entries.js[oldKey];
-                delete entries.js[oldKey];
-                entries.js[newKey] = typeof oldVal === 'string'
-                  ? oldVal.replace(new RegExp(`${oldKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=/|$)`), newKey)
-                  : oldVal;
-                changed = true;
-              }
-              
-              if (entries.html && entries.html[oldKey]) {
-                const oldVal = entries.html[oldKey];
-                delete entries.html[oldKey];
-                entries.html[newKey] = typeof oldVal === 'string'
-                  ? oldVal.replace(new RegExp(`${oldKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=/|$)`), newKey)
-                  : oldVal;
-                changed = true;
-              }
+          if (nameLineRegex.test(content)) {
+            updatedContent = content.replace(nameLineRegex, `$1${trimmedNewName}`);
+          } else {
+            updatedContent = `/**\n * @name ${trimmedNewName}\n */\n${content}`;
+          }
 
-              if (changed) {
-                fs.writeFileSync(entriesPath, JSON.stringify(entries, null, 2));
-              }
-            } catch (e) {
-              console.error('[文件系统 API] 更新 entries.json 失败:', e);
-            }
+          if (updatedContent !== content) {
+            fs.writeFileSync(indexFilePath, updatedContent, 'utf8');
           }
 
           sendJSON(res, 200, { success: true });

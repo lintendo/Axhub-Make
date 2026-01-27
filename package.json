@@ -1,6 +1,6 @@
 {
   "name": "axhub-make",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "private": true,
   "description": "Axhub Make（AI 辅助生成原型工具）",
   "type": "module",
