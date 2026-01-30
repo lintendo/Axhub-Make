@@ -4,7 +4,7 @@
  * =====================================================
  * Chrome 扩展导出转换器
  * 
- * 专门处理通过 Chrome 扩展 Axhub 导出的 HTML 文件
+ * 专门处理通过 Chrome 扩展本项目导出的 HTML 文件
  * 
  * 功能：
  * 1. 转换 index.html 为 React 组件
@@ -369,7 +369,7 @@ function generateComponent(pageName, bodyContent, headContent) {
 
 import './style.css';
 import React, { forwardRef, useImperativeHandle } from 'react';
-import type { AxhubProps, AxhubHandle } from '../../common/axhub-types';
+import type { AxureProps, AxureHandle } from '../../common/axure-types';
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -407,7 +407,7 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-const Component = forwardRef<AxhubHandle, AxhubProps>(function ${componentName}(innerProps, ref) {
+const Component = forwardRef<AxureHandle, AxureProps>(function ${componentName}(innerProps, ref) {
   console.log('[${pageName}] 组件开始渲染');
   
   useImperativeHandle(ref, function () {
@@ -434,7 +434,7 @@ ${finalContent.split('\n').map(line => '      ' + line).join('\n')}
   }
 });
 
-const WrappedComponent = forwardRef<AxhubHandle, AxhubProps>((props, ref) => (
+const WrappedComponent = forwardRef<AxureHandle, AxureProps>((props, ref) => (
   <ErrorBoundary>
     <Component {...props} ref={ref} />
   </ErrorBoundary>

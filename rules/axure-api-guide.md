@@ -1,10 +1,10 @@
 # Axure API 使用指南
 
-本文档说明如何在 Axhub 原型中使用 Axure API 实现交互功能。
+本文档说明如何在本项目原型中使用 Axure API 实现交互功能。
 
 ## 📌 什么是 Axure API
 
-Axure API 是 Axhub 提供的一套接口规范，用于实现组件与 Axure 原型之间的交互。通过 Axure API，组件可以：
+Axure API 是本项目提供的一套接口规范，用于实现组件与 Axure 原型之间的交互。通过 Axure API，组件可以：
 
 - **触发事件**：向外部发送事件通知
 - **接收动作**：响应外部调用的动作
@@ -29,13 +29,13 @@ Axure API 是 Axhub 提供的一套接口规范，用于实现组件与 Axure �
 
 ### 组件定义
 
-使用 `forwardRef<AxhubHandle, AxhubProps>` 包装组件：
+使用 `forwardRef<AxureHandle, AxureProps>` 包装组件：
 
 ```typescript
 import React, { forwardRef, useImperativeHandle } from 'react';
-import type { AxhubProps, AxhubHandle } from '../../common/axhub-types';
+import type { AxureProps, AxureHandle } from '../../common/axure-types';
 
-const Component = forwardRef<AxhubHandle, AxhubProps>(function MyComponent(innerProps, ref) {
+const Component = forwardRef<AxureHandle, AxureProps>(function MyComponent(innerProps, ref) {
   // 组件实现
   
   useImperativeHandle(ref, function () {
@@ -80,7 +80,7 @@ const title = typeof configSource.title === 'string' && configSource.title
 定义组件可以触发的事件：
 
 ```typescript
-import type { EventItem } from '../../common/axhub-types';
+import type { EventItem } from '../../common/axure-types';
 
 const EVENT_LIST: EventItem[] = [
   { name: 'onClick', desc: '点击按钮时触发' },
@@ -116,7 +116,7 @@ emitEvent('onChange', JSON.stringify({ timestamp: Date.now(), value: 'new_value'
 定义组件可以响应的动作：
 
 ```typescript
-import type { Action } from '../../common/axhub-types';
+import type { Action } from '../../common/axure-types';
 
 // ⚠️ 强制规则：params 必须是字符串类型
 // 如果需要传递复杂参数，请在 desc 中说明使用 JSON 格式
@@ -166,7 +166,7 @@ const fireActionHandler = useCallback(function (name: string, params?: string) {
 定义组件暴露的内部状态：
 
 ```typescript
-import type { KeyDesc } from '../../common/axhub-types';
+import type { KeyDesc } from '../../common/axure-types';
 
 // ⚠️ name 必须使用小写 + 下划线（snake_case），详见 KeyDesc 说明
 const VAR_LIST: KeyDesc[] = [
@@ -199,7 +199,7 @@ useImperativeHandle(ref, function () {
 定义配置面板中的可配置项：
 
 ```typescript
-import type { ConfigItem } from '../../common/axhub-types';
+import type { ConfigItem } from '../../common/axure-types';
 
 const CONFIG_LIST: ConfigItem[] = [
   {
@@ -241,7 +241,7 @@ const CONFIG_LIST: ConfigItem[] = [
 定义组件接收的数据结构：
 
 ```typescript
-import type { DataDesc } from '../../common/axhub-types';
+import type { DataDesc } from '../../common/axure-types';
 
 const DATA_LIST: DataDesc[] = [
   {
@@ -265,13 +265,13 @@ const users = Array.isArray(dataSource.users) ? dataSource.users : [];
 
 ## 🔧 Container 容器使用
 
-`container` 是 AxhubProps 提供的 DOM 容器元素，适用于需要直接操作 DOM 的场景（如图表库）：
+`container` 是 AxureProps 提供的 DOM 容器元素，适用于需要直接操作 DOM 的场景（如图表库）：
 
 ```typescript
 import { useRef, useEffect } from 'react';
 import * as echarts from 'echarts/core';
 
-const Component = forwardRef<AxhubHandle, AxhubProps>(function Chart(innerProps, ref) {
+const Component = forwardRef<AxureHandle, AxureProps>(function Chart(innerProps, ref) {
   const container = innerProps && innerProps.container ? innerProps.container : null;
   const chartRef = useRef<any>(null);
 
@@ -311,9 +311,9 @@ import type {
   ConfigItem,
   Action,
   EventItem,
-  AxhubProps,
-  AxhubHandle
-} from '../../common/axhub-types';
+  AxureProps,
+  AxureHandle
+} from '../../common/axure-types';
 
 const EVENT_LIST: EventItem[] = [
   { name: 'onSubmit', desc: '提交表单时触发，传递表单数据（JSON 字符串格式）', payload: 'JSON string' }
@@ -341,7 +341,7 @@ const CONFIG_LIST: ConfigItem[] = [
 
 const DATA_LIST: DataDesc[] = [];
 
-const Component = forwardRef<AxhubHandle, AxhubProps>(function UserForm(innerProps, ref) {
+const Component = forwardRef<AxureHandle, AxureProps>(function UserForm(innerProps, ref) {
   const configSource = innerProps && innerProps.config ? innerProps.config : {};
   const onEventHandler = typeof innerProps.onEvent === 'function' 
     ? innerProps.onEvent 
@@ -431,6 +431,6 @@ export default Component;
 
 ## 📚 参考资源
 
-- **类型定义**：`/src/common/axhub-types.ts`
+- **类型定义**：`/src/common/axure-types.ts`
 - **配置面板类型**：`/src/common/config-panel-types.ts`
 - **示例代码**：查看 `/src/elements/` 和 `/src/pages/` 目录下以 `ref-` 开头的文件

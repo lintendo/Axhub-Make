@@ -489,9 +489,9 @@ function generateComponent(pageName, bodyContent, headContent) {
 
 import './style.css';
 import React, { forwardRef, useImperativeHandle } from 'react';
-import type { AxhubProps, AxhubHandle } from '../../common/axhub-types';
+import type { AxureProps, AxureHandle } from '../../common/axure-types';
 
-const Component = forwardRef<AxhubHandle, AxhubProps>(function ${componentName}(innerProps, ref) {
+const Component = forwardRef<AxureHandle, AxureProps>(function ${componentName}(innerProps, ref) {
   useImperativeHandle(ref, function () {
     return {
       getVar: function () { return undefined; },

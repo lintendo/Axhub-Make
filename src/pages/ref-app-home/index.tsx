@@ -7,7 +7,7 @@
  * - /assets/docs/设计规范.UIGuidelines.md
  * 
  * ==================== 重要说明 ====================
- * 本文件是演示文件，用于展示 Axhub 页面开发规范
+ * 本文件是演示文件，用于展示本项目页面开发规范
  * 文件中的详细注释【规范说明】仅用于教学和说明规范要求
  * 
  * 实际开发时：
@@ -30,16 +30,16 @@ import React, { useState, useCallback, useImperativeHandle, forwardRef } from 'r
 import { Flame, Timer, Zap, Activity } from 'lucide-react';
 
 // 4. 导入类型定义（必需）
-// 从 axhub-types 导入所有必要的类型
+// 从 axure-types 导入所有必要的类型
 import type {
     KeyDesc,
     DataDesc,
     ConfigItem,
     Action,
     EventItem,
-    AxhubProps,
-    AxhubHandle
-} from '../../common/axhub-types';
+    AxureProps,
+    AxureHandle
+} from '../../common/axure-types';
 
 // 【规范说明】事件列表定义
 // 必须清晰描述每个事件的触发时机和用途
@@ -89,8 +89,8 @@ const DATA_LIST: DataDesc[] = [
 ];
 
 // 【规范说明】组件定义
-// 必须使用 forwardRef<AxhubHandle, AxhubProps> 包装组件
-const Component = forwardRef<AxhubHandle, AxhubProps>(function FitnessHome(innerProps, ref) {
+// 必须使用 forwardRef<AxureHandle, AxureProps> 包装组件
+const Component = forwardRef<AxureHandle, AxureProps>(function FitnessHome(innerProps, ref) {
     // 【规范说明】Props 处理
     // 安全解构 props 并提供默认值，避免访问 undefined 属性
     const dataSource = innerProps && innerProps.data ? innerProps.data : {};
@@ -164,7 +164,7 @@ const Component = forwardRef<AxhubHandle, AxhubProps>(function FitnessHome(inner
     }, []);
 
     // 【规范说明】useImperativeHandle
-    // 必须暴露完整的 AxhubHandle 接口，包括所有列表和方法
+    // 必须暴露完整的 AxureHandle 接口，包括所有列表和方法
     // 依赖项数组必须包含所有使用到的 state 和函数
     useImperativeHandle(ref, function () {
         return {
@@ -360,5 +360,5 @@ const Component = forwardRef<AxhubHandle, AxhubProps>(function FitnessHome(inner
 
 // 【规范说明】导出组件
 // 必须使用 export default Component（大小写敏感）
-// 这是 Axhub 平台集成的必要条件
+// 这是本项目平台集成的必要条件
 export default Component;

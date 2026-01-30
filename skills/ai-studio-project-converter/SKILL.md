@@ -1,17 +1,17 @@
 ---
 name: ai-studio-project-converter
-description: 将 Google AI Studio 生成的 React 项目转换为 Axhub Make 页面组件的流程规范；在处理 Import Map、样式迁移、依赖安装、环境变量与验收时使用。
+description: 将 Google AI Studio 生成的 React 项目转换为本项目页面组件的流程规范；在处理 Import Map、样式迁移、依赖安装、环境变量与验收时使用。
 ---
 
 # AI Studio 项目转换规范
 
-将 Google AI Studio 生成的零配置 React 应用转换为 Axhub 页面组件，保持视觉效果和功能，符合 Axhub 开发规范。
+将 Google AI Studio 生成的零配置 React 应用转换为本项目页面组件，保持视觉效果和功能，符合本项目开发规范。
 
 ## 核心目标
 
 - 保持页面视觉一致性
 - 移除 AI Studio 特定入口与 HTML 模板
-- 产出可在 Axhub 中运行的页面组件
+- 产出可在本项目中运行的页面组件
 
 ## 使用方式
 
@@ -85,7 +85,7 @@ ai-studio-project/
 <link href="https://fonts.googleapis.com/...">  <!-- 可能包含外部字体 -->
 ```
 
-### Axhub 组件规范
+###本项目组件规范
 
 所有页面组件必须遵循以下格式：
 
@@ -100,9 +100,9 @@ ai-studio-project/
 
 import './style.css';
 import React, { forwardRef, useImperativeHandle } from 'react';
-import type { AxhubProps, AxhubHandle } from '../../common/axhub-types';
+import type { AxureProps, AxureHandle } from '../../common/axure-types';
 
-const Component = forwardRef<AxhubHandle, AxhubProps>(function PageName(innerProps, ref) {
+const Component = forwardRef<AxureHandle, AxureProps>(function PageName(innerProps, ref) {
   useImperativeHandle(ref, function () {
     return {
       getVar: function () { return undefined; },
@@ -139,7 +139,7 @@ export default function App() {
 }
 ```
 
-**转换为 Axhub 规范**：
+**转换为本项目规范**：
 ```typescript
 /**
  * @name 页面名称
@@ -151,10 +151,10 @@ export default function App() {
 
 import './style.css';
 import React, { forwardRef, useImperativeHandle, useState } from 'react';
-import type { AxhubProps, AxhubHandle } from '../../common/axhub-types';
+import type { AxureProps, AxureHandle } from '../../common/axure-types';
 import Header from './components/Header';
 
-const Component = forwardRef<AxhubHandle, AxhubProps>(function PageName(innerProps, ref) {
+const Component = forwardRef<AxureHandle, AxureProps>(function PageName(innerProps, ref) {
   const [count, setCount] = useState(0);
   
   useImperativeHandle(ref, function () {
@@ -177,8 +177,8 @@ export default Component;
 
 **关键转换点**：
 1. 添加文件头部注释（`@name` 和参考资料）
-2. 使用 `forwardRef<AxhubHandle, AxhubProps>` 包装
-3. 实现 `useImperativeHandle` 暴露 Axhub API
+2. 使用 `forwardRef<AxureHandle, AxureProps>` 包装
+3. 实现 `useImperativeHandle` 暴露本项目API
 4. 使用 `export default Component`
 5. 保持原有的 JSX、Hooks 和 Tailwind 类名不变
 
@@ -201,10 +201,8 @@ export default Component;
 从 `index.html` 的 Import Map 提取依赖：
 
 ```bash
-cd apps/axhub-make
-
 # 常见依赖：lucide-react, framer-motion 等
-# 排除：react, react-dom（Axhub 已有）
+# 排除：react, react-dom（本项目已有）
 pnpm add [识别到的依赖列表]
 ```
 
@@ -224,7 +222,7 @@ pnpm add [识别到的依赖列表]
 
 **必须移除**：
 - `index.html`（提取信息后删除）
-- `index.tsx`（Axhub 有自己的入口）
+- `index.tsx`（本项目有自己的入口）
 - `metadata.json`（可选保留作为参考）
 
 ## 验收标准

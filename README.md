@@ -1,4 +1,4 @@
-# Axhub Make
+#本项目Make
 
 一个专为 **产品经理** 和 **设计师** 打造的 AI 辅助生成原型工具。
 
@@ -34,8 +34,6 @@
 npm install
 ```
 
-> 💡 **提示**：这一步只需要执行一次，会自动安装所有必需的工具。
-
 安装完成后就可以启动项目了
 
 ```bash
@@ -44,34 +42,8 @@ npm run dev
 
 ### 第二步：与 AI 沟通需求
 
-1. **打开 AI 助手**（如 Cascade、Cursor 等）
+1. **打开 AI 助手**（如 TRAE、Cursor 等）
 2. **描述你的需求**，AI 会引导你完善细节
-3. **选择生成模式**（直接生成/规格优先/完整流程）
-4. **确认文档**，AI 会根据模式生成相应文档（prd.md / spec.md）
-
-**示例对话：**
-
-```
-你：我想做一个用户列表页面
-
-AI：好的！这个需求比较明确，我建议使用"规格优先"模式。
-    请问这个页面需要哪些功能？
-    1. 用户数据的展示方式（表格、卡片、列表）？
-    2. 是否需要搜索和筛选功能？
-    3. 是否需要分页？
-    ...
-
-你：用表格展示，需要搜索功能
-
-AI：明白了。关于数据结构：
-    1. 用户数据包含哪些字段？
-    ...
-```
-
-**生成模式说明：**
-- **直接生成**：需求明确时，一次性产出 spec.md + 代码
-- **规格优先**：需求较复杂时，先确认 spec.md 再生成代码
-- **完整流程**：大型项目，先产出 prd.md，确认后产出 spec.md，最后生成代码
 
 ### 第三步：AI 生成代码
 
@@ -94,33 +66,46 @@ AI 会根据你的需求自动生成：
 ```
 Axhub Make/
 ├── src/
-│   ├── common/              # 公共类型和工具（无需关注）
+│   ├── common/              # 公共类型和工具（通常无需改）
 │   ├── elements/            # 原型元件目录
-│   │   ├── button/          # 按钮元素示例
-│   │   │   ├── index.tsx           # 元素代码
+│   │   ├── side-menu/       # 元件示例
+│   │   │   ├── index.tsx           # 元件代码
 │   │   │   ├── spec.md             # 需求文档
+│   │   │   └── style.css           # 样式文件
+│   │   ├── ref-button/      # 参考元件（以 ref- 前缀标记）
 │   │   └── [你的元件]/
 │   ├── pages/               # 原型页面目录
-│   │   ├── sample-page/     # 示例页面
+│   │   ├── home/            # 页面示例
+│   │   │   ├── index.tsx           # 页面代码
+│   │   │   ├── spec.md             # 需求文档
+│   │   │   └── style.css           # 样式文件
+│   │   ├── ref-app-home/    # 参考页面（以 ref- 前缀标记）
 │   │   └── [你的页面]/
 │   └── themes/              # 主题配置目录
-│       ├── antd/            # Ant Design 主题示例
+│       ├── antd-new/        # 主题示例
 │       │   ├── designToken.json    # 主题 Token
-│       │   └── index.tsx           # 主题演示页
+│       │   ├── DESIGN-SPEC.md      # 主题规范
+│       │   ├── index.tsx           # 主题演示页
+│       │   └── style.css           # 主题样式
 │       └── [你的主题]/
-├── rules/                   # Agents 工作规则
-│   ├── requirements-alignment.md   # 需求对齐指南
-│   ├── development-standards.md    # 开发标准
-│   ├── debugging-guide.md          # 调试指南
-│   └── theme-generation-guide.md   # 主题生成规范
 ├── assets/                  # 资源文件
 │   ├── database/            # 资产管理数据库
 │   ├── templates/           # 文档模板
 │   ├── docs/                # 参考文档
 │   └── libraries/           # 前端库文档
+├── rules/                   # Agents 工作规则
+│   ├── requirements-alignment.md   # 需求对齐指南
+│   ├── development-standards.md    # 开发标准
+│   ├── debugging-guide.md          # 调试指南
+│   ├── theme-generation-guide.md   # 主题生成规范
+│   └── ...                  # 其他规则（资产 / Axure / 设计等）
+├── admin/                   # 管理后台静态文件（构建产物）
+├── scripts/                 # 构建/生成脚本
+├── vite-plugins/            # 开发服务器与构建插件
 ├── temp/                    # 临时文件目录
 ├── dist/                    # 构建产物（自动生成）
 ```
+
 
 ## 💡 使用技巧
 

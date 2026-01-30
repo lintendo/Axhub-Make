@@ -1,4 +1,4 @@
-import{U as h,j as r,ab as b,aN as M,aO as j,ac as S,aP as E,aQ as $,aR as H,aH as g}from"./chunks/vendor.js";import{d as I}from"./chunks/index.js";const C=`
+import{r as h,j as r,ab as b,aN as M,aO as j,ac as S,aP as E,aQ as $,aR as H,aH as g}from"./chunks/vendor.js";import{d as I}from"./chunks/index.js";const C=`
   body {
     background: #f5f5f5;
   }

@@ -6,7 +6,7 @@
  * 检查项目：
  * 1. 导出规范：必须使用 `export default Component`
  * 2. Tailwind CSS：如果使用了 Tailwind 类名，必须在 style.css 中添加 `@import "tailwindcss"`
- * 3. Axure API：如果使用了 Axure API，必须符合 axhub-types.ts 的类型定义
+ * 3. Axure API：如果使用了 Axure API，必须符合 axure-types.ts 的类型定义
  */
 
 import type { Plugin } from 'vite';
@@ -140,25 +140,25 @@ function checkAxureAPI(content: string, filePath: string): ReviewIssue[] {
     return issues;
   }
   
-  // 检查是否导入了 AxhubProps 和 AxhubHandle（支持多行导入）
-  const hasAxhubPropsImport = /import\s+type\s*\{[^}]*\bAxhubProps\b[^}]*\}\s*from\s+['"].*axhub-types/.test(content.replace(/\n/g, ' '));
-  const hasAxhubHandleImport = /import\s+type\s*\{[^}]*\bAxhubHandle\b[^}]*\}\s*from\s+['"].*axhub-types/.test(content.replace(/\n/g, ' '));
+  // 检查是否导入了 AxureProps 和 AxureHandle（支持多行导入）
+  const hasAxurePropsImport = /import\s+type\s*\{[^}]*\bAxureProps\b[^}]*\}\s*from\s+['"].*axure-types/.test(content.replace(/\n/g, ' '));
+  const hasAxureHandleImport = /import\s+type\s*\{[^}]*\bAxureHandle\b[^}]*\}\s*from\s+['"].*axure-types/.test(content.replace(/\n/g, ' '));
   
-  if (!hasAxhubPropsImport) {
+  if (!hasAxurePropsImport) {
     issues.push({
       type: 'error',
       rule: 'axure-api-props',
-      message: '使用了 forwardRef 但未导入 AxhubProps 类型',
-      suggestion: '从 axhub-types 导入：import type { AxhubProps, AxhubHandle } from \'../../common/axhub-types\''
+      message: '使用了 forwardRef 但未导入 AxureProps 类型',
+      suggestion: '从 axure-types 导入：import type { AxureProps, AxureHandle } from \'../../common/axure-types\''
     });
   }
   
-  if (!hasAxhubHandleImport) {
+  if (!hasAxureHandleImport) {
     issues.push({
       type: 'error',
       rule: 'axure-api-handle',
-      message: '使用了 forwardRef 但未导入 AxhubHandle 类型',
-      suggestion: '从 axhub-types 导入：import type { AxhubProps, AxhubHandle } from \'../../common/axhub-types\''
+      message: '使用了 forwardRef 但未导入 AxureHandle 类型',
+      suggestion: '从 axure-types 导入：import type { AxureProps, AxureHandle } from \'../../common/axure-types\''
     });
   }
   
@@ -168,21 +168,21 @@ function checkAxureAPI(content: string, filePath: string): ReviewIssue[] {
     const handleType = forwardRefMatch[1].trim();
     const propsType = forwardRefMatch[2].trim();
     
-    if (handleType !== 'AxhubHandle') {
+    if (handleType !== 'AxureHandle') {
       issues.push({
         type: 'error',
         rule: 'axure-api-handle-type',
-        message: `forwardRef 第一个类型参数错误：使用了 "${handleType}"，应该使用 "AxhubHandle"`,
-        suggestion: '使用正确的类型：forwardRef<AxhubHandle, AxhubProps>'
+        message: `forwardRef 第一个类型参数错误：使用了 "${handleType}"，应该使用 "AxureHandle"`,
+        suggestion: '使用正确的类型：forwardRef<AxureHandle, AxureProps>'
       });
     }
     
-    if (propsType !== 'AxhubProps') {
+    if (propsType !== 'AxureProps') {
       issues.push({
         type: 'error',
         rule: 'axure-api-props-type',
-        message: `forwardRef 第二个类型参数错误：使用了 "${propsType}"，应该使用 "AxhubProps"`,
-        suggestion: '使用正确的类型：forwardRef<AxhubHandle, AxhubProps>'
+        message: `forwardRef 第二个类型参数错误：使用了 "${propsType}"，应该使用 "AxureProps"`,
+        suggestion: '使用正确的类型：forwardRef<AxureHandle, AxureProps>'
       });
     }
   }
@@ -194,7 +194,7 @@ function checkAxureAPI(content: string, filePath: string): ReviewIssue[] {
       type: 'warning',
       rule: 'axure-api-imperative-handle',
       message: '使用了 forwardRef 但未使用 useImperativeHandle',
-      suggestion: '使用 useImperativeHandle 暴露 AxhubHandle 接口'
+      suggestion: '使用 useImperativeHandle 暴露 AxureHandle 接口'
     });
   }
   

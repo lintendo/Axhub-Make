@@ -33,6 +33,7 @@ entries.json
 # IDE and editors
 .idea/
 .obsidian/
+.claude/
 /.drafts/
 *.swp
 *.swo
@@ -115,4 +116,3 @@ temp/
 # Database files (keep directory structure and initial data)
 # assets/database/*.json
 # !assets/database/.gitkeep
-

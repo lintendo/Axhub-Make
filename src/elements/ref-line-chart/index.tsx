@@ -8,7 +8,7 @@
  * - /assets/libraries/echarts.md (ECharts)
  * 
  * ==================== 重要说明 ====================
- * 本文件是演示文件，用于展示 Axhub 元素开发规范
+ * 本文件是演示文件，用于展示本项目元素开发规范
  * 文件中的详细注释【规范说明】仅用于教学和说明规范要求
  * 
  * 实际开发时：
@@ -55,9 +55,9 @@ import type {
   Action,
   EventItem,
   CSSProperties,
-  AxhubProps,
-  AxhubHandle
-} from '../../common/axhub-types';
+  AxureProps,
+  AxureHandle
+} from '../../common/axure-types';
 
 // 【规范说明】事件列表定义
 // 必须清晰描述每个事件的触发时机和用途
@@ -115,8 +115,8 @@ const DATA_LIST: DataDesc[] = [
 ];
 
 // 【规范说明】组件定义
-// 必须使用 forwardRef<AxhubHandle, AxhubProps> 包装组件
-const Component = forwardRef<AxhubHandle, AxhubProps>(function LineChart(innerProps, ref) {
+// 必须使用 forwardRef<AxureHandle, AxureProps> 包装组件
+const Component = forwardRef<AxureHandle, AxureProps>(function LineChart(innerProps, ref) {
   // 【规范说明】Props 处理
   // 安全解构 props 并提供默认值，包括 container
   const dataSource = innerProps && innerProps.data ? innerProps.data : {};
@@ -320,7 +320,7 @@ const Component = forwardRef<AxhubHandle, AxhubProps>(function LineChart(innerPr
   }, [handleUpdateData, handleResize, handleShowLoading, handleHideLoading]);
 
   // 【规范说明】useImperativeHandle
-  // 必须暴露完整的 AxhubHandle 接口，包括所有列表和方法
+  // 必须暴露完整的 AxureHandle 接口，包括所有列表和方法
   useImperativeHandle(ref, function () {
     return {
       getVar: function (name: string) {
@@ -346,5 +346,5 @@ const Component = forwardRef<AxhubHandle, AxhubProps>(function LineChart(innerPr
 
 // 【规范说明】导出组件
 // 必须使用 export default Component（大小写敏感）
-// 这是 Axhub 平台集成的必要条件
+// 这是本项目平台集成的必要条件
 export default Component;

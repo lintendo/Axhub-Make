@@ -249,14 +249,14 @@ function generateTasksDocument(analysis, outputDir, pageName, tempDir) {
   markdown += `## ✅ 转换任务（共 5 个）\n\n`;
   
   markdown += `### 任务 1: 转换主应用组件\n\n`;
-  markdown += `**目标**: 将 \`App.tsx\` 转换为 Axhub 组件规范\n\n`;
+  markdown += `**目标**: 将 \`App.tsx\` 转换为本项目组件规范\n\n`;
   if (report.structure.hasAppTsx) {
     markdown += `**参考文件**: \`src/pages/${pageName}/App.tsx\`\n\n`;
     markdown += `**操作**:\n`;
     markdown += `1. 重命名 \`App.tsx\` 为 \`index.tsx\`\n`;
-    markdown += `2. 按照 \`/rules/ai-studio-project-converter.md\` 中的 Axhub 组件规范改造\n`;
+    markdown += `2. 按照 \`/rules/ai-studio-project-converter.md\` 中的本项目组件规范改造\n`;
     markdown += `3. 添加文件头部注释（\`@name\` 和参考资料）\n`;
-    markdown += `4. 使用 \`forwardRef<AxhubHandle, AxhubProps>\` 包装\n`;
+    markdown += `4. 使用 \`forwardRef<AxureHandle, AxureProps>\` 包装\n`;
     markdown += `5. 实现 \`useImperativeHandle\`\n`;
     markdown += `6. 保持原有的 JSX、Hooks 和 Tailwind 类名不变\n\n`;
   } else {
@@ -292,7 +292,7 @@ function generateTasksDocument(analysis, outputDir, pageName, tempDir) {
     markdown += `- ✓ \`index.html\` (已提取信息)\n`;
   }
   if (report.structure.hasIndexTsx) {
-    markdown += `- ✓ \`index.tsx\` (Axhub 有自己的入口)\n`;
+    markdown += `- ✓ \`index.tsx\` (本项目有自己的入口)\n`;
   }
   if (report.structure.hasViteConfig) {
     markdown += `- ⚠️ \`vite.config.ts\` (检查路径别名后可删除)\n`;
@@ -306,7 +306,6 @@ function generateTasksDocument(analysis, outputDir, pageName, tempDir) {
   if (report.dependencies.toInstall && report.dependencies.toInstall.length > 0) {
     markdown += `**执行命令**:\n`;
     markdown += `\`\`\`bash\n`;
-    markdown += `cd apps/axhub-make\n`;
     markdown += `pnpm add ${report.dependencies.toInstall.join(' ')}\n`;
     markdown += `\`\`\`\n\n`;
     

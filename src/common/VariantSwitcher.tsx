@@ -1,5 +1,5 @@
 /**
- * Axhub Variant Switcher 组件 (重构版)
+ *本项目Variant Switcher 组件 (重构版)
  *
  * 核心特性：
  * - 零依赖：不依赖任何外部 CSS 框架或图标库

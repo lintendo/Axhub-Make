@@ -1,17 +1,17 @@
 ---
 name: v0-project-converter
-description: 将 V0 生成的 Next.js 项目转换为 Axhub Make 页面组件的流程规范；在执行 V0 项目转换、依赖清理、路径别名替换、样式迁移与验收时使用。
+description: 将 V0 生成的 Next.js 项目转换为本项目页面组件的流程规范；在执行 V0 项目转换、依赖清理、路径别名替换、样式迁移与验收时使用。
 ---
 
 # V0 项目转换规范
 
-将 V0 生成的 Next.js 项目快速转换为 Axhub 页面组件，保持视觉效果和功能，符合 Axhub 开发规范。
+将 V0 生成的 Next.js 项目快速转换为本项目页面组件，保持视觉效果和功能，符合本项目开发规范。
 
 ## 核心目标
 
 - 保持页面视觉一致性
 - 移除 Next.js 特有实现
-- 产出可在 Axhub 中运行的页面组件
+- 产出可在本项目中运行的页面组件
 
 ## 使用方式
 
@@ -44,7 +44,7 @@ node scripts/v0-converter.mjs "temp/my-v0-project" my-page
 
 ## 转换要点
 
-### Axhub 组件规范
+###本项目组件规范
 
 所有页面组件必须遵循以下格式：
 
@@ -59,9 +59,9 @@ node scripts/v0-converter.mjs "temp/my-v0-project" my-page
 
 import './style.css';
 import React, { forwardRef, useImperativeHandle } from 'react';
-import type { AxhubProps, AxhubHandle } from '../../common/axhub-types';
+import type { AxureProps, AxureHandle } from '../../common/axure-types';
 
-const Component = forwardRef<AxhubHandle, AxhubProps>(function PageName(innerProps, ref) {
+const Component = forwardRef<AxureHandle, AxureProps>(function PageName(innerProps, ref) {
   useImperativeHandle(ref, function () {
     return {
       getVar: function () { return undefined; },
@@ -90,7 +90,7 @@ export default Component;
 
 ```typescript
 // ❌ 需要移除
-"use client"                                    // Next.js 客户端组件指令，Axhub 不需要
+"use client"                                    // Next.js 客户端组件指令，本项目不需要
 import { useRouter } from 'next/navigation'    // Next.js 路由
 import Image from 'next/image'                 // Next.js 图片组件
 import Link from 'next/link'                   // Next.js 链接组件
@@ -106,7 +106,7 @@ import { Analytics } from '@vercel/analytics/next'  // Vercel 分析
 ```
 
 **关于 "use client"**：
-- Axhub 不使用 Next.js，所有组件都是客户端渲染
+-本项目不使用 Next.js，所有组件都是客户端渲染
 - 必须删除，否则会导致语法错误
 
 ### 路径别名转换
@@ -145,7 +145,7 @@ import { cn } from "../../lib/utils"
 排除 Next.js 相关依赖：
 - `next` 及所有 `next-*` 包
 - `@vercel/*` 包
-- `react` 和 `react-dom`（Axhub 已有）
+- `react` 和 `react-dom`（本项目已有）
 
 保留其他依赖：
 - `class-variance-authority`, `clsx`, `tailwind-merge`

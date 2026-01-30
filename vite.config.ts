@@ -600,6 +600,83 @@ function docsApiPlugin(): Plugin {
           return;
         }
 
+        if (req.method === 'PUT' && req.url.startsWith('/api/docs/')) {
+          const encodedDocName = req.url.replace('/api/docs/', '').split('?')[0];
+          if (!encodedDocName) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'Missing document name' }));
+            return;
+          }
+
+          const chunks: Buffer[] = [];
+          req.on('data', (chunk: Buffer) => chunks.push(chunk));
+          req.on('end', () => {
+            try {
+              let bodyData: any = {};
+              try {
+                const bodyText = Buffer.concat(chunks).toString('utf8');
+                bodyData = bodyText ? JSON.parse(bodyText) : {};
+              } catch (e) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+                return;
+              }
+
+              const newBaseName = String(bodyData?.newBaseName || '').trim();
+              if (!newBaseName) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: 'Missing newBaseName parameter' }));
+                return;
+              }
+              if (/[/\\:*?"<>|]/.test(newBaseName)) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: 'Invalid newBaseName format' }));
+                return;
+              }
+
+              const docName = decodeURIComponent(encodedDocName);
+              const docsDir = path.resolve(__dirname, 'assets/docs');
+              const oldPath = path.join(docsDir, docName);
+
+              if (!oldPath.startsWith(docsDir)) {
+                res.statusCode = 403;
+                res.end(JSON.stringify({ error: 'Forbidden' }));
+                return;
+              }
+              if (!fs.existsSync(oldPath)) {
+                res.statusCode = 404;
+                res.end(JSON.stringify({ error: 'Document not found' }));
+                return;
+              }
+
+              const ext = path.extname(oldPath);
+              const newFileName = `${newBaseName}${ext}`;
+              const newPath = path.join(docsDir, newFileName);
+
+              if (!newPath.startsWith(docsDir)) {
+                res.statusCode = 403;
+                res.end(JSON.stringify({ error: 'Forbidden' }));
+                return;
+              }
+              if (fs.existsSync(newPath)) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: '目标文件已存在' }));
+                return;
+              }
+
+              fs.renameSync(oldPath, newPath);
+
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: true, name: newFileName }));
+            } catch (error: any) {
+              console.error('Error renaming doc:', error);
+              res.statusCode = 500;
+              res.end(JSON.stringify({ error: error.message }));
+            }
+          });
+          return;
+        }
+
         // GET 请求处理
         if (req.method !== 'GET') {
           return next();

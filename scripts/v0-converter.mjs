@@ -243,9 +243,9 @@ function generateTasksDocument(analysis, outputDir, pageName, tempDir) {
   markdown += `## ✅ 转换任务\n\n`;
   
   markdown += `### 任务 1: 创建 index.tsx\n\n`;
-  markdown += `**目标**: 将 \`app/page.tsx\` 包装为 Axhub 组件\n\n`;
+  markdown += `**目标**: 将 \`app/page.tsx\` 包装为本项目组件\n\n`;
   markdown += `**参考文件**: \`src/pages/${pageName}/app/page.tsx\`\n\n`;
-  markdown += `**操作**: 按照 \`/rules/v0-project-converter.md\` 中的 Axhub 组件规范创建 \`index.tsx\`\n\n`;
+  markdown += `**操作**: 按照 \`/rules/v0-project-converter.md\` 中的本项目组件规范创建 \`index.tsx\`\n\n`;
   
   markdown += `### 任务 2: 创建 style.css\n\n`;
   markdown += `**目标**: 基于 \`app/globals.css\` 创建样式文件\n\n`;
@@ -285,7 +285,6 @@ function generateTasksDocument(analysis, outputDir, pageName, tempDir) {
   if (report.dependencies.toInstall && report.dependencies.toInstall.length > 0) {
     markdown += `**执行命令**:\n`;
     markdown += `\`\`\`bash\n`;
-    markdown += `cd apps/axhub-make\n`;
     markdown += `pnpm add ${report.dependencies.toInstall.join(' ')}\n`;
     markdown += `\`\`\`\n\n`;
   } else {

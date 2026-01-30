@@ -48,9 +48,9 @@ import type {
   ConfigItem,
   Action,
   EventItem,
-  AxhubProps,
-  AxhubHandle
-} from '../../common/axhub-types';
+  AxureProps,
+  AxureHandle
+} from '../../common/axure-types';
 
 import SideMenu from '../../elements/side-menu';
 
@@ -257,7 +257,7 @@ const DATA_LIST: DataDesc[] = [
   }
 ];
 
-const Component = forwardRef<AxhubHandle, AxhubProps>(function EcommerceDashboard(innerProps, ref) {
+const Component = forwardRef<AxureHandle, AxureProps>(function EcommerceDashboard(innerProps, ref) {
   const dataSource = innerProps && innerProps.data ? innerProps.data : {};
   const configSource = innerProps && innerProps.config ? innerProps.config : {};
   const onEventHandler = typeof innerProps.onEvent === 'function' ? innerProps.onEvent : () => undefined;
