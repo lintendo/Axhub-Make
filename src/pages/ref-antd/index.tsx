@@ -113,7 +113,7 @@ const SalesTrendChart = () => {
           lineStyle: { width: 3 }
         },
         {
-          name: '访问量',
+          name: '访问人数',
           type: 'line',
           smooth: true,
           showSymbol: false,
@@ -230,7 +230,7 @@ const VAR_LIST: KeyDesc[] = [
 ];
 
 const CONFIG_LIST: ConfigItem[] = [
-  { type: 'input', attributeId: 'title', displayName: '页面标题', info: '显示在页面顶部的标题', initialValue: '电商后台概览' }
+  { type: 'input', attributeId: 'title', displayName: '页面标题', info: '显示在页面顶部的标题', initialValue: '电商后台' }
 ];
 
 const DATA_LIST: DataDesc[] = [
@@ -262,7 +262,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function EcommerceDashboar
   const configSource = innerProps && innerProps.config ? innerProps.config : {};
   const onEventHandler = typeof innerProps.onEvent === 'function' ? innerProps.onEvent : () => undefined;
 
-  const title = typeof configSource.title === 'string' && configSource.title ? configSource.title : '电商后台概览';
+  const title = typeof configSource.title === 'string' && configSource.title ? configSource.title : '电商后台';
   
   const { token } = theme.useToken();
 
@@ -396,7 +396,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function EcommerceDashboar
             <Col xs={24} sm={12} lg={6}>
               <Card bordered={false} bodyStyle={{ padding: '20px 24px' }}>
                 <Statistic
-                  title="访问量"
+                  title="访问人数"
                   value={8846}
                   valueStyle={{ color: '#1e293b', fontSize: 24, fontWeight: 'bold' }}
                   prefix={<UserOutlined style={{ fontSize: 18, color: '#3b82f6', marginRight: 8 }} />}

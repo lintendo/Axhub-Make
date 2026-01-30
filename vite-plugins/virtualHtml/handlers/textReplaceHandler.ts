@@ -25,6 +25,8 @@ async function getAllFilePaths(dirPath: string): Promise<string[]> {
   return files;
 }
 
+type TextReplacement = { searchText: string; replaceText: string };
+
 async function replaceMatches(dirPath: string, searchText: string, replaceText: string): Promise<number> {
   let changedFilesCount = 0;
   const files = await getAllFilePaths(dirPath);
@@ -34,6 +36,37 @@ async function replaceMatches(dirPath: string, searchText: string, replaceText: 
       const content = await fs.promises.readFile(file, 'utf-8');
       if (content.includes(searchText)) {
         const newContent = content.replaceAll(searchText, replaceText);
+        await fs.promises.writeFile(file, newContent, 'utf-8');
+        console.log(`[API] ✅ 已修改: ${file}`);
+        changedFilesCount++;
+      }
+    } catch (err) {
+      console.error(`处理文件失败: ${file}`, err);
+    }
+  }
+
+  return changedFilesCount;
+}
+
+async function replaceMatchesBatch(dirPath: string, replacements: TextReplacement[]): Promise<number> {
+  let changedFilesCount = 0;
+  const files = await getAllFilePaths(dirPath);
+
+  for (const file of files) {
+    try {
+      const content = await fs.promises.readFile(file, 'utf-8');
+      let newContent = content;
+      let changed = false;
+
+      for (const { searchText, replaceText } of replacements) {
+        if (!searchText) continue;
+        if (newContent.includes(searchText)) {
+          newContent = newContent.replaceAll(searchText, replaceText);
+          changed = true;
+        }
+      }
+
+      if (changed && newContent !== content) {
         await fs.promises.writeFile(file, newContent, 'utf-8');
         console.log(`[API] ✅ 已修改: ${file}`);
         changedFilesCount++;
@@ -56,12 +89,12 @@ export function handleTextReplace(req: IncomingMessage, res: ServerResponse): bo
     
     req.on('end', async () => {
       try {
-        const { path: targetPath, searchText, replaceText } = JSON.parse(body);
+        const { path: targetPath, searchText, replaceText, replacements } = JSON.parse(body);
         
-        if (!targetPath || !searchText || replaceText === undefined) {
+        if (!targetPath || (!searchText && !Array.isArray(replacements))) {
           res.statusCode = 400;
           res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ error: 'path, searchText, and replaceText are required' }));
+          res.end(JSON.stringify({ error: 'path and replacement data are required' }));
           return;
         }
 
@@ -82,7 +115,33 @@ export function handleTextReplace(req: IncomingMessage, res: ServerResponse): bo
           return;
         }
 
-        const changedFiles = await replaceMatches(fullPath, searchText, replaceText);
+        let changedFiles = 0;
+        if (Array.isArray(replacements)) {
+          const cleaned = replacements
+            .filter((item: any) => item && typeof item.searchText === 'string' && item.replaceText !== undefined)
+            .map((item: any) => ({
+              searchText: item.searchText,
+              replaceText: String(item.replaceText ?? '')
+            }));
+
+          if (cleaned.length === 0) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'replacements is empty' }));
+            return;
+          }
+
+          changedFiles = await replaceMatchesBatch(fullPath, cleaned);
+        } else {
+          if (!searchText || replaceText === undefined) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'searchText and replaceText are required' }));
+            return;
+          }
+
+          changedFiles = await replaceMatches(fullPath, searchText, replaceText);
+        }
         console.log(`[API] 替换完成: 共修改了 ${changedFiles} 个文件`);
 
         res.statusCode = 200;

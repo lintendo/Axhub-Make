@@ -25,6 +25,8 @@ async function getAllFilePaths(dirPath: string): Promise<string[]> {
   return files;
 }
 
+type TextReplacement = { searchText: string };
+
 async function countMatches(dirPath: string, searchText: string): Promise<number> {
   let totalCount = 0;
   const files = await getAllFilePaths(dirPath);
@@ -44,6 +46,37 @@ async function countMatches(dirPath: string, searchText: string): Promise<number
   return totalCount;
 }
 
+async function countMatchesBatch(dirPath: string, replacements: TextReplacement[]): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  const files = await getAllFilePaths(dirPath);
+
+  const searchTexts = replacements
+    .map(item => item.searchText)
+    .filter(text => typeof text === 'string' && text.length > 0);
+
+  searchTexts.forEach(text => {
+    counts[text] = 0;
+  });
+
+  if (searchTexts.length === 0) return counts;
+
+  for (const file of files) {
+    try {
+      const content = await fs.promises.readFile(file, 'utf-8');
+      for (const searchText of searchTexts) {
+        const count = content.split(searchText).length - 1;
+        if (count > 0) {
+          counts[searchText] += count;
+        }
+      }
+    } catch (err) {
+      console.error(`无法读取文件: ${file}`, err);
+    }
+  }
+
+  return counts;
+}
+
 export function handleTextReplaceCount(req: IncomingMessage, res: ServerResponse): boolean {
   if (req.method === 'POST' && req.url?.startsWith('/api/text-replace/count')) {
     let body = '';
@@ -54,12 +87,12 @@ export function handleTextReplaceCount(req: IncomingMessage, res: ServerResponse
     
     req.on('end', async () => {
       try {
-        const { path: targetPath, searchText } = JSON.parse(body);
+        const { path: targetPath, searchText, searchTexts, replacements } = JSON.parse(body);
         
-        if (!targetPath || !searchText) {
+        if (!targetPath || (!searchText && !Array.isArray(searchTexts) && !Array.isArray(replacements))) {
           res.statusCode = 400;
           res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ error: 'path and searchText are required' }));
+          res.end(JSON.stringify({ error: 'path and search text data are required' }));
           return;
         }
 
@@ -80,12 +113,36 @@ export function handleTextReplaceCount(req: IncomingMessage, res: ServerResponse
           return;
         }
 
+        if (Array.isArray(replacements) || Array.isArray(searchTexts)) {
+          const list = Array.isArray(replacements)
+            ? replacements
+                .filter((item: any) => item && typeof item.searchText === 'string')
+                .map((item: any) => ({ searchText: String(item.searchText) }))
+            : (searchTexts || [])
+                .filter((item: any) => typeof item === 'string')
+                .map((item: any) => ({ searchText: String(item) }));
+
+          if (list.length === 0) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'searchTexts is empty' }));
+            return;
+          }
+
+          const countsMap = await countMatchesBatch(fullPath, list);
+          const totalCount = Object.values(countsMap).reduce((sum, value) => sum + value, 0);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: true, counts: countsMap, totalCount }));
+          return;
+        }
+
         const count = await countMatches(fullPath, searchText);
         console.log(`[API] 统计文本 "${searchText}" 出现次数: ${count}`);
 
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ success: true, count }));
+        res.end(JSON.stringify({ success: true, count, totalCount: count }));
       } catch (err) {
         console.error('[API] ❌ 统计文本失败:', err);
         res.statusCode = 500;
