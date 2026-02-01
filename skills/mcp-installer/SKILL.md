@@ -15,6 +15,7 @@ Install MCP server configurations across multiple clients and OSes with a CLI-fi
 
 - Identify the target client ID and OS; use `references/clients.md` for the supported list and known paths.
 - Gather MCP server definitions (name -> config object) and decide whether to override existing entries.
+- If any provided MCP config includes secrets (for example fields like `key`, `token`, `apiKey`, `accessToken`, `secret`, `password`, or `Authorization`, or env vars like `*_KEY`, `*_TOKEN`), pause the install and ask the user to obtain/provide those values first. Only proceed once the user confirms they have the required credentials (or requests installing a placeholder and will fill it in later).
 
 ### 2) Prefer @smithery/cli (when supported)
 
