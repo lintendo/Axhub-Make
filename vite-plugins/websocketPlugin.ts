@@ -1,6 +1,10 @@
 import type { Plugin, ViteDevServer } from 'vite';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { IncomingMessage } from 'http';
+import fs from 'fs';
+import path from 'path';
+import extractZip from 'extract-zip';
+import { exec } from 'child_process';
 
 export interface WebSocketMessage {
   type: string;
@@ -18,6 +22,80 @@ export interface ClientMeta {
   connectedAt: number;
 }
 
+interface UploadSession {
+  transferId: string;
+  pageName: string;
+  displayName?: string;
+  fileName: string;
+  mode: 'zip' | 'files';
+  totalChunks: number;
+  totalBytes?: number;
+  receivedChunks: number;
+  receivedBytes: number;
+  chunks: Map<number, Buffer>;
+  filesRoot?: string;
+  filesReceived: number;
+  startedAt: number;
+}
+
+interface HandleMessageContext {
+  clientMeta: Map<WebSocket, ClientMeta>;
+  uploadSessions: Map<string, UploadSession>;
+  projectRoot: string;
+}
+
+const IGNORED_EXTRACT_ENTRIES = new Set(['__MACOSX', '.DS_Store']);
+
+function ensureDir(dirPath: string) {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+}
+
+function inferExtractedRootFolder(extractDir: string) {
+  if (!fs.existsSync(extractDir)) {
+    return { entryCount: 0, hasRootFolder: false, rootFolderName: '' };
+  }
+
+  const entries = fs
+    .readdirSync(extractDir, { withFileTypes: true })
+    .filter(entry => !IGNORED_EXTRACT_ENTRIES.has(entry.name));
+
+  if (entries.length === 1 && entries[0].isDirectory()) {
+    return { entryCount: entries.length, hasRootFolder: true, rootFolderName: entries[0].name };
+  }
+
+  return { entryCount: entries.length, hasRootFolder: false, rootFolderName: '' };
+}
+
+function isSafeName(value: string) {
+  return Boolean(value && value.trim() && !value.includes('..') && !/[\\/]/.test(value));
+}
+
+function isSafeRelativePath(value: string) {
+  if (!value || typeof value !== 'string') return false;
+  const normalized = value.replace(/\\/g, '/');
+  if (normalized.startsWith('/') || normalized.startsWith('~')) return false;
+  if (normalized.split('/').some(part => part === '..')) return false;
+  return true;
+}
+
+function isValidDisplayName(value?: string) {
+  if (value === undefined) return true;
+  const text = String(value).trim();
+  return text.length > 0 && text.length <= 200;
+}
+
+function sendWsMessage(ws: WebSocket, payload: any) {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(payload));
+  }
+}
+
+function quoteForShell(value: string) {
+  return `"${String(value).replace(/["\\$`]/g, '\\$&')}"`;
+}
+
 /**
  * WebSocket 插件 - 在 Vite 开发服务器上添加 WebSocket 支持
  */
@@ -25,8 +103,10 @@ export function websocketPlugin(): Plugin {
   let wss: WebSocketServer | null = null;
   const clients = new Set<WebSocket>();
   const clientMeta = new Map<WebSocket, ClientMeta>();
+  const uploadSessions = new Map<string, UploadSession>();
   let nextClientId = 1;
   const WS_PATH = '/ws';
+  const projectRoot = process.cwd();
 
   return {
     name: 'vite-websocket',
@@ -108,7 +188,7 @@ export function websocketPlugin(): Plugin {
             });
 
             // 处理不同类型的消息
-            handleMessage(ws, message, clients);
+            handleMessage(ws, message, clients, { clientMeta, uploadSessions, projectRoot });
           } catch (err) {
             console.error('[WebSocket] 解析消息失败:', err);
             ws.send(JSON.stringify({ 
@@ -342,7 +422,8 @@ export function websocketPlugin(): Plugin {
 function handleMessage(
   ws: WebSocket, 
   message: WebSocketMessage, 
-  clients: Set<WebSocket>
+  clients: Set<WebSocket>,
+  context: HandleMessageContext
 ) {
   switch (message.type) {
     case 'identify':
@@ -350,11 +431,11 @@ function handleMessage(
       {
         const meta = Array.from(clients).find(c => c === ws);
         if (meta) {
-          const clientInfo = clientMeta.get(ws);
+          const clientInfo = context.clientMeta.get(ws);
           if (clientInfo) {
             clientInfo.type = message.client || clientInfo.type;
             clientInfo.version = message.version || clientInfo.version;
-            clientMeta.set(ws, clientInfo);
+            context.clientMeta.set(ws, clientInfo);
             console.log('[WebSocket] 客户端已识别:', {
               id: clientInfo.id,
               type: clientInfo.type,
@@ -387,6 +468,298 @@ function handleMessage(
         type: 'echo',
         data: message.data
       }));
+      break;
+    case 'chrome-export:init':
+      {
+        const data = (message.data ?? message.payload ?? {}) as any;
+        const transferId = String(data.transferId || '').trim();
+        const pageName = String(data.pageName || '').trim();
+        const displayName = data.displayName !== undefined ? String(data.displayName).trim() : undefined;
+        const mode = data.mode === 'files' ? 'files' : 'zip';
+        const totalChunks = Number(data.totalChunks);
+        const totalBytes = typeof data.totalBytes === 'number' ? data.totalBytes : undefined;
+        const fileNameRaw = String(data.fileName || 'chrome-export.zip');
+        const fileName = path.basename(fileNameRaw || 'chrome-export.zip');
+
+        if (!transferId || !isSafeName(transferId)) {
+          return sendWsMessage(ws, { type: 'chrome-export:error', message: 'transferId is invalid' });
+        }
+        if (!pageName || !isSafeName(pageName)) {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'pageName is invalid' });
+        }
+        if (!isValidDisplayName(displayName)) {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'displayName is invalid' });
+        }
+        if (mode === 'zip' && (!Number.isFinite(totalChunks) || totalChunks <= 0)) {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'totalChunks is invalid' });
+        }
+        if (context.uploadSessions.has(transferId)) {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'transferId already exists' });
+        }
+
+        const transferDir = path.join(context.projectRoot, 'temp', 'chrome-export', transferId);
+        const filesRoot = mode === 'files' ? path.join(transferDir, 'files') : undefined;
+        if (filesRoot) {
+          ensureDir(filesRoot);
+        }
+
+        const session: UploadSession = {
+          transferId,
+          pageName,
+          displayName,
+          fileName,
+          mode,
+          totalChunks,
+          totalBytes,
+          receivedChunks: 0,
+          receivedBytes: 0,
+          chunks: new Map(),
+          filesRoot,
+          filesReceived: 0,
+          startedAt: Date.now()
+        };
+
+        context.uploadSessions.set(transferId, session);
+        sendWsMessage(ws, { type: 'chrome-export:ack', transferId });
+      }
+      break;
+    case 'chrome-export:chunk':
+      {
+        const data = (message.data ?? message.payload ?? {}) as any;
+        const transferId = String(data.transferId || '').trim();
+        const chunkIndex = Number(data.index);
+        const chunkData = data.data;
+
+        if (!transferId || !context.uploadSessions.has(transferId)) {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'unknown transferId' });
+        }
+        const session = context.uploadSessions.get(transferId)!;
+        if (session.mode !== 'zip') {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'chunk not allowed for files mode' });
+        }
+        if (!Number.isFinite(chunkIndex) || chunkIndex < 0) {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'invalid chunk index' });
+        }
+        if (typeof chunkData !== 'string' || !chunkData) {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'invalid chunk data' });
+        }
+        if (chunkIndex >= session.totalChunks) {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'chunk index out of range' });
+        }
+
+        if (!session.chunks.has(chunkIndex)) {
+          const buffer = Buffer.from(chunkData, 'base64');
+          session.chunks.set(chunkIndex, buffer);
+          session.receivedChunks = session.chunks.size;
+          session.receivedBytes += buffer.byteLength;
+        }
+
+        sendWsMessage(ws, {
+          type: 'chrome-export:progress',
+          transferId,
+          receivedChunks: session.receivedChunks,
+          totalChunks: session.totalChunks,
+          receivedBytes: session.receivedBytes,
+          totalBytes: session.totalBytes
+        });
+      }
+      break;
+    case 'chrome-export:file':
+      {
+        const data = (message.data ?? message.payload ?? {}) as any;
+        const transferId = String(data.transferId || '').trim();
+        const relativePath = String(data.path || data.relativePath || '').trim();
+        const fileData = data.data;
+
+        if (!transferId || !context.uploadSessions.has(transferId)) {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'unknown transferId' });
+        }
+        const session = context.uploadSessions.get(transferId)!;
+        if (session.mode !== 'files') {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'file not allowed for zip mode' });
+        }
+        if (!isSafeRelativePath(relativePath)) {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'invalid file path' });
+        }
+        if (typeof fileData !== 'string' || !fileData) {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'invalid file data' });
+        }
+        if (!session.filesRoot) {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'files root not ready' });
+        }
+
+        const targetPath = path.join(session.filesRoot, relativePath);
+        ensureDir(path.dirname(targetPath));
+
+        const buffer = Buffer.from(fileData, 'base64');
+        fs.writeFileSync(targetPath, buffer);
+        session.filesReceived += 1;
+
+        sendWsMessage(ws, {
+          type: 'chrome-export:progress',
+          transferId,
+          filesReceived: session.filesReceived
+        });
+      }
+      break;
+    case 'chrome-export:complete':
+      {
+        const data = (message.data ?? message.payload ?? {}) as any;
+        const transferId = String(data.transferId || '').trim();
+
+        if (!transferId || !context.uploadSessions.has(transferId)) {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'unknown transferId' });
+        }
+
+        const session = context.uploadSessions.get(transferId)!;
+        const inboxRoot = path.join(context.projectRoot, 'temp', 'chrome-export');
+        const transferDir = path.join(inboxRoot, transferId);
+        const extractDir = path.join(transferDir, 'extract');
+
+        if (session.mode === 'zip') {
+          const missing: number[] = [];
+          for (let i = 0; i < session.totalChunks; i += 1) {
+            if (!session.chunks.has(i)) {
+              missing.push(i);
+            }
+          }
+
+          if (missing.length > 0) {
+            return sendWsMessage(ws, {
+              type: 'chrome-export:error',
+              transferId,
+              message: 'missing chunks',
+              missing
+            });
+          }
+
+          const orderedBuffers: Buffer[] = new Array(session.totalChunks);
+          for (let i = 0; i < session.totalChunks; i += 1) {
+            orderedBuffers[i] = session.chunks.get(i)!;
+          }
+
+          const zipBuffer = Buffer.concat(orderedBuffers);
+          const zipPath = path.join(transferDir, session.fileName);
+
+          ensureDir(transferDir);
+          fs.writeFileSync(zipPath, zipBuffer);
+
+          if (fs.existsSync(extractDir)) {
+            fs.rmSync(extractDir, { recursive: true, force: true });
+          }
+          ensureDir(extractDir);
+
+          sendWsMessage(ws, { type: 'chrome-export:status', transferId, stage: 'extracting' });
+
+          extractZip(zipPath, { dir: extractDir })
+          .then(() => {
+            const inferred = inferExtractedRootFolder(extractDir);
+            if (inferred.entryCount === 0) {
+              throw new Error('empty zip');
+            }
+            const sourceDir = inferred.hasRootFolder
+              ? path.join(extractDir, inferred.rootFolderName)
+              : extractDir;
+
+            const outputName = session.pageName;
+            if (!isSafeName(outputName)) {
+              throw new Error('invalid pageName');
+            }
+
+            const scriptPath = path.join(context.projectRoot, 'scripts', 'chrome-export-converter.mjs');
+            const displayNameArg = session.displayName ? ` --display-name ${quoteForShell(session.displayName)}` : '';
+            const command = `node "${scriptPath}" "${sourceDir}" "${outputName}"${displayNameArg}`;
+
+            sendWsMessage(ws, { type: 'chrome-export:status', transferId, stage: 'importing' });
+
+            exec(command, (error, stdout, stderr) => {
+              if (error) {
+                sendWsMessage(ws, {
+                  type: 'chrome-export:error',
+                  transferId,
+                  message: error.message || 'import failed'
+                });
+              } else {
+                const outputDir = path.join(context.projectRoot, 'src', 'pages', outputName);
+                sendWsMessage(ws, {
+                  type: 'chrome-export:done',
+                  transferId,
+                  pageName: outputName,
+                  displayName: session.displayName,
+                  sourceDir,
+                  outputDir,
+                  stdout: stdout ? String(stdout).trim() : undefined,
+                  stderr: stderr ? String(stderr).trim() : undefined
+                });
+                if (fs.existsSync(transferDir)) {
+                  fs.rmSync(transferDir, { recursive: true, force: true });
+                }
+                context.uploadSessions.delete(transferId);
+              }
+            });
+          })
+          .catch((error: any) => {
+            sendWsMessage(ws, {
+              type: 'chrome-export:error',
+              transferId,
+              message: error?.message || 'extract failed'
+            });
+          });
+        } else {
+          if (!session.filesRoot) {
+            return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'files root not ready' });
+          }
+
+          const sourceDir = session.filesRoot;
+          const outputName = session.pageName;
+          if (!isSafeName(outputName)) {
+            return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'invalid pageName' });
+          }
+
+          const scriptPath = path.join(context.projectRoot, 'scripts', 'chrome-export-converter.mjs');
+          const displayNameArg = session.displayName ? ` --display-name ${quoteForShell(session.displayName)}` : '';
+          const command = `node "${scriptPath}" "${sourceDir}" "${outputName}"${displayNameArg}`;
+
+          sendWsMessage(ws, { type: 'chrome-export:status', transferId, stage: 'importing' });
+
+          exec(command, (error, stdout, stderr) => {
+            if (error) {
+              sendWsMessage(ws, {
+                type: 'chrome-export:error',
+                transferId,
+                message: error.message || 'import failed'
+              });
+            } else {
+              const outputDir = path.join(context.projectRoot, 'src', 'pages', outputName);
+              sendWsMessage(ws, {
+                type: 'chrome-export:done',
+                transferId,
+                pageName: outputName,
+                displayName: session.displayName,
+                sourceDir,
+                outputDir,
+                stdout: stdout ? String(stdout).trim() : undefined,
+                stderr: stderr ? String(stderr).trim() : undefined
+              });
+              if (fs.existsSync(transferDir)) {
+                fs.rmSync(transferDir, { recursive: true, force: true });
+              }
+              context.uploadSessions.delete(transferId);
+            }
+          });
+        }
+      }
+      break;
+    case 'chrome-export:abort':
+      {
+        const data = (message.data ?? message.payload ?? {}) as any;
+        const transferId = String(data.transferId || '').trim();
+        if (!transferId || !context.uploadSessions.has(transferId)) {
+          return sendWsMessage(ws, { type: 'chrome-export:error', transferId, message: 'unknown transferId' });
+        }
+        context.uploadSessions.delete(transferId);
+        sendWsMessage(ws, { type: 'chrome-export:aborted', transferId });
+      }
       break;
 
     default:

@@ -287,11 +287,19 @@ function convertStyleToJSX(styleStr) {
 /**
  * 生成组件代码
  */
-function generateComponent(pageName, bodyContent, headContent) {
-  const componentName = pageName
+function normalizeDisplayName(displayName) {
+  const text = String(displayName ?? '').trim();
+  const singleLine = text.replace(/\r?\n/g, ' ');
+  const safeText = singleLine.replace(/\*\//g, '* /');
+  return safeText.slice(0, 200);
+}
+
+function generateComponent(pageSlug, displayName, bodyContent, headContent) {
+  const componentName = pageSlug
     .split(/[-_\s]+/)
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join('');
+  const safeDisplayName = normalizeDisplayName(displayName || pageSlug);
   
   let cleanedContent = bodyContent.trim();
   if (cleanedContent.startsWith('{/*')) {
@@ -360,7 +368,7 @@ function generateComponent(pageName, bodyContent, headContent) {
   }
   
   return `/**
- * @name ${pageName}
+ * @name ${safeDisplayName}
  * 
  * 参考资料：
  * - /rules/development-standards.md
@@ -385,16 +393,16 @@ class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('[${pageName}] 组件渲染错误:', error);
-    console.error('[${pageName}] 错误详情:', errorInfo);
-    console.error('[${pageName}] 错误堆栈:', error.stack);
+    console.error('[${pageSlug}] 组件渲染错误:', error);
+    console.error('[${pageSlug}] 错误详情:', errorInfo);
+    console.error('[${pageSlug}] 错误堆栈:', error.stack);
   }
 
   render() {
     if (this.state.hasError) {
       return (
         <div style={{ padding: '20px', color: 'red', border: '2px solid red', margin: '20px' }}>
-          <h2>组件渲染失败: ${pageName}</h2>
+          <h2>组件渲染失败: ${safeDisplayName}</h2>
           <pre style={{ whiteSpace: 'pre-wrap', fontSize: '12px' }}>
             {this.state.error?.toString()}
             {this.state.error?.stack}
@@ -408,7 +416,7 @@ class ErrorBoundary extends React.Component<
 }
 
 const Component = forwardRef<AxureHandle, AxureProps>(function ${componentName}(innerProps, ref) {
-  console.log('[${pageName}] 组件开始渲染');
+  console.log('[${pageSlug}] 组件开始渲染');
   
   useImperativeHandle(ref, function () {
     return {
@@ -422,14 +430,14 @@ const Component = forwardRef<AxureHandle, AxureProps>(function ${componentName}(
     };
   }, []);
 ${injectionCode}
-  console.log('[${pageName}] 准备返回 JSX');
+  console.log('[${pageSlug}] 准备返回 JSX');
   
   try {
     return (
 ${finalContent.split('\n').map(line => '      ' + line).join('\n')}
     );
   } catch (error) {
-    console.error('[${pageName}] JSX 渲染错误:', error);
+    console.error('[${pageSlug}] JSX 渲染错误:', error);
     throw error;
   }
 });
@@ -544,8 +552,8 @@ function extractFontsFromCSS(cssPath) {
 /**
  * 转换单个页面
  */
-function convertPage(sourcePath, outputDir, pageName) {
-  log(`正在转换页面: ${pageName}`, 'progress');
+function convertPage(sourcePath, outputDir, pageSlug, displayName) {
+  log(`正在转换页面: ${pageSlug}`, 'progress');
   
   // Chrome 扩展导出固定使用 index.html
   const htmlPath = path.join(sourcePath, 'index.html');
@@ -572,7 +580,7 @@ function convertPage(sourcePath, outputDir, pageName) {
   ensureDir(outputDir);
   
   // 生成组件和样式
-  const componentCode = generateComponent(pageName, bodyContent, headContent);
+  const componentCode = generateComponent(pageSlug, displayName, bodyContent, headContent);
   const styleCSS = generateStyleCSS(fonts, sourcePath);
   
   fs.writeFileSync(path.join(outputDir, 'index.tsx'), componentCode);
@@ -620,7 +628,7 @@ function convertPage(sourcePath, outputDir, pageName) {
     }
   });
   
-  log(`页面转换完成: ${pageName}`, 'info');
+  log(`页面转换完成: ${pageSlug}`, 'info');
 }
 
 /**
@@ -648,25 +656,54 @@ async function main() {
 Chrome 扩展导出转换器
 
 使用方法:
-  node scripts/chrome-export-converter.mjs <source-dir> [output-name]
+  node scripts/chrome-export-converter.mjs <source-dir> [output-name] [display-name]
+  node scripts/chrome-export-converter.mjs <source-dir> --name <output-name> --display-name <display-name>
 
 参数说明:
   source-dir   : Chrome 扩展导出的目录（包含 index.html）
   output-name  : 输出页面名称（可选，默认使用目录名）
+  display-name : 页面显示名（可选，写入 index.tsx 的 @name）
 
 示例:
   node scripts/chrome-export-converter.mjs ".drafts/my-export" my-page
+  node scripts/chrome-export-converter.mjs ".drafts/my-export" my-page "登录页"
     `);
     process.exit(0);
   }
-  
-  const sourceDirArg = args[0];
-  const outputName = args[1] || path.basename(sourceDirArg)
+
+  const flags = {};
+  const positionals = [];
+  for (let i = 0; i < args.length; i += 1) {
+    const token = args[i];
+    if (token === '--name' || token === '--display-name') {
+      const next = args[i + 1];
+      if (typeof next === 'string' && next) {
+        flags[token] = next;
+        i += 1;
+      } else {
+        flags[token] = '';
+      }
+      continue;
+    }
+    positionals.push(token);
+  }
+
+  const sourceDirArg = positionals[0];
+  const outputNameRaw = flags['--name'] || positionals[1] || path.basename(sourceDirArg);
+  const outputName = String(outputNameRaw)
     .replace(/[^a-z0-9-]/gi, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .toLowerCase();
-  
+  const displayNameRaw = flags['--display-name'] ?? positionals[2];
+  const displayName = (displayNameRaw !== undefined ? String(displayNameRaw).trim() : '') || outputName;
+  if (displayNameRaw !== undefined) {
+    const trimmedDisplayName = String(displayNameRaw).trim();
+    if (!trimmedDisplayName || trimmedDisplayName.length > 200) {
+      throw new Error('displayName 长度必须在 1-200 字符');
+    }
+  }
+
   const sourcePath = path.resolve(CONFIG.projectRoot, sourceDirArg);
   const outputDir = path.join(CONFIG.pagesDir, outputName);
   
@@ -681,7 +718,7 @@ Chrome 扩展导出转换器
     const { type, pages } = detectProjectType(sourcePath);
     log(`项目类型: ${type}`, 'info');
     
-    convertPage(pages[0].path, outputDir, outputName);
+    convertPage(pages[0].path, outputDir, outputName, displayName);
     log('✅ 转换完成！', 'info');
     log(`📁 页面位置: ${outputDir}`, 'info');
     
