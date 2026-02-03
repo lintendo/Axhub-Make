@@ -55,6 +55,14 @@ function getLocalIP(): string {
   return 'localhost';
 }
 
+function getRequestPathname(req: any): string {
+  try {
+    return new URL(req.url || '/', `http://${req.headers.host}`).pathname;
+  } catch {
+    return (req.url || '/').split('?')[0];
+  }
+}
+
 /**
  * 局域网访问控制插件
  * 根据 allowLAN 配置决定是否允许非本地 IP 访问
@@ -256,6 +264,7 @@ function serveAdminPlugin(): Plugin {
     configureServer(server: any) {
       server.middlewares.use((req: any, res: any, next: any) => {
         const adminDir = path.resolve(__dirname, 'admin');
+        const pathname = getRequestPathname(req);
         
         // 获取运行时的局域网 IP 和端口
         const localIP = getLocalIP();
@@ -275,7 +284,7 @@ function serveAdminPlugin(): Plugin {
   </script>`;
         
         // 处理根路径 / 或 /index.html
-        if (req.url === '/' || req.url === '/index.html') {
+        if (pathname === '/' || pathname === '/index.html') {
           const indexPath = path.join(adminDir, 'index.html');
           if (fs.existsSync(indexPath)) {
             let html = fs.readFileSync(indexPath, 'utf8');
@@ -288,8 +297,8 @@ function serveAdminPlugin(): Plugin {
         }
         
         // 处理 /*.html 请求（如 /projects.html）
-        if (req.url && req.url.match(/^\/[^/]+\.html$/)) {
-          const htmlPath = path.join(adminDir, req.url);
+        if (pathname && pathname.match(/^\/[^/]+\.html$/)) {
+          const htmlPath = path.join(adminDir, pathname);
           if (fs.existsSync(htmlPath)) {
             let html = fs.readFileSync(htmlPath, 'utf8');
             // 注入项目路径配置和局域网 IP
@@ -301,8 +310,8 @@ function serveAdminPlugin(): Plugin {
         }
         
         // 处理 /assets/* 静态资源
-        if (req.url && req.url.startsWith('/assets/')) {
-          const assetPath = path.join(adminDir, req.url);
+        if (pathname && pathname.startsWith('/assets/')) {
+          const assetPath = path.join(adminDir, pathname);
           if (fs.existsSync(assetPath)) {
             const ext = path.extname(assetPath);
             const contentTypes: Record<string, string> = {
@@ -321,8 +330,8 @@ function serveAdminPlugin(): Plugin {
         }
         
         // 处理 /images/* 静态资源
-        if (req.url && req.url.startsWith('/images/')) {
-          const imagePath = path.join(adminDir, req.url);
+        if (pathname && pathname.startsWith('/images/')) {
+          const imagePath = path.join(adminDir, pathname);
           if (fs.existsSync(imagePath)) {
             const ext = path.extname(imagePath);
             const contentTypes: Record<string, string> = {
@@ -340,8 +349,8 @@ function serveAdminPlugin(): Plugin {
         }
 
         // 处理 /admin/* 静态资源（如 auto-debug-client.js）
-        if (req.url && req.url.startsWith('/admin/')) {
-          const adminFilePath = path.join(adminDir, req.url.replace('/admin/', ''));
+        if (pathname && pathname.startsWith('/admin/')) {
+          const adminFilePath = path.join(adminDir, pathname.replace('/admin/', ''));
           if (fs.existsSync(adminFilePath)) {
             const ext = path.extname(adminFilePath);
             const contentTypes: Record<string, string> = {
@@ -357,8 +366,8 @@ function serveAdminPlugin(): Plugin {
         }
 
         // 处理根目录下的 .js 文件（如 /auto-debug-client.js）
-        if (req.url && req.url.match(/^\/[^/]+\.js$/)) {
-          const jsPath = path.join(adminDir, req.url);
+        if (pathname && pathname.match(/^\/[^/]+\.js$/)) {
+          const jsPath = path.join(adminDir, pathname);
           if (fs.existsSync(jsPath)) {
             res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
             res.end(fs.readFileSync(jsPath));
@@ -367,8 +376,8 @@ function serveAdminPlugin(): Plugin {
         }
 
         // 处理 /assets/docs/*/spec.html 请求（文档预览）
-        if (req.url && req.url.match(/^\/assets\/docs\/[^/]+\/spec\.html$/)) {
-          const encodedDocName = req.url.match(/^\/assets\/docs\/([^/]+)\/spec\.html$/)?.[1];
+        if (pathname && pathname.match(/^\/assets\/docs\/[^/]+\/spec\.html$/)) {
+          const encodedDocName = pathname.match(/^\/assets\/docs\/([^/]+)\/spec\.html$/)?.[1];
           if (encodedDocName) {
             const specTemplatePath = path.join(adminDir, 'spec-template.html');
             if (fs.existsSync(specTemplatePath)) {
@@ -392,8 +401,8 @@ function serveAdminPlugin(): Plugin {
         }
 
         // 处理 /assets/libraries/*/spec.html 请求（前端库预览）
-        if (req.url && req.url.match(/^\/assets\/libraries\/[^/]+\/spec\.html$/)) {
-          const libraryName = req.url.match(/^\/assets\/libraries\/([^/]+)\/spec\.html$/)?.[1];
+        if (pathname && pathname.match(/^\/assets\/libraries\/[^/]+\/spec\.html$/)) {
+          const libraryName = pathname.match(/^\/assets\/libraries\/([^/]+)\/spec\.html$/)?.[1];
           if (libraryName) {
             const specTemplatePath = path.join(adminDir, 'spec-template.html');
             if (fs.existsSync(specTemplatePath)) {
@@ -425,7 +434,8 @@ function downloadDistPlugin(): Plugin {
     name: 'download-dist-plugin',
     configureServer(server: any) {
       server.middlewares.use((req: any, res: any, next: any) => {
-        if (req.method !== 'GET' || req.url !== '/api/download-dist') {
+        const pathname = getRequestPathname(req);
+        if (req.method !== 'GET' || pathname !== '/api/download-dist') {
           return next();
         }
 
@@ -492,7 +502,8 @@ function versionApiPlugin(): Plugin {
     name: 'version-api-plugin',
     configureServer(server: any) {
       server.middlewares.use((req: any, res: any, next: any) => {
-        if (req.method !== 'GET' || req.url !== '/api/version') {
+        const pathname = getRequestPathname(req);
+        if (req.method !== 'GET' || pathname !== '/api/version') {
           return next();
         }
 
@@ -520,14 +531,15 @@ function docsApiPlugin(): Plugin {
     name: 'docs-api-plugin',
     configureServer(server: any) {
       server.middlewares.use((req: any, res: any, next: any) => {
-        if (!req.url.startsWith('/api/docs') && !req.url.startsWith('/api/libraries')) {
+        const pathname = getRequestPathname(req);
+        if (!pathname.startsWith('/api/docs') && !pathname.startsWith('/api/libraries')) {
           return next();
         }
 
         // DELETE /api/docs/:name - 删除文档
-        if (req.method === 'DELETE' && req.url.startsWith('/api/docs/')) {
+        if (req.method === 'DELETE' && pathname.startsWith('/api/docs/')) {
           try {
-            const docName = req.url.replace('/api/docs/', '').split('?')[0];
+            const docName = pathname.replace('/api/docs/', '');
             if (!docName) {
               res.statusCode = 400;
               res.end(JSON.stringify({ error: 'Missing document name' }));
@@ -563,9 +575,9 @@ function docsApiPlugin(): Plugin {
         }
 
         // DELETE /api/libraries/:name - 删除前端库
-        if (req.method === 'DELETE' && req.url.startsWith('/api/libraries/')) {
+        if (req.method === 'DELETE' && pathname.startsWith('/api/libraries/')) {
           try {
-            const libraryName = req.url.replace('/api/libraries/', '').split('?')[0];
+            const libraryName = pathname.replace('/api/libraries/', '');
             if (!libraryName) {
               res.statusCode = 400;
               res.end(JSON.stringify({ error: 'Missing library name' }));
@@ -600,8 +612,8 @@ function docsApiPlugin(): Plugin {
           return;
         }
 
-        if (req.method === 'PUT' && req.url.startsWith('/api/docs/')) {
-          const encodedDocName = req.url.replace('/api/docs/', '').split('?')[0];
+        if (req.method === 'PUT' && pathname.startsWith('/api/docs/')) {
+          const encodedDocName = pathname.replace('/api/docs/', '');
           if (!encodedDocName) {
             res.statusCode = 400;
             res.end(JSON.stringify({ error: 'Missing document name' }));
@@ -683,9 +695,9 @@ function docsApiPlugin(): Plugin {
         }
 
         // 处理 /api/libraries/:name.md 端点用于获取单个前端库内容
-        if (req.url.startsWith('/api/libraries/') && req.url !== '/api/libraries' && req.url !== '/api/libraries/') {
+        if (pathname.startsWith('/api/libraries/') && pathname !== '/api/libraries' && pathname !== '/api/libraries/') {
           try {
-            const encodedLibraryFile = req.url.replace('/api/libraries/', '').split('?')[0];
+            const encodedLibraryFile = pathname.replace('/api/libraries/', '');
             if (!encodedLibraryFile) {
               return next();
             }
@@ -719,9 +731,9 @@ function docsApiPlugin(): Plugin {
         }
 
         // 处理 /api/docs/:name 端点用于获取单个文档内容
-        if (req.url.startsWith('/api/docs/') && req.url !== '/api/docs' && req.url !== '/api/docs/') {
+        if (pathname.startsWith('/api/docs/') && pathname !== '/api/docs' && pathname !== '/api/docs/') {
           try {
-            const encodedDocName = req.url.replace('/api/docs/', '').split('?')[0];
+            const encodedDocName = pathname.replace('/api/docs/', '');
             if (!encodedDocName) {
               return next();
             }
@@ -766,7 +778,7 @@ function docsApiPlugin(): Plugin {
         }
 
         // 处理 /api/docs 端点用于获取文档列表
-        if (req.url === '/api/docs' || req.url === '/api/docs/') {
+        if (pathname === '/api/docs' || pathname === '/api/docs/') {
           try {
             const docsDir = path.resolve(__dirname, 'assets/docs');
             const docs: any[] = [];
@@ -802,7 +814,7 @@ function docsApiPlugin(): Plugin {
         }
 
         // 处理 /api/libraries 端点用于获取前端库列表
-        if (req.url === '/api/libraries' || req.url === '/api/libraries/') {
+        if (pathname === '/api/libraries' || pathname === '/api/libraries/') {
           try {
             const librariesDir = path.resolve(__dirname, 'assets/libraries');
             const libraries: any[] = [];
@@ -865,7 +877,8 @@ function uploadDocsApiPlugin(): Plugin {
     name: 'upload-docs-api-plugin',
     configureServer(server: any) {
       server.middlewares.use((req: any, res: any, next: any) => {
-        if (req.method !== 'POST' || req.url !== '/api/upload-docs') {
+        const pathname = getRequestPathname(req);
+        if (req.method !== 'POST' || pathname !== '/api/upload-docs') {
           return next();
         }
 
@@ -1105,14 +1118,15 @@ function themesApiPlugin(): Plugin {
       };
 
       server.middlewares.use((req: any, res: any, next: any) => {
-        if (!req.url.startsWith('/api/themes')) {
+        const pathname = getRequestPathname(req);
+        if (!pathname.startsWith('/api/themes')) {
           return next();
         }
 
         // DELETE /api/themes/:name - 删除主题
-        if (req.method === 'DELETE' && req.url !== '/api/themes' && req.url !== '/api/themes/') {
+        if (req.method === 'DELETE' && pathname !== '/api/themes' && pathname !== '/api/themes/') {
           try {
-            const themeName = req.url.replace('/api/themes/', '').split('?')[0];
+            const themeName = pathname.replace('/api/themes/', '');
             if (!themeName) {
               res.statusCode = 400;
               res.end(JSON.stringify({ error: 'Missing theme name' }));
@@ -1148,10 +1162,10 @@ function themesApiPlugin(): Plugin {
         }
 
         // PUT /api/themes/:name - 更新主题显示名称
-        if (req.method === 'PUT' && req.url !== '/api/themes' && req.url !== '/api/themes/') {
+        if (req.method === 'PUT' && pathname !== '/api/themes' && pathname !== '/api/themes/') {
           (async () => {
             try {
-              const themeName = req.url.replace('/api/themes/', '').split('?')[0];
+              const themeName = pathname.replace('/api/themes/', '');
               if (!themeName) {
                 res.statusCode = 400;
                 res.end(JSON.stringify({ error: 'Missing theme name' }));
@@ -1214,9 +1228,9 @@ function themesApiPlugin(): Plugin {
         }
 
         // 处理 /api/themes/:name 端点用于获取单个主题内容
-        if (req.url !== '/api/themes' && req.url !== '/api/themes/') {
+        if (pathname !== '/api/themes' && pathname !== '/api/themes/') {
           try {
-            const themeName = req.url.replace('/api/themes/', '').split('?')[0];
+            const themeName = pathname.replace('/api/themes/', '');
             if (!themeName) {
               return next();
             }

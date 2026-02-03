@@ -567,6 +567,10 @@ export function fileSystemApiPlugin(): Plugin {
                   }
                 });
               }
+              
+              if (targetTypeRequired && !['pages', 'elements'].includes(String(targetType))) {
+                return sendJSON(res, 400, { error: 'Invalid targetType' });
+              }
 
               // 获取文件路径 - 尝试多种可能的属性名
               const tempFilePath = file.filepath || file.path || file.tempFilePath;
@@ -641,11 +645,20 @@ export function fileSystemApiPlugin(): Plugin {
 
                   const basename = path.basename(originalFilename, path.extname(originalFilename));
                   const fallbackFolderName = truncateName(sanitizeFolderName(basename), 60);
+                  const safeFallbackFolderName = fallbackFolderName || `upload-${Date.now()}`;
                   const targetFolderName = hasRootFolder
                     ? truncateName(extractedRootFolderName, 60)
-                    : fallbackFolderName;
+                    : safeFallbackFolderName;
 
-                  const targetDir = path.join(projectRoot, 'src', targetType, targetFolderName);
+                  const targetBaseDir = path.join(projectRoot, 'src', targetType);
+                  const targetDir = path.join(targetBaseDir, targetFolderName);
+                  const resolvedTargetBase = path.resolve(targetBaseDir);
+                  const resolvedTargetDir = path.resolve(targetDir);
+
+                  // 防止覆盖整个 pages/elements 目录或越界写入
+                  if (resolvedTargetDir === resolvedTargetBase || !resolvedTargetDir.startsWith(resolvedTargetBase + path.sep)) {
+                    throw new Error('目标目录不安全，已阻止解压');
+                  }
 
                   console.log('[文件系统 API] ZIP 结构分析:', {
                     hasRootFolder,
