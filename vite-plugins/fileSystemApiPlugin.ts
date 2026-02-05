@@ -79,6 +79,27 @@ function inferExtractedRootFolder(extractDir: string) {
   return { entryCount: entries.length, hasRootFolder: false, rootFolderName: '' };
 }
 
+function sanitizeRelativePath(input: string) {
+  const normalized = input.replace(/\\/g, '/');
+  const parts = normalized.split('/').filter(part => part && part !== '.' && part !== '..');
+  return parts.join('/');
+}
+
+function deriveRootFolderName(paths: string[]) {
+  const roots = new Set<string>();
+  for (const rawPath of paths) {
+    const cleaned = sanitizeRelativePath(rawPath);
+    if (!cleaned) continue;
+    const [root] = cleaned.split('/');
+    if (root) roots.add(root);
+  }
+  return roots.size === 1 ? Array.from(roots)[0] : '';
+}
+
+function hasIgnoredEntry(relativePath: string) {
+  return relativePath.split('/').some(segment => IGNORED_EXTRACT_ENTRIES.has(segment));
+}
+
 function moveFileWithFallback(srcPath: string, destPath: string) {
   try {
     fs.renameSync(srcPath, destPath);
@@ -508,6 +529,7 @@ export function fileSystemApiPlugin(): Plugin {
           const form = formidable({
             uploadDir: path.join(projectRoot, 'temp'),
             keepExtensions: true,
+            multiples: true,
             maxFileSize: 100 * 1024 * 1024, // 100MB
           });
 
@@ -523,44 +545,52 @@ export function fileSystemApiPlugin(): Plugin {
               
               const uploadType = getFieldValue(fields.uploadType);
               const targetType = getFieldValue(fields.targetType);
+              const uploadMode = getFieldValue(fields.uploadMode);
+              const folderNameField = getFieldValue(fields.folderName);
               const targetTypeRequired = uploadType !== 'local_axure';
               
-              // 文件可能在 files.file 或 fields.file 中
-              let file = files.file ? (Array.isArray(files.file) ? files.file[0] : files.file) : null;
-              
-              // 如果 files 中没有，检查 fields 中是否有（某些版本的 formidable 会这样）
-              if (!file && fields.file) {
-                file = Array.isArray(fields.file) ? fields.file[0] : fields.file;
+              const normalizeFiles = (value: any) => {
+                if (!value) return [];
+                return Array.isArray(value) ? value : [value];
+              };
+
+              let fileList = normalizeFiles(files.files);
+              if (fileList.length === 0) fileList = normalizeFiles(files.file);
+              if (fileList.length === 0 && fields.file) {
+                fileList = normalizeFiles(fields.file);
               }
+
+              const isFolderUpload = uploadMode === 'folder' || fileList.length > 1;
 
               console.log('[文件系统 API] 原始文件对象:', {
                 hasFilesFile: !!files.file,
+                hasFilesFiles: !!files.files,
                 hasFieldsFile: !!fields.file,
-                fileType: file ? typeof file : 'undefined',
-                fileKeys: file ? Object.keys(file) : [],
-                fileConstructor: file ? file.constructor.name : 'undefined'
+                fileCount: fileList.length,
+                uploadMode,
+                isFolderUpload,
               });
 
               console.log('[文件系统 API] 接收到的参数:', {
                 uploadType,
                 targetType,
-                hasFile: !!file,
-                fileInfo: file ? { filepath: file.filepath, originalFilename: file.originalFilename } : null,
+                hasFile: fileList.length > 0,
+                fileInfo: fileList.length > 0 ? { filepath: fileList[0]?.filepath, originalFilename: fileList[0]?.originalFilename } : null,
                 fieldsKeys: Object.keys(fields),
                 filesKeys: Object.keys(files)
               });
 
-              if (!file || !uploadType || (targetTypeRequired && !targetType)) {
+              if (!fileList.length || !uploadType || (targetTypeRequired && !targetType)) {
                 console.error('[文件系统 API] 缺少必需参数:', { 
-                  hasFile: !!file, 
+                  hasFile: fileList.length > 0, 
                   uploadType, 
                   targetType,
-                  fileType: file ? typeof file : 'undefined'
+                  fileType: fileList.length > 0 ? typeof fileList[0] : 'undefined'
                 });
                 return sendJSON(res, 400, { 
                   error: 'Missing required parameters',
                   details: {
-                    hasFile: !!file,
+                    hasFile: fileList.length > 0,
                     hasUploadType: !!uploadType,
                     hasTargetType: !!targetType,
                     targetTypeRequired
@@ -572,28 +602,40 @@ export function fileSystemApiPlugin(): Plugin {
                 return sendJSON(res, 400, { error: 'Invalid targetType' });
               }
 
-              // 获取文件路径 - 尝试多种可能的属性名
-              const tempFilePath = file.filepath || file.path || file.tempFilePath;
-              const originalFilename = file.originalFilename || file.name || file.filename || 'upload.zip';
+              const primaryFile = fileList[0];
+              const tempFilePath = primaryFile?.filepath || primaryFile?.path || primaryFile?.tempFilePath;
+              const originalFilename = primaryFile?.originalFilename || primaryFile?.name || primaryFile?.filename || 'upload.zip';
 
               console.log('[文件系统 API] 文件信息:', {
                 tempFilePath,
                 originalFilename,
-                fileSize: file.size,
-                fileExists: fs.existsSync(tempFilePath),
-                fileStats: fs.existsSync(tempFilePath) ? fs.statSync(tempFilePath) : null
+                fileCount: fileList.length,
+                isFolderUpload,
               });
 
-              if (!fs.existsSync(tempFilePath)) {
-                return sendJSON(res, 500, { error: '临时文件不存在' });
+              if (!isFolderUpload) {
+                if (!tempFilePath || !fs.existsSync(tempFilePath)) {
+                  return sendJSON(res, 500, { error: '临时文件不存在' });
+                }
+
+                if (fs.statSync(tempFilePath).size === 0) {
+                  return sendJSON(res, 500, { error: '上传的文件为空' });
+                }
+              } else {
+                const missingFile = fileList.find((file: any) => !file?.filepath || !fs.existsSync(file.filepath));
+                if (missingFile) {
+                  return sendJSON(res, 500, { error: '上传的文件夹存在缺失文件，请重试' });
+                }
               }
 
-              if (fs.statSync(tempFilePath).size === 0) {
-                return sendJSON(res, 500, { error: '上传的文件为空' });
-              }
+              const relativePaths = normalizeFiles(fields.relativePaths).map((value: any) => String(value));
+              const derivedRootName = deriveRootFolderName(relativePaths);
 
               // AI 辅助类型：local_axure（解压到 temp 并返回 Prompt）
               if (uploadType === 'local_axure') {
+                if (isFolderUpload) {
+                  return sendJSON(res, 400, { error: 'local_axure 暂不支持文件夹上传，请使用 ZIP 文件' });
+                }
                 try {
                   const scriptPath = path.join(projectRoot, 'scripts', 'local-axure-extract.mjs');
                   const command = `node "${scriptPath}" "${tempFilePath}" "${originalFilename}"`;
@@ -627,15 +669,69 @@ export function fileSystemApiPlugin(): Plugin {
                 }
               }
 
+              let folderUploadContext: {
+                tempExtractDir: string;
+                inferred: { entryCount: number; hasRootFolder: boolean; rootFolderName: string };
+                fallbackName: string;
+              } | null = null;
+
+              if (isFolderUpload) {
+                try {
+                  const tempExtractDir = path.join(projectRoot, 'temp', `folder-upload-${Date.now()}`);
+                  fs.mkdirSync(tempExtractDir, { recursive: true });
+
+                  const fallbackSource = folderNameField || derivedRootName || `upload-${Date.now()}`;
+                  const fallbackName = truncateName(sanitizeFolderName(fallbackSource), 60) || `upload-${Date.now()}`;
+
+                  fileList.forEach((file: any, index: number) => {
+                    const sourcePath = file?.filepath || file?.path || file?.tempFilePath;
+                    if (!sourcePath || !fs.existsSync(sourcePath)) return;
+
+                    const rawRelativePath = relativePaths[index] || file?.originalFilename || file?.name || `file-${index}`;
+                    const safeRelativePath = sanitizeRelativePath(String(rawRelativePath));
+                    if (!safeRelativePath || hasIgnoredEntry(safeRelativePath)) {
+                      fs.unlinkSync(sourcePath);
+                      return;
+                    }
+
+                    const destPath = path.join(tempExtractDir, safeRelativePath);
+                    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+                    fs.copyFileSync(sourcePath, destPath);
+                    fs.unlinkSync(sourcePath);
+                  });
+
+                  const inferred = inferExtractedRootFolder(tempExtractDir);
+                  if (inferred.entryCount === 0) {
+                    return sendJSON(res, 500, { error: '上传的文件夹为空' });
+                  }
+
+                  folderUploadContext = {
+                    tempExtractDir,
+                    inferred,
+                    fallbackName
+                  };
+                } catch (e: any) {
+                  console.error('[文件系统 API] 文件夹处理失败:', e);
+                  return sendJSON(res, 500, { error: `文件夹处理失败: ${e.message || '未知错误'}` });
+                }
+              }
+
               // 直接处理类型：make, axhub, google_stitch
               if (['make', 'axhub', 'google_stitch'].includes(uploadType)) {
                 try {
                   // 解压到临时目录（先解压再分析目录结构，避免依赖 ZIP 条目解析）
-                  const tempExtractDir = path.join(projectRoot, 'temp', `extract-${Date.now()}`);
-                  fs.mkdirSync(tempExtractDir, { recursive: true });
-                  await extractZip(tempFilePath, { dir: tempExtractDir });
+                  const tempExtractDir = isFolderUpload
+                    ? folderUploadContext!.tempExtractDir
+                    : path.join(projectRoot, 'temp', `extract-${Date.now()}`);
 
-                  const inferred = inferExtractedRootFolder(tempExtractDir);
+                  if (!isFolderUpload) {
+                    fs.mkdirSync(tempExtractDir, { recursive: true });
+                    await extractZip(tempFilePath, { dir: tempExtractDir });
+                  }
+
+                  const inferred = isFolderUpload
+                    ? folderUploadContext!.inferred
+                    : inferExtractedRootFolder(tempExtractDir);
                   if (inferred.entryCount === 0) {
                     throw new Error('ZIP 文件为空');
                   }
@@ -643,7 +739,9 @@ export function fileSystemApiPlugin(): Plugin {
                   const extractedRootFolderName = inferred.rootFolderName;
                   const hasRootFolder = inferred.hasRootFolder;
 
-                  const basename = path.basename(originalFilename, path.extname(originalFilename));
+                  const basename = isFolderUpload
+                    ? folderUploadContext!.fallbackName
+                    : path.basename(originalFilename, path.extname(originalFilename));
                   const fallbackFolderName = truncateName(sanitizeFolderName(basename), 60);
                   const safeFallbackFolderName = fallbackFolderName || `upload-${Date.now()}`;
                   const targetFolderName = hasRootFolder
@@ -714,7 +812,9 @@ export function fileSystemApiPlugin(): Plugin {
                   if (fs.existsSync(tempExtractDir)) {
                     fs.rmSync(tempExtractDir, { recursive: true, force: true });
                   }
-                  fs.unlinkSync(tempFilePath);
+                  if (!isFolderUpload) {
+                    fs.unlinkSync(tempFilePath);
+                  }
 
                   // 根据类型执行转换脚本
                   if (uploadType === 'axhub') {
@@ -757,7 +857,7 @@ export function fileSystemApiPlugin(): Plugin {
                   if (e?.code === 'ENAMETOOLONG') {
                     return sendJSON(res, 500, {
                       error:
-                        '解压失败：ZIP 内部存在过长的文件名/路径（超出系统限制）。请尝试重新导出/缩短文件名，或将项目移动到更短的本地路径后重试。',
+                        '解压失败：ZIP 内部路径过长（超出系统限制）。请解压后上传文件夹，或缩短文件名后重试。',
                     });
                   }
                   return sendJSON(res, 500, { error: `解压失败: ${e.message}` });
@@ -769,13 +869,21 @@ export function fileSystemApiPlugin(): Plugin {
                 try {
                   // 解压到 temp 目录
                   const timestamp = Date.now();
-                  const basename = path.basename(originalFilename, path.extname(originalFilename));
+                  const basename = isFolderUpload
+                    ? (folderUploadContext?.fallbackName || folderNameField || derivedRootName || `upload-${timestamp}`)
+                    : path.basename(originalFilename, path.extname(originalFilename));
                   const extractDirName = `${uploadType}-${truncateName(sanitizeFolderName(basename), 40)}-${timestamp}`;
-                  const extractDir = path.join(projectRoot, 'temp', extractDirName);
+                  const extractDir = isFolderUpload
+                    ? (folderUploadContext!.inferred.hasRootFolder
+                        ? path.join(folderUploadContext!.tempExtractDir, folderUploadContext!.inferred.rootFolderName)
+                        : folderUploadContext!.tempExtractDir)
+                    : path.join(projectRoot, 'temp', extractDirName);
 
-                  fs.mkdirSync(extractDir, { recursive: true });
-                  await extractZip(tempFilePath, { dir: extractDir });
-                  fs.unlinkSync(tempFilePath);
+                  if (!isFolderUpload) {
+                    fs.mkdirSync(extractDir, { recursive: true });
+                    await extractZip(tempFilePath, { dir: extractDir });
+                    fs.unlinkSync(tempFilePath);
+                  }
 
                   // V0 项目：自动执行预处理脚本（同步等待完成）
                   if (uploadType === 'v0') {
@@ -894,6 +1002,12 @@ export function fileSystemApiPlugin(): Plugin {
                   }
                 } catch (e: any) {
                   console.error('[文件系统 API] 解压失败:', e);
+                  if (e?.code === 'ENAMETOOLONG') {
+                    return sendJSON(res, 500, {
+                      error:
+                        '解压失败：ZIP 内部路径过长（超出系统限制）。请解压后上传文件夹，或缩短文件名后重试。',
+                    });
+                  }
                   return sendJSON(res, 500, { error: `解压失败: ${e.message}` });
                 }
               }

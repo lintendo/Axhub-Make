@@ -54,7 +54,11 @@
       // 等待 DevTemplateBootstrap 加载后检查 inspecta 模式
       // 如果是 inspecta 模式则禁用错误捕获
       function checkInspectaMode() {
-        if (window.DevTemplateBootstrap && window.DevTemplateBootstrap.inspectaMode) {
+        if (
+          window.DevTemplateBootstrap &&
+          (window.DevTemplateBootstrap.inspectaMode ||
+            window.DevTemplateBootstrap.editors?.getMode?.() === 'inspecta')
+        ) {
           console.log('%c[Error System] Inspecta 模式已启用，错误捕获已禁用', 'color: #faad14; font-weight: bold;');
           return true;
         }
@@ -63,7 +67,8 @@
       
       // 先快速检查 URL 参数（避免在 bootstrap 加载前就触发错误）
       const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('inspecta') === 'true') {
+      const editorParam = urlParams.get('editor');
+      if (editorParam === 'inspecta' || urlParams.get('inspecta') === 'true') {
         console.log('%c[Error System] 检测到 inspecta 参数，错误捕获已禁用', 'color: #faad14; font-weight: bold;');
         return;
       }
