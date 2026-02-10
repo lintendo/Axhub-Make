@@ -39,7 +39,7 @@ type AssistantConfig = {
   apiBaseUrl?: string | null;
 };
 
-type AssistantRuntimeSource = 'config' | 'cloudcli' | 'env' | 'default';
+type AssistantRuntimeSource = 'axhub-genie' | 'config' | 'cloudcli' | 'env' | 'default';
 
 type AssistantHealthStatus =
   | 'ready'
@@ -51,9 +51,9 @@ type AssistantHealthStatus =
 type AssistantCommandSource = 'axhub-genie' | 'cloudcli' | 'default';
 
 type AssistantHealthHints = {
-  installGlobal: 'npm install -g @axhub/genie';
-  start: 'axhub-genie';
-  status: 'axhub-genie status';
+  installGlobal: string;
+  start: string;
+  status: string;
 };
 
 type AssistantHealthInfo = {
@@ -74,7 +74,7 @@ type AssistantRuntimeInfo = {
 
 type AssistantBootstrapMode = 'install_global' | 'start_existing';
 
-type AssistantProbeStatus = 'ready' | 'missing_cli' | 'needs_update' | 'cli_error';
+type AssistantProbeStatus = 'ready' | 'missing_cli' | 'needs_update' | 'cli_error' | 'not_running';
 
 type AssistantProbeResult = {
   status: AssistantProbeStatus;
@@ -82,6 +82,9 @@ type AssistantProbeResult = {
   commandSource: Exclude<AssistantCommandSource, 'default'>;
   config: AssistantConfig | null;
 };
+
+const ASSISTANT_START_RETRY_TIMES = 6;
+const ASSISTANT_START_RETRY_INTERVAL_MS = 1_000;
 
 type SystemConfig = {
   server: Record<string, any>;
@@ -104,11 +107,18 @@ const DEFAULT_ASSISTANT_HEALTH_URL = `${DEFAULT_ASSISTANT_WEB_BASE_URL}/health`;
 const ASSISTANT_SERVICE_ID = '@axhub/genie';
 const ASSISTANT_SERVICE_NAME = 'Axhub Genie';
 const CLOUDCLI_STATUS_TIMEOUT_MS = 2_000;
-const ASSISTANT_HINTS: AssistantHealthHints = {
-  installGlobal: 'npm install -g @axhub/genie',
-  start: 'axhub-genie',
-  status: 'axhub-genie status',
-};
+function getAssistantHealthHints(): AssistantHealthHints {
+  const installBaseCommand = 'npm install -g @axhub/genie';
+  const installGlobal = process.platform === 'darwin'
+    ? `sudo ${installBaseCommand}`
+    : installBaseCommand;
+
+  return {
+    installGlobal,
+    start: 'axhub-genie',
+    status: 'axhub-genie status',
+  };
+}
 
 function normalizeOptionalString(value: unknown): string | null {
   if (value === null || value === undefined) return null;
@@ -250,14 +260,54 @@ function containsNeedsUpdateHint(text: string): boolean {
   return /(need\s*update|needs\s*update|outdated|upgrade|please\s*update|版本过旧|需要更新|请更新)/i.test(normalized);
 }
 
+function getCommandCandidates(command: string): string[] {
+  if (process.platform !== 'win32') {
+    return [command];
+  }
+
+  if (/\.(cmd|exe|bat)$/i.test(command)) {
+    return [command];
+  }
+
+  return [command, `${command}.cmd`, `${command}.exe`, `${command}.bat`];
+}
+
+function spawnSyncFirstAvailable(command: string, args: string[], options?: Parameters<typeof spawnSync>[2]) {
+  for (const candidate of getCommandCandidates(command)) {
+    const result = spawnSync(candidate, args, options);
+    const errCode = (result.error as NodeJS.ErrnoException | undefined)?.code;
+    if (errCode === 'ENOENT') {
+      continue;
+    }
+
+    return {
+      command: candidate,
+      result,
+    };
+  }
+
+  return null;
+}
+
 function readAssistantStatusFromCli(command: 'axhub-genie' | 'cloudcli', args: string[]): AssistantProbeResult {
   const commandSource: Exclude<AssistantCommandSource, 'default'> = command === 'axhub-genie' ? 'axhub-genie' : 'cloudcli';
 
   try {
-    const result = spawnSync(command, args, {
+    const execution = spawnSyncFirstAvailable(command, args, {
       encoding: 'utf8',
       timeout: CLOUDCLI_STATUS_TIMEOUT_MS,
     });
+
+    if (!execution) {
+      return {
+        status: 'missing_cli',
+        message: `未检测到 ${command} 命令`,
+        commandSource,
+        config: null,
+      };
+    }
+
+    const result = execution.result;
 
     if (result.error) {
       const errCode = (result.error as NodeJS.ErrnoException).code;
@@ -322,6 +372,17 @@ function readAssistantStatusFromCli(command: 'axhub-genie' | 'cloudcli', args: s
     }
 
     const config = extractAssistantConfigFromStatusPayload(parsed);
+    const running = typeof parsed?.running === 'boolean' ? parsed.running : null;
+
+    if (running === false) {
+      return {
+        status: 'not_running',
+        message: `${command} 服务未启动`,
+        commandSource,
+        config,
+      };
+    }
+
     if (!config) {
       return {
         status: 'cli_error',
@@ -355,10 +416,109 @@ function readCloudCliAssistantStatus(): AssistantProbeResult {
   return readAssistantStatusFromCli('cloudcli', ['status', '--json']);
 }
 
-function getAssistantBootstrapHints() {
-  return {
-    installGlobal: ASSISTANT_HINTS.installGlobal,
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function startAxhubGenieAndWait(projectPath: string): Promise<AssistantProbeResult> {
+  const startCommand = getAssistantHealthHints().start;
+
+  try {
+    runCommandInBackground(startCommand, projectPath);
+  } catch (error: any) {
+    return {
+      status: 'cli_error',
+      message: `自动启动 Axhub Genie 失败: ${error?.message || 'unknown error'}`,
+      commandSource: 'axhub-genie',
+      config: null,
+    };
+  }
+
+  let lastProbe: AssistantProbeResult = {
+    status: 'not_running',
+    message: 'Axhub Genie 服务未启动',
+    commandSource: 'axhub-genie',
+    config: null,
   };
+
+  for (let attempt = 0; attempt < ASSISTANT_START_RETRY_TIMES; attempt++) {
+    await sleep(ASSISTANT_START_RETRY_INTERVAL_MS);
+    const probe = readAxhubGenieStatus();
+    lastProbe = probe;
+
+    if (probe.status === 'ready') {
+      return {
+        ...probe,
+        message: 'Axhub Genie 已自动启动并就绪',
+      };
+    }
+
+    if (probe.status === 'missing_cli' || probe.status === 'needs_update' || probe.status === 'cli_error') {
+      return probe;
+    }
+  }
+
+  return {
+    ...lastProbe,
+    status: 'not_running',
+    message: 'Axhub Genie 自动启动失败，请手动执行 axhub-genie 后重试',
+  };
+}
+
+function resolveRuntimeEndpoints(params: {
+  statusConfig: AssistantConfig | null;
+  configAssistant: AssistantConfig;
+  envAssistant: AssistantConfig;
+}): { webBaseUrl: string; apiBaseUrl: string; source: AssistantRuntimeSource } {
+  const candidates: Array<{ source: AssistantRuntimeSource; value: AssistantConfig | null }> = [
+    { source: 'axhub-genie', value: params.statusConfig },
+    { source: 'config', value: params.configAssistant },
+    { source: 'env', value: params.envAssistant },
+    {
+      source: 'default',
+      value: {
+        webBaseUrl: DEFAULT_ASSISTANT_WEB_BASE_URL,
+        apiBaseUrl: DEFAULT_ASSISTANT_API_BASE_URL,
+      },
+    },
+  ];
+
+  let webBaseUrl: string | null = null;
+  let apiBaseUrl: string | null = null;
+  let source: AssistantRuntimeSource = 'default';
+
+  for (const candidate of candidates) {
+    const value = candidate.value;
+    if (!value) continue;
+
+    if (!webBaseUrl && value.webBaseUrl) {
+      webBaseUrl = value.webBaseUrl;
+      if (source === 'default') {
+        source = candidate.source;
+      }
+    }
+
+    if (!apiBaseUrl && value.apiBaseUrl) {
+      apiBaseUrl = value.apiBaseUrl;
+      if (source === 'default') {
+        source = candidate.source;
+      }
+    }
+
+    if (webBaseUrl && apiBaseUrl) {
+      break;
+    }
+  }
+
+  return {
+    webBaseUrl: normalizeBaseUrl(webBaseUrl) || DEFAULT_ASSISTANT_WEB_BASE_URL,
+    apiBaseUrl: apiBaseUrl || DEFAULT_ASSISTANT_API_BASE_URL,
+    source,
+  };
+}
+
+function getAssistantBootstrapHints() {
+  return getAssistantHealthHints();
 }
 
 function createAssistantHealthInfo(params: {
@@ -371,7 +531,7 @@ function createAssistantHealthInfo(params: {
     message: params.message,
     checkedAt: new Date().toISOString(),
     commandSource: params.commandSource,
-    hints: ASSISTANT_HINTS,
+    hints: getAssistantHealthHints(),
   };
 }
 
@@ -384,11 +544,21 @@ function normalizeAssistantBootstrapMode(value: unknown): AssistantBootstrapMode
   return null;
 }
 
-function buildAssistantBootstrapCommand(mode: AssistantBootstrapMode): string {
-  if (mode === 'install_global') {
-    return `${ASSISTANT_HINTS.installGlobal} && ${ASSISTANT_HINTS.start}`;
+function getPreferredNpmCommandForBootstrap(): string {
+  if (process.platform !== 'win32') {
+    return 'npm';
   }
-  return ASSISTANT_HINTS.start;
+
+  return isCommandAvailable('npm.cmd') ? 'npm.cmd' : 'npm';
+}
+
+function buildAssistantBootstrapCommand(mode: AssistantBootstrapMode): string {
+  const hints = getAssistantHealthHints();
+  if (mode === 'install_global') {
+    const npmCommand = getPreferredNpmCommandForBootstrap();
+    return `${npmCommand} install -g @axhub/genie && ${hints.start}`;
+  }
+  return hints.start;
 }
 
 function runCommandInBackground(command: string, cwd: string) {
@@ -413,10 +583,16 @@ function runCommandInBackground(command: string, cwd: string) {
 
 function isCommandAvailable(command: string, args: string[] = ['--version']): boolean {
   try {
-    const result = spawnSync(command, args, {
+    const execution = spawnSyncFirstAvailable(command, args, {
       encoding: 'utf8',
       timeout: CLOUDCLI_STATUS_TIMEOUT_MS,
     });
+
+    if (!execution) {
+      return false;
+    }
+
+    const result = execution.result;
 
     if (result.error) {
       const errCode = (result.error as NodeJS.ErrnoException).code;
@@ -498,98 +674,49 @@ async function resolveAssistantRuntime(config: SystemConfig, projectPath: string
   }
 
   const configAssistant = normalizeAssistantConfig(config.assistant);
-  const axhubGenieStatus = readAxhubGenieStatus();
-  const cloudCliStatus = axhubGenieStatus.status === 'ready' ? null : readCloudCliAssistantStatus();
-  const cloudCliAssistant = axhubGenieStatus.config || cloudCliStatus?.config || null;
   const envAssistant: AssistantConfig = {
     webBaseUrl: normalizeBaseUrl(process.env.AXHUB_ASSISTANT_WEB_BASE_URL),
     apiBaseUrl: normalizeBaseUrl(process.env.AXHUB_ASSISTANT_API_BASE_URL),
   };
 
-  const candidates: Array<{ source: AssistantRuntimeSource; value: AssistantConfig | null }> = [
-    { source: 'config', value: configAssistant },
-    { source: 'cloudcli', value: cloudCliAssistant },
-    { source: 'env', value: envAssistant },
-    {
-      source: 'default',
-      value: {
-        webBaseUrl: DEFAULT_ASSISTANT_WEB_BASE_URL,
-        apiBaseUrl: DEFAULT_ASSISTANT_API_BASE_URL,
-      },
-    },
-  ];
+  let axhubGenieStatus = readAxhubGenieStatus();
 
-  let webBaseUrl: string | null = null;
-  let apiBaseUrl: string | null = null;
-  let source: AssistantRuntimeSource = 'default';
-
-  for (const candidate of candidates) {
-    const value = candidate.value;
-    if (!value) continue;
-
-    if (!webBaseUrl && value.webBaseUrl) {
-      webBaseUrl = value.webBaseUrl;
-      if (source === 'default') {
-        source = candidate.source;
-      }
-    }
-
-    if (!apiBaseUrl && value.apiBaseUrl) {
-      apiBaseUrl = value.apiBaseUrl;
-      if (source === 'default') {
-        source = candidate.source;
-      }
-    }
-
-    if (webBaseUrl && apiBaseUrl) {
-      break;
-    }
+  if (axhubGenieStatus.status === 'not_running') {
+    axhubGenieStatus = await startAxhubGenieAndWait(projectPath);
   }
 
-  const resolvedWebBaseUrl = normalizeBaseUrl(webBaseUrl) || DEFAULT_ASSISTANT_WEB_BASE_URL;
-  const resolvedApiBaseUrl = apiBaseUrl || DEFAULT_ASSISTANT_API_BASE_URL;
+  const resolvedEndpoints = resolveRuntimeEndpoints({
+    statusConfig: axhubGenieStatus.config,
+    configAssistant,
+    envAssistant,
+  });
 
-  let healthStatus: AssistantHealthStatus = 'ready';
-  let healthMessage = 'Axhub Genie 已就绪';
-  let commandSource: AssistantCommandSource = 'default';
+  let healthStatus: AssistantHealthStatus = 'runtime_unreachable';
+  let healthMessage = '未找到可用的助手地址，请确认 Axhub Genie 已启动';
+  const commandSource: AssistantCommandSource = 'axhub-genie';
 
   if (axhubGenieStatus.status === 'ready') {
-    commandSource = 'axhub-genie';
-  } else if (cloudCliStatus?.status === 'ready') {
-    commandSource = 'cloudcli';
-  }
-
-  if (source === 'default') {
-    if (axhubGenieStatus.status === 'needs_update') {
-      healthStatus = 'needs_update';
-      healthMessage = axhubGenieStatus.message;
-      commandSource = 'axhub-genie';
-    } else if (axhubGenieStatus.status === 'missing_cli' && cloudCliStatus?.status !== 'ready') {
-      healthStatus = 'missing_cli';
-      healthMessage = '未检测到 Axhub Genie，请先安装后重试';
-      commandSource = cloudCliStatus?.commandSource || 'axhub-genie';
-    } else if (axhubGenieStatus.status === 'cli_error' && cloudCliStatus?.status !== 'ready') {
-      healthStatus = 'cli_error';
-      healthMessage = axhubGenieStatus.message;
-      commandSource = 'axhub-genie';
-    } else if (cloudCliStatus?.status === 'cli_error') {
-      healthStatus = 'runtime_unreachable';
-      healthMessage = '未找到可用的助手地址，请确认 Axhub Genie 已启动';
-      commandSource = 'cloudcli';
-    }
-  }
-
-  if (healthStatus === 'ready') {
+    healthStatus = 'ready';
+    healthMessage = `已通过 axhub-genie status --json 获取服务地址（默认 /health 探测失败：${healthProbe.message}）`;
+  } else if (axhubGenieStatus.status === 'missing_cli') {
+    healthStatus = 'missing_cli';
+    healthMessage = '未检测到 axhub-genie 命令，请先安装后重试';
+  } else if (axhubGenieStatus.status === 'needs_update') {
+    healthStatus = 'needs_update';
+    healthMessage = axhubGenieStatus.message;
+  } else if (axhubGenieStatus.status === 'not_running') {
     healthStatus = 'runtime_unreachable';
-    healthMessage = healthProbe.message;
-    commandSource = commandSource === 'default' ? 'axhub-genie' : commandSource;
+    healthMessage = 'Axhub Genie 自动启动失败，请手动执行 axhub-genie 后重试';
+  } else if (axhubGenieStatus.status === 'cli_error') {
+    healthStatus = 'cli_error';
+    healthMessage = axhubGenieStatus.message;
   }
 
   return {
-    webBaseUrl: resolvedWebBaseUrl,
-    apiBaseUrl: resolvedApiBaseUrl,
+    webBaseUrl: resolvedEndpoints.webBaseUrl,
+    apiBaseUrl: resolvedEndpoints.apiBaseUrl,
     projectPath,
-    source,
+    source: resolvedEndpoints.source,
     health: createAssistantHealthInfo({
       status: healthStatus,
       message: healthMessage,
@@ -606,6 +733,8 @@ export const __assistantRuntimeTestUtils = {
   getAssistantBootstrapHints,
   validateBootstrapPrerequisites,
   readAssistantStatusFromCli,
+  startAxhubGenieAndWait,
+  resolveRuntimeEndpoints,
   resolveAssistantRuntime,
   verifyAssistantHealthEndpoint,
 };
@@ -1013,7 +1142,7 @@ export function configApiPlugin(): Plugin {
               const assistantRuntime = await resolveAssistantRuntime(config, projectRoot);
 
               if (assistantRuntime.health.status !== 'ready') {
-                throw new Error(`${assistantRuntime.health.message}。可尝试：${ASSISTANT_HINTS.installGlobal}`);
+                throw new Error(`${assistantRuntime.health.message}。可尝试：${getAssistantHealthHints().installGlobal}`);
               }
 
               const provider = client;
