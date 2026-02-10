@@ -1,0 +1,1 @@
+async function t(r){const o=await fetch("/api/prompt/execute",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(r)}),e=await o.json();if(!o.ok)throw new Error((e==null?void 0:e.error)||"自动执行失败");if(!(e!=null&&e.url)||typeof e.url!="string")throw new Error("自动执行返回地址无效");return e}export{t as e};

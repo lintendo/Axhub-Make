@@ -1,6 +1,7 @@
 import type { Plugin } from 'vite';
 import fs from 'fs';
 import path from 'path';
+import { exec, spawn, spawnSync } from 'node:child_process';
 
 type ProjectDefaults = {
   defaultDoc?: string | null;
@@ -12,10 +13,82 @@ type ProjectInfo = {
   description?: string | null;
 };
 
+type PromptClient = 'claude' | 'cursor' | 'codex';
+type MainIDE = 'cursor' | 'trae' | 'vscode' | 'trae_cn' | 'windsurf' | 'kiro' | 'qoder' | 'antigravity';
+
+const MAIN_IDE_VALUES: MainIDE[] = ['cursor', 'trae', 'vscode', 'trae_cn', 'windsurf', 'kiro', 'qoder', 'antigravity'];
+
+const MAIN_IDE_APP_NAMES: Record<MainIDE, string> = {
+  cursor: 'Cursor',
+  trae: 'TRAE',
+  vscode: 'Visual Studio Code',
+  trae_cn: 'TRAE CN',
+  windsurf: 'Windsurf',
+  kiro: 'Kiro',
+  qoder: 'Qoder',
+  antigravity: 'Antigravity',
+};
+
+type AutomationConfig = {
+  defaultPromptClient?: PromptClient | null;
+  defaultIDE?: MainIDE | null;
+};
+
+type AssistantConfig = {
+  webBaseUrl?: string | null;
+  apiBaseUrl?: string | null;
+};
+
+type AssistantRuntimeSource = 'config' | 'cloudcli' | 'env' | 'default';
+
+type AssistantHealthStatus =
+  | 'ready'
+  | 'missing_cli'
+  | 'cli_error'
+  | 'runtime_unreachable'
+  | 'needs_update';
+
+type AssistantCommandSource = 'axhub-genie' | 'cloudcli' | 'default';
+
+type AssistantHealthHints = {
+  installGlobal: 'npm install -g @axhub/genie';
+  start: 'axhub-genie';
+  status: 'axhub-genie status';
+};
+
+type AssistantHealthInfo = {
+  status: AssistantHealthStatus;
+  message: string;
+  checkedAt: string;
+  commandSource: AssistantCommandSource;
+  hints: AssistantHealthHints;
+};
+
+type AssistantRuntimeInfo = {
+  webBaseUrl: string;
+  apiBaseUrl: string;
+  projectPath: string;
+  source: AssistantRuntimeSource;
+  health: AssistantHealthInfo;
+};
+
+type AssistantBootstrapMode = 'install_global' | 'start_existing';
+
+type AssistantProbeStatus = 'ready' | 'missing_cli' | 'needs_update' | 'cli_error';
+
+type AssistantProbeResult = {
+  status: AssistantProbeStatus;
+  message: string;
+  commandSource: Exclude<AssistantCommandSource, 'default'>;
+  config: AssistantConfig | null;
+};
+
 type SystemConfig = {
   server: Record<string, any>;
   projectDefaults?: ProjectDefaults;
   projectInfo?: ProjectInfo;
+  automation?: AutomationConfig;
+  assistant?: AssistantConfig;
 };
 
 type AgentDocsPaths = {
@@ -23,6 +96,18 @@ type AgentDocsPaths = {
   agentsTemplatePath: string;
   agentsPath: string;
   claudePath: string;
+};
+
+const DEFAULT_ASSISTANT_WEB_BASE_URL = 'http://localhost:32123';
+const DEFAULT_ASSISTANT_API_BASE_URL = 'http://localhost:32123/api';
+const DEFAULT_ASSISTANT_HEALTH_URL = `${DEFAULT_ASSISTANT_WEB_BASE_URL}/health`;
+const ASSISTANT_SERVICE_ID = '@axhub/genie';
+const ASSISTANT_SERVICE_NAME = 'Axhub Genie';
+const CLOUDCLI_STATUS_TIMEOUT_MS = 2_000;
+const ASSISTANT_HINTS: AssistantHealthHints = {
+  installGlobal: 'npm install -g @axhub/genie',
+  start: 'axhub-genie',
+  status: 'axhub-genie status',
 };
 
 function normalizeOptionalString(value: unknown): string | null {
@@ -58,6 +143,483 @@ function normalizeProjectInfo(value: unknown): ProjectInfo {
     name: normalizeInlineText(info.name),
     description: normalizeInlineText(info.description)
   };
+}
+
+function normalizePromptClient(value: unknown): PromptClient | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'claude' || normalized === 'cursor' || normalized === 'codex') {
+    return normalized;
+  }
+  return null;
+}
+
+function normalizeMainIDE(value: unknown): MainIDE | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase() as MainIDE;
+  return MAIN_IDE_VALUES.includes(normalized) ? normalized : null;
+}
+
+function normalizeAutomationConfig(value: unknown): AutomationConfig {
+  if (!value || typeof value !== 'object') {
+    return { defaultPromptClient: null, defaultIDE: null };
+  }
+  const config = value as AutomationConfig;
+  return {
+    defaultPromptClient: normalizePromptClient(config.defaultPromptClient),
+    defaultIDE: normalizeMainIDE(config.defaultIDE),
+  };
+}
+
+function trimTrailingSlashes(value: string): string {
+  return value.replace(/\/+$/g, '');
+}
+
+function normalizeBaseUrl(value: unknown): string | null {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) return null;
+  return trimTrailingSlashes(normalized);
+}
+
+function normalizeAssistantConfig(value: unknown): AssistantConfig {
+  if (!value || typeof value !== 'object') {
+    return { webBaseUrl: null, apiBaseUrl: null };
+  }
+  const config = value as AssistantConfig;
+  return {
+    webBaseUrl: normalizeBaseUrl(config.webBaseUrl),
+    apiBaseUrl: normalizeBaseUrl(config.apiBaseUrl),
+  };
+}
+
+function readSystemConfig(configPath: string): SystemConfig {
+  let config: SystemConfig = { server: { host: 'localhost', allowLAN: true } };
+
+  if (fs.existsSync(configPath)) {
+    const fileContent = fs.readFileSync(configPath, 'utf8');
+    config = JSON.parse(fileContent);
+  }
+
+  if (!config.server || typeof config.server !== 'object') {
+    config.server = { host: 'localhost', allowLAN: true };
+  }
+  if (config.server.allowLAN === undefined) {
+    config.server.allowLAN = true;
+  }
+
+  config.projectDefaults = normalizeProjectDefaults(config.projectDefaults);
+  config.projectInfo = normalizeProjectInfo(config.projectInfo);
+  config.automation = normalizeAutomationConfig(config.automation);
+  config.assistant = normalizeAssistantConfig(config.assistant);
+
+  return config;
+}
+
+function extractAssistantConfigFromStatusPayload(parsed: any): AssistantConfig | null {
+  const endpoint = parsed?.endpoint ?? parsed?.assistant?.endpoint ?? parsed?.runtime?.endpoint ?? {};
+  const webBaseUrl = normalizeBaseUrl(
+    endpoint?.frontendUrl
+    ?? endpoint?.webBaseUrl
+    ?? endpoint?.webUrl
+    ?? parsed?.frontendUrl
+    ?? parsed?.webBaseUrl
+    ?? parsed?.webUrl
+  );
+  const apiBaseUrl = normalizeBaseUrl(
+    endpoint?.apiBaseUrl
+    ?? endpoint?.apiUrl
+    ?? parsed?.apiBaseUrl
+    ?? parsed?.apiUrl
+  );
+
+  if (!webBaseUrl && !apiBaseUrl) {
+    return null;
+  }
+
+  return {
+    webBaseUrl,
+    apiBaseUrl,
+  };
+}
+
+function containsNeedsUpdateHint(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized) return false;
+  return /(need\s*update|needs\s*update|outdated|upgrade|please\s*update|版本过旧|需要更新|请更新)/i.test(normalized);
+}
+
+function readAssistantStatusFromCli(command: 'axhub-genie' | 'cloudcli', args: string[]): AssistantProbeResult {
+  const commandSource: Exclude<AssistantCommandSource, 'default'> = command === 'axhub-genie' ? 'axhub-genie' : 'cloudcli';
+
+  try {
+    const result = spawnSync(command, args, {
+      encoding: 'utf8',
+      timeout: CLOUDCLI_STATUS_TIMEOUT_MS,
+    });
+
+    if (result.error) {
+      const errCode = (result.error as NodeJS.ErrnoException).code;
+      if (errCode === 'ENOENT') {
+        return {
+          status: 'missing_cli',
+          message: `未检测到 ${command} 命令`,
+          commandSource,
+          config: null,
+        };
+      }
+
+      return {
+        status: 'cli_error',
+        message: `${command} 执行失败: ${(result.error as Error).message || 'unknown error'}`,
+        commandSource,
+        config: null,
+      };
+    }
+
+    const stdout = typeof result.stdout === 'string' ? result.stdout.trim() : '';
+    const stderr = typeof result.stderr === 'string' ? result.stderr.trim() : '';
+    const mergedOutput = [stdout, stderr].filter(Boolean).join('\n');
+
+    if (result.status !== 0) {
+      if (command === 'axhub-genie' && containsNeedsUpdateHint(mergedOutput)) {
+        return {
+          status: 'needs_update',
+          message: `检测到 ${command} 版本可能过旧，请更新后重试`,
+          commandSource,
+          config: null,
+        };
+      }
+
+      return {
+        status: 'cli_error',
+        message: `${command} status 执行失败${mergedOutput ? `: ${mergedOutput}` : ''}`,
+        commandSource,
+        config: null,
+      };
+    }
+
+    if (!stdout) {
+      return {
+        status: 'cli_error',
+        message: `${command} status 未返回有效输出`,
+        commandSource,
+        config: null,
+      };
+    }
+
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(stdout);
+    } catch {
+      return {
+        status: 'cli_error',
+        message: `${command} status 返回内容无法解析为 JSON`,
+        commandSource,
+        config: null,
+      };
+    }
+
+    const config = extractAssistantConfigFromStatusPayload(parsed);
+    if (!config) {
+      return {
+        status: 'cli_error',
+        message: `${command} status 返回中未发现可用地址`,
+        commandSource,
+        config: null,
+      };
+    }
+
+    return {
+      status: 'ready',
+      message: `${command} 已就绪`,
+      commandSource,
+      config,
+    };
+  } catch (error: any) {
+    return {
+      status: 'cli_error',
+      message: `${command} status 检查失败: ${error?.message || 'unknown error'}`,
+      commandSource,
+      config: null,
+    };
+  }
+}
+
+function readAxhubGenieStatus(): AssistantProbeResult {
+  return readAssistantStatusFromCli('axhub-genie', ['status', '--json']);
+}
+
+function readCloudCliAssistantStatus(): AssistantProbeResult {
+  return readAssistantStatusFromCli('cloudcli', ['status', '--json']);
+}
+
+function getAssistantBootstrapHints() {
+  return {
+    installGlobal: ASSISTANT_HINTS.installGlobal,
+  };
+}
+
+function createAssistantHealthInfo(params: {
+  status: AssistantHealthStatus;
+  message: string;
+  commandSource: AssistantCommandSource;
+}): AssistantHealthInfo {
+  return {
+    status: params.status,
+    message: params.message,
+    checkedAt: new Date().toISOString(),
+    commandSource: params.commandSource,
+    hints: ASSISTANT_HINTS,
+  };
+}
+
+function normalizeAssistantBootstrapMode(value: unknown): AssistantBootstrapMode | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  if (normalized === 'install_global' || normalized === 'start_existing') {
+    return normalized;
+  }
+  return null;
+}
+
+function buildAssistantBootstrapCommand(mode: AssistantBootstrapMode): string {
+  if (mode === 'install_global') {
+    return `${ASSISTANT_HINTS.installGlobal} && ${ASSISTANT_HINTS.start}`;
+  }
+  return ASSISTANT_HINTS.start;
+}
+
+function runCommandInBackground(command: string, cwd: string) {
+  if (process.platform === 'win32') {
+    const child = spawn('cmd.exe', ['/d', '/s', '/c', command], {
+      cwd,
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    child.unref();
+    return;
+  }
+
+  const child = spawn('sh', ['-lc', command], {
+    cwd,
+    detached: true,
+    stdio: 'ignore',
+  });
+  child.unref();
+}
+
+function isCommandAvailable(command: string, args: string[] = ['--version']): boolean {
+  try {
+    const result = spawnSync(command, args, {
+      encoding: 'utf8',
+      timeout: CLOUDCLI_STATUS_TIMEOUT_MS,
+    });
+
+    if (result.error) {
+      const errCode = (result.error as NodeJS.ErrnoException).code;
+      return errCode !== 'ENOENT';
+    }
+
+    return result.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+function validateBootstrapPrerequisites(mode: AssistantBootstrapMode): string | null {
+  if (mode === 'install_global') {
+    if (!isCommandAvailable('npm')) {
+      return 'npm 未安装，无法自动安装 Axhub Genie';
+    }
+    return null;
+  }
+
+  if (!isCommandAvailable('axhub-genie')) {
+    return '未检测到 axhub-genie 命令，请先安装后重试';
+  }
+
+  return null;
+}
+
+async function verifyAssistantHealthEndpoint(): Promise<{ ok: boolean; message: string }> {
+  const healthUrl = DEFAULT_ASSISTANT_HEALTH_URL;
+
+  try {
+    const response = await fetch(healthUrl, { method: 'GET' });
+    if (!response.ok) {
+      return { ok: false, message: `/health 探测失败: status ${response.status}` };
+    }
+
+    const appIdentifier = response.headers.get('X-App-Identifier') || response.headers.get('x-app-identifier') || '';
+    let payload: any = null;
+    try {
+      payload = await response.json();
+    } catch {
+      return { ok: false, message: '/health 响应不是有效 JSON' };
+    }
+
+    const serviceId = payload?.service?.id || '';
+    const serviceName = payload?.service?.name || '';
+
+    const idMatched = serviceId === ASSISTANT_SERVICE_ID || appIdentifier === ASSISTANT_SERVICE_ID;
+    const nameMatched = typeof serviceName === 'string' && serviceName.toLowerCase().includes(ASSISTANT_SERVICE_NAME.toLowerCase());
+
+    if (!idMatched && !nameMatched) {
+      return { ok: false, message: '健康检查服务身份不匹配（非 Axhub Genie）' };
+    }
+
+    if (payload?.status !== 'ok') {
+      return { ok: false, message: `健康检查状态异常: ${String(payload?.status || 'unknown')}` };
+    }
+
+    return { ok: true, message: 'Axhub Genie 健康检查通过' };
+  } catch (error: any) {
+    return { ok: false, message: `健康检查请求失败: ${error?.message || 'unknown error'}` };
+  }
+}
+
+async function resolveAssistantRuntime(config: SystemConfig, projectPath: string): Promise<AssistantRuntimeInfo> {
+  const healthProbe = await verifyAssistantHealthEndpoint();
+  if (healthProbe.ok) {
+    return {
+      webBaseUrl: DEFAULT_ASSISTANT_WEB_BASE_URL,
+      apiBaseUrl: DEFAULT_ASSISTANT_API_BASE_URL,
+      projectPath,
+      source: 'default',
+      health: createAssistantHealthInfo({
+        status: 'ready',
+        message: healthProbe.message,
+        commandSource: 'default',
+      }),
+    };
+  }
+
+  const configAssistant = normalizeAssistantConfig(config.assistant);
+  const axhubGenieStatus = readAxhubGenieStatus();
+  const cloudCliStatus = axhubGenieStatus.status === 'ready' ? null : readCloudCliAssistantStatus();
+  const cloudCliAssistant = axhubGenieStatus.config || cloudCliStatus?.config || null;
+  const envAssistant: AssistantConfig = {
+    webBaseUrl: normalizeBaseUrl(process.env.AXHUB_ASSISTANT_WEB_BASE_URL),
+    apiBaseUrl: normalizeBaseUrl(process.env.AXHUB_ASSISTANT_API_BASE_URL),
+  };
+
+  const candidates: Array<{ source: AssistantRuntimeSource; value: AssistantConfig | null }> = [
+    { source: 'config', value: configAssistant },
+    { source: 'cloudcli', value: cloudCliAssistant },
+    { source: 'env', value: envAssistant },
+    {
+      source: 'default',
+      value: {
+        webBaseUrl: DEFAULT_ASSISTANT_WEB_BASE_URL,
+        apiBaseUrl: DEFAULT_ASSISTANT_API_BASE_URL,
+      },
+    },
+  ];
+
+  let webBaseUrl: string | null = null;
+  let apiBaseUrl: string | null = null;
+  let source: AssistantRuntimeSource = 'default';
+
+  for (const candidate of candidates) {
+    const value = candidate.value;
+    if (!value) continue;
+
+    if (!webBaseUrl && value.webBaseUrl) {
+      webBaseUrl = value.webBaseUrl;
+      if (source === 'default') {
+        source = candidate.source;
+      }
+    }
+
+    if (!apiBaseUrl && value.apiBaseUrl) {
+      apiBaseUrl = value.apiBaseUrl;
+      if (source === 'default') {
+        source = candidate.source;
+      }
+    }
+
+    if (webBaseUrl && apiBaseUrl) {
+      break;
+    }
+  }
+
+  const resolvedWebBaseUrl = normalizeBaseUrl(webBaseUrl) || DEFAULT_ASSISTANT_WEB_BASE_URL;
+  const resolvedApiBaseUrl = apiBaseUrl || DEFAULT_ASSISTANT_API_BASE_URL;
+
+  let healthStatus: AssistantHealthStatus = 'ready';
+  let healthMessage = 'Axhub Genie 已就绪';
+  let commandSource: AssistantCommandSource = 'default';
+
+  if (axhubGenieStatus.status === 'ready') {
+    commandSource = 'axhub-genie';
+  } else if (cloudCliStatus?.status === 'ready') {
+    commandSource = 'cloudcli';
+  }
+
+  if (source === 'default') {
+    if (axhubGenieStatus.status === 'needs_update') {
+      healthStatus = 'needs_update';
+      healthMessage = axhubGenieStatus.message;
+      commandSource = 'axhub-genie';
+    } else if (axhubGenieStatus.status === 'missing_cli' && cloudCliStatus?.status !== 'ready') {
+      healthStatus = 'missing_cli';
+      healthMessage = '未检测到 Axhub Genie，请先安装后重试';
+      commandSource = cloudCliStatus?.commandSource || 'axhub-genie';
+    } else if (axhubGenieStatus.status === 'cli_error' && cloudCliStatus?.status !== 'ready') {
+      healthStatus = 'cli_error';
+      healthMessage = axhubGenieStatus.message;
+      commandSource = 'axhub-genie';
+    } else if (cloudCliStatus?.status === 'cli_error') {
+      healthStatus = 'runtime_unreachable';
+      healthMessage = '未找到可用的助手地址，请确认 Axhub Genie 已启动';
+      commandSource = 'cloudcli';
+    }
+  }
+
+  if (healthStatus === 'ready') {
+    healthStatus = 'runtime_unreachable';
+    healthMessage = healthProbe.message;
+    commandSource = commandSource === 'default' ? 'axhub-genie' : commandSource;
+  }
+
+  return {
+    webBaseUrl: resolvedWebBaseUrl,
+    apiBaseUrl: resolvedApiBaseUrl,
+    projectPath,
+    source,
+    health: createAssistantHealthInfo({
+      status: healthStatus,
+      message: healthMessage,
+      commandSource,
+    }),
+  };
+}
+
+export const __assistantRuntimeTestUtils = {
+  extractAssistantConfigFromStatusPayload,
+  containsNeedsUpdateHint,
+  normalizeAssistantBootstrapMode,
+  buildAssistantBootstrapCommand,
+  getAssistantBootstrapHints,
+  validateBootstrapPrerequisites,
+  readAssistantStatusFromCli,
+  resolveAssistantRuntime,
+  verifyAssistantHealthEndpoint,
+};
+
+function buildAgentApiUrl(apiBaseUrl: string): string {
+  const normalized = trimTrailingSlashes(apiBaseUrl);
+  if (/\/api$/i.test(normalized)) {
+    return `${normalized}/agent`;
+  }
+  return `${normalized}/api/agent`;
+}
+
+function quoteForShell(value: string) {
+  return `"${String(value).replace(/["\\$`]/g, '\\$&')}"`;
 }
 
 function buildProjectInfoSection(projectInfo: ProjectInfo, projectDefaults: ProjectDefaults): string {
@@ -148,26 +710,10 @@ export function configApiPlugin(): Plugin {
       }
 
       // GET /api/config - 读取配置
-      server.middlewares.use((req: any, res: any, next: any) => {
+      server.middlewares.use(async (req: any, res: any, next: any) => {
         if (req.method === 'GET' && req.url === '/api/config') {
           try {
-            let config: SystemConfig = { server: { host: 'localhost', allowLAN: true } };
-            
-            if (fs.existsSync(configPath)) {
-              const fileContent = fs.readFileSync(configPath, 'utf8');
-              config = JSON.parse(fileContent);
-              
-              // 确保有默认值
-              if (!config.server) {
-                config.server = { host: 'localhost', allowLAN: true };
-              }
-              if (config.server.allowLAN === undefined) {
-                config.server.allowLAN = true;
-              }
-            }
-
-            config.projectDefaults = normalizeProjectDefaults(config.projectDefaults);
-            config.projectInfo = normalizeProjectInfo(config.projectInfo);
+            const config = readSystemConfig(configPath);
             
             // 移除 port 字段（不对外暴露，固定使用 51720 起始）
             if (config.server && 'port' in config.server) {
@@ -182,6 +728,98 @@ export function configApiPlugin(): Plugin {
             res.setHeader('Content-Type', 'application/json; charset=utf-8');
             res.end(JSON.stringify({ error: e?.message || 'Failed to read config' }));
           }
+          return;
+        }
+
+        if (req.method === 'GET' && req.url === '/api/assistant/runtime') {
+          try {
+            const config = readSystemConfig(configPath);
+            const runtime = await resolveAssistantRuntime(config, projectRoot);
+
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify(runtime));
+          } catch (e: any) {
+            const fallback: AssistantRuntimeInfo = {
+              webBaseUrl: DEFAULT_ASSISTANT_WEB_BASE_URL,
+              apiBaseUrl: DEFAULT_ASSISTANT_API_BASE_URL,
+              projectPath: projectRoot,
+              source: 'default',
+              health: createAssistantHealthInfo({
+                status: 'runtime_unreachable',
+                message: '助手运行时检查失败，请稍后重试',
+                commandSource: 'default',
+              }),
+            };
+
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify(fallback));
+          }
+          return;
+        }
+
+        if (req.method === 'POST' && req.url === '/api/assistant/bootstrap') {
+          const chunks: Buffer[] = [];
+          let totalLength = 0;
+
+          req.on('data', (chunk: Buffer) => {
+            totalLength += chunk.length;
+            if (totalLength > 1024 * 10) {
+              res.statusCode = 413;
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.end(JSON.stringify({ error: 'Payload too large' }));
+              req.destroy();
+              return;
+            }
+            chunks.push(chunk);
+          });
+
+          req.on('end', async () => {
+            try {
+              const raw = Buffer.concat(chunks).toString('utf8');
+              const body = raw ? JSON.parse(raw) : {};
+              const mode = normalizeAssistantBootstrapMode(body?.mode);
+
+              if (!mode) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify({ error: 'Invalid bootstrap mode', hints: getAssistantBootstrapHints() }));
+                return;
+              }
+
+              const prerequisiteError = validateBootstrapPrerequisites(mode);
+              if (prerequisiteError) {
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify({ error: prerequisiteError, hints: getAssistantBootstrapHints() }));
+                return;
+              }
+
+              const command = buildAssistantBootstrapCommand(mode);
+              runCommandInBackground(command, projectRoot);
+
+              const config = readSystemConfig(configPath);
+              const runtime = await resolveAssistantRuntime(config, projectRoot);
+
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.end(JSON.stringify({
+                success: true,
+                mode,
+                message: '已触发启动，请稍后重试',
+                runtime,
+              }));
+            } catch (e: any) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.end(JSON.stringify({
+                error: e?.message || '无法自动启动 Axhub Genie',
+                hints: getAssistantBootstrapHints(),
+              }));
+            }
+          });
+
           return;
         }
 
@@ -223,8 +861,12 @@ export function configApiPlugin(): Plugin {
               // 校验/归一化 projectDefaults
               const projectDefaults = normalizeProjectDefaults(newConfig.projectDefaults);
               const projectInfo = normalizeProjectInfo(newConfig.projectInfo);
+              const automation = normalizeAutomationConfig(newConfig.automation);
+              const assistant = normalizeAssistantConfig(newConfig.assistant);
               newConfig.projectDefaults = projectDefaults;
               newConfig.projectInfo = projectInfo;
+              newConfig.automation = automation;
+              newConfig.assistant = assistant;
 
               // 使用模板生成 AGENTS.md（项目参考规范）
               if (!writeAgentDocs(agentsTemplatePath, agentsPath, claudePath, projectInfo, projectDefaults)) {
@@ -247,6 +889,179 @@ export function configApiPlugin(): Plugin {
               res.end(JSON.stringify({ error: e?.message || 'Failed to save config' }));
             }
           });
+          return;
+        }
+
+        if (req.method === 'POST' && req.url === '/api/ide/open') {
+          const chunks: Buffer[] = [];
+          let totalLength = 0;
+
+          req.on('data', (chunk: Buffer) => {
+            totalLength += chunk.length;
+            if (totalLength > 1024 * 10) {
+              res.statusCode = 413;
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.end(JSON.stringify({ error: 'Payload too large' }));
+              req.destroy();
+              return;
+            }
+            chunks.push(chunk);
+          });
+
+          req.on('end', () => {
+            try {
+              const raw = Buffer.concat(chunks).toString('utf8');
+              const body = JSON.parse(raw || '{}');
+
+              let configuredIDE: MainIDE | null = null;
+              if (fs.existsSync(configPath)) {
+                const fileContent = fs.readFileSync(configPath, 'utf8');
+                const savedConfig = JSON.parse(fileContent) as SystemConfig;
+                configuredIDE = normalizeMainIDE(savedConfig?.automation?.defaultIDE);
+              }
+
+              const ide = normalizeMainIDE(body?.ide) || configuredIDE;
+              if (!ide) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify({ error: 'Main IDE is not configured' }));
+                return;
+              }
+
+              const rawTargetPath = typeof body?.targetPath === 'string' ? body.targetPath.trim() : '';
+              const targetPath = rawTargetPath ? rawTargetPath : projectRoot;
+              const absoluteTargetPath = path.isAbsolute(targetPath) ? targetPath : path.resolve(projectRoot, targetPath);
+              const ideAppName = MAIN_IDE_APP_NAMES[ide];
+
+              const command = process.platform === 'win32'
+                ? `powershell -NoProfile -Command Start-Process ${quoteForShell(ideAppName)} ${quoteForShell(absoluteTargetPath)}`
+                : `open -a ${quoteForShell(ideAppName)} ${quoteForShell(absoluteTargetPath)}`;
+
+              exec(command, (error) => {
+                if (error) {
+                  res.statusCode = 500;
+                  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                  res.end(JSON.stringify({ error: `打开 ${ideAppName} 失败: ${error.message}` }));
+                  return;
+                }
+
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify({
+                  success: true,
+                  ide,
+                  targetPath: absoluteTargetPath,
+                  command,
+                }));
+              });
+            } catch (e: any) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.end(JSON.stringify({ error: e?.message || 'Failed to open IDE' }));
+            }
+          });
+
+          return;
+        }
+
+        if (req.method === 'POST' && req.url === '/api/prompt/execute') {
+          const chunks: Buffer[] = [];
+          let totalLength = 0;
+
+          req.on('data', (chunk: Buffer) => {
+            totalLength += chunk.length;
+            if (totalLength > 1024 * 1024) {
+              res.statusCode = 413;
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.end(JSON.stringify({ error: 'Payload too large' }));
+              req.destroy();
+              return;
+            }
+            chunks.push(chunk);
+          });
+
+          req.on('end', async () => {
+            try {
+              const raw = Buffer.concat(chunks).toString('utf8');
+              const body = JSON.parse(raw || '{}');
+              const client = normalizePromptClient(body?.client);
+              const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
+              const scene = typeof body?.scene === 'string' ? body.scene.trim() : '';
+
+              if (!client) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify({ error: 'Invalid client' }));
+                return;
+              }
+
+              if (!prompt) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify({ error: 'Prompt is required' }));
+                return;
+              }
+
+              if (!scene) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify({ error: 'Scene is required' }));
+                return;
+              }
+
+              const config = readSystemConfig(configPath);
+              const assistantRuntime = await resolveAssistantRuntime(config, projectRoot);
+
+              if (assistantRuntime.health.status !== 'ready') {
+                throw new Error(`${assistantRuntime.health.message}。可尝试：${ASSISTANT_HINTS.installGlobal}`);
+              }
+
+              const provider = client;
+              const agentApiUrl = buildAgentApiUrl(assistantRuntime.apiBaseUrl);
+
+              const upstreamResponse = await fetch(agentApiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  projectPath: assistantRuntime.projectPath,
+                  provider,
+                  message: prompt,
+                  stream: false,
+                }),
+              });
+
+              const upstreamText = await upstreamResponse.text();
+              let upstreamData: any = null;
+              try {
+                upstreamData = upstreamText ? JSON.parse(upstreamText) : null;
+              } catch {
+                upstreamData = null;
+              }
+
+              if (!upstreamResponse.ok) {
+                const upstreamError = upstreamData?.error || upstreamData?.message || upstreamText || `status ${upstreamResponse.status}`;
+                throw new Error(`Agent API 调用失败: ${upstreamError}`);
+              }
+
+              const sessionId = typeof upstreamData?.sessionId === 'string' ? upstreamData.sessionId : '';
+              const sessionUrl = typeof upstreamData?.sessionUrl === 'string' ? upstreamData.sessionUrl : '';
+
+              const url = sessionUrl || (sessionId ? `${assistantRuntime.webBaseUrl}/session/${encodeURIComponent(sessionId)}` : '');
+
+              if (!url) {
+                throw new Error('Agent API 返回缺少 sessionUrl/sessionId');
+              }
+
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.end(JSON.stringify({ success: true, url, sessionId, scene, provider }));
+            } catch (e: any) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.end(JSON.stringify({ error: e?.message || 'Failed to execute prompt' }));
+            }
+          });
+
           return;
         }
 

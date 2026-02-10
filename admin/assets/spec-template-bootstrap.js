@@ -1,4 +1,4 @@
-import{r as h,j as r,ab as b,aN as M,aO as j,ac as S,aP as E,aQ as $,aR as H,aH as g}from"./chunks/vendor.js";import{d as I}from"./chunks/index.js";const C=`
+import{r as h,j as r,a9 as b,aW as M,aX as j,ab as S,aY as E,aZ as $,a_ as H,aQ as g}from"./chunks/vendor.js";import{d as I}from"./chunks/index.js";const C=`
   body {
     background: #f5f5f5;
   }
@@ -60,10 +60,10 @@ import{r as h,j as r,ab as b,aN as M,aO as j,ac as S,aP as E,aQ as $,aR as H,aH 
           <p>无法加载 Markdown 文件: ${n}</p>
           <pre>${e}</pre>
         </div>
-      `)}}async function P(n){try{console.log("[Spec Template] 加载多个 Markdown 文档:",n);const e=await Promise.all(n.map(async({key:t,label:o,url:s})=>{const a=await fetch(s);if(!a.ok)throw new Error(`HTTP ${a.status}: ${a.statusText} for ${s}`);const i=await a.text();return{key:t,label:o,content:i}}));T(e)}catch(e){console.error("[Spec Template] 加载失败:",e);const t=document.getElementById("spec-root");t&&(t.innerHTML=`
+      `)}}async function D(n){try{console.log("[Spec Template] 加载多个 Markdown 文档:",n);const e=await Promise.all(n.map(async({key:t,label:o,url:s})=>{const a=await fetch(s);if(!a.ok)throw new Error(`HTTP ${a.status}: ${a.statusText} for ${s}`);const i=await a.text();return{key:t,label:o,content:i}}));T(e)}catch(e){console.error("[Spec Template] 加载失败:",e);const t=document.getElementById("spec-root");t&&(t.innerHTML=`
         <div style="color: red; padding: 20px;">
           <h2>加载失败</h2>
           <p>无法加载 Markdown 文件</p>
           <pre>${e}</pre>
         </div>
-      `)}}typeof window<"u"&&(window.SpecTemplateBootstrap={renderMarkdown:y,renderMarkdownDocuments:T,loadMarkdownFromUrl:N,loadMarkdownDocumentsFromUrls:P},console.log("[Spec Template Bootstrap] 已挂载到全局"));
+      `)}}typeof window<"u"&&(window.SpecTemplateBootstrap={renderMarkdown:y,renderMarkdownDocuments:T,loadMarkdownFromUrl:N,loadMarkdownDocumentsFromUrls:D},console.log("[Spec Template Bootstrap] 已挂载到全局"));

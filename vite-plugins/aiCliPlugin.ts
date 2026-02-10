@@ -20,29 +20,37 @@ function hasCommand(cmd: string): boolean {
   return result.status === 0;
 }
 
+type CliSpawnConfig = {
+  command: string;
+  args: string[];
+  useStdin: boolean;
+  input?: string;
+};
+
 /**
  * CLI 适配器（严格对齐官方用法）
  */
-const CLI_ADAPTERS: Record<AIType, (opts: RunAIOptions) => { command: string; args: string[]; useStdin: boolean; input?: string }> = {
+const CLI_ADAPTERS: Record<AIType, (opts: RunAIOptions) => CliSpawnConfig> = {
   claude: ({ prompt, interactive }) => {
     if (interactive) {
-      // 官方：进入 Claude Code 交互 TUI
-      return { command: 'claude', args: [], useStdin: false };
+      // 官方：claude [prompt] → 启动交互式会话，并把 prompt 作为首条消息
+      return { command: 'claude', args: [prompt], useStdin: false };
     }
     // 官方 headless 模式
     return { command: 'claude', args: ['-p', prompt], useStdin: false };
   },
   gemini: ({ prompt, interactive }) => {
     if (interactive) {
-      return { command: 'gemini', args: [], useStdin: false };
+      // 官方：gemini -i "<prompt>" → 执行 prompt 并进入交互模式
+      return { command: 'gemini', args: ['-i', prompt], useStdin: false };
     }
     // Gemini CLI 通过 stdin 接收输入
     return { command: 'gemini', args: [], useStdin: true, input: prompt };
   },
   opencode: ({ prompt, interactive }) => {
     if (interactive) {
-      // 启动 OpenCode TUI
-      return { command: 'opencode', args: [], useStdin: false };
+      // 启动 OpenCode TUI，并附带首条 prompt（如 CLI 版本不支持该参数，会在运行时报错）
+      return { command: 'opencode', args: ['--prompt', prompt], useStdin: false };
     }
     // 非交互模式：opencode run "prompt"
     return { command: 'opencode', args: ['run', prompt], useStdin: false };
@@ -66,10 +74,7 @@ const CLI_ADAPTERS: Record<AIType, (opts: RunAIOptions) => { command: string; ar
   },
 };
 
-/**
- * 统一执行入口
- */
-function runAICommand(options: RunAIOptions): Promise<string> {
+function spawnAIProcess(options: RunAIOptions) {
   const {
     cli,
     prompt,
@@ -79,13 +84,13 @@ function runAICommand(options: RunAIOptions): Promise<string> {
 
   // Cursor 使用 'agent' 命令，需要特殊检测
   const commandToCheck = cli === 'cursor' ? 'agent' : cli;
-  
   if (!hasCommand(commandToCheck)) {
     throw new Error(`CLI not found: ${cli} (command: ${commandToCheck})`);
   }
 
-  // 交互式 → 强制非静默
+  // 交互式 → 强制非静默（否则用户看不到 TUI）
   const finalSilent = interactive ? false : silent;
+
   const adapter = CLI_ADAPTERS[cli];
   if (!adapter) {
     throw new Error(`Unsupported CLI: ${cli}`);
@@ -93,32 +98,49 @@ function runAICommand(options: RunAIOptions): Promise<string> {
 
   const config = adapter({ ...options, interactive });
   const { command, args, useStdin, input } = config;
-  
-  console.log(`[AI CLI] Spawning command: ${command} ${args.join(' ')}${useStdin ? ' (with stdin)' : ''}`);
-  
+
+  console.log(
+    `[AI CLI] Spawning command: ${command} ${args.join(' ')}${useStdin ? ' (with stdin)' : ''}`,
+  );
+
+  const child = spawn(command, args, {
+    stdio: finalSilent
+      ? ['pipe', 'pipe', 'pipe']
+      : (useStdin ? ['pipe', 'inherit', 'inherit'] : 'inherit'),
+    env: process.env,
+    // Windows 上执行 .cmd/.bat 往往需要 shell；macOS/Linux 默认关闭以避免命令注入风险
+    shell: platform() === 'win32',
+  });
+
+  // 如果需要通过 stdin 传递输入
+  if (useStdin && input && child.stdin) {
+    console.log(`[AI CLI] Writing to stdin: ${input.substring(0, 50)}...`);
+    child.stdin.write(input);
+    child.stdin.end();
+  }
+
+  return { child, finalSilent };
+}
+
+/**
+ * 统一执行入口
+ */
+function runAICommand(options: RunAIOptions): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    const child = spawn(command, args, {
-      stdio: finalSilent ? ['pipe', 'pipe', 'pipe'] : (useStdin ? ['pipe', 'inherit', 'inherit'] : 'inherit'),
-      env: process.env,
-      shell: true,
-    });
+    const { child, finalSilent } = spawnAIProcess(options);
 
     let output = '';
     let errorOutput = '';
 
-    // 设置超时（60秒）
-    const timeout = setTimeout(() => {
-      console.error(`[AI CLI] Command timeout after 60s`);
-      child.kill('SIGTERM');
-      reject(new Error('Command execution timeout (60s)'));
-    }, 60000);
-
-    // 如果需要通过 stdin 传递输入
-    if (useStdin && input && child.stdin) {
-      console.log(`[AI CLI] Writing to stdin: ${input.substring(0, 50)}...`);
-      child.stdin.write(input);
-      child.stdin.end();
-    }
+    // 仅在非交互模式下设置超时（交互式会话不应被强制终止）
+    const timeoutMs = options.interactive ? 0 : 60000;
+    const timeout = timeoutMs
+      ? setTimeout(() => {
+        console.error(`[AI CLI] Command timeout after ${Math.round(timeoutMs / 1000)}s`);
+        child.kill('SIGTERM');
+        reject(new Error(`Command execution timeout (${Math.round(timeoutMs / 1000)}s)`));
+      }, timeoutMs)
+      : null;
 
     // 捕获输出
     if (finalSilent && child.stdout && child.stderr) {
@@ -137,14 +159,14 @@ function runAICommand(options: RunAIOptions): Promise<string> {
 
     // 错误处理
     child.on('error', (error) => {
-      clearTimeout(timeout);
+      if (timeout) clearTimeout(timeout);
       console.error(`[AI CLI] Process error:`, error);
       reject(error);
     });
 
     // 进程关闭 - 这是主要的完成事件
     child.on('close', (code, signal) => {
-      clearTimeout(timeout);
+      if (timeout) clearTimeout(timeout);
       console.log(`[AI CLI] Process closed with code ${code}, signal ${signal}`);
       
       if (code === 0) {
@@ -168,6 +190,9 @@ export function aiCliPlugin(): Plugin {
   // 防抖机制：记录正在执行的任务
   const runningTasks = new Map<string, { promise: Promise<string>; timestamp: number }>();
   const DEBOUNCE_TIME = 2000; // 2秒内的相同请求会被合并
+  let interactiveSession:
+    | { pid: number; cli: AIType; startedAt: number }
+    | null = null;
 
   return {
     name: 'ai-cli-api',
@@ -228,6 +253,53 @@ export function aiCliPlugin(): Plugin {
             const commandToCheck = cli === 'cursor' ? 'agent' : cli;
             if (!hasCommand(commandToCheck)) {
               return sendError(res, 404, `CLI not found: ${cli}. Please install it first.`);
+            }
+
+            // 交互式会话：直接在 dev server 的终端里启动 TUI，不等待结束（避免 HTTP 长连接挂起）
+            if (interactive) {
+              if (interactiveSession) {
+                return sendError(
+                  res,
+                  409,
+                  `Interactive session already running (cli: ${interactiveSession.cli}, pid: ${interactiveSession.pid}). Please exit it before starting a new one.`,
+                );
+              }
+
+              console.log(`[AI CLI] Launching interactive ${cli} session...`);
+
+              try {
+                const { child } = spawnAIProcess({
+                  cli,
+                  prompt,
+                  silent: false,
+                  interactive: true,
+                });
+
+                interactiveSession = {
+                  pid: child.pid ?? -1,
+                  cli,
+                  startedAt: Date.now(),
+                };
+
+                child.on('close', () => {
+                  interactiveSession = null;
+                });
+
+                sendJSON(res, 202, {
+                  success: true,
+                  cli,
+                  interactive: true,
+                  pid: child.pid ?? null,
+                  message: 'Interactive session started in the dev server terminal.',
+                  timestamp: new Date().toISOString(),
+                });
+              } catch (error: any) {
+                console.error('[AI CLI] Interactive launch error:', error);
+                interactiveSession = null;
+                sendError(res, 500, error.message || 'Failed to launch interactive AI CLI session');
+              }
+
+              return;
             }
 
             // 防抖检查

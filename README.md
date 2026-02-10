@@ -40,6 +40,30 @@ npm install
 npm run dev
 ```
 
+如果你希望一键检测环境并自动启动，可直接使用：
+
+```bash
+# macOS（推荐：直接双击文件运行）
+./双击这里启动-macos.command
+```
+
+也可以在 Finder 里直接双击：`双击这里启动-macos.command`
+
+也可以在资源管理器里直接双击：`双击这里启动-windows.bat`
+
+```bat
+:: Windows
+双击这里启动-windows.bat
+```
+
+这两个脚本会自动执行：
+- 检查是否安装 `node` / `npm` / `git`
+- `node` 或 `npm` 缺失时会停止，并输出可一行复制给 AI 的安装排障 Prompt
+- `git` 缺失时会继续执行 `npm install` / `npm run dev`，同时仍会输出 Git 安装建议 Prompt
+- 检查依赖是否完整，必要时执行 `npm install`
+- 启动开发服务 `npm run dev`
+- 中途报错时输出可一行复制给 AI 的排障 Prompt
+
 ### 第二步：与 AI 沟通需求
 
 1. **打开 AI 助手**（如 TRAE、Cursor 等）

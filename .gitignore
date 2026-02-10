@@ -34,6 +34,7 @@ entries.json
 .idea/
 .obsidian/
 .claude/
+.trae/
 /.drafts/
 *.swp
 *.swo

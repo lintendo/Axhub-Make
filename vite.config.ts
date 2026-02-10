@@ -1411,6 +1411,7 @@ const config: any = {
     autoDebugPlugin(), // 提供自动调试 API 端点
     configApiPlugin(), // 提供 /api/config 端点
     aiCliPlugin(), // 提供 /api/ai 端点
+    // agentChatApiPlugin(), // 暂时移除 AI Chat 功能（/api/agent）
     gitVersionApiPlugin(), // 提供 /api/git 端点（Git 版本管理）
     forceInlineDynamicImportsOff(isIifeBuild),
     isIifeBuild

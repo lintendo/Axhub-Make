@@ -660,7 +660,7 @@ export function fileSystemApiPlugin(): Plugin {
                     success: true,
                     uploadType,
                     filePath,
-                    prompt: `本地 Axure ZIP 已上传并解压完成。\n\n解压目录：\`${filePath}\`\n\n请阅读技能文档：\n- \`${skillDoc}\`${targetHint}\n\n请按技能文档流程，从解压目录中提取主题/数据/文档并还原页面/元素。`,
+                    prompt: `本地 Axure ZIP 已上传并解压完成。\n\n解压目录：\`${filePath}\`\n\n请阅读技能文档：\n- \`${skillDoc}\`${targetHint}\n\n开始执行前：先根据 skill 的用户交互指南用简短中文回复用户，确认需求（目标范围/输出类型/是否允许优化等）。\n\n请按技能文档流程，从解压目录中提取主题/数据/文档并还原页面/元素。`,
                     message: '文件已解压，请复制 Prompt 交给 AI 处理'
                   });
                 } catch (e: any) {

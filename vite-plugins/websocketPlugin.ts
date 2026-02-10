@@ -335,6 +335,8 @@ export function websocketPlugin(): Plugin {
                 ? [targetClientType]
                 : [];
 
+            // 这里的 targetClientTypes 是插件层的“按客户端类型定向”机制。
+            // 当前前端仅对 vscode/cursor 做 open-file 的稳定投递；其他 IDE 本轮通过系统命令打开，不走 WS 定向。
             const targetClients = normalizedTargetClientTypes.length === 0
               ? clients
               : new Set(

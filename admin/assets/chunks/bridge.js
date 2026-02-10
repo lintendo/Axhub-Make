@@ -1,0 +1,1 @@
+const r="AXHUB_WEB_EDITOR_GENIE_REQUEST";function n(e){return{type:r,payload:e}}function s(e){if(!e||typeof e!="object")return!1;const t=e;if(t.type!==r||!t.payload||typeof t.payload!="object")return!1;const o=t.payload;return typeof o.preferCurrentSession=="boolean"&&typeof o.mode=="string"}export{n as c,s as i};
