@@ -49,8 +49,10 @@ else
 fi
 
 if [ "$need_install" -eq 1 ]; then
-  echo "[2/3] 安装依赖（npm install）..."
-  if ! npm install; then
+  echo "[2/3] 安装依赖（npm --registry https://registry.npmmirror.com install）..."
+  echo "[提示] 首次打开或依赖更新时，安装可能需要几分钟，请耐心等待。"
+  echo "[提示] 这不是每次都会执行，后续通常会直接跳过安装。"
+  if ! npm --registry https://registry.npmmirror.com install; then
     print_ai_prompt "执行 npm install 失败。请分析报错并给我修复步骤。"
     exit 1
   fi

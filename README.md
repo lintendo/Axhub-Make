@@ -44,23 +44,24 @@ npm run dev
 
 ```bash
 # macOS（推荐：直接双击文件运行）
-./双击这里启动-macos.command
+./00-双击这里启动-macos.command
 ```
 
-也可以在 Finder 里直接双击：`双击这里启动-macos.command`
+也可以在 Finder 里直接双击：`00-双击这里启动-macos.command`
 
-也可以在资源管理器里直接双击：`双击这里启动-windows.bat`
+也可以在资源管理器里直接双击：`00-双击这里启动-windows.bat`
 
 ```bat
 :: Windows
-双击这里启动-windows.bat
+00-双击这里启动-windows.bat
 ```
 
 这两个脚本会自动执行：
 - 检查是否安装 `node` / `npm` / `git`
 - `node` 或 `npm` 缺失时会停止，并输出可一行复制给 AI 的安装排障 Prompt
 - `git` 缺失时会继续执行 `npm install` / `npm run dev`，同时仍会输出 Git 安装建议 Prompt
-- 检查依赖是否完整，必要时执行 `npm install`
+- 检查依赖是否完整，必要时执行 `npm --registry https://registry.npmmirror.com install`（加速镜像）
+- 进入依赖安装阶段时会提示：首次可能较慢，后续一般不会每次都安装
 - 启动开发服务 `npm run dev`
 - 中途报错时输出可一行复制给 AI 的排障 Prompt
 

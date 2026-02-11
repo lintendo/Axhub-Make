@@ -1,7 +1,7 @@
 import type { Plugin } from 'vite';
 import fs from 'fs';
 import path from 'path';
-import { exec, spawn, spawnSync } from 'node:child_process';
+import { exec, execFile, spawn, spawnSync } from 'node:child_process';
 
 type ProjectDefaults = {
   defaultDoc?: string | null;
@@ -27,6 +27,28 @@ const MAIN_IDE_APP_NAMES: Record<MainIDE, string> = {
   kiro: 'Kiro',
   qoder: 'Qoder',
   antigravity: 'Antigravity',
+};
+
+const MAIN_IDE_WINDOWS_COMMAND_CANDIDATES: Record<MainIDE, string[]> = {
+  cursor: ['cursor'],
+  trae: ['trae'],
+  vscode: ['code', 'code-insiders'],
+  trae_cn: ['trae-cn', 'trae_cn', 'trae'],
+  windsurf: ['windsurf'],
+  kiro: ['kiro'],
+  qoder: ['qoder'],
+  antigravity: ['antigravity'],
+};
+
+const MAIN_IDE_WINDOWS_EXECUTABLE_NAMES: Record<MainIDE, string[]> = {
+  cursor: ['Cursor.exe'],
+  trae: ['TRAE.exe', 'Trae.exe'],
+  vscode: ['Code.exe', 'Code - Insiders.exe'],
+  trae_cn: ['TRAE CN.exe', 'TRAE.exe', 'Trae.exe'],
+  windsurf: ['Windsurf.exe'],
+  kiro: ['Kiro.exe'],
+  qoder: ['Qoder.exe'],
+  antigravity: ['Antigravity.exe'],
 };
 
 type AutomationConfig = {
@@ -72,6 +94,10 @@ type AssistantRuntimeInfo = {
   health: AssistantHealthInfo;
 };
 
+type AssistantRuntimeResolveOptions = {
+  autoStart?: boolean;
+};
+
 type AssistantBootstrapMode = 'install_global' | 'start_existing';
 
 type AssistantProbeStatus = 'ready' | 'missing_cli' | 'needs_update' | 'cli_error' | 'not_running';
@@ -83,8 +109,7 @@ type AssistantProbeResult = {
   config: AssistantConfig | null;
 };
 
-const ASSISTANT_START_RETRY_TIMES = 6;
-const ASSISTANT_START_RETRY_INTERVAL_MS = 1_000;
+const ASSISTANT_START_CHECK_DELAY_MS = 500;
 
 type SystemConfig = {
   server: Record<string, any>;
@@ -106,7 +131,34 @@ const DEFAULT_ASSISTANT_API_BASE_URL = 'http://localhost:32123/api';
 const DEFAULT_ASSISTANT_HEALTH_URL = `${DEFAULT_ASSISTANT_WEB_BASE_URL}/health`;
 const ASSISTANT_SERVICE_ID = '@axhub/genie';
 const ASSISTANT_SERVICE_NAME = 'Axhub Genie';
+const ASSISTANT_RUNTIME_LOG_PREFIX = '[assistant-runtime]';
 const CLOUDCLI_STATUS_TIMEOUT_MS = 2_000;
+
+function logAssistantRuntime(level: 'info' | 'warn' | 'error', message: string, meta?: Record<string, unknown>) {
+  const payload = meta ? `${ASSISTANT_RUNTIME_LOG_PREFIX} ${message}` : `${ASSISTANT_RUNTIME_LOG_PREFIX} ${message}`;
+  if (level === 'error') {
+    if (meta) {
+      console.error(payload, meta);
+      return;
+    }
+    console.error(payload);
+    return;
+  }
+  if (level === 'warn') {
+    if (meta) {
+      console.warn(payload, meta);
+      return;
+    }
+    console.warn(payload);
+    return;
+  }
+  if (meta) {
+    console.info(payload, meta);
+    return;
+  }
+  console.info(payload);
+}
+
 function getAssistantHealthHints(): AssistantHealthHints {
   const installBaseCommand = 'npm install -g @axhub/genie';
   const installGlobal = process.platform === 'darwin'
@@ -260,6 +312,12 @@ function containsNeedsUpdateHint(text: string): boolean {
   return /(need\s*update|needs\s*update|outdated|upgrade|please\s*update|版本过旧|需要更新|请更新)/i.test(normalized);
 }
 
+function containsNotRunningHint(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized) return false;
+  return /(not\s*running|service\s*not\s*running|not\s*started|未启动|尚未启动|未运行|服务未运行)/i.test(normalized);
+}
+
 function getCommandCandidates(command: string): string[] {
   if (process.platform !== 'win32') {
     return [command];
@@ -272,11 +330,42 @@ function getCommandCandidates(command: string): string[] {
   return [command, `${command}.cmd`, `${command}.exe`, `${command}.bat`];
 }
 
+function quoteForCmdExec(value: string): string {
+  if (!value) return '""';
+  if (!/[\s"&^|<>]/.test(value)) return value;
+  const escaped = value
+    .replace(/(\\*)"/g, '$1$1\\"')
+    .replace(/(\\+)$/g, '$1$1');
+  return `"${escaped}"`;
+}
+
+function buildWindowsCommandLine(command: string, args: string[]): string {
+  const parts = [command, ...args].map((part) => quoteForCmdExec(String(part)));
+  return parts.join(' ');
+}
+
+function spawnSyncCommand(command: string, args: string[], options?: Parameters<typeof spawnSync>[2]) {
+  if (process.platform !== 'win32') {
+    return spawnSync(command, args, options);
+  }
+
+  const useCmdWrapper = !/\.exe$/i.test(command);
+  if (!useCmdWrapper) {
+    return spawnSync(command, args, options);
+  }
+
+  const commandLine = buildWindowsCommandLine(command, args);
+  return spawnSync('cmd.exe', ['/d', '/s', '/c', commandLine], {
+    ...options,
+    windowsHide: true,
+  });
+}
+
 function spawnSyncFirstAvailable(command: string, args: string[], options?: Parameters<typeof spawnSync>[2]) {
   for (const candidate of getCommandCandidates(command)) {
-    const result = spawnSync(candidate, args, options);
+    const result = spawnSyncCommand(candidate, args, options);
     const errCode = (result.error as NodeJS.ErrnoException | undefined)?.code;
-    if (errCode === 'ENOENT') {
+    if (errCode === 'ENOENT' || errCode === 'EINVAL') {
       continue;
     }
 
@@ -337,6 +426,15 @@ function readAssistantStatusFromCli(command: 'axhub-genie' | 'cloudcli', args: s
         return {
           status: 'needs_update',
           message: `检测到 ${command} 版本可能过旧，请更新后重试`,
+          commandSource,
+          config: null,
+        };
+      }
+
+      if (command === 'axhub-genie' && containsNotRunningHint(mergedOutput)) {
+        return {
+          status: 'not_running',
+          message: `${command} 服务未启动`,
           commandSource,
           config: null,
         };
@@ -409,7 +507,14 @@ function readAssistantStatusFromCli(command: 'axhub-genie' | 'cloudcli', args: s
 }
 
 function readAxhubGenieStatus(): AssistantProbeResult {
-  return readAssistantStatusFromCli('axhub-genie', ['status', '--json']);
+  const probe = readAssistantStatusFromCli('axhub-genie', ['status', '--json']);
+  const level = probe.status === 'ready' ? 'info' : 'warn';
+  logAssistantRuntime(level, 'axhub-genie status --json', {
+    status: probe.status,
+    message: probe.message,
+    config: probe.config || null,
+  });
+  return probe;
 }
 
 function readCloudCliAssistantStatus(): AssistantProbeResult {
@@ -420,12 +525,126 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function runExecutableCommandInBackground(command: string, args: string[], cwd: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const isWindows = process.platform === 'win32';
+    const useWindowsCmdWrapper = isWindows && !/\.exe$/i.test(command);
+    const spawnCommand = useWindowsCmdWrapper ? 'cmd.exe' : command;
+    const spawnArgs = useWindowsCmdWrapper
+      ? ['/d', '/s', '/c', buildWindowsCommandLine(command, args)]
+      : args;
+
+    logAssistantRuntime('info', '后台执行可执行命令', {
+      command,
+      args,
+      spawnCommand,
+      spawnArgs,
+      cwd,
+      platform: process.platform,
+    });
+
+    const child = spawn(spawnCommand, spawnArgs, {
+      cwd,
+      detached: true,
+      stdio: ['ignore', 'ignore', 'pipe'],
+      windowsHide: process.platform === 'win32',
+    });
+
+    if (typeof (child as any)?.once !== 'function') {
+      if (typeof child.unref === 'function') {
+        child.unref();
+      }
+      resolve();
+      return;
+    }
+
+    let settled = false;
+    let stderrText = '';
+    if (child.stderr && typeof (child.stderr as any).setEncoding === 'function' && typeof (child.stderr as any).on === 'function') {
+      (child.stderr as any).setEncoding('utf8');
+      (child.stderr as any).on('data', (chunk: string) => {
+        if (typeof chunk !== 'string') return;
+        if (stderrText.length >= 4000) return;
+        stderrText += chunk;
+      });
+    }
+
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      if (typeof child.unref === 'function') {
+        child.unref();
+      }
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    };
+
+    child.once('error', (error) => {
+      logAssistantRuntime('error', '可执行命令触发失败', {
+        command,
+        args,
+        cwd,
+        error: (error as Error)?.message || 'unknown error',
+      });
+      finish(error as Error);
+    });
+
+    child.once('spawn', () => {
+      logAssistantRuntime('info', '可执行命令已触发', {
+        command,
+        args,
+        cwd,
+        pid: typeof child.pid === 'number' ? child.pid : null,
+      });
+      if ((child.stderr as any)?.unref && typeof (child.stderr as any).unref === 'function') {
+        (child.stderr as any).unref();
+      }
+      setTimeout(() => finish(), 150);
+    });
+
+    child.once('exit', (code, signal) => {
+      const stderrSnippet = stderrText.trim().slice(0, 500);
+      const exitMeta = {
+        command,
+        args,
+        cwd,
+        code,
+        signal,
+        stderr: stderrSnippet || null,
+      };
+
+      if (typeof code === 'number' && code !== 0) {
+        logAssistantRuntime('error', '可执行命令异常退出', exitMeta);
+        finish(new Error(`命令退出 code=${code}${stderrSnippet ? ` stderr=${stderrSnippet}` : ''}`));
+        return;
+      }
+
+      logAssistantRuntime('warn', '可执行命令提前退出', exitMeta);
+      finish();
+    });
+
+    setTimeout(() => finish(), 500);
+  });
+}
+
 async function startAxhubGenieAndWait(projectPath: string): Promise<AssistantProbeResult> {
   const startCommand = getAssistantHealthHints().start;
+  logAssistantRuntime('info', '准备自动启动 Axhub Genie', {
+    command: startCommand,
+    cwd: projectPath,
+  });
 
   try {
-    runCommandInBackground(startCommand, projectPath);
+    await runExecutableCommandInBackground(startCommand, [], projectPath);
   } catch (error: any) {
+    logAssistantRuntime('error', '启动命令触发失败', {
+      command: startCommand,
+      cwd: projectPath,
+      error: error?.message || 'unknown error',
+    });
     return {
       status: 'cli_error',
       message: `自动启动 Axhub Genie 失败: ${error?.message || 'unknown error'}`,
@@ -434,32 +653,45 @@ async function startAxhubGenieAndWait(projectPath: string): Promise<AssistantPro
     };
   }
 
-  let lastProbe: AssistantProbeResult = {
-    status: 'not_running',
-    message: 'Axhub Genie 服务未启动',
-    commandSource: 'axhub-genie',
-    config: null,
-  };
+  await sleep(ASSISTANT_START_CHECK_DELAY_MS);
+  const probe = readAxhubGenieStatus();
 
-  for (let attempt = 0; attempt < ASSISTANT_START_RETRY_TIMES; attempt++) {
-    await sleep(ASSISTANT_START_RETRY_INTERVAL_MS);
-    const probe = readAxhubGenieStatus();
-    lastProbe = probe;
-
-    if (probe.status === 'ready') {
-      return {
-        ...probe,
-        message: 'Axhub Genie 已自动启动并就绪',
-      };
-    }
-
-    if (probe.status === 'missing_cli' || probe.status === 'needs_update' || probe.status === 'cli_error') {
-      return probe;
-    }
+  if (probe.status === 'ready') {
+    logAssistantRuntime('info', 'Axhub Genie 自动启动成功', {
+      config: probe.config || null,
+    });
+    return {
+      ...probe,
+      message: 'Axhub Genie 已自动启动并就绪',
+    };
   }
 
+  if (probe.status === 'missing_cli' || probe.status === 'needs_update') {
+    logAssistantRuntime('warn', '自动启动提前结束', {
+      reason: probe.status,
+      message: probe.message,
+    });
+    return probe;
+  }
+
+  if (probe.status === 'cli_error') {
+    logAssistantRuntime('error', '自动启动失败（cli_error）', {
+      message: probe.message,
+    });
+    return {
+      ...probe,
+      status: 'not_running',
+      message: `${probe.message}。Axhub Genie 自动启动失败，请手动执行 axhub-genie 后重试`,
+    };
+  }
+
+  logAssistantRuntime('error', '自动启动失败（启动后单次检查未就绪）', {
+    status: probe.status,
+    message: probe.message,
+    config: probe.config || null,
+  });
   return {
-    ...lastProbe,
+    ...probe,
     status: 'not_running',
     message: 'Axhub Genie 自动启动失败，请手动执行 axhub-genie 后重试',
   };
@@ -561,24 +793,90 @@ function buildAssistantBootstrapCommand(mode: AssistantBootstrapMode): string {
   return hints.start;
 }
 
-function runCommandInBackground(command: string, cwd: string) {
-  if (process.platform === 'win32') {
-    const child = spawn('cmd.exe', ['/d', '/s', '/c', command], {
-      cwd,
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-    });
-    child.unref();
-    return;
-  }
+function runCommandInBackground(command: string, cwd: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    logAssistantRuntime('info', '后台执行命令', { command, cwd, platform: process.platform });
+    const child = process.platform === 'win32'
+      ? spawn('cmd.exe', ['/d', '/s', '/c', command], {
+        cwd,
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+      })
+      : spawn('sh', ['-lc', command], {
+        cwd,
+        detached: true,
+        stdio: 'ignore',
+      });
 
-  const child = spawn('sh', ['-lc', command], {
-    cwd,
-    detached: true,
-    stdio: 'ignore',
+    if (typeof (child as any)?.once !== 'function') {
+      child.unref();
+      logAssistantRuntime('warn', '子进程对象不支持事件监听，按已触发处理', { command, cwd });
+      resolve();
+      return;
+    }
+
+    let settled = false;
+    let stderrText = '';
+    if (child.stderr && typeof (child.stderr as any).setEncoding === 'function' && typeof (child.stderr as any).on === 'function') {
+      (child.stderr as any).setEncoding('utf8');
+      (child.stderr as any).on('data', (chunk: string) => {
+        if (typeof chunk !== 'string') return;
+        if (stderrText.length >= 4000) return;
+        stderrText += chunk;
+      });
+    }
+
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      if (typeof child.unref === 'function') {
+        child.unref();
+      }
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    };
+
+    child.once('error', (error) => {
+      logAssistantRuntime('error', '后台命令触发失败', {
+        command,
+        cwd,
+        error: (error as Error)?.message || 'unknown error',
+      });
+      finish(error as Error);
+    });
+    child.once('spawn', () => {
+      logAssistantRuntime('info', '后台命令已触发', {
+        command,
+        cwd,
+        pid: typeof child.pid === 'number' ? child.pid : null,
+      });
+      setTimeout(() => finish(), 150);
+    });
+    child.once('exit', (code, signal) => {
+      const stderrSnippet = stderrText.trim().slice(0, 500);
+      const exitMeta = {
+        command,
+        cwd,
+        code,
+        signal,
+        stderr: stderrSnippet || null,
+      };
+
+      if (typeof code === 'number' && code !== 0) {
+        logAssistantRuntime('error', '后台命令异常退出', exitMeta);
+        finish(new Error(`命令退出 code=${code}${stderrSnippet ? ` stderr=${stderrSnippet}` : ''}`));
+        return;
+      }
+
+      logAssistantRuntime('warn', '后台命令提前退出', exitMeta);
+      finish();
+    });
+    setTimeout(() => finish(), 500);
   });
-  child.unref();
 }
 
 function isCommandAvailable(command: string, args: string[] = ['--version']): boolean {
@@ -657,8 +955,19 @@ async function verifyAssistantHealthEndpoint(): Promise<{ ok: boolean; message: 
   }
 }
 
-async function resolveAssistantRuntime(config: SystemConfig, projectPath: string): Promise<AssistantRuntimeInfo> {
+async function resolveAssistantRuntime(
+  config: SystemConfig,
+  projectPath: string,
+  options?: AssistantRuntimeResolveOptions,
+): Promise<AssistantRuntimeInfo> {
+  const shouldAutoStart = options?.autoStart !== false;
+  logAssistantRuntime('info', '开始解析助手运行时', { projectPath, autoStart: shouldAutoStart });
   const healthProbe = await verifyAssistantHealthEndpoint();
+  logAssistantRuntime(healthProbe.ok ? 'info' : 'warn', '固定地址健康检查结果', {
+    healthUrl: DEFAULT_ASSISTANT_HEALTH_URL,
+    ok: healthProbe.ok,
+    message: healthProbe.message,
+  });
   if (healthProbe.ok) {
     return {
       webBaseUrl: DEFAULT_ASSISTANT_WEB_BASE_URL,
@@ -681,14 +990,24 @@ async function resolveAssistantRuntime(config: SystemConfig, projectPath: string
 
   let axhubGenieStatus = readAxhubGenieStatus();
 
-  if (axhubGenieStatus.status === 'not_running') {
+  if (axhubGenieStatus.status === 'not_running' && shouldAutoStart) {
     axhubGenieStatus = await startAxhubGenieAndWait(projectPath);
+  } else if (axhubGenieStatus.status === 'not_running' && !shouldAutoStart) {
+    logAssistantRuntime('info', '检测到未启动，但本次请求禁用自动启动', {
+      projectPath,
+    });
   }
 
   const resolvedEndpoints = resolveRuntimeEndpoints({
-    statusConfig: axhubGenieStatus.config,
+    statusConfig: axhubGenieStatus.status === 'ready' ? axhubGenieStatus.config : null,
     configAssistant,
     envAssistant,
+  });
+  logAssistantRuntime('info', '地址解析结果', {
+    source: resolvedEndpoints.source,
+    webBaseUrl: resolvedEndpoints.webBaseUrl,
+    apiBaseUrl: resolvedEndpoints.apiBaseUrl,
+    status: axhubGenieStatus.status,
   });
 
   let healthStatus: AssistantHealthStatus = 'runtime_unreachable';
@@ -712,7 +1031,7 @@ async function resolveAssistantRuntime(config: SystemConfig, projectPath: string
     healthMessage = axhubGenieStatus.message;
   }
 
-  return {
+  const runtime = {
     webBaseUrl: resolvedEndpoints.webBaseUrl,
     apiBaseUrl: resolvedEndpoints.apiBaseUrl,
     projectPath,
@@ -723,6 +1042,15 @@ async function resolveAssistantRuntime(config: SystemConfig, projectPath: string
       commandSource,
     }),
   };
+  logAssistantRuntime(healthStatus === 'ready' ? 'info' : 'warn', '运行时判定完成', {
+    healthStatus,
+    healthMessage,
+    commandSource,
+    source: runtime.source,
+    webBaseUrl: runtime.webBaseUrl,
+    apiBaseUrl: runtime.apiBaseUrl,
+  });
+  return runtime;
 }
 
 export const __assistantRuntimeTestUtils = {
@@ -749,6 +1077,90 @@ function buildAgentApiUrl(apiBaseUrl: string): string {
 
 function quoteForShell(value: string) {
   return `"${String(value).replace(/["\\$`]/g, '\\$&')}"`;
+}
+
+function quoteForPowerShellSingle(value: string) {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+function resolveWindowsExecutablePath(candidates: string[]): string | null {
+  for (const candidate of candidates) {
+    const trimmed = candidate.trim();
+    if (!trimmed) continue;
+
+    const result = spawnSync('where', [trimmed], {
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+
+    if (result.status !== 0) continue;
+
+    const lines = String(result.stdout || '')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (!lines.length) continue;
+
+    const exePath = lines.find((line) => /\.exe$/i.test(line));
+    if (exePath) {
+      return exePath;
+    }
+
+    const commandWrapper = lines.find((line) => /\.(cmd|bat)$/i.test(line));
+    if (commandWrapper) {
+      const inferredExePath = commandWrapper.replace(/\.(cmd|bat)$/i, '.exe');
+      if (fs.existsSync(inferredExePath)) {
+        return inferredExePath;
+      }
+    }
+  }
+
+  return null;
+}
+
+function resolveWindowsExecutableFromRegistry(executableNames: string[]): string | null {
+  const keyRoots = [
+    'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths',
+    'HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths',
+    'HKLM\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\App Paths',
+  ];
+
+  for (const executableName of executableNames) {
+    const normalizedName = executableName.trim();
+    if (!normalizedName) continue;
+
+    for (const keyRoot of keyRoots) {
+      const key = `${keyRoot}\\${normalizedName}`;
+      const query = spawnSync('reg', ['query', key, '/ve'], {
+        encoding: 'utf8',
+        windowsHide: true,
+      });
+
+      if (query.status !== 0 || query.error) {
+        continue;
+      }
+
+      const output = String(query.stdout || '');
+      const lines = output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      const matchedLine = lines.find((line) => /REG_\w+/i.test(line));
+      if (!matchedLine) {
+        continue;
+      }
+
+      const valueMatch = matchedLine.match(/REG_\w+\s+(.+)$/i);
+      if (!valueMatch || !valueMatch[1]) {
+        continue;
+      }
+
+      const resolvedPath = valueMatch[1].trim().replace(/^"|"$/g, '');
+      if (resolvedPath && fs.existsSync(resolvedPath)) {
+        return resolvedPath;
+      }
+    }
+  }
+
+  return null;
 }
 
 function buildProjectInfoSection(projectInfo: ProjectInfo, projectDefaults: ProjectDefaults): string {
@@ -860,10 +1272,20 @@ export function configApiPlugin(): Plugin {
           return;
         }
 
-        if (req.method === 'GET' && req.url === '/api/assistant/runtime') {
+        if (req.method === 'GET' && req.url?.startsWith('/api/assistant/runtime')) {
           try {
+            const url = new URL(req.url, 'http://localhost');
+            if (url.pathname !== '/api/assistant/runtime') {
+              next();
+              return;
+            }
+
+            const autoStartParam = (url.searchParams.get('autoStart') || '').trim().toLowerCase();
+            const shouldAutoStart = !(autoStartParam === '0' || autoStartParam === 'false' || autoStartParam === 'no');
             const config = readSystemConfig(configPath);
-            const runtime = await resolveAssistantRuntime(config, projectRoot);
+            const runtime = await resolveAssistantRuntime(config, projectRoot, {
+              autoStart: shouldAutoStart,
+            });
 
             res.statusCode = 200;
             res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -926,7 +1348,7 @@ export function configApiPlugin(): Plugin {
               }
 
               const command = buildAssistantBootstrapCommand(mode);
-              runCommandInBackground(command, projectRoot);
+              await runCommandInBackground(command, projectRoot);
 
               const config = readSystemConfig(configPath);
               const runtime = await resolveAssistantRuntime(config, projectRoot);
@@ -1063,14 +1485,20 @@ export function configApiPlugin(): Plugin {
               const ideAppName = MAIN_IDE_APP_NAMES[ide];
 
               const command = process.platform === 'win32'
-                ? `powershell -NoProfile -Command Start-Process ${quoteForShell(ideAppName)} ${quoteForShell(absoluteTargetPath)}`
+                ? `powershell -NoProfile -Command Start-Process -FilePath ${quoteForPowerShellSingle(ideAppName)} -ArgumentList ${quoteForPowerShellSingle(absoluteTargetPath)} -ErrorAction Stop`
                 : `open -a ${quoteForShell(ideAppName)} ${quoteForShell(absoluteTargetPath)}`;
 
-              exec(command, (error) => {
-                if (error) {
+              const handleOpenCommandResult = (error: Error | null, _stdout?: string | Buffer, stderr?: string | Buffer) => {
+                const stderrText = typeof stderr === 'string'
+                  ? stderr.trim()
+                  : Buffer.isBuffer(stderr)
+                    ? stderr.toString('utf8').trim()
+                    : '';
+
+                if (error && stderrText) {
                   res.statusCode = 500;
                   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-                  res.end(JSON.stringify({ error: `打开 ${ideAppName} 失败: ${error.message}` }));
+                  res.end(JSON.stringify({ error: `打开 ${ideAppName} 失败: ${stderrText || error.message}` }));
                   return;
                 }
 
@@ -1082,7 +1510,65 @@ export function configApiPlugin(): Plugin {
                   targetPath: absoluteTargetPath,
                   command,
                 }));
-              });
+              };
+
+              if (process.platform === 'win32') {
+                const executableCandidates = [
+                  ...(MAIN_IDE_WINDOWS_COMMAND_CANDIDATES[ide] || []),
+                  ideAppName,
+                ];
+                const executableNameCandidates = MAIN_IDE_WINDOWS_EXECUTABLE_NAMES[ide] || [];
+
+                const executablePath =
+                  resolveWindowsExecutablePath(executableCandidates)
+                  || resolveWindowsExecutablePath(executableNameCandidates)
+                  || resolveWindowsExecutableFromRegistry(executableNameCandidates);
+
+                if (executablePath) {
+                  const child = spawn(executablePath, [absoluteTargetPath], {
+                    detached: true,
+                    stdio: 'ignore',
+                    windowsHide: true,
+                    shell: false,
+                  });
+
+                  child.once('error', (spawnError) => {
+                    res.statusCode = 500;
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                    res.end(JSON.stringify({ error: `打开 ${ideAppName} 失败: ${spawnError.message}` }));
+                  });
+
+                  child.once('spawn', () => {
+                    child.unref();
+                    res.statusCode = 200;
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                    res.end(JSON.stringify({
+                      success: true,
+                      ide,
+                      targetPath: absoluteTargetPath,
+                      command: `${quoteForShell(executablePath)} ${quoteForShell(absoluteTargetPath)}`,
+                    }));
+                  });
+
+                  return;
+                }
+
+                execFile(
+                  'powershell',
+                  [
+                    '-NoProfile',
+                    '-NonInteractive',
+                    '-WindowStyle',
+                    'Hidden',
+                    '-Command',
+                    `Start-Process -FilePath ${quoteForPowerShellSingle(ideAppName)} -ArgumentList ${quoteForPowerShellSingle(absoluteTargetPath)} -ErrorAction Stop`,
+                  ],
+                  { windowsHide: true },
+                  handleOpenCommandResult,
+                );
+              } else {
+                exec(command, handleOpenCommandResult);
+              }
             } catch (e: any) {
               res.statusCode = 500;
               res.setHeader('Content-Type', 'application/json; charset=utf-8');
