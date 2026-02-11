@@ -2,6 +2,7 @@
 setlocal EnableExtensions
 
 set "NPM_REGISTRY=https://registry.npmmirror.com"
+set "NPM_CACHE_DIR=%cd%\\.npm-cache"
 
 cd /d "%~dp0"
 if errorlevel 1 goto :fail_cd
@@ -31,10 +32,11 @@ if "%NEED_INSTALL%"=="0" (
 )
 
 if "%NEED_INSTALL%"=="1" (
-  echo [2/3] Installing dependencies ^(npm --registry %NPM_REGISTRY% install^)...
+  echo [2/3] Installing dependencies ^(npm --cache .\\.npm-cache --registry %NPM_REGISTRY% install^)...
   echo [Hint] First launch or dependency changes may take a few minutes. Please wait.
   echo [Hint] This step does not run every time. Future launches usually skip install.
-  call npm --registry %NPM_REGISTRY% install
+  if not exist "%NPM_CACHE_DIR%" mkdir "%NPM_CACHE_DIR%"
+  call npm --cache "%NPM_CACHE_DIR%" --registry %NPM_REGISTRY% install
   if errorlevel 1 goto :fail_install
 ) else (
   echo [2/3] Dependencies already installed. Skip npm install.
