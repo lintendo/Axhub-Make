@@ -113,6 +113,8 @@ type AssistantProbeResult = {
 };
 
 const ASSISTANT_START_CHECK_DELAY_MS = 500;
+const ASSISTANT_START_MAX_PROBE_ATTEMPTS = 6;
+const ASSISTANT_START_PROBE_INTERVAL_MS = 700;
 
 type SystemConfig = {
   server: Record<string, any>;
@@ -670,46 +672,71 @@ async function startAxhubGenieAndWait(projectPath: string): Promise<AssistantPro
   }
 
   await sleep(ASSISTANT_START_CHECK_DELAY_MS);
-  const probe = readAxhubGenieStatus();
 
-  if (probe.status === 'ready') {
-    logAssistantRuntime('info', 'Axhub Genie 自动启动成功', {
+  let lastProbe: AssistantProbeResult = {
+    status: 'not_running',
+    message: 'Axhub Genie 服务未启动',
+    commandSource: 'axhub-genie',
+    config: null,
+  };
+
+  for (let attempt = 0; attempt < ASSISTANT_START_MAX_PROBE_ATTEMPTS; attempt += 1) {
+    const probe = readAxhubGenieStatus();
+    lastProbe = probe;
+
+    logAssistantRuntime(probe.status === 'ready' ? 'info' : 'warn', '自动启动后状态探测', {
+      attempt: attempt + 1,
+      maxAttempts: ASSISTANT_START_MAX_PROBE_ATTEMPTS,
+      status: probe.status,
+      message: probe.message,
       config: probe.config || null,
     });
-    return {
-      ...probe,
-      message: 'Axhub Genie 已自动启动并就绪',
-    };
+
+    if (probe.status === 'ready') {
+      logAssistantRuntime('info', 'Axhub Genie 自动启动成功', {
+        attempt: attempt + 1,
+        config: probe.config || null,
+      });
+      return {
+        ...probe,
+        message: 'Axhub Genie 已自动启动并就绪',
+      };
+    }
+
+    if (probe.status === 'missing_cli' || probe.status === 'needs_update') {
+      logAssistantRuntime('warn', '自动启动提前结束', {
+        reason: probe.status,
+        message: probe.message,
+      });
+      return probe;
+    }
+
+    if (probe.status === 'cli_error') {
+      logAssistantRuntime('error', '自动启动失败（cli_error）', {
+        message: probe.message,
+      });
+      return {
+        ...probe,
+        status: 'not_running',
+        message: `${probe.message}。Axhub Genie 自动启动失败，请手动执行 axhub-genie 后重试`,
+      };
+    }
+
+    if (attempt < ASSISTANT_START_MAX_PROBE_ATTEMPTS - 1) {
+      await sleep(ASSISTANT_START_PROBE_INTERVAL_MS);
+    }
   }
 
-  if (probe.status === 'missing_cli' || probe.status === 'needs_update') {
-    logAssistantRuntime('warn', '自动启动提前结束', {
-      reason: probe.status,
-      message: probe.message,
-    });
-    return probe;
-  }
-
-  if (probe.status === 'cli_error') {
-    logAssistantRuntime('error', '自动启动失败（cli_error）', {
-      message: probe.message,
-    });
-    return {
-      ...probe,
-      status: 'not_running',
-      message: `${probe.message}。Axhub Genie 自动启动失败，请手动执行 axhub-genie 后重试`,
-    };
-  }
-
-  logAssistantRuntime('error', '自动启动失败（启动后单次检查未就绪）', {
-    status: probe.status,
-    message: probe.message,
-    config: probe.config || null,
+  logAssistantRuntime('error', '自动启动失败（多次检查未就绪）', {
+    status: lastProbe.status,
+    message: lastProbe.message,
+    config: lastProbe.config || null,
+    attempts: ASSISTANT_START_MAX_PROBE_ATTEMPTS,
   });
   return {
-    ...probe,
+    ...lastProbe,
     status: 'not_running',
-    message: 'Axhub Genie 自动启动失败，请手动执行 axhub-genie 后重试',
+    message: `${lastProbe.message || 'Axhub Genie 未在预期时间内就绪'}。请手动执行 axhub-genie 后重试`,
   };
 }
 
