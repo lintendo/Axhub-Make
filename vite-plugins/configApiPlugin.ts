@@ -13,7 +13,10 @@ type ProjectInfo = {
   description?: string | null;
 };
 
-type PromptClient = 'claude' | 'cursor' | 'codex';
+type LegacyPromptClient = 'claude' | 'cursor' | 'codex';
+type GeniePromptClient = 'genie:claude' | 'genie:cursor' | 'genie:codex';
+type LocalPromptClient = 'local:cursor' | 'local:qoder';
+type PromptClient = GeniePromptClient | LocalPromptClient;
 type MainIDE = 'cursor' | 'trae' | 'vscode' | 'trae_cn' | 'windsurf' | 'kiro' | 'qoder' | 'antigravity';
 
 const MAIN_IDE_VALUES: MainIDE[] = ['cursor', 'trae', 'vscode', 'trae_cn', 'windsurf', 'kiro', 'qoder', 'antigravity'];
@@ -209,6 +212,19 @@ function normalizeProjectInfo(value: unknown): ProjectInfo {
 
 function normalizePromptClient(value: unknown): PromptClient | null {
   if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') return null;
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'genie:claude' || normalized === 'genie:cursor' || normalized === 'genie:codex') return normalized;
+  if (normalized === 'local:cursor' || normalized === 'local:qoder') return normalized;
+  if (normalized === 'claude') return 'genie:claude';
+  if (normalized === 'cursor') return 'genie:cursor';
+  if (normalized === 'codex') return 'genie:codex';
+
+  return null;
+}
+
+function normalizeExecutePromptClient(value: unknown): LegacyPromptClient | null {
   if (typeof value !== 'string') return null;
   const normalized = value.trim().toLowerCase();
   if (normalized === 'claude' || normalized === 'cursor' || normalized === 'codex') {
@@ -1599,7 +1615,7 @@ export function configApiPlugin(): Plugin {
             try {
               const raw = Buffer.concat(chunks).toString('utf8');
               const body = JSON.parse(raw || '{}');
-              const client = normalizePromptClient(body?.client);
+              const client = normalizeExecutePromptClient(body?.client);
               const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
               const scene = typeof body?.scene === 'string' ? body.scene.trim() : '';
 
