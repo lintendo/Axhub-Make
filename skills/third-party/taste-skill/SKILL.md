@@ -1,3 +1,8 @@
+---
+name: taste-skill
+description: "Use when generating high-agency React/Next.js frontend UIs that need anti-slop design engineering. Provides configurable dials for design variance, motion intensity, and visual density, plus enforced rules against AI clichés (Inter font, purple gradients, emoji icons, centered hero layouts) and a creative arsenal of advanced UI patterns (bento grids, magnetic buttons, scroll hijack, parallax tilt cards)."
+---
+
 # High-Agency Frontend Skill
 
 ## 1. ACTIVE BASELINE CONFIGURATION
