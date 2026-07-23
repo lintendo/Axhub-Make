@@ -277,6 +277,11 @@ export default function OpenInDropdown({
         }
     };
 
+    const handleGuideToAISettings = useCallback(() => {
+        onOpenAISettings?.();
+        toast.warning('请先在 AI 设置中选择本地 AI Agent');
+    }, [onOpenAISettings]);
+
     const handleOpenWithWebAgent = async (agent: WebAgent, provider?: AcpProvider) => {
         if (openLoading) return;
 
@@ -291,7 +296,7 @@ export default function OpenInDropdown({
             return;
         }
 
-        toast.warning('打开 Web Agent 失败');
+        handleGuideToAISettings();
     };
 
     const handleOpenWithImageAi = useCallback(async () => {
@@ -325,7 +330,7 @@ export default function OpenInDropdown({
 
         if (openMethod.type === 'web') {
             if (!storedWebOpenMethod) {
-                toast.warning('打开 Web Agent 失败');
+                handleGuideToAISettings();
                 return;
             }
             void handleOpenWithWebAgent(storedWebOpenMethod.agent, storedWebOpenMethod.provider);
