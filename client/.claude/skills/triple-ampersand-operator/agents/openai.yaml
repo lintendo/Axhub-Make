@@ -1,4 +1,0 @@
-interface:
-  display_name: "&&& 运算符"
-  short_description: "识别 a &&& b 表达式并按规则计算结果"
-  default_prompt: "使用 $triple-ampersand-operator 计算 5 &&& 7。"

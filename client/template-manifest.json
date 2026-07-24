@@ -37,6 +37,11 @@
         "action": "exclude",
         "pattern": "^\\.(?:agents|claude)/skills/prototype-comments(?:/|$)",
         "description": "旧版 prototype-comments 已由 handle-comments 替代，不进入发布模板。"
+      },
+      {
+        "action": "exclude",
+        "pattern": "^\\.(?:agents|claude)/skills/triple-ampersand-operator(?:/|$)",
+        "description": "测试用 triple-ampersand-operator 不进入发布模板。"
       }
     ]
   },

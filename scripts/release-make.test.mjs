@@ -331,6 +331,27 @@ describe('release make artifact helpers', () => {
     assert(rules.every(({ description }) => typeof description === 'string' && description.trim()));
   });
 
+  it('does not publish the triple ampersand test skill', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.resolve('client/template-manifest.json'), 'utf8'));
+    const excludedPaths = (manifest.runtime.fileRules || [])
+      .filter(({ action }) => action === 'exclude')
+      .map(({ pattern }) => new RegExp(pattern, 'u'));
+    const skillRoots = ['.agents', '.claude'];
+
+    for (const skillRoot of skillRoots) {
+      const relativeSkillPath = `${skillRoot}/skills/triple-ampersand-operator`;
+      assert(
+        excludedPaths.some((pattern) => pattern.test(`${relativeSkillPath}/SKILL.md`)),
+        `${relativeSkillPath} must be excluded by the client template manifest`,
+      );
+      assert.equal(
+        fs.existsSync(path.resolve('client', relativeSkillPath)),
+        false,
+        `${relativeSkillPath} must not exist in client template source`,
+      );
+    }
+  });
+
   it('derives allowed Make metadata entries from the template manifest', () => {
     assert.deepEqual(
       releaseMake.listAllowedMakeClientTemplateMetadataEntries({
