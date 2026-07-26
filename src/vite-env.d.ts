@@ -43,6 +43,11 @@ declare module '*.gif' {
   export default value;
 }
 
+declare module '*.wav' {
+  const value: string;
+  export default value;
+}
+
 declare module 'marked' {
   export const marked: any;
 }
