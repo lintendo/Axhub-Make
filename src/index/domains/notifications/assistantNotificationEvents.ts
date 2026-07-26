@@ -30,28 +30,32 @@ function readRunState(value: unknown): AcpRunState | null {
 function readFinalizedAssistantRunState(
   messages: unknown,
   threadId: string,
+  headId: unknown,
 ): TerminalRunState | null {
   if (!Array.isArray(messages)) return null;
+  const currentHeadId = readText(headId);
+  if (!currentHeadId) return null;
 
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const entry = isRecord(messages[index]) ? messages[index] : null;
-    const content = isRecord(entry?.content) ? entry.content : entry;
-    if (!content || content.role !== 'assistant') continue;
+  const entry = messages.find((value) => (
+    isRecord(value) && readText(value.id) === currentHeadId
+  ));
+  if (!isRecord(entry)) return null;
 
-    const metadata = isRecord(content.metadata) ? content.metadata : null;
-    const custom = isRecord(metadata?.custom) ? metadata.custom : null;
-    const acpRun = isRecord(custom?.acpRun) ? custom.acpRun : null;
-    if (!acpRun) continue;
+  const content = isRecord(entry.content) ? entry.content : entry;
+  const role = readText(entry.role) || readText(content.role);
+  if (role !== 'assistant') return null;
 
-    const runThreadId = readText(acpRun.threadId);
-    if (runThreadId && runThreadId !== threadId) continue;
-    const state = readRunState(acpRun.status);
-    if (state === 'completed' || state === 'error' || state === 'aborted') {
-      return state;
-    }
-  }
+  const metadata = isRecord(content.metadata) ? content.metadata : null;
+  const custom = isRecord(metadata?.custom) ? metadata.custom : null;
+  const acpRun = isRecord(custom?.acpRun) ? custom.acpRun : null;
+  if (!acpRun) return null;
 
-  return null;
+  const runThreadId = readText(acpRun.threadId);
+  if (runThreadId && runThreadId !== threadId) return null;
+  const state = readRunState(acpRun.status);
+  return state === 'completed' || state === 'error' || state === 'aborted'
+    ? state
+    : null;
 }
 
 export function readAcpThreadEvent(data: unknown): AcpThreadEvent | null {
@@ -71,7 +75,7 @@ export function readAcpThreadEvent(data: unknown): AcpThreadEvent | null {
   }
 
   if (payload.kind === 'thread.messages.changed') {
-    const state = readFinalizedAssistantRunState(payload.messages, threadId);
+    const state = readFinalizedAssistantRunState(payload.messages, threadId, payload.headId);
     return state ? { threadId, runState: state } : null;
   }
 
@@ -87,6 +91,7 @@ export function readAcpThreadEvent(data: unknown): AcpThreadEvent | null {
 
 export function createAssistantNotificationTracker(): AssistantNotificationTracker {
   const activeRuns = new Map<string, number>();
+  let nextRunSequence = 0;
 
   return {
     consume(data) {
@@ -94,7 +99,8 @@ export function createAssistantNotificationTracker(): AssistantNotificationTrack
       if (!event) return null;
 
       if (event.runState === 'running') {
-        activeRuns.set(event.threadId, (activeRuns.get(event.threadId) || 0) + 1);
+        nextRunSequence += 1;
+        activeRuns.set(event.threadId, nextRunSequence);
         return null;
       }
 

@@ -42,6 +42,27 @@ describe('notification coordinator', () => {
     expect(play).not.toHaveBeenCalled();
   });
 
+  it('remembers a disabled terminal event so enabling sound later does not replay it', async () => {
+    const play = vi.fn().mockResolvedValue(true);
+    let completionEnabled = false;
+    const coordinator = createNotificationCoordinator({
+      getSettings: () => ({ completionEnabled, reminderEnabled: true }),
+      player: { play },
+    });
+    const intent = {
+      source: 'assistant-thread' as const,
+      scopeKey: 'thread-1',
+      outcome: 'completed' as const,
+      eventId: 'run-1',
+    };
+
+    await expect(coordinator.notify(intent)).resolves.toBe(false);
+    completionEnabled = true;
+    await expect(coordinator.notify(intent)).resolves.toBe(false);
+
+    expect(play).not.toHaveBeenCalled();
+  });
+
   it('deduplicates only repeated event ids and keeps a second commentary cycle audible', async () => {
     const play = vi.fn().mockResolvedValue(true);
     const coordinator = createNotificationCoordinator({

@@ -23,8 +23,9 @@ export function createNotificationCoordinator(options: {
 
   return {
     async notify(intent) {
-      if (intent.outcome === 'aborted') return false;
       if (intent.eventId && handledEventIds.has(intent.eventId)) return false;
+      if (intent.eventId) handledEventIds.add(intent.eventId);
+      if (intent.outcome === 'aborted') return false;
 
       const sound: NotificationSound = intent.outcome === 'error'
         ? 'reminder'
@@ -37,7 +38,6 @@ export function createNotificationCoordinator(options: {
         return false;
       }
 
-      if (intent.eventId) handledEventIds.add(intent.eventId);
       try {
         return await options.player.play(sound);
       } catch {
