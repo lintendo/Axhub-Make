@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeStatuses } from './report-mobile-theme-screenshot-status.mjs';
+import { parseCliArgs, summarizeStatuses } from './report-mobile-theme-screenshot-status.mjs';
 
 describe('mobile screenshot status report', () => {
   it('counts collection and regression states independently', () => {
@@ -14,5 +14,9 @@ describe('mobile screenshot status report', () => {
       regression: { passed: 1, pending: 2 },
       ready: 1,
     });
+  });
+
+  it('accepts the leading argument separator inserted by pnpm scripts', () => {
+    expect(parseCliArgs(['--', '--strict'])).toEqual({ json: false, strict: true });
   });
 });

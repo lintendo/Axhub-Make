@@ -70,7 +70,8 @@ export function reportMobileThemeScreenshotStatus({ themesRoot, json = false, st
 
 export function parseCliArgs(argv) {
   const options = { json: false, strict: false };
-  for (const arg of argv) {
+  for (const [index, arg] of argv.entries()) {
+    if (index === 0 && arg === '--') continue;
     if (arg === '--json') options.json = true;
     else if (arg === '--strict') options.strict = true;
     else throw new Error(`UNKNOWN_ARGUMENT ${arg}`);
