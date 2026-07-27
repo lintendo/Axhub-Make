@@ -1,0 +1,213 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/design-md/unknown/netflix/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-netflix-mobile",
+    "slug": "netflix-mobile",
+    "brand": "Netflix",
+    "titleZh": "Netflix 主题",
+    "titleEn": "Netflix",
+    "descriptionZh": "Netflix 的 Design.md 主题展示，围绕移动端、媒体、音乐、视频与阅读组织页面。",
+    "descriptionEn": "Netflix mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "媒体、音乐、视频与阅读"
+    ],
+    "distributionTags": [
+      "移动端",
+      "媒体、音乐、视频与阅读"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/netflix-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    }
+  },
+  "tokens": {
+    "palette": [
+      "#E50914",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Helvetica Neue",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Helvetica Neue",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "local-preview",
+      "path": "assets/cover.svg"
+    }
+  ],
+  "display": {
+    "brand": "Netflix 主题",
+    "brandAlias": "Netflix",
+    "description": "Netflix 的 Design.md 主题展示，围绕移动端、媒体、音乐、视频与阅读组织页面。",
+    "descriptionEn": "Netflix mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "媒体、音乐、视频与阅读"
+    ],
+    "fontStylesheets": [],
+    "palette": [
+      {
+        "color": "#E50914",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#2B2B2B",
+        "cssValue": "#2B2B2B",
+        "description": "Divider (`#2B2B2B`): 1pt hairlines between rows inside settings / profile screens."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#141414",
+        "cssValue": "#141414",
+        "description": "Netflix's iOS app is a cinematic dark canvas where poster art does all the heavy lifting. From the moment you pick a profile, you're dropped into a screen that feels less like a traditional app and more like a black-box theater: the canvas is `#141414` (a warm true-dark charcoal used across every Netflix surface since the brand's modern refresh), and every row of content is a horizontal strip of 2:3 vertical poster tiles separated only by titles and the faintest of whitespace. The top of every Home screen is a full-bleed hero — no app-logo header, no search bar at the top — where a trailer auto-plays muted over the selected title's key art, fading from the full landscape bleed at the top into the dark canvas via a vertical gradient that eats away at the bottom third of the image. You scroll, and rows of posters flow under your thumb like film strips."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#FFFFFF",
+        "cssValue": "#FFFFFF",
+        "description": "The accent system is singular and sacred: Netflix Red (`#E50914`). It appears in exactly three places — the word \"NETFLIX\" at the top of the feed (the only header element, a wordmark), the large red Play button on the hero and every detail page, and the notification badges. Nothing else in the UI is red. Everything else — text, surface elevation, buttons that aren't Play — lives in a narrow monochrome palette: white (`#FFFFFF`), muted white (`#AAAAAA`), a near-black deep gray (`#1F1F1F`) for raised surfaces, and the canvas (`#141414`) itself. When Netflix wants to signal a different profile, it rotates a small palette of saturated accent colors (red, blue, yellow, green) on the circular avatars of the profile picker — but those never leak into the main app chrome."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#E50914",
+        "cssValue": "#E50914",
+        "description": "The accent system is singular and sacred: Netflix Red (`#E50914`). It appears in exactly three places — the word \"NETFLIX\" at the top of the feed (the only header element, a wordmark), the large red Play button on the hero and every detail page, and the notification badges. Nothing else in the UI is red. Everything else — text, surface elevation, buttons that aren't Play — lives in a narrow monochrome palette: white (`#FFFFFF`), muted white (`#AAAAAA`), a near-black deep gray (`#1F1F1F`) for raised surfaces, and the canvas (`#141414`) itself. When Netflix wants to signal a different profile, it rotates a small palette of saturated accent colors (red, blue, yellow, green) on the circular avatars of the profile picker — but those never leak into the main app chrome."
+      },
+      {
+        "label": "边框 5 - Border 5",
+        "value": "rgba(20,20,20,0.92)",
+        "cssValue": "rgba(20,20,20,0.92)",
+        "description": "Background: transparent at top of feed, fades to `rgba(20,20,20,0.92)` with `translucent backdrop blur` blur on scroll"
+      },
+      {
+        "label": "边框 6 - Border 6",
+        "value": "#1F1F1F",
+        "cssValue": "#1F1F1F",
+        "description": "The accent system is singular and sacred: Netflix Red (`#E50914`). It appears in exactly three places — the word \"NETFLIX\" at the top of the feed (the only header element, a wordmark), the large red Play button on the hero and every detail page, and the notification badges. Nothing else in the UI is red. Everything else — text, surface elevation, buttons that aren't Play — lives in a narrow monochrome palette: white (`#FFFFFF`), muted white (`#AAAAAA`), a near-black deep gray (`#1F1F1F`) for raised surfaces, and the canvas (`#141414`) itself. When Netflix wants to signal a different profile, it rotates a small palette of saturated accent colors (red, blue, yellow, green) on the circular avatars of the profile picker — but those never leak into the main app chrome."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Helvetica Neue",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "local-preview",
+        "path": "assets/cover.svg"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use {#141414} as the canvas — warm dark charcoal, not pure black (except behind hero art)。",
+        "建议：Reserve Netflix Red ({#E50914}) for the NETFLIX wordmark, Play button, and Continue Watching progress bar — nothing else。",
+        "建议：Use the red wordmark as the ONLY header on Home — no text title, no search bar in the top app bar。",
+        "建议：Render posters at a 2:3 aspect ratio with a 4pt corner radius — Netflix's signature tile。",
+        "建议：Use the vertical gradient from canvas to transparent to fade hero images into the background。"
+      ],
+      "dont": [
+        "避免：use pure black {#000000} as the canvas — {#141414} is warmer and the Netflix standard。",
+        "避免：ship a light mode — Netflix has always been dark-only。",
+        "避免：use green for success (downloaded, checkmark states) — Netflix uses gray。",
+        "避免：use a full-pill corner on the Play button — 4pt is signature。",
+        "避免：use red anywhere other than the defined brand moments — no red borders, no red text, no red accent on metadata。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "media",
+      "navigation": [
+        "推荐",
+        "收藏",
+        "我的"
+      ],
+      "primaryAction": "开始播放"
+    }
+  },
+  "status": {
+    "displayPage": "todo",
+    "collectionErrors": []
+  }
+}

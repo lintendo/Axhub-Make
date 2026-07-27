@@ -1,0 +1,220 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/design-md/unknown/facebook/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-facebook-mobile",
+    "slug": "facebook-mobile",
+    "brand": "Facebook",
+    "titleZh": "Facebook 主题",
+    "titleEn": "Facebook",
+    "descriptionZh": "Facebook 的 Design.md 主题展示，围绕移动端、社交与社区组织页面。",
+    "descriptionEn": "Facebook mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "社交与社区"
+    ],
+    "distributionTags": [
+      "移动端",
+      "社交与社区"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/facebook-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    }
+  },
+  "tokens": {
+    "palette": [
+      "#1877F2",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Helvetica Neue",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Helvetica Neue",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "local-preview",
+      "path": "assets/cover.svg"
+    }
+  ],
+  "display": {
+    "brand": "Facebook 主题",
+    "brandAlias": "Facebook",
+    "description": "Facebook 的 Design.md 主题展示，围绕移动端、社交与社区组织页面。",
+    "descriptionEn": "Facebook mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "社交与社区"
+    ],
+    "fontStylesheets": [],
+    "palette": [
+      {
+        "color": "#1877F2",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "阴影 1 - Shadow 1",
+        "value": "rgba(0,0,0,0.2) 0 4px 16px",
+        "cssValue": "rgba(0,0,0,0.2) 0 4px 16px",
+        "description": "Background: `#FFFFFF` light / `#242526` dark, shadow `rgba(0,0,0,0.2) 0 4px 16px`, 500pt radius pill"
+      }
+    ],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#E4E6EB",
+        "cssValue": "#E4E6EB",
+        "description": "Divider (`#E4E6EB`): Hairlines between comments, action rows."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#CED0D4",
+        "cssValue": "#CED0D4",
+        "description": "Separator Bar (`#CED0D4`): Thicker separator between feed sections (rare)."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#3E4042",
+        "cssValue": "#3E4042",
+        "description": "Dark Divider (`#3E4042`): Hairlines."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#C13584",
+        "cssValue": "#C13584",
+        "description": "Story Ring (Gradient): `#C13584` → `#E1306C` → `#FD1D1D` → `#F77737` (pink → red → orange) — inherited from Instagram's story ring, used on Facebook Stories."
+      },
+      {
+        "label": "边框 5 - Border 5",
+        "value": "#1877F2",
+        "cssValue": "#1877F2",
+        "description": "Color does three jobs on Facebook: Facebook Blue (`#1877F2`) is the brand — it paints the top nav bar, the \"Like\" thumbs-up icon when active, the primary CTA (Login, Post, Send), and any \"Facebook\" self-reference. The reactions system is its own palette — Love is a coral-pink heart (`#F3425F`), Haha/Wow/Sad share an amber yellow (`#F7B928`), Angry is an orange-red (`#E9710F`), Care is a warm yellow-hug (`#F7B928`). And the informational green (`#42B72A`, sometimes the \"Create Post\" green) tips users toward creation actions. Everything else is neutral gray — post metadata, timestamps, comment bubbles, dividers. The result is a chromatic app that uses color to signal role, not to decorate."
+      },
+      {
+        "label": "边框 6 - Border 6",
+        "value": "#FFFFFF",
+        "cssValue": "#FFFFFF",
+        "description": "Card White (`#FFFFFF`): Post cards, story thumbnails, profile cover, modals."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Helvetica Neue",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "local-preview",
+        "path": "assets/cover.svg"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use soft gray {#F0F2F5} as the light canvas — it's the between-card space that defines Facebook's rhythm。",
+        "建议：Put every feed item in a white rounded card (8pt radius) — Facebook is the most card-based of social apps。",
+        "建议：Use Facebook Blue {#1877F2} for the brand, active Like, primary CTAs, and links — consistently。",
+        "建议：Keep the 5-tab bottom bar: Home / Video / Marketplace / Notifications / Menu — with labels always shown。",
+        "建议：Use the Reactions popover on long-press — 7 emoji in a horizontal floating pill, each scaling as the user drags across。"
+      ],
+      "dont": [
+        "避免：use pure black canvas — Facebook's light mode canvas is {#F0F2F5}, dark is {#18191A}。",
+        "避免：hide tab labels — Facebook shows them; this is a deliberate choice for accessibility and utility。",
+        "避免：add colors beyond the Reactions palette — the 7 reaction colors are the expressive palette, nothing else。",
+        "避免：use heavy drop shadows on cards — the gray canvas does the separation work。",
+        "避免：use fancy custom fonts — the current app uses SF Pro, not Klavika or Helvetica Neue。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "feed",
+      "navigation": [
+        "首页",
+        "发现",
+        "我的"
+      ],
+      "primaryAction": "发布动态"
+    }
+  },
+  "status": {
+    "displayPage": "todo",
+    "collectionErrors": []
+  }
+}

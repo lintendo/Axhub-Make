@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/design-md/unknown/twitch/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-twitch-mobile",
+    "slug": "twitch-mobile",
+    "brand": "Twitch",
+    "titleZh": "Twitch 主题",
+    "titleEn": "Twitch",
+    "descriptionZh": "Twitch 的 Design.md 主题展示，围绕移动端、媒体、音乐、视频与阅读组织页面。",
+    "descriptionEn": "Twitch mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "媒体、音乐、视频与阅读"
+    ],
+    "distributionTags": [
+      "移动端",
+      "媒体、音乐、视频与阅读"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/twitch-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    }
+  },
+  "tokens": {
+    "palette": [
+      "#9146FF",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Roboto",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Roboto",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "local-preview",
+      "path": "assets/cover.svg"
+    }
+  ],
+  "display": {
+    "brand": "Twitch 主题",
+    "brandAlias": "Twitch",
+    "description": "Twitch 的 Design.md 主题展示，围绕移动端、媒体、音乐、视频与阅读组织页面。",
+    "descriptionEn": "Twitch mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "媒体、音乐、视频与阅读"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#9146FF",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "阴影 1 - Shadow 1",
+        "value": "rgba(145,70,255,0.35) 0 6px 18px",
+        "cssValue": "rgba(145,70,255,0.35) 0 6px 18px",
+        "description": "Shadow: `rgba(145,70,255,0.35) 0 6px 18px` on the channel-page primary CTA"
+      },
+      {
+        "label": "阴影 2 - Shadow 2",
+        "value": "rgba(0,0,0,0.5) 0 12px 28px",
+        "cssValue": "rgba(0,0,0,0.5) 0 12px 28px",
+        "description": "Press: scale 1.03 with focus lift `rgba(0,0,0,0.5) 0 12px 28px` and a subtle purple ring; thumbnail begins live preview after ~600ms"
+      }
+    ],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#2A2A2D",
+        "cssValue": "#2A2A2D",
+        "description": "Surface 3 (`#2A2A2D`): Pressed state on dark surfaces, hairline divider tone."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Roboto",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "local-preview",
+        "path": "assets/cover.svg"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use {#0E0E10} near-black canvas — faint cool tint, quiet chrome so content/chat carry energy。",
+        "建议：Keep the color split strict: Twitch Purple ({#9146FF}) = brand/action; Live Red ({#EB0400}) = liveness only。",
+        "建议：Use off-white {#EFEFF1} for primary text — softer than pure white for long chat reading。",
+        "建议：Put the red \"● LIVE\" pill top-left and the black viewer-count pill bottom-left on live thumbnails。",
+        "建议：Encode presence in the avatar ring — purple normally, red when currently LIVE。"
+      ],
+      "dont": [
+        "避免：use pure black {#000000} for the app canvas — that's the theater/player surface only。",
+        "避免：use Live Red for anything except liveness — it must always mean \"happening now\"。",
+        "避免：use Twitch Purple for the LIVE state — purple is action/brand, never status。",
+        "避免：use pure white {#FFFFFF} for body text — {#EFEFF1} is the intentional softer choice。",
+        "避免：use thin or medium weights — Roobert here is 400 / 600 / 700 only。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "media",
+      "navigation": [
+        "推荐",
+        "收藏",
+        "我的"
+      ],
+      "primaryAction": "开始播放"
+    }
+  },
+  "status": {
+    "displayPage": "todo",
+    "collectionErrors": []
+  }
+}

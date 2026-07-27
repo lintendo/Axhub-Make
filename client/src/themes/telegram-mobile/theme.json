@@ -1,0 +1,209 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/design-md/unknown/telegram/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-telegram-mobile",
+    "slug": "telegram-mobile",
+    "brand": "Telegram",
+    "titleZh": "Telegram 主题",
+    "titleEn": "Telegram",
+    "descriptionZh": "Telegram 的 Design.md 主题展示，围绕移动端、通讯与协作组织页面。",
+    "descriptionEn": "Telegram mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "通讯与协作"
+    ],
+    "distributionTags": [
+      "移动端",
+      "通讯与协作"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/telegram-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    }
+  },
+  "tokens": {
+    "palette": [
+      "#0088CC",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Roboto",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Roboto",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "local-preview",
+      "path": "assets/cover.svg"
+    }
+  ],
+  "display": {
+    "brand": "Telegram 主题",
+    "brandAlias": "Telegram",
+    "description": "Telegram 的 Design.md 主题展示，围绕移动端、通讯与协作组织页面。",
+    "descriptionEn": "Telegram mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "通讯与协作"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#0088CC",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#E5E5E5",
+        "cssValue": "#E5E5E5",
+        "description": "Incoming Bubble (Light) (`#FFFFFF`): White fill with 1pt `#E5E5E5` border."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#C7C7CC",
+        "cssValue": "#C7C7CC",
+        "description": "Divider (`#C7C7CC`): Hairline separator (iOS default tint)."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#383838",
+        "cssValue": "#383838",
+        "description": "Divider (Dark) (`#383838`): Dark-mode hairline separator."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#B1B1B1",
+        "cssValue": "#B1B1B1",
+        "description": "Sent Gray (`#B1B1B1`): Single check = sent."
+      },
+      {
+        "label": "边框 5 - Border 5",
+        "value": "#FFFFFF",
+        "cssValue": "#FFFFFF",
+        "description": "True white canvas (`#FFFFFF`) light / crushed black (`#212121` or `#000000` OLED) dark"
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Roboto",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "local-preview",
+        "path": "assets/cover.svg"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use {#0088CC} (Telegram Blue) as the default accent — but build the system so accent is a single variable that users can change。",
+        "建议：Use {#2B86FD} for outgoing bubbles in default blue theme; support accent-tinted outgoing bubbles。",
+        "建议：Respect user-selected chat backgrounds (solid, gradient, tile, photo)。",
+        "建议：Use SF Pro + Telegram's proprietary outlined icon vocabulary (NOT web-accessible icon alone)。",
+        "建议：Offer OLED dark mode ({#000000}) as a distinct option from default dark。"
+      ],
+      "dont": [
+        "避免：hardcode accent color — theme it; the accent variable should cascade。",
+        "避免：use WhatsApp's asymmetric tail — Telegram bubble tails are SUBTLY notched (6pt), not pointed。",
+        "避免：use warm cream chat backgrounds; Telegram defaults to cool white/soft-blue or pure dark。",
+        "避免：use web-accessible icon for everything — Telegram's tab bar uses outlined custom glyphs。",
+        "避免：dim the whole screen on long-press — only the backdrop around the context menu blurs。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "chat",
+      "navigation": [
+        "消息",
+        "联系人",
+        "我的"
+      ],
+      "primaryAction": "发起对话"
+    }
+  },
+  "status": {
+    "displayPage": "todo",
+    "collectionErrors": []
+  }
+}

@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/design-md/unknown/chatgpt/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-chatgpt-mobile",
+    "slug": "chatgpt-mobile",
+    "brand": "Chatgpt",
+    "titleZh": "Chatgpt 主题",
+    "titleEn": "Chatgpt",
+    "descriptionZh": "Chatgpt 的 Design.md 主题展示，围绕移动端、AI 与开发工具组织页面。",
+    "descriptionEn": "Chatgpt mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "AI 与开发工具"
+    ],
+    "distributionTags": [
+      "移动端",
+      "AI 与开发工具"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/chatgpt-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    }
+  },
+  "tokens": {
+    "palette": [
+      "#10A37F",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Inter",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Inter",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "local-preview",
+      "path": "assets/cover.svg"
+    }
+  ],
+  "display": {
+    "brand": "Chatgpt 主题",
+    "brandAlias": "Chatgpt",
+    "description": "Chatgpt 的 Design.md 主题展示，围绕移动端、AI 与开发工具组织页面。",
+    "descriptionEn": "Chatgpt mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "AI 与开发工具"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#10A37F",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#E5E5E5",
+        "cssValue": "#E5E5E5",
+        "description": "Code Block Border (`#E5E5E5` / `#363636`): 1pt border."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#424242",
+        "cssValue": "#424242",
+        "description": "Assistant Inline Code Bg (`#F0F0F0` / `#424242`): Inline `code` chip background."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#F0F0F0",
+        "cssValue": "#F0F0F0",
+        "description": "Assistant Inline Code Bg (`#F0F0F0` / `#424242`): Inline `code` chip background."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#676767",
+        "cssValue": "#676767",
+        "description": "Text Secondary Light (`#676767`): Placeholder, timestamps, meta"
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Inter",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "local-preview",
+        "path": "assets/cover.svg"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use pure white ({#FFFFFF}) as canvas light / charcoal-black ({#212121}) dark — NOT true black。",
+        "建议：Make the send button a circle — black-on-white light, white-on-black dark, 32pt with up-arrow。",
+        "建议：Keep the UI monochromatic — no brand accent beyond subtle blue ({#2A7FFF}) on links。",
+        "建议：Give user messages a soft-gray bubble ({#F7F7F8}) — assistant messages get NO bubble。",
+        "建议：Render markdown in assistant responses — code blocks, tables, LaTeX, headings all rendered cleanly。"
+      ],
+      "dont": [
+        "避免：use bubbles around assistant responses — plain inline text flow is the rule。",
+        "避免：use ChatGPT Green ({#10A37F}) — it's been mostly retired; keep the UI monochromatic。",
+        "避免：make the send button square or rectangular — it's a circle。",
+        "避免：use heavy shadows on content — ChatGPT is flat; shadows only on floating ephemeral UI。",
+        "避免：render markdown naively — code blocks need syntax highlighting + copy button。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "assistant",
+      "navigation": [
+        "对话",
+        "探索",
+        "我的"
+      ],
+      "primaryAction": "开始对话"
+    }
+  },
+  "status": {
+    "displayPage": "todo",
+    "collectionErrors": []
+  }
+}

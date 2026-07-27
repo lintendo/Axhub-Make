@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/design-md/unknown/doordash/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-doordash-mobile",
+    "slug": "doordash-mobile",
+    "brand": "Doordash",
+    "titleZh": "Doordash 主题",
+    "titleEn": "Doordash",
+    "descriptionZh": "Doordash 的 Design.md 主题展示，围绕移动端、本地生活与餐饮组织页面。",
+    "descriptionEn": "Doordash mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "本地生活与餐饮"
+    ],
+    "distributionTags": [
+      "移动端",
+      "本地生活与餐饮"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/doordash-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    }
+  },
+  "tokens": {
+    "palette": [
+      "#008B4A",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Roboto",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Roboto",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "local-preview",
+      "path": "assets/cover.svg"
+    }
+  ],
+  "display": {
+    "brand": "Doordash 主题",
+    "brandAlias": "Doordash",
+    "description": "Doordash 的 Design.md 主题展示，围绕移动端、本地生活与餐饮组织页面。",
+    "descriptionEn": "Doordash mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "本地生活与餐饮"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#008B4A",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "阴影 1 - Shadow 1",
+        "value": "rgba(0,0,0,0.06) 0 4px 12px",
+        "cssValue": "rgba(0,0,0,0.06) 0 4px 12px",
+        "description": "Background: `#FFFFFF` with `rgba(0,0,0,0.06) 0 4px 12px` shadow on scroll"
+      }
+    ],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#FF8000",
+        "cssValue": "#FF8000",
+        "description": "Typography is TT Norms Pro (DoorDash's proprietary face, very close to a tightened Proxima Nova / SF Pro hybrid). Titles are set in weight 700 at 20-28pt — assertive, not elegant — and body copy sits at weight 400 with generous tracking that keeps restaurant names and delivery times readable at speed. The hierarchy is brutal and efficient: price in large bold numerals, restaurant name in 17-20pt semibold, meta-data (rating, fee, time) in 13pt regular gray. The color temperature is warm throughout: off-white (`#FFFFFF`) body, charcoal text (`#191919`), neutral cool grays for borders, and a small supporting palette of warm highlights (orange `#FF8000` for ratings, green `#008B4A` for $0 fee badges)."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#E5E5E5",
+        "cssValue": "#E5E5E5",
+        "description": "Divider (`#E5E5E5`): Hairline dividers, card borders (where used), list row separators."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#3A3A3A",
+        "cssValue": "#3A3A3A",
+        "description": "Divider Dark (`#3A3A3A`): Hairline dividers in dark mode."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#191919",
+        "cssValue": "#191919",
+        "description": "Typography is TT Norms Pro (DoorDash's proprietary face, very close to a tightened Proxima Nova / SF Pro hybrid). Titles are set in weight 700 at 20-28pt — assertive, not elegant — and body copy sits at weight 400 with generous tracking that keeps restaurant names and delivery times readable at speed. The hierarchy is brutal and efficient: price in large bold numerals, restaurant name in 17-20pt semibold, meta-data (rating, fee, time) in 13pt regular gray. The color temperature is warm throughout: off-white (`#FFFFFF`) body, charcoal text (`#191919`), neutral cool grays for borders, and a small supporting palette of warm highlights (orange `#FF8000` for ratings, green `#008B4A` for $0 fee badges)."
+      },
+      {
+        "label": "边框 5 - Border 5",
+        "value": "#008B4A",
+        "cssValue": "#008B4A",
+        "description": "Typography is TT Norms Pro (DoorDash's proprietary face, very close to a tightened Proxima Nova / SF Pro hybrid). Titles are set in weight 700 at 20-28pt — assertive, not elegant — and body copy sits at weight 400 with generous tracking that keeps restaurant names and delivery times readable at speed. The hierarchy is brutal and efficient: price in large bold numerals, restaurant name in 17-20pt semibold, meta-data (rating, fee, time) in 13pt regular gray. The color temperature is warm throughout: off-white (`#FFFFFF`) body, charcoal text (`#191919`), neutral cool grays for borders, and a small supporting palette of warm highlights (orange `#FF8000` for ratings, green `#008B4A` for $0 fee badges)."
+      },
+      {
+        "label": "边框 6 - Border 6",
+        "value": "#F7F7F7",
+        "cssValue": "#F7F7F7",
+        "description": "Surface Muted (`#F7F7F7`): Search bar fill, quiet card backgrounds, category chip fill."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Roboto",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "local-preview",
+        "path": "assets/cover.svg"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use DoorDash Red ({#EB1700}) for every primary CTA — it's the \"spend money\" color。",
+        "建议：Photograph food at 16:9 with warm lighting; never use stock-flat food photos。",
+        "建议：Set titles in weight 700 — hierarchy is bold, not subtle。",
+        "建议：Keep the floating checkout button pinned bottom when cart > 0。",
+        "建议：Round primary CTAs to 28pt (pill shape); round cards to 16pt。"
+      ],
+      "dont": [
+        "避免：use DoorDash Red for non-interactive elements — no red text, no red icons beyond the pin/logo。",
+        "避免：use small-title nav bars on top-level tabs — DoorDash uses large-title iOS style。",
+        "避免：understate price — always weight 700, never italicized。",
+        "避免：compose food cards without a photo — no placeholders, no gray blocks in production。",
+        "避免：use square food photos — 16:9 is the law。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "commerce",
+      "navigation": [
+        "首页",
+        "订单",
+        "我的"
+      ],
+      "primaryAction": "立即购买"
+    }
+  },
+  "status": {
+    "displayPage": "todo",
+    "collectionErrors": []
+  }
+}

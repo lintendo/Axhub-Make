@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/design-md/unknown/revolut/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-revolut-mobile",
+    "slug": "revolut-mobile",
+    "brand": "Revolut",
+    "titleZh": "Revolut 主题",
+    "titleEn": "Revolut",
+    "descriptionZh": "Revolut 的 Design.md 主题展示，围绕移动端、金融与支付组织页面。",
+    "descriptionEn": "Revolut mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "金融与支付"
+    ],
+    "distributionTags": [
+      "移动端",
+      "金融与支付"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/revolut-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    }
+  },
+  "tokens": {
+    "palette": [
+      "#5B6BFF",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Roboto",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Roboto",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "local-preview",
+      "path": "assets/cover.svg"
+    }
+  ],
+  "display": {
+    "brand": "Revolut 主题",
+    "brandAlias": "Revolut",
+    "description": "Revolut 的 Design.md 主题展示，围绕移动端、金融与支付组织页面。",
+    "descriptionEn": "Revolut mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "金融与支付"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#5B6BFF",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#2A2A38",
+        "cssValue": "#2A2A38",
+        "description": "Divider (`#2A2A38`): Hairline rules between rows and around tiles."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#33334A",
+        "cssValue": "#33334A",
+        "description": "Border Subtle (`#33334A`): Card outline at rest, input border."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#6B5BFF",
+        "cssValue": "#6B5BFF",
+        "description": "The accent system is a gradient ritual. The violet→purple sweep carries the brand: the primary CTA, the active tab, the selected segment, the analytics donut's spent arc, and the sheen that rolls across the metal card. A solid `#6B5BFF` is the fallback when a gradient can't be used (thin strokes, small icons, focus rings). Everything else is white, gray, or the deep canvas. The restraint makes the gradient feel like *Revolut* — when it appears, it's the product speaking."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#28283A",
+        "cssValue": "#28283A",
+        "description": "Surface 3 (`#28283A`): Pressed state on dark surfaces, segmented-control track."
+      },
+      {
+        "label": "边框 5 - Border 5",
+        "value": "#9A9AAA",
+        "cssValue": "#9A9AAA",
+        "description": "Text Secondary (`#9A9AAA`): Merchant subtitles, metadata, currency names, helper text."
+      },
+      {
+        "label": "边框 6 - Border 6",
+        "value": "#1E1E2A",
+        "cssValue": "#1E1E2A",
+        "description": "Revolut's iOS app is a near-black financial cockpit where money looks engineered, not nostalgic. The canvas sits at `#0A0A0F` — a cool, almost-black with the faintest blue cast — so that the product's signature gradient (an electric violet-to-indigo sweep, `#5B6BFF → #9C6BFF`) and the metal-card hero read like premium hardware on a dark workbench. Nothing is beige, nothing is \"bank green\"; this is fintech as a precision instrument. Balance numbers are huge, spend analytics are charted in a single donut, and every surface is a slightly-lifted slab (`#16161F` / `#1E1E2A`) floating on the void."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Roboto",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "local-preview",
+        "path": "assets/cover.svg"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use {#0A0A0F} as the canvas — cool near-black, not pure {#000000}, not warm。",
+        "建议：Reserve the violet→purple gradient ({#5B6BFF → #9C6BFF}) for the primary action, active tab, and the spent arc。",
+        "建议：Use the solid {#6B5BFF} only where a gradient can't render (thin strokes, tiny icons, focus rings)。",
+        "建议：Make the balance the largest element on the screen — 34–40pt weight 700, tabular。",
+        "建议：Use tabular numerals for every balance, amount, and currency tile so columns align。"
+      ],
+      "dont": [
+        "避免：use pure black {#000000} or a warm dark — the canvas has a cool blue cast。",
+        "避免：apply the gradient to text glyphs — it's a fill/stroke device only。",
+        "避免：add a second accent hue — the gradient is the entire brand color story。",
+        "避免：let a merchant name outweigh its amount, or an amount outweigh the hero balance。",
+        "避免：use proportional figures for money — always tabular, decimal-aligned。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "finance",
+      "navigation": [
+        "资产",
+        "交易",
+        "我的"
+      ],
+      "primaryAction": "转账"
+    }
+  },
+  "status": {
+    "displayPage": "todo",
+    "collectionErrors": []
+  }
+}
