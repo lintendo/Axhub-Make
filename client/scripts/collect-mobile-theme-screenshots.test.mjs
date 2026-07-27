@@ -273,6 +273,39 @@ describe('image normalization pipeline', () => {
       .toEqual(originalNames.map((name) => `original-${name}`));
     expect(fs.readdirSync(outputDir).filter((name) => name.startsWith('.screenshot-stage-'))).toEqual([]);
   });
+
+  it('keeps promoted assets and committed metadata when backup cleanup fails', async () => {
+    const outputDir = temporaryDir();
+    const oldNames = [1, 2, 3].map((index) => `product-screenshot-0${index}.webp`);
+    for (const name of oldNames) fs.writeFileSync(path.join(outputDir, name), `old-${name}`);
+    const metadataPath = path.join(outputDir, 'theme.json');
+    fs.writeFileSync(metadataPath, '{"version":"old"}\n');
+    const fetchImpl = await threeImageFetch();
+    let cleanupCalled = false;
+
+    const assets = await normalizeScreenshotSet({
+      assetUrls: ['https://example.com/0', 'https://example.com/1', 'https://example.com/2'],
+      outputDir,
+      source: source(),
+      fetchImpl,
+      collectedAt: '2026-07-27T00:00:00.000Z',
+      afterPromote: (promotedAssets) => {
+        fs.writeFileSync(metadataPath, JSON.stringify({ version: 'new', count: promotedAssets.length }));
+      },
+      removeBackupDir: (backupDir) => {
+        cleanupCalled = true;
+        fs.rmSync(backupDir, { recursive: true, force: true });
+        throw new Error('BACKUP_CLEANUP_FAILED');
+      },
+    });
+
+    expect(cleanupCalled).toBe(true);
+    expect(assets).toHaveLength(3);
+    expect(JSON.parse(fs.readFileSync(metadataPath, 'utf8'))).toEqual({ version: 'new', count: 3 });
+    expect(oldNames.map((name) => fs.readFileSync(path.join(outputDir, name), 'utf8')))
+      .not.toEqual(oldNames.map((name) => `old-${name}`));
+    expect(fs.readdirSync(outputDir).filter((name) => name.startsWith('.screenshot-'))).toEqual([]);
+  });
 });
 
 describe('collector CLI', () => {

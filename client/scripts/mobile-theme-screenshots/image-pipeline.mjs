@@ -8,7 +8,7 @@ import { validateScreenshotAsset } from './model.mjs';
 
 const MAX_BYTES = 450 * 1024;
 
-function promoteAssetSet({ assets, outputDir, stagingDir }) {
+function promoteAssetSet({ assets, outputDir, stagingDir, removeBackupDir }) {
   const backupDir = fs.mkdtempSync(path.join(outputDir, '.screenshot-backup-'));
   const backups = [];
   const promoted = [];
@@ -46,8 +46,12 @@ function promoteAssetSet({ assets, outputDir, stagingDir }) {
     rollback,
     finalize() {
       if (settled) return;
-      fs.rmSync(backupDir, { recursive: true, force: true });
       settled = true;
+      try {
+        removeBackupDir(backupDir);
+      } catch {
+        // Cleanup failure must not roll back assets after metadata is committed.
+      }
     },
   };
 }
@@ -68,6 +72,7 @@ export async function normalizeScreenshotSet({
   fetchImpl = fetch,
   collectedAt = new Date().toISOString(),
   afterPromote,
+  removeBackupDir = (directory) => fs.rmSync(directory, { recursive: true, force: true }),
 }) {
   if (!Array.isArray(assetUrls) || assetUrls.length !== 3) {
     throw new Error('INSUFFICIENT_SCREENSHOTS expected exactly 3 asset URLs');
@@ -128,14 +133,14 @@ export async function normalizeScreenshotSet({
       fs.writeFileSync(path.join(stagingDir, fileName), normalized.data);
       assets.push(asset);
     }
-    const promotion = promoteAssetSet({ assets, outputDir, stagingDir });
+    const promotion = promoteAssetSet({ assets, outputDir, stagingDir, removeBackupDir });
     try {
       if (afterPromote) await afterPromote(assets);
-      promotion.finalize();
     } catch (error) {
       promotion.rollback();
       throw error;
     }
+    promotion.finalize();
     return assets;
   } finally {
     fs.rmSync(stagingDir, { recursive: true, force: true });
