@@ -58,7 +58,7 @@
   "assets": {
     "designMd": {
       "path": "DESIGN.md",
-      "method": "derived_from_metadata"
+      "method": "curated_from_local_source_evidence"
     },
     "tailwind": {
       "path": "tw.css",
