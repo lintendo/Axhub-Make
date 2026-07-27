@@ -21,7 +21,8 @@ function requireValue(argv, index, option) {
 }
 
 export function parseCliArgs(argv) {
-  const [command, ...rest] = argv;
+  const commandIndex = argv.findIndex((value) => value !== '--');
+  const [command, ...rest] = commandIndex === -1 ? [] : argv.slice(commandIndex);
   if (!['discover', 'collect'].includes(command)) throw new Error('USAGE expected discover or collect command');
   const options = { assetUrls: [] };
   for (let index = 0; index < rest.length; index += 1) {

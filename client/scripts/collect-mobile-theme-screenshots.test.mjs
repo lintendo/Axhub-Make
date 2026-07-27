@@ -386,6 +386,18 @@ describe('collector CLI', () => {
     expect(JSON.parse(fs.readFileSync(outputPath, 'utf8'))).toEqual(report);
   });
 
+  it('accepts the package-manager argument separator before the command', async () => {
+    const clientRoot = temporaryDir('mobile-client-');
+    writeTheme(clientRoot, 'separator-mobile', 'Separator');
+    const report = await runCli(
+      ['--', 'discover', '--theme', 'separator-mobile'],
+      { clientRoot, fetchImpl: async () => new Response(JSON.stringify({ results: [] })) },
+    );
+    expect(report.themes).toEqual([
+      { theme: 'separator-mobile', term: 'Separator', candidates: [] },
+    ]);
+  });
+
   it('fails a single-theme discovery when the source endpoint is unavailable', async () => {
     const clientRoot = temporaryDir('mobile-client-');
     writeTheme(clientRoot, 'unavailable-mobile', 'Unavailable');
