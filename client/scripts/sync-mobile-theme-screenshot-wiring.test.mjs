@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { rewriteMobileThemeEntry, syncMobileThemeScreenshotWiring } from './sync-mobile-theme-screenshot-wiring.mjs';
+import { parseCliArgs, rewriteMobileThemeEntry, syncMobileThemeScreenshotWiring } from './sync-mobile-theme-screenshot-wiring.mjs';
 
 describe('mobile theme screenshot wiring', () => {
+  it('accepts a pnpm-forwarded separator before --check', () => {
+    expect(parseCliArgs(['--', '--check'])).toMatchObject({ check: true });
+  });
+
   it('replaces only the cover import and previewImages initializer', () => {
     const source = `
 import previewAsset0 from './assets/cover.svg?url';

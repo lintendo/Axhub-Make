@@ -93,7 +93,8 @@ export function parseCliArgs(argv) {
   const options = { check: false, all: false, theme: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--check') options.check = true;
+    if (arg === '--') continue;
+    else if (arg === '--check') options.check = true;
     else if (arg === '--all') options.all = true;
     else if (arg === '--theme') options.theme = argv[++i];
     else throw new Error(`UNKNOWN_ARGUMENT ${arg}`);
