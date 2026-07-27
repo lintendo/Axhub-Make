@@ -59,6 +59,20 @@ function hasGenericExtremeRuntimeRadius(source: string) {
   return /(?:\b(?:control|card|preview|pill|circle|full|radius)\s*:\s*['"](?:9999px|50%)|--[\w-]*radius-(?:control|card|preview|pill|circle|full)\s*:\s*(?:9999px|50%)|\bborder-radius\s*:\s*(?:9999px|50%))/i.test(source);
 }
 
+function isCssLength(value: unknown) {
+  return /^-?\d*\.?\d+(?:px|rem|em|ch|vw|vh)$/.test(String(value));
+}
+
+function hasObservedExtremeRadiusEvidence(source: string, role: string, value: unknown) {
+  const rolePattern = role.replace(/([a-z])([A-Z])/g, '$1[-\\s]?$2');
+  const valuePattern = escapeRegExp(String(value));
+  return source.split(/\r?\n/).some((line) => (
+    /\*\*Observed(?:\s+—[^*]+)?:\*\*/i.test(line)
+    && new RegExp(rolePattern, 'i').test(line)
+    && new RegExp(valuePattern).test(line)
+  ));
+}
+
 describe('retained PC theme portfolio quality contract', () => {
   it.each(qualityUpgradeSlugs)('%s has a complete executable DESIGN.md', (slug) => {
     const source = readThemeFile(slug, 'DESIGN.md');
@@ -92,7 +106,7 @@ describe('retained PC theme portfolio quality contract', () => {
 
     for (const { path: tokenPath, value } of objectLeaves(tokens.spacing)) {
       expect(tokenPath, `${slug}: spacing key ${tokenPath}`).not.toMatch(/font|type|text|lineHeight|leading|tracking|letter|radius|radii|corner/i);
-      expect(String(value), `${slug}: spacing ${String(value)}`).toMatch(/^-?\d*\.?\d+(?:px|rem|em|ch|vw|vh|%)$/);
+      expect(isCssLength(value), `${slug}: spacing ${String(value)}`).toBe(true);
     }
 
     for (const { path: role, value } of objectLeaves(tokens.radius)) {
@@ -100,9 +114,7 @@ describe('retained PC theme portfolio quality contract', () => {
       expect(String(value), `${slug}: radius.${role}`).toMatch(/^-?\d*\.?\d+(?:px|rem|em|%)$/);
       if (/^(?:9999px|50%)$/.test(String(value))) {
         expect(role, `${slug}: extreme radius role ${role}`).toMatch(/^(?!pill$|circle$|full$).+(?:pill|circle)$/i);
-        expect(source, `${slug}: source evidence for ${role}`).toMatch(
-          new RegExp(role.replace(/([a-z])([A-Z])/g, '$1[-\\s]?$2'), 'i'),
-        );
+        expect(hasObservedExtremeRadiusEvidence(source, role, value), `${slug}: source evidence for ${role}`).toBe(true);
       }
     }
 
@@ -161,5 +173,14 @@ describe('retained PC theme portfolio quality contract', () => {
     '.button { border-radius: 9999px; }',
   ])('rejects generic runtime extreme radius: %s', (source) => {
     expect(hasGenericExtremeRuntimeRadius(source)).toBe(true);
+  });
+
+  it('rejects percentages from the spacing CSS length category', () => {
+    expect(isCssLength('10%')).toBe(false);
+  });
+
+  it('requires extreme radius role/value evidence to be observed, not inferred', () => {
+    expect(hasObservedExtremeRadiusEvidence('**Inference:** category icon circle may use `50%`.', 'categoryIconCircle', '50%')).toBe(false);
+    expect(hasObservedExtremeRadiusEvidence('**Observed — narrow role:** category icon circle may use `50%`.', 'categoryIconCircle', '50%')).toBe(true);
   });
 });
