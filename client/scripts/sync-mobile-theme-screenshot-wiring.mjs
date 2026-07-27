@@ -16,24 +16,57 @@ const previewInitializer = `[
     { type: 'product-screenshot', url: productScreenshot03 },
   ]`;
 
+function isWiredPreviewInitializer(initializer) {
+  if (!ts.isArrayLiteralExpression(initializer) || initializer.elements.length !== 3) return false;
+  return initializer.elements.every((element, index) => {
+    if (!ts.isObjectLiteralExpression(element)) return false;
+    const type = element.properties.find((property) => ts.isPropertyAssignment(property) && property.name.getText() === 'type');
+    const url = element.properties.find((property) => ts.isPropertyAssignment(property) && property.name.getText() === 'url');
+    return ts.isPropertyAssignment(type)
+      && ts.isStringLiteral(type.initializer)
+      && type.initializer.text === 'product-screenshot'
+      && ts.isPropertyAssignment(url)
+      && ts.isIdentifier(url.initializer)
+      && url.initializer.text === `productScreenshot0${index + 1}`;
+  });
+}
+
 export function rewriteMobileThemeEntry(source, fileName = 'index.tsx') {
   const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const edits = [];
+  const screenshotPaths = [1, 2, 3].map((index) => `./assets/product-screenshot-0${index}.webp?url`);
+  const imports = sourceFile.statements.filter(ts.isImportDeclaration);
+  const coverImports = imports.filter((statement) => statement.moduleSpecifier.text === './assets/cover.svg?url');
+  const screenshotImports = imports.filter((statement) => screenshotPaths.includes(statement.moduleSpecifier.text));
+  const configDeclarations = [];
   for (const statement of sourceFile.statements) {
-    if (ts.isImportDeclaration(statement)
-      && ts.isStringLiteral(statement.moduleSpecifier)
-      && statement.moduleSpecifier.text === './assets/cover.svg?url') {
-      edits.push({ start: statement.getStart(sourceFile), end: statement.getEnd(), text: importBlock });
+    if (!ts.isVariableStatement(statement)
+      || !(statement.declarationList.flags & ts.NodeFlags.Const)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.name.text === 'config' && ts.isObjectLiteralExpression(declaration.initializer)) {
+        configDeclarations.push(declaration);
+      }
     }
   }
-  function visit(node) {
-    if (ts.isPropertyAssignment(node) && node.name.getText(sourceFile) === 'previewImages') {
-      edits.push({ start: node.initializer.getStart(sourceFile), end: node.initializer.getEnd(), text: previewInitializer });
-    }
-    ts.forEachChild(node, visit);
+  if (configDeclarations.length !== 1) throw new Error(`${fileName}: expected exactly one const config object`);
+  const configObject = configDeclarations[0].initializer;
+  const previewProperties = configObject.properties.filter((property) => ts.isPropertyAssignment(property)
+    && property.name.getText(sourceFile) === 'previewImages');
+  if (previewProperties.length !== 1) throw new Error(`${fileName}: expected exactly one config.previewImages property`);
+
+  const hasCompleteScreenshotImports = screenshotPaths.every((assetPath, index) => {
+    const matching = screenshotImports.filter((statement) => statement.moduleSpecifier.text === assetPath);
+    return matching.length === 1 && matching[0].importClause?.name?.text === `productScreenshot0${index + 1}`;
+  });
+  const isLegacy = coverImports.length === 1 && screenshotImports.length === 0;
+  const isWired = coverImports.length === 0 && screenshotImports.length === 3 && hasCompleteScreenshotImports;
+  if (!isLegacy && !isWired) throw new Error(`${fileName}: incomplete or mixed screenshot imports`);
+
+  const edits = [];
+  if (isLegacy) edits.push({ start: coverImports[0].getStart(sourceFile), end: coverImports[0].getEnd(), text: importBlock });
+  const previewProperty = previewProperties[0];
+  if (!isWiredPreviewInitializer(previewProperty.initializer)) {
+    edits.push({ start: previewProperty.initializer.getStart(sourceFile), end: previewProperty.initializer.getEnd(), text: previewInitializer });
   }
-  visit(sourceFile);
-  if (edits.length !== 2) throw new Error(`${fileName}: expected cover import and config.previewImages edit`);
   return edits.sort((a, b) => b.start - a.start).reduce(
     (text, edit) => `${text.slice(0, edit.start)}${edit.text}${text.slice(edit.end)}`,
     source,
