@@ -40,7 +40,7 @@ Use this theme for a bold consumer security offer: a dark charcoal hero, a brigh
 ## Components
 
 - Promotion strip: yellow fill, compact centered message, optional accessible close button, no competing CTA.
-- Primary CTA: pink fill, white label, `44px` height, `9999px` pill role, explicit price/plan wording nearby.
+- Primary CTA: pink fill, white label, `44px` height, `12px` bounded corners, explicit price/plan wording nearby. **Inference:** the retained reference does not establish a reusable purchase-control pill/circle token.
 - Feature checklist: white check/icon plus text on dark hero; each item remains readable without the icon color.
 - Product art: one large illustrative object with meaningful alt text when communicative; never crop a security claim into the artwork.
 - Plan/guarantee note: neutral text with icon and link; disclose terms without relying on hover.
@@ -75,6 +75,7 @@ Use this theme for a bold consumer security offer: a dark charcoal hero, a brigh
 
 ## Known Gaps
 
+- **Blocking license gap:** screenshot, product art, brand imagery, and font references have no local license evidence; keep this client theme and verify rights before redistribution.
 - No official source DESIGN.md, source commit, license, product-art provenance, or interaction/motion spec is available locally.
 - The capture covers one offer state only; checkout, plan comparison, signed-in security controls, errors, and dark/light system behavior are unobserved.
 - The local preview is static, so animation and responsive crop rules need validation before production use.

@@ -76,6 +76,7 @@ Use this theme for calm, information-rich healthcare and senior-living workflows
 
 ## Known Gaps
 
+- **Blocking license gap:** the retained screenshot, source imagery, and named fonts have no local license evidence; keep this client theme and verify rights before redistribution.
 - Source metadata does not include a downloadable upstream DESIGN.md, source commit, asset license, or official font files.
 - Only a limited official-site section is retained locally; complete EHR tables, forms, empty/error states, and dark mode were not observed.
 - Local CSS currently falls back from Reckless Neue and does not load Saans; typography must be licensed and wired by the consuming product.

@@ -14,11 +14,13 @@ import EditorialCard from './components/EditorialCard';
 import SpecTable from './components/SpecTable';
 import OnePagerTemplate from './templates/OnePagerTemplate';
 import LongDocTemplate from './templates/LongDocTemplate';
+import themeData from './theme.json';
 import previewAsset from './assets/kami-demo-tesla.png?url';
 
 const config: BatchShowcaseConfig = {
   brand: 'Kami 紙主题',
   brandAlias: 'Kami',
+  source: themeData.source,
   description: 'Kami 紙主题用于文档、白皮书和作品集排版，强调纸张质感、墨蓝重点和清晰的信息层级。',
   descriptionEn: 'A document-first theme for polished one-pagers, white papers, and portfolios.',
   variant: 'editorial-agency',
@@ -36,7 +38,6 @@ const config: BatchShowcaseConfig = {
     control: '6px',
     card: '4px',
     preview: '0px',
-    pill: '9999px',
     source: 'design-md',
   },
   spacing: {

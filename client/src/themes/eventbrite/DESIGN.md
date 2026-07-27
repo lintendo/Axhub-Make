@@ -42,7 +42,7 @@ Use this theme for event discovery on the web: an efficient search-led header, a
 
 - Search header: event and location inputs share one desktop group, with persistent labels/icons and a distinct submit action.
 - Event hero: wide image, editorial overlay, short supporting label, and one high-contrast `44px` CTA; text contrast is validated against each image.
-- Category control: circular icon target above a short label; selected state uses action-blue plus a written/shape change.
+- Category control: circular icon target above a short label; selected state uses action-blue plus a written/shape change. **Observed — narrow role:** the category icon circle may use `50%` only for its equal-width/equal-height icon target; it is not a general control or card radius.
 - Event card: image, title, date/time, location, and price/availability in that order; whole-card click does not replace accessible inner links.
 - Consent layer: when present, it remains above content, traps focus only if modal, and never adopts event-card styling.
 
@@ -76,6 +76,7 @@ Use this theme for event discovery on the web: an efficient search-led header, a
 
 ## Known Gaps
 
+- **Blocking license gap:** event imagery, screenshot, and Neue Plak font references have no local license evidence; keep this client theme and verify rights before redistribution.
 - No official source DESIGN.md, Git commit, source license, Neue Plak files, or canonical orange token is retained locally.
 - The capture shows one discovery page and a consent state; checkout, organizer tools, empty/error/loading states, and dark mode are unobserved.
 - The local preview uses Inter and a static image, so interaction density and source typography are approximations.

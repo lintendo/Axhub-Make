@@ -73,6 +73,7 @@ Use these semantic roles exactly:
 
 ## Known Gaps
 
+- **Blocking license gap:** the local demo image has unresolved provenance and license; keep this retained theme in client and exclude the image from redistribution claims.
 - The demo image has no separately recorded origin or license; replace it before external redistribution if provenance cannot be established.
 - Charter and TsangerJinKai02 font files are not bundled in this theme, so fallback rendering varies by host.
 - No print stylesheet, PDF pagination rules, dark mode, or RTL sample is currently present.

@@ -75,6 +75,7 @@ Use this theme for playful, progress-oriented learning experiences on the web. T
 
 ## Known Gaps
 
+- **Blocking license gap:** brand imagery, screenshot, and DIN Round/Feather font references have no local license evidence; keep this client theme and verify rights before redistribution.
 - No official source DESIGN.md, Git commit, asset license, DIN Round/Feather font files, or motion specifications are retained locally.
 - The screenshot covers one landing/onboarding state only; lesson flows, error states, streaks, and accessibility behavior remain unobserved.
 - The local preview uses Inter, so it approximates rather than reproduces the named source typefaces.

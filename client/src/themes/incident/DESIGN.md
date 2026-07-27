@@ -77,6 +77,7 @@ Use this theme for transparent operational status and incident communication. It
 
 ## Known Gaps
 
+- **Blocking license gap:** source screenshot, brand imagery, and font references have no local license evidence; keep this client theme and verify rights before redistribution.
 - No official source DESIGN.md, Git commit, license, font files, complete state taxonomy, or accessibility audit is retained locally.
 - The screenshot shows one active-incident page only; all-clear, maintenance scheduling, subscriptions, authentication, and error/loading states are unobserved.
 - The local preview uses Inter rather than the source-tagged Times/Arial pairing.

@@ -32,6 +32,33 @@ function flattenValues(value: unknown): unknown[] {
   return [value];
 }
 
+function objectLeaves(value: unknown, prefix = ''): Array<{ path: string; value: unknown }> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [{ path: prefix, value }];
+  return Object.entries(value).flatMap(([key, child]) => objectLeaves(child, prefix ? `${prefix}.${key}` : key));
+}
+
+function expectNonEmptyRecord(value: unknown, message: string): asserts value is Record<string, unknown> {
+  expect(value, message).toBeTypeOf('object');
+  expect(value, message).not.toBeNull();
+  expect(Array.isArray(value), message).toBe(false);
+  expect(Object.keys(value as Record<string, unknown>).length, message).toBeGreaterThan(0);
+}
+
+function expectNonEmptyString(value: unknown, message: string): asserts value is string {
+  expect(value, message).toBeTypeOf('string');
+  expect((value as string).trim().length, message).toBeGreaterThan(0);
+}
+
+function expectNonEmptyStringArray(value: unknown, message: string): asserts value is string[] {
+  expect(Array.isArray(value), message).toBe(true);
+  expect((value as unknown[]).length, message).toBeGreaterThan(0);
+  for (const item of value as unknown[]) expectNonEmptyString(item, message);
+}
+
+function hasGenericExtremeRuntimeRadius(source: string) {
+  return /(?:\b(?:control|card|preview|pill|circle|full|radius)\s*:\s*['"](?:9999px|50%)|--[\w-]*radius-(?:control|card|preview|pill|circle|full)\s*:\s*(?:9999px|50%)|\bborder-radius\s*:\s*(?:9999px|50%))/i.test(source);
+}
+
 describe('retained PC theme portfolio quality contract', () => {
   it.each(qualityUpgradeSlugs)('%s has a complete executable DESIGN.md', (slug) => {
     const source = readThemeFile(slug, 'DESIGN.md');
@@ -39,18 +66,100 @@ describe('retained PC theme portfolio quality contract', () => {
     for (const section of ['Colors', 'Typography', 'Components', 'Layout', 'Responsive', "Do's and Don'ts"]) {
       expect(source, `${slug}: ${section}`).toMatch(new RegExp(`^## .*${escapeRegExp(section)}`, 'mi'));
     }
-    expect(source, `${slug}: evidence boundary`).toMatch(/Observed|Inference|Known Gaps/i);
+    expect(source, `${slug}: evidence/source heading`).toMatch(/^## .*Evidence.*Source Record/im);
+    expect(source, `${slug}: local or remote source`).toMatch(/\*\*(?:Observed — )?(?:source URL(?:s)?|local source paths?):\*\*/i);
+    expect(source, `${slug}: pinned commit applicability`).toMatch(/\*\*Pinned upstream commit:\*\*/i);
+    expect(source, `${slug}: license status`).toMatch(/\*\*License:\*\*/i);
+    expect(source, `${slug}: conversion notes`).toMatch(/\*\*Conversion notes:\*\*/i);
+    expect(source, `${slug}: observed facts`).toMatch(/\*\*Observed(?:\s+—[^*]+)?:\*\*/i);
+    expect(source, `${slug}: inference`).toMatch(/\*\*Inference(?:\s+—[^*]+)?:\*\*/i);
+    expect(source, `${slug}: Known Gaps`).toMatch(/^## Known Gaps\s*$/im);
+    expect(source, `${slug}: blocking unresolved license gap`).toMatch(
+      /^## Known Gaps\s*$[\s\S]*^- \*\*Blocking license gap:\*\*/im,
+    );
   });
 
-  it.each(qualityUpgradeSlugs.filter((slug) => slug !== 'kami'))('%s keeps token categories semantically separate', (slug) => {
+  it.each(qualityUpgradeSlugs)('%s has complete independent token categories', (slug) => {
     const tokens = JSON.parse(readThemeFile(slug, 'assets/tokens.json'));
-    const spacingValues = flattenValues(tokens.spacing ?? []);
-    for (const value of spacingValues) {
+    const theme = JSON.parse(readThemeFile(slug, 'theme.json'));
+    const source = readThemeFile(slug, 'DESIGN.md');
+
+    for (const category of ['spacing', 'radius', 'typography'] as const) {
+      expectNonEmptyRecord(tokens[category], `${slug}: assets/tokens.json ${category}`);
+      expectNonEmptyRecord(theme.tokens?.[category], `${slug}: theme.json tokens.${category}`);
+      expect(theme.tokens[category], `${slug}: ${category} metadata matches tokens`).toEqual(tokens[category]);
+    }
+
+    for (const { path: tokenPath, value } of objectLeaves(tokens.spacing)) {
+      expect(tokenPath, `${slug}: spacing key ${tokenPath}`).not.toMatch(/font|type|text|lineHeight|leading|tracking|letter|radius|radii|corner/i);
       expect(String(value), `${slug}: spacing ${String(value)}`).toMatch(/^-?\d*\.?\d+(?:px|rem|em|ch|vw|vh|%)$/);
     }
-    const radiusValues = flattenValues(tokens.radius ?? tokens.radii ?? []);
-    for (const value of radiusValues) {
-      expect(String(value), `${slug}: radius ${String(value)}`).not.toMatch(/^(?:9999px|50%)$/);
+
+    for (const { path: role, value } of objectLeaves(tokens.radius)) {
+      expect(role, `${slug}: radius key ${role}`).not.toMatch(/font|type|text|lineHeight|leading|tracking|letter|space|gap|padding|margin/i);
+      expect(String(value), `${slug}: radius.${role}`).toMatch(/^-?\d*\.?\d+(?:px|rem|em|%)$/);
+      if (/^(?:9999px|50%)$/.test(String(value))) {
+        expect(role, `${slug}: extreme radius role ${role}`).toMatch(/^(?!pill$|circle$|full$).+(?:pill|circle)$/i);
+        expect(source, `${slug}: source evidence for ${role}`).toMatch(
+          new RegExp(role.replace(/([a-z])([A-Z])/g, '$1[-\\s]?$2'), 'i'),
+        );
+      }
     }
+
+    const typography = tokens.typography;
+    expectNonEmptyRecord(typography.fontFamily, `${slug}: typography.fontFamily`);
+    expectNonEmptyRecord(typography.fontSize, `${slug}: typography.fontSize`);
+    expectNonEmptyRecord(typography.lineHeight, `${slug}: typography.lineHeight`);
+    expectNonEmptyRecord(typography.letterSpacing, `${slug}: typography.letterSpacing`);
+    expect(flattenValues(typography.fontSize).every((value) => /^-?\d*\.?\d+(?:px|rem|em)$/.test(String(value)))).toBe(true);
+    expect(flattenValues(typography.lineHeight).every((value) => /^(?:normal|-?\d*\.?\d+)$/.test(String(value)))).toBe(true);
+    expect(flattenValues(typography.letterSpacing).every((value) => /^(?:normal|-?\d*\.?\d+(?:px|rem|em))$/.test(String(value)))).toBe(true);
+
+    expectNonEmptyRecord(theme.display?.spacing, `${slug}: display.spacing`);
+    expectNonEmptyRecord(theme.display?.radius, `${slug}: display.radius`);
+
+    const runtimeRadiusSource = [readThemeFile(slug, 'index.tsx'), readThemeFile(slug, 'style.css')].join('\n');
+    expect(hasGenericExtremeRuntimeRadius(runtimeRadiusSource), `${slug}: generic runtime extreme radius`).toBe(false);
+  });
+
+  it.each(qualityUpgradeSlugs)('%s has honest structured source metadata', (slug) => {
+    const theme = JSON.parse(readThemeFile(slug, 'theme.json'));
+    expectNonEmptyRecord(theme.source, `${slug}: source metadata`);
+    const sourceUrls = [theme.source.originalDetailUrl, theme.source.websiteUrl].filter(
+      (value): value is string => typeof value === 'string' && value.trim().length > 0,
+    );
+    const localPaths = Array.isArray(theme.source.localPaths)
+      ? theme.source.localPaths.filter((value: unknown) => typeof value === 'string' && value.trim().length > 0)
+      : [];
+    expect(sourceUrls.length + localPaths.length, `${slug}: source URL or path`).toBeGreaterThan(0);
+    expect(theme.source.pinnedCommit?.status, `${slug}: pinned commit applicability`).toMatch(
+      /^(?:pinned|not-applicable|unavailable)$/i,
+    );
+    if (theme.source.pinnedCommit.status === 'pinned') {
+      expectNonEmptyString(theme.source.pinnedCommit.commit, `${slug}: pinned commit`);
+    } else {
+      expectNonEmptyString(theme.source.pinnedCommit.reason, `${slug}: pinned commit reason`);
+    }
+    expect(theme.source.license?.status, `${slug}: license status`).toMatch(/^(?:verified|unresolved)$/i);
+    expectNonEmptyString(theme.source.license.evidence, `${slug}: license evidence`);
+    expectNonEmptyString(theme.source.license.scope, `${slug}: license scope`);
+    expectNonEmptyString(theme.source.conversionNotes, `${slug}: conversion notes`);
+    for (const category of ['observed', 'inferred', 'knownGaps'] as const) {
+      expectNonEmptyStringArray(theme.source.evidence?.[category], `${slug}: source evidence.${category}`);
+    }
+    if (theme.source.license.status === 'unresolved') {
+      expect(theme.status?.collectionErrors, `${slug}: unresolved license remains blocking`).toEqual(
+        expect.arrayContaining([expect.stringMatching(/blocking.*license/i)]),
+      );
+    }
+  });
+
+  it.each([
+    "radius: { control: '9999px' }",
+    "radius: { full: '50%' }",
+    '.dmb { --dmb-radius-control: 9999px; }',
+    '.button { border-radius: 9999px; }',
+  ])('rejects generic runtime extreme radius: %s', (source) => {
+    expect(hasGenericExtremeRuntimeRadius(source)).toBe(true);
   });
 });

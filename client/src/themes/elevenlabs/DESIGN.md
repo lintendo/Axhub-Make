@@ -41,7 +41,7 @@ Use this theme for a precise AI/audio product page: near-white canvas, decisive 
 
 ## Components
 
-- Primary action: black fill, white label, `40px` height, `9999px` pill role, `16px` horizontal inset.
+- Primary action: black fill, white label, `40px` height, `12px` bounded corners, `16px` horizontal inset. **Inference:** retain a bounded control radius because the retained still reference does not establish a reusable primary-action pill/circle token.
 - Secondary action: transparent/white surface, ink label, no elevation, visible focus outline.
 - Audio demo: panel fill, segmented text tabs, a large selected orb/play target, and small descriptive metadata below each item.
 - Mode rail: compact tabs with a clear selected underline or fill; preserve text labels at all widths.
@@ -77,6 +77,7 @@ Use this theme for a precise AI/audio product page: near-white canvas, decisive 
 
 ## Known Gaps
 
+- **Blocking license gap:** screenshot, brand imagery, and Waldenburg font references have no local license evidence; keep this client theme and verify rights before redistribution.
 - No official source DESIGN.md, pinned code commit, asset/font license, or Waldenburg font files are retained locally.
 - The still images do not reveal audio waveform behavior, loading/errors, hover states, or complete responsive navigation.
 - The local executable preview uses Inter and therefore cannot reproduce the named proprietary source families exactly.

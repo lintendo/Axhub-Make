@@ -76,6 +76,7 @@ Use this theme for a high-energy game and entertainment storefront on the web. I
 
 ## Known Gaps
 
+- **Blocking license gap:** screenshot, game art, brand imagery, and SegoeProBlack font references have no local license evidence; keep this client theme and verify rights before redistribution.
 - No official source DESIGN.md, source commit, license, game-art permission, SegoeProBlack file, or carousel interaction recording is retained locally.
 - The capture represents a single campaign/home state only; commerce, age gates, search, library, errors, loading, and accessibility states are unobserved.
 - The local preview uses Inter and a static image, so source typography and live media behavior remain approximations.

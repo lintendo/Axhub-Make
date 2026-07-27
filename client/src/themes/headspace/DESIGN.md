@@ -38,7 +38,7 @@ Use this theme for supportive wellbeing and care-navigation experiences. It pair
 
 ## Components
 
-- Primary action: action-blue fill, white label, `40px` minimum height, `9999px` pill role, clear visible focus outline.
+- Primary action: action-blue fill, white label, `40px` minimum height, `12px` bounded corners, clear visible focus outline. **Inference:** the retained reference does not establish a reusable primary-action pill/circle token.
 - Secondary care action: charcoal fill, white label, same target size; clarify the action in text rather than color alone.
 - Support card: cream fill, `16px` corners, generous `24px` inset, image cluster anchored low/right, title and action at top/left.
 - Benefit line: a small icon/check plus concise claim; keep evidence or disclaimer nearby where a health claim is made.
@@ -74,6 +74,7 @@ Use this theme for supportive wellbeing and care-navigation experiences. It pair
 
 ## Known Gaps
 
+- **Blocking license gap:** care imagery, screenshot, and Apercu font references have no local license evidence; keep this client theme and verify rights before redistribution.
 - No official source DESIGN.md, source commit, license, Apercu font files, or motion/accessibility rules are recorded locally.
 - The reference shows one public landing state only; sign-in, program flows, crisis guidance, forms, error/loading states, and dark mode are unobserved.
 - The local preview is static and therefore cannot validate card interaction or media behavior.

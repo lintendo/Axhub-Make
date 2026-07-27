@@ -74,6 +74,7 @@ Use this theme for an agent-native software-development product on the web. It i
 
 ## Known Gaps
 
+- **Blocking license gap:** source screenshot and Geist font references have no local license evidence; keep this client theme and verify rights before redistribution.
 - No official source DESIGN.md, source commit, license, font files, interaction recordings, or dark-mode reference is present.
 - The retained capture shows a marketing/developer entry state only; IDE integration, loading, errors, and authenticated workspace behavior are unobserved.
 - Local CSS names Geist fonts but does not bundle or load them.

@@ -5,7 +5,37 @@
     "originalDetailUrl": "https://styles.refero.design/style/3792d0ca-6c74-4667-a64d-76efe9f87076",
     "fallbackRawUrl": "",
     "mirrorSource": "",
-    "websiteUrl": ""
+    "websiteUrl": "",
+    "localPaths": [
+      "DESIGN.md",
+      "theme.json",
+      "assets/tokens.json",
+      "index.tsx",
+      "style.css",
+      "tw.css",
+      "assets/source-preview.jpg"
+    ],
+    "pinnedCommit": {
+      "status": "not-applicable",
+      "reason": "Retained Refero URL/image evidence is not a Git repository and has no applicable upstream commit."
+    },
+    "license": {
+      "status": "unresolved",
+      "evidence": "No local license evidence is stored for the retained screenshot, brand imagery, or named proprietary fonts.",
+      "scope": "Internal design reference only; keep the retained client theme and exclude unresolved assets from redistribution claims."
+    },
+    "conversionNotes": "Curated retained URL/image metadata and local preview evidence into one responsive React/Web specification without claiming an official upstream design system.",
+    "evidence": {
+      "observed": [
+        "The retained Refero detail URL, theme-local preview image, palette metadata, CSS, and React entry were inspected."
+      ],
+      "inferred": [
+        "Component dimensions, interaction states, token roles, and responsive behavior beyond the retained still evidence are explicitly treated as implementation inference."
+      ],
+      "knownGaps": [
+        "Official source DESIGN.md, applicable Git commit, asset/font licenses, complete interaction states, and full responsive behavior remain unresolved."
+      ]
+    }
   },
   "identity": {
     "id": "P1R-026",
@@ -104,13 +134,40 @@
       "#1a3a1a"
     ],
     "typography": {
-      "display": "Inter",
-      "body": "Inter",
-      "mono": "ui-monospace",
-      "hints": [
-        "Inter",
-        "ui-monospace"
-      ]
+      "fontFamily": {
+        "display": "Segoe UI",
+        "body": "Segoe UI",
+        "mono": "ui-monospace"
+      },
+      "fontSize": {
+        "hero": "48px",
+        "subtitle": "22px",
+        "navigation": "12px",
+        "body": "15px",
+        "rail": "11px"
+      },
+      "lineHeight": {
+        "hero": "1.02",
+        "subtitle": "1.2",
+        "navigation": "1.3",
+        "body": "1.5",
+        "rail": "1.25"
+      },
+      "letterSpacing": {
+        "default": "0em"
+      }
+    },
+    "spacing": {
+      "xs": "8px",
+      "sm": "16px",
+      "md": "24px",
+      "lg": "40px",
+      "section": "64px"
+    },
+    "radius": {
+      "control": "0px",
+      "card": "4px",
+      "preview": "0px"
     }
   },
   "previewImages": [
@@ -252,10 +309,24 @@
         "避免：不要把 Xbox.com 套用到与 游戏娱乐、媒体内容、趣味互动 明显无关的产品语境。",
         "避免：不要用通用行业模板覆盖 Xbox.com 的采集图风格；需要保留原图里的版式密度、留白和视觉重心。"
       ]
+    },
+    "spacing": {
+      "xs": "8px",
+      "sm": "16px",
+      "md": "24px",
+      "lg": "40px",
+      "section": "64px"
+    },
+    "radius": {
+      "control": "0px",
+      "card": "4px",
+      "preview": "0px"
     }
   },
   "status": {
     "displayPage": "done",
-    "collectionErrors": []
+    "collectionErrors": [
+      "Blocking license gap: retained external visual/font assets have no local license evidence; keep this client theme and exclude unresolved assets from redistribution claims."
+    ]
   }
 }
