@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/doordash-food-grocery-more/id719972451",
+          "officialPageUrl": "https://apps.apple.com/us/app/doordash-food-grocery-more/id719972451",
+          "marketId": "719972451",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/54/c4/e0/54c4e01d-c99d-fb5b-f5be-17b658a66370/AppStore-iPhone6.9-Screen-04.jpg/720x1564bb.webp",
+          "collectedAt": "2026-07-27T19:27:35.071Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "b5203c18829117f5fb7d5ca492c9d0e0f4da52a737c639e293fff23c174432d4",
+          "byteLength": 85242,
+          "width": 720,
+          "height": 1564
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/doordash-food-grocery-more/id719972451",
+          "officialPageUrl": "https://apps.apple.com/us/app/doordash-food-grocery-more/id719972451",
+          "marketId": "719972451",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/fb/82/48/fb8248fe-2087-12e9-5c65-d5e5d8021a96/AppStore-iPhone6.9-Screen-02.jpg/720x1564bb.webp",
+          "collectedAt": "2026-07-27T19:27:35.071Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "a9e661b44c6f3e7f44e1bccfc798915d658a5e085678e1f28d4614996579b031",
+          "byteLength": 66486,
+          "width": 720,
+          "height": 1564
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/doordash-food-grocery-more/id719972451",
+          "officialPageUrl": "https://apps.apple.com/us/app/doordash-food-grocery-more/id719972451",
+          "marketId": "719972451",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/54/71/45/547145f5-0a45-b2c0-8e52-daec67a1ef66/AppStore-iPhone6.9-Screen-03.jpg/720x1564bb.webp",
+          "collectedAt": "2026-07-27T19:27:35.071Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "c8f228727cd73c472b6286451515d73e6401ee0b673bfb550f56116b5de025bb",
+          "byteLength": 77794,
+          "width": 720,
+          "height": 1564
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -161,8 +231,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -216,7 +294,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

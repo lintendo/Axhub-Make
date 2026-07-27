@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/google-calendar-get-organized/id909319292",
+          "officialPageUrl": "https://apps.apple.com/us/app/google-calendar-get-organized/id909319292",
+          "marketId": "909319292",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/3f/f7/8c/3ff78cf3-b3d7-d0ed-e3bc-12879b7714a0/APP_IPHONE_65-0.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:05.750Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "38a8eadf9795d120f580d147fe4c62ae068988264ed63860369db55d368570c2",
+          "byteLength": 47980,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/google-calendar-get-organized/id909319292",
+          "officialPageUrl": "https://apps.apple.com/us/app/google-calendar-get-organized/id909319292",
+          "marketId": "909319292",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/f0/b9/25/f0b925c2-7cb0-b73e-03d5-1774b5ab1212/APP_IPHONE_65-1.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:05.750Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "6d0ec1d182ba904c8992bcf448bad9592ea09fa0843b417e28f392b1c25d392d",
+          "byteLength": 31534,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/google-calendar-get-organized/id909319292",
+          "officialPageUrl": "https://apps.apple.com/us/app/google-calendar-get-organized/id909319292",
+          "marketId": "909319292",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/e2/72/e3/e272e31d-29cc-bbd2-1ca4-eed465e26191/APP_IPHONE_65-2.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:05.750Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "2289ed9465fffa10418f8ddd2d34467843e200424899a2418c6060d993a9ae53",
+          "byteLength": 35648,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -161,8 +231,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -216,7 +294,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

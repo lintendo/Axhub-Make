@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/gmail-email-by-google/id422689480?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/gmail-email-by-google/id422689480?uo=4",
+          "marketId": "422689480",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/61/93/d8/6193d85d-6769-b879-0fdc-1a3fd6ea83c7/APP_IPHONE_55-0.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "141375fec7e7f4fd57b95cd48134f7eff97f4708fb55f280f781ab7a01f86a03",
+          "byteLength": 18590,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/gmail-email-by-google/id422689480?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/gmail-email-by-google/id422689480?uo=4",
+          "marketId": "422689480",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/b0/07/67/b00767ec-0d29-44a1-0533-87719c95cee7/APP_IPHONE_55-1.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "dba0f82000f81e2d8971409e2d850fd3756e9602551f291a4570070909341063",
+          "byteLength": 17282,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/gmail-email-by-google/id422689480?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/gmail-email-by-google/id422689480?uo=4",
+          "marketId": "422689480",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/fb/a0/7e/fba07e24-3e1a-2352-1153-67e055a7c8e6/APP_IPHONE_55-2.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "81f3b7d1b63c2ff2aa83b11e6feb592519021ec4f0abee3dc2c48f8191be3186",
+          "byteLength": 16970,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -155,8 +225,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -210,7 +288,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

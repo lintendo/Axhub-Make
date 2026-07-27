@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/disney/id1446075923?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/disney/id1446075923?uo=4",
+          "marketId": "1446075923",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/64/35/64/643564d0-3d3c-0cbb-1a4f-17922f535d6c/1.1_EN-US_Mobile_-_iOS_-_5.5_-_Home_-_1.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "5eac89b56ad0a7445f72d888fd453a4cac0b2b103da49488d46cb7d8b4910f42",
+          "byteLength": 27624,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/disney/id1446075923?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/disney/id1446075923?uo=4",
+          "marketId": "1446075923",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/49/c8/d0/49c8d09e-b069-446e-d12b-4480a947e9f9/1.2_EN-US_Mobile_-_iOS_-_5.5_-_Home_-_1.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "14c1fa36133f01aac2bb554bf9ecd81e416d2e391efc69b007e3e711fa7ab807",
+          "byteLength": 28788,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/disney/id1446075923?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/disney/id1446075923?uo=4",
+          "marketId": "1446075923",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/b2/f4/97/b2f497d8-6659-7d01-2ace-a0a3c1c44588/2._EN-US_Mobile_-_iOS_-_5.5_-_Hulu_on_Disney_U002b.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "b1db1efd3def70bf10d9236d28a477a95b6f014460d150caf5c397b7df6384ec",
+          "byteLength": 32234,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -154,8 +224,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -209,7 +287,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

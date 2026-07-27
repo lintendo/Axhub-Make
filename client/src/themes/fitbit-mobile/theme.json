@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/google-health-fitbit/id462638897",
+          "officialPageUrl": "https://apps.apple.com/us/app/google-health-fitbit/id462638897",
+          "marketId": "462638897",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/be/52/35/be523521-1e31-5c62-b819-35e83e87d217/download__U00289_U0029.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:01.538Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "8293592bd0ec87c29d940d0fe6f4a7ff9b212b5711929a25e760d71b06d2118a",
+          "byteLength": 48102,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/google-health-fitbit/id462638897",
+          "officialPageUrl": "https://apps.apple.com/us/app/google-health-fitbit/id462638897",
+          "marketId": "462638897",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/09/6b/5f/096b5f41-f8f8-ab5b-4f7a-0a899017e68d/download__U002810_U0029.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:01.538Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "9ae9db98cfeb523b36cf29d061a152138d0495736a6948185c00f71eae2df1b8",
+          "byteLength": 38632,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/google-health-fitbit/id462638897",
+          "officialPageUrl": "https://apps.apple.com/us/app/google-health-fitbit/id462638897",
+          "marketId": "462638897",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/21/2a/c8/212ac88a-55a0-d738-6c21-a3148543f875/download__U002811_U0029.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:01.538Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "2d5a9be8db91ed6b7e3160056ce55c2c442ecbe217f829c4681e430c1518df2a",
+          "byteLength": 45808,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -154,8 +224,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -209,7 +287,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

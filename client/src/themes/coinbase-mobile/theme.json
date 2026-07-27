@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/coinbase-buy-crypto-stocks/id886427730?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/coinbase-buy-crypto-stocks/id886427730?uo=4",
+          "marketId": "886427730",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/5a/fa/41/5afa4116-b4a8-2692-8870-3b0b9c492f02/5cbddf4e-d6fb-45fe-84d6-1fec258d1e83_ASO-5.5_-SCREEN1.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "0d9c4e81af8efd0ef2e60d2e89172ed4de852cff901a3a721ac34e6d90d37569",
+          "byteLength": 22836,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/coinbase-buy-crypto-stocks/id886427730?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/coinbase-buy-crypto-stocks/id886427730?uo=4",
+          "marketId": "886427730",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/b0/54/bf/b054bfcf-f700-7192-ee01-f862c89e8957/da4bf06c-f8e4-40ee-9537-14146a8fe328_ASO-5.5_-SCREEN2.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "9f1ecaddb8ec92ba44764efe9034e0ae6c30f43f228e8a196a9ed34382651e4a",
+          "byteLength": 20784,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/coinbase-buy-crypto-stocks/id886427730?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/coinbase-buy-crypto-stocks/id886427730?uo=4",
+          "marketId": "886427730",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/b2/f4/1e/b2f41ef4-f3c6-d35b-d46d-30df1fdc3ee7/b67f1c60-0052-4fec-b8bf-d8ebb996dfc0_ASO-5.5_-SCREEN3_-_Varaint_1.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "439607b2ea03a3234909384e2617ccc7a8d09e127764cafccfc86742535f67c9",
+          "byteLength": 16366,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -142,8 +212,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -197,7 +275,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

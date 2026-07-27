@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/google-maps/id585027354",
+          "officialPageUrl": "https://apps.apple.com/us/app/google-maps/id585027354",
+          "marketId": "585027354",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/f0/12/54/f0125476-fd37-8c11-ca24-1034451ccaf6/download.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:10.360Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "d583a8435058e4a044c4943887f2697b83e1ec101c40a3fed43e0987776a0bb8",
+          "byteLength": 51332,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/google-maps/id585027354",
+          "officialPageUrl": "https://apps.apple.com/us/app/google-maps/id585027354",
+          "marketId": "585027354",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/3c/02/9e/3c029eda-f5d4-c59b-b3ee-b6821c40c7ad/download__U00281_U0029.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:10.360Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "1a2db68803d099bcb6b57346f1e9e943f95d7e1148823a351a7a7856b19cfbe1",
+          "byteLength": 72230,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/google-maps/id585027354",
+          "officialPageUrl": "https://apps.apple.com/us/app/google-maps/id585027354",
+          "marketId": "585027354",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/1a/9a/53/1a9a5337-f18f-2d2d-f35e-265b553d1a4a/download__U00282_U0029.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:10.360Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "f401273e460a09d85006fcbe7fd21ae6e81c6b653f0e1dd1415e0ead7274689a",
+          "byteLength": 79084,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -191,8 +261,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -246,7 +324,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

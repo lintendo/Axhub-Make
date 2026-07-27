@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/discord-talk-play-hang-out/id985746746?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/discord-talk-play-hang-out/id985746746?uo=4",
+          "marketId": "985746746",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/24/4c/42/244c42b9-0433-6108-6801-d3163d22c4cc/86d98c10-0014-4bcb-89a5-39c7776e014e_1_GroupChat_Tile_EN_5-5.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "23e81f14ee1b8039edd96535a18986ae4a06f327e20d351a142fce12d6fcca12",
+          "byteLength": 22728,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/discord-talk-play-hang-out/id985746746?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/discord-talk-play-hang-out/id985746746?uo=4",
+          "marketId": "985746746",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/63/78/09/637809c2-08ec-3525-6deb-81bc8cfa258d/5cc22caa-9cad-409f-9de8-f852cabe5d08_2_Stream_Tile_EN_5-5.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "c75ec6f31cfe5aec7163b29c3356fd27337506a0c1a6eca3f777d5b09c6ade46",
+          "byteLength": 21660,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/discord-talk-play-hang-out/id985746746?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/discord-talk-play-hang-out/id985746746?uo=4",
+          "marketId": "985746746",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/7b/c6/01/7bc601c6-3616-ee25-7344-47a422a76729/4440dc86-9288-47c3-afe2-cd9b804c8700_3_SeeWhos_Tile_EN_5-5.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "a4e563be32e2c45b2293b72a7d534cb97ac514ffd670a35a798d4b92fb9c5856",
+          "byteLength": 21972,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -146,8 +216,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -201,7 +279,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

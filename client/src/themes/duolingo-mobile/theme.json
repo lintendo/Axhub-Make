@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/duolingo-language-lessons/id570060128",
+          "officialPageUrl": "https://apps.apple.com/us/app/duolingo-language-lessons/id570060128",
+          "marketId": "570060128",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/8e/2f/9e/8e2f9e62-0e7e-0836-1871-3da0adb4a79f/iPhone6.5_-_Default_-_first_screen_adapt_Var_2_01.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:16:57.219Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "4c67079b912495b7e99212d335b53facd8c73f12bd9d2e205453e4c13065729b",
+          "byteLength": 25448,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/duolingo-language-lessons/id570060128",
+          "officialPageUrl": "https://apps.apple.com/us/app/duolingo-language-lessons/id570060128",
+          "marketId": "570060128",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/13/de/3a/13de3ac7-bd4f-e15e-bdb9-6f7b6bec45fb/V2_iOS6.5_02.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:16:57.219Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "b64f88b7b2ef6051f61112526c1bdd6719f301b51669a1e37116b44a5c853f95",
+          "byteLength": 23250,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/duolingo-language-lessons/id570060128",
+          "officialPageUrl": "https://apps.apple.com/us/app/duolingo-language-lessons/id570060128",
+          "marketId": "570060128",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/e6/c9/23/e6c923a9-e873-4b93-c12c-e6730a7ddf78/V2_iOS6.5_03.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:16:57.219Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "69a8718028708af3ffdd4190cbb78142468521388e21c8ccb8786b3c923bae05",
+          "byteLength": 28086,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -81,8 +143,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -165,8 +235,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -224,7 +302,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }
