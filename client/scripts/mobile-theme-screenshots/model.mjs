@@ -16,6 +16,28 @@ function requireUrl(value, label) {
   if (typeof value !== 'string' || !/^https:\/\//.test(value)) throw new Error(`${label} must be an https URL`);
 }
 
+function requireNonEmptyString(value, label) {
+  if (typeof value !== 'string' || value.trim() === '') throw new Error(`${label} must be a non-empty string`);
+}
+
+function validateMarketMetadata(source) {
+  if (!Object.hasOwn(source, 'marketId')) throw new Error('source.marketId must be explicitly present');
+  if (!Object.hasOwn(source, 'storefront')) throw new Error('source.storefront must be explicitly present');
+  if (source.kind === 'official-promo') {
+    if (source.marketId !== null) requireNonEmptyString(source.marketId, 'source.marketId');
+    if (source.storefront !== null) requireNonEmptyString(source.storefront, 'source.storefront');
+    return;
+  }
+  requireNonEmptyString(source.marketId, 'source.marketId');
+  requireNonEmptyString(source.storefront, 'source.storefront');
+}
+
+function isCanonicalIsoTimestamp(value) {
+  if (typeof value !== 'string') return false;
+  const timestamp = new Date(value);
+  return !Number.isNaN(timestamp.valueOf()) && timestamp.toISOString() === value;
+}
+
 export function validateScreenshotAsset(asset) {
   if (asset?.type !== 'product-screenshot') throw new Error('asset.type must be product-screenshot');
   if (!/^assets\/product-screenshot-0[1-3]\.webp$/.test(asset.path)) throw new Error('invalid screenshot asset path');
@@ -25,8 +47,9 @@ export function validateScreenshotAsset(asset) {
   requireUrl(asset.source.pageUrl, 'source.pageUrl');
   requireUrl(asset.source.officialPageUrl, 'source.officialPageUrl');
   requireUrl(asset.source.assetUrl, 'source.assetUrl');
+  validateMarketMetadata(asset.source);
   if (asset.source.usage !== 'official-promotional') throw new Error('source.usage must be official-promotional');
-  if (!/^\d{4}-\d{2}-\d{2}T/.test(asset.source.collectedAt)) throw new Error('invalid source.collectedAt');
+  if (!isCanonicalIsoTimestamp(asset.source.collectedAt)) throw new Error('invalid source.collectedAt');
   if (!/^[a-f0-9]{64}$/.test(asset.integrity?.sha256 || '')) throw new Error('invalid integrity.sha256');
   if (!Number.isInteger(asset.integrity?.byteLength) || asset.integrity.byteLength <= 0) throw new Error('invalid byte length');
   if (!Number.isInteger(asset.integrity?.width) || asset.integrity.width < 320) throw new Error('screenshot width must be at least 320');
