@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/notion-notes-tasks-ai/id1232780281",
+          "officialPageUrl": "https://apps.apple.com/us/app/notion-notes-tasks-ai/id1232780281",
+          "marketId": "1232780281",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/dc/ab/18/dcab1823-c701-c006-f6de-fdd4007f564d/NotionLabs_Notion_iOS-6.9_US_Screenshots_250924_04.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:36.735Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "b098a58c8b15958cb65be676202b9961c16df2225d41f722a3b8f3207b1b6bf4",
+          "byteLength": 35506,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/notion-notes-tasks-ai/id1232780281",
+          "officialPageUrl": "https://apps.apple.com/us/app/notion-notes-tasks-ai/id1232780281",
+          "marketId": "1232780281",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/08/1d/dd/081ddd0a-7a36-1a61-5a4b-6f8b74d626db/NotionLabs_Notion_iOS-6.9_US_Screenshots_250924_02.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:36.735Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "c3b41adffa757f1693f654ef8726c1cd626fa62c2fecbde43e2e02062c7ad1b9",
+          "byteLength": 29414,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/notion-notes-tasks-ai/id1232780281",
+          "officialPageUrl": "https://apps.apple.com/us/app/notion-notes-tasks-ai/id1232780281",
+          "marketId": "1232780281",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/36/31/93/36319340-4217-6136-84f5-4a1430d97daf/NotionLabs_Notion_iOS-6.9_US_Screenshots_250924_03.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:36.735Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "a677951eba52807de44f3390f9dcf2f993eec097df256e8667f5a58bd2c0bd1e",
+          "byteLength": 25956,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -167,8 +237,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -222,7 +300,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

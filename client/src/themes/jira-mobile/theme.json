@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/jira-cloud-by-atlassian/id1006972087?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/jira-cloud-by-atlassian/id1006972087?uo=4",
+          "marketId": "1006972087",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/67/5a/e5/675ae558-d9a7-7326-2de2-40c05f533eac/82cd19de-93a6-4455-84b6-2a48a1d57b75_1.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "ffad77aec02f5b77e2b26715e91be21ae7ab300e6881837a72d5354b51469b89",
+          "byteLength": 16546,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/jira-cloud-by-atlassian/id1006972087?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/jira-cloud-by-atlassian/id1006972087?uo=4",
+          "marketId": "1006972087",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/12/f2/fe/12f2fe9a-f0bd-2b3c-a4a6-4007c562bfb7/90344beb-3f63-41b5-b72a-f448ebbd862c_2.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "d1d55854fac807b941922f4ecbcaa6250039b769e034b4cefb1595981c6ef9f8",
+          "byteLength": 15592,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/jira-cloud-by-atlassian/id1006972087?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/jira-cloud-by-atlassian/id1006972087?uo=4",
+          "marketId": "1006972087",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/6a/f2/79/6af27929-7f24-748f-1fc9-872ec8d0ef67/f50ec98c-9f60-4f72-9632-162093b1906c_3.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "57c64f6e2c138d6efdd1ea7875388b38db19a616432d767d1636614e9c109d86",
+          "byteLength": 11848,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -185,8 +255,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -240,7 +318,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

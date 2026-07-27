@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/reddit/id1064216828?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/reddit/id1064216828?uo=4",
+          "marketId": "1064216828",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/35/48/b4/3548b4e1-e380-b504-b809-96511057c828/c754066e-6338-43b4-8b15-b995646437f9_Reddit_SS_Brand_Update_Colorful_Set_5.5_4.png/720x1280bb.webp",
+          "collectedAt": "2026-07-27T19:27:38.846Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "ea42706a3128e32bb88e2e2f0f966b41c8ff090b5e822d20cec18ede174e71eb",
+          "byteLength": 41196,
+          "width": 720,
+          "height": 1280
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/reddit/id1064216828?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/reddit/id1064216828?uo=4",
+          "marketId": "1064216828",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/ed/84/a7/ed84a7ec-7d78-c117-7e09-8ec911800018/b58a74df-0fe7-4816-be96-153438344906_Reddit_SS_Brand_Update_Colorful_Set_5.5_2.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:38.846Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "f4df73779cb256bfee65c6014c2d1eaa3f97698e0f1de082325a5b15f7a7f8e7",
+          "byteLength": 38628,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/reddit/id1064216828?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/reddit/id1064216828?uo=4",
+          "marketId": "1064216828",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/7b/92/d7/7b92d7f0-6281-71d9-0891-e5499f4ca57d/aa03a0e1-d00d-42ae-ba45-f419bbc04c70_Reddit_SS_Brand_Update_Colorful_Set_5.5_3.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:38.846Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "822c4ffa7b40c321c267c0479fa7b2a247ab4f0b989c4690427e4016998a557d",
+          "byteLength": 34454,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -136,8 +206,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -191,7 +269,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

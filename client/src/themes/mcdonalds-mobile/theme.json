@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/mcdonalds/id922103212?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/mcdonalds/id922103212?uo=4",
+          "marketId": "922103212",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/fb/af/ac/fbafac0f-2503-d0af-de9b-be5c2075e163/b28364fe-bb62-4368-9378-2153c033c2b4_Image1_ios5.5.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "565fb50ffd26d1a7c10ffcf66e1a1c9300d20603a05b145500841225bac4af5b",
+          "byteLength": 20664,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/mcdonalds/id922103212?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/mcdonalds/id922103212?uo=4",
+          "marketId": "922103212",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/8c/c4/b5/8cc4b55c-19aa-5f8b-cc1b-08e1101c8930/a19aea51-0934-4dcf-8128-e9119a05ef85_Image2_ios5.5.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "cab24908379d2e1d539a131835641f7db131c033ad529c7aad4e870eb6bfbd80",
+          "byteLength": 28070,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/mcdonalds/id922103212?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/mcdonalds/id922103212?uo=4",
+          "marketId": "922103212",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/82/ac/90/82ac90dc-55fb-7224-8f38-3a4eed91f0fa/35ddf8ac-16d2-4b5a-a610-9951ea0c0325_Image3_ios5.5.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "b828825f7efe26e9434f927bcbbbf112c21c5533180d040544d9e4d73f3757a2",
+          "byteLength": 29310,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -173,8 +243,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -228,7 +306,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

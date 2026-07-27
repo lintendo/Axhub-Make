@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/headspace-sleep-meditation/id493145008?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/headspace-sleep-meditation/id493145008?uo=4",
+          "marketId": "493145008",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/f0/d9/f0/f0d9f061-22cb-bbe9-6214-a23f971490bf/5.png/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:27:35.601Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "d736e48b0190ea3f74371032f880c9cab1a672e0d924fd881cf7bc2f7d4b2529",
+          "byteLength": 36186,
+          "width": 720,
+          "height": 1561
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/headspace-sleep-meditation/id493145008?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/headspace-sleep-meditation/id493145008?uo=4",
+          "marketId": "493145008",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/17/aa/29/17aa2961-e804-11d8-d196-58c486554ffe/7cfe3748-bd48-4629-8716-8735363c19b2_1242x2208bb__U002833_U0029.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:35.601Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "08a924a49dfd3e9f3c537a8b6a0646f01d42bdc306d0bf6105294392be1739bf",
+          "byteLength": 15850,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/headspace-sleep-meditation/id493145008?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/headspace-sleep-meditation/id493145008?uo=4",
+          "marketId": "493145008",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/32/c2/9d/32c29ddf-48c3-99a3-1f38-e05fa2a739f5/4e362280-094d-45b5-9b86-4c93af24d424_1242x2208bb__U002834_U0029.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:35.601Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "43d08d52e181dcdc2b83ed0a1041458ede46ab9290ac132afbb323fcde2c2b06",
+          "byteLength": 16134,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -183,8 +253,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -238,7 +316,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

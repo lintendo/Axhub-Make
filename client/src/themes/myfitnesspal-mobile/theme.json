@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/myfitnesspal-calorie-counter/id341232718",
+          "officialPageUrl": "https://apps.apple.com/us/app/myfitnesspal-calorie-counter/id341232718",
+          "marketId": "341232718",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/04/90/0e/04900ea5-3aba-b487-8185-a8daa4677500/MFP_iOS_US_6.9_Screen_1.png/720x1563bb.webp",
+          "collectedAt": "2026-07-27T19:17:19.145Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "93f0797a3f9e458c391c574d910f997b8a2bdee436d55ffb0acd0ef46a1f8670",
+          "byteLength": 73754,
+          "width": 720,
+          "height": 1563
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/myfitnesspal-calorie-counter/id341232718",
+          "officialPageUrl": "https://apps.apple.com/us/app/myfitnesspal-calorie-counter/id341232718",
+          "marketId": "341232718",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/da/43/87/da4387d7-4e0a-5842-fc88-7a7108ba730a/MFP_iOS_US_6.9_Screen_2.png/720x1563bb.webp",
+          "collectedAt": "2026-07-27T19:17:19.145Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "d0429f96e001114850f1c0a2268da026d15be62f0939cdd812c09f8709e2d99d",
+          "byteLength": 54640,
+          "width": 720,
+          "height": 1563
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/myfitnesspal-calorie-counter/id341232718",
+          "officialPageUrl": "https://apps.apple.com/us/app/myfitnesspal-calorie-counter/id341232718",
+          "marketId": "341232718",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/cd/e0/0f/cde00f0e-b9b4-34ed-0384-70d4e41cf06d/MFP_iOS_US_6.9_Screen_3.png/720x1563bb.webp",
+          "collectedAt": "2026-07-27T19:17:19.145Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "1d24e5aa6def36e435d88a0bf08ccf5982b7ee9b245306062c44deb5fce076ca",
+          "byteLength": 27178,
+          "width": 720,
+          "height": 1563
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -165,8 +235,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -220,7 +298,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

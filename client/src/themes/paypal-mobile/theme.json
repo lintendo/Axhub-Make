@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/paypal-pay-send-save/id283646709",
+          "officialPageUrl": "https://apps.apple.com/us/app/paypal-pay-send-save/id283646709",
+          "marketId": "283646709",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/1c/45/8d/1c458df5-046f-52b7-4be4-70edd25cb14d/01_iPhone_65_US.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:26.916Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "526e9ae9d0d232267a6377bb86c79b35931090fa3d84f89460bfffafc5141917",
+          "byteLength": 46918,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/paypal-pay-send-save/id283646709",
+          "officialPageUrl": "https://apps.apple.com/us/app/paypal-pay-send-save/id283646709",
+          "marketId": "283646709",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/a1/af/f0/a1aff0c2-07ae-1398-3ec8-6886ed29d453/02_iPhone_65_US.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:26.916Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "3ec62862a408a7870d5d9e13a537f80b15a1e60bced7e1139eaad4d9cb39831e",
+          "byteLength": 49578,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/paypal-pay-send-save/id283646709",
+          "officialPageUrl": "https://apps.apple.com/us/app/paypal-pay-send-save/id283646709",
+          "marketId": "283646709",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/5e/da/ee/5edaee22-9514-30cd-b420-06d839e25ad3/03_iPhone_65_US.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:26.916Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "815d9b358128df02d80854402590d25d09397cab541ef10667e5f6e56c84cef1",
+          "byteLength": 64568,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -82,8 +144,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -164,8 +234,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -224,7 +302,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }
