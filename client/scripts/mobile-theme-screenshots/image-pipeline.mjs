@@ -8,10 +8,20 @@ import { validateScreenshotAsset } from './model.mjs';
 
 const MAX_BYTES = 450 * 1024;
 
-function replaceAssetSetAtomically({ assets, outputDir, stagingDir }) {
+function promoteAssetSet({ assets, outputDir, stagingDir }) {
   const backupDir = fs.mkdtempSync(path.join(outputDir, '.screenshot-backup-'));
   const backups = [];
   const promoted = [];
+  let settled = false;
+  const rollback = () => {
+    if (settled) return;
+    for (const destination of promoted.reverse()) fs.rmSync(destination, { force: true });
+    for (const { destination, backup } of backups.reverse()) {
+      if (fs.existsSync(backup)) fs.renameSync(backup, destination);
+    }
+    fs.rmSync(backupDir, { recursive: true, force: true });
+    settled = true;
+  };
   try {
     for (const asset of assets) {
       const fileName = path.basename(asset.path);
@@ -29,11 +39,25 @@ function replaceAssetSetAtomically({ assets, outputDir, stagingDir }) {
       promoted.push(destination);
     }
   } catch (error) {
-    for (const destination of promoted.reverse()) fs.rmSync(destination, { force: true });
-    for (const { destination, backup } of backups.reverse()) fs.renameSync(backup, destination);
+    rollback();
     throw error;
-  } finally {
-    fs.rmSync(backupDir, { recursive: true, force: true });
+  }
+  return {
+    rollback,
+    finalize() {
+      if (settled) return;
+      fs.rmSync(backupDir, { recursive: true, force: true });
+      settled = true;
+    },
+  };
+}
+
+function requireHttpsAssetUrl(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:') throw new Error('not https');
+  } catch {
+    throw new Error(`INVALID_ASSET_URL ${value}`);
   }
 }
 
@@ -43,10 +67,12 @@ export async function normalizeScreenshotSet({
   source,
   fetchImpl = fetch,
   collectedAt = new Date().toISOString(),
+  afterPromote,
 }) {
   if (!Array.isArray(assetUrls) || assetUrls.length !== 3) {
     throw new Error('INSUFFICIENT_SCREENSHOTS expected exactly 3 asset URLs');
   }
+  assetUrls.forEach(requireHttpsAssetUrl);
   fs.mkdirSync(outputDir, { recursive: true });
   const stagingDir = fs.mkdtempSync(path.join(outputDir, '.screenshot-stage-'));
   try {
@@ -57,7 +83,12 @@ export async function normalizeScreenshotSet({
       const contentType = response.headers.get('content-type') || '';
       if (!contentType.startsWith('image/')) throw new Error(`INVALID_IMAGE_RESPONSE ${assetUrl}`);
       const sourceBuffer = Buffer.from(await response.arrayBuffer());
-      const inputMetadata = await sharp(sourceBuffer).metadata();
+      let inputMetadata;
+      try {
+        inputMetadata = await sharp(sourceBuffer).metadata();
+      } catch {
+        throw new Error(`INVALID_IMAGE_RESPONSE ${assetUrl}`);
+      }
       if (
         !inputMetadata.width
         || !inputMetadata.height
@@ -66,11 +97,16 @@ export async function normalizeScreenshotSet({
       ) {
         throw new Error(`INVALID_IMAGE_DIMENSIONS ${assetUrl}`);
       }
-      const normalized = await sharp(sourceBuffer)
-        .rotate()
-        .resize({ width: 720, withoutEnlargement: true })
-        .webp({ quality: 82, effort: 5 })
-        .toBuffer({ resolveWithObject: true });
+      let normalized;
+      try {
+        normalized = await sharp(sourceBuffer)
+          .rotate()
+          .resize({ width: 720, withoutEnlargement: true })
+          .webp({ quality: 82, effort: 5 })
+          .toBuffer({ resolveWithObject: true });
+      } catch {
+        throw new Error(`INVALID_IMAGE_RESPONSE ${assetUrl}`);
+      }
       if (normalized.data.byteLength > MAX_BYTES) throw new Error(`IMAGE_TOO_LARGE ${assetUrl}`);
       const sha256 = crypto.createHash('sha256').update(normalized.data).digest('hex');
       if (assets.some((asset) => asset.integrity.sha256 === sha256)) {
@@ -92,7 +128,14 @@ export async function normalizeScreenshotSet({
       fs.writeFileSync(path.join(stagingDir, fileName), normalized.data);
       assets.push(asset);
     }
-    replaceAssetSetAtomically({ assets, outputDir, stagingDir });
+    const promotion = promoteAssetSet({ assets, outputDir, stagingDir });
+    try {
+      if (afterPromote) await afterPromote(assets);
+      promotion.finalize();
+    } catch (error) {
+      promotion.rollback();
+      throw error;
+    }
     return assets;
   } finally {
     fs.rmSync(stagingDir, { recursive: true, force: true });

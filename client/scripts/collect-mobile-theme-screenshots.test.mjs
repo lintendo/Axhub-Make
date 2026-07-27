@@ -128,6 +128,18 @@ describe('Apple screenshot source', () => {
     await expect(lookupAppleScreenshots({ storeId: '42', fetchImpl }))
       .rejects.toThrow(/SOURCE_HTTP_ERROR 503/);
   });
+
+  it('rejects a lookup response whose product ID does not match the requested store ID', async () => {
+    const fetchImpl = async () => new Response(JSON.stringify({
+      results: [{
+        trackId: 99,
+        trackViewUrl: 'https://apps.apple.com/us/app/sibling/id99',
+        screenshotUrls: ['https://example.com/0', 'https://example.com/1', 'https://example.com/2'],
+      }],
+    }));
+    await expect(lookupAppleScreenshots({ storeId: '42', storefront: 'us', fetchImpl }))
+      .rejects.toThrow(/SOURCE_PRODUCT_MISMATCH/);
+  });
 });
 
 describe('image normalization pipeline', () => {
@@ -191,6 +203,33 @@ describe('image normalization pipeline', () => {
         headers: { 'content-type': 'text/html' },
       }),
     })).rejects.toThrow(/INVALID_IMAGE_RESPONSE/);
+  });
+
+  it('rejects corrupt bytes even when the response claims to be an image', async () => {
+    await expect(normalizeScreenshotSet({
+      assetUrls: ['https://example.com/0', 'https://example.com/1', 'https://example.com/2'],
+      outputDir: temporaryDir(),
+      source: source(),
+      fetchImpl: async () => new Response('not an image', {
+        headers: { 'content-type': 'image/png' },
+      }),
+    })).rejects.toThrow(/INVALID_IMAGE_RESPONSE/);
+  });
+
+  it('rejects malformed and non-HTTPS asset URLs before making a request', async () => {
+    for (const invalidUrl of ['https://', 'http://example.com/image.png']) {
+      let fetchCount = 0;
+      await expect(normalizeScreenshotSet({
+        assetUrls: [invalidUrl, 'https://example.com/1', 'https://example.com/2'],
+        outputDir: temporaryDir(),
+        source: source(),
+        fetchImpl: async () => {
+          fetchCount += 1;
+          throw new Error('should not fetch');
+        },
+      })).rejects.toThrow(/INVALID_ASSET_URL/);
+      expect(fetchCount).toBe(0);
+    }
   });
 
   it.each([
@@ -356,6 +395,54 @@ describe('collector CLI', () => {
 
     expect(fetchCount).toBe(0);
     expect(fs.readFileSync(themePath, 'utf8')).toBe(before);
+  });
+
+  it('rejects a malformed HTTPS source page before downloading fallback assets', async () => {
+    const clientRoot = temporaryDir('mobile-client-');
+    writeTheme(clientRoot, 'malformed-url-mobile');
+    let fetchCount = 0;
+    await expect(runCli([
+      'collect', '--theme', 'malformed-url-mobile',
+      '--source-kind', 'official-promo',
+      '--source-page', 'https://',
+      '--official-page', 'https://www.example.com/mobile',
+      '--asset-url', 'https://example.com/0',
+      '--asset-url', 'https://example.com/1',
+      '--asset-url', 'https://example.com/2',
+    ], { clientRoot, fetchImpl: async () => { fetchCount += 1; } }))
+      .rejects.toThrow(/INVALID_URL/);
+    expect(fetchCount).toBe(0);
+  });
+
+  it('rolls back promoted assets when theme metadata writing fails', async () => {
+    const clientRoot = temporaryDir('mobile-client-');
+    const themeDir = writeTheme(clientRoot, 'transaction-mobile');
+    const oldNames = [1, 2, 3].map((index) => `product-screenshot-0${index}.webp`);
+    for (const name of oldNames) fs.writeFileSync(path.join(themeDir, 'assets', name), `old-${name}`);
+    const fetchImpl = await threeImageFetch();
+    const themePath = path.join(themeDir, 'theme.json');
+
+    await expect(runCli([
+      'collect', '--theme', 'transaction-mobile',
+      '--source-kind', 'official-promo',
+      '--source-page', 'https://promo.example.com/mobile',
+      '--official-page', 'https://www.example.com/mobile',
+      '--asset-url', 'https://example.com/0',
+      '--asset-url', 'https://example.com/1',
+      '--asset-url', 'https://example.com/2',
+    ], {
+      clientRoot,
+      fetchImpl,
+      writeJsonImpl: (filePath) => {
+        if (filePath === themePath) throw new Error('METADATA_WRITE_FAILED');
+      },
+    })).rejects.toThrow(/METADATA_WRITE_FAILED/);
+
+    expect(oldNames.map((name) => fs.readFileSync(path.join(themeDir, 'assets', name), 'utf8')))
+      .toEqual(oldNames.map((name) => `old-${name}`));
+    expect(fs.readdirSync(path.join(themeDir, 'assets')).filter((name) => name.startsWith('.screenshot-')))
+      .toEqual([]);
+    expect(JSON.parse(fs.readFileSync(themePath, 'utf8')).assets.productScreenshots).toBeUndefined();
   });
 
   it('discovers all mobile themes and writes the candidate report to --output', async () => {

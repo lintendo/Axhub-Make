@@ -33,6 +33,9 @@ export async function lookupAppleScreenshots({ storeId, storefront = 'us', fetch
   const payload = await fetchJson(url, fetchImpl);
   const app = payload.results?.[0];
   if (!app) throw new Error(`SOURCE_NOT_RESOLVED ${storeId}`);
+  if (String(app.trackId) !== String(storeId)) {
+    throw new Error(`SOURCE_PRODUCT_MISMATCH expected ${storeId} received ${app.trackId}`);
+  }
   const screenshotUrls = [...new Set(app.screenshotUrls || [])];
   if (screenshotUrls.length === 0) throw new Error(`STATIC_SCREENSHOTS_UNAVAILABLE ${storeId}`);
   if (screenshotUrls.length < 3) throw new Error(`INSUFFICIENT_SCREENSHOTS ${storeId} ${screenshotUrls.length}`);

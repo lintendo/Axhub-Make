@@ -48,8 +48,13 @@ export function parseCliArgs(argv) {
 }
 
 function requireHttps(value, label) {
-  if (typeof value !== 'string' || !/^https:\/\//.test(value)) throw new Error(`${label} must be an https URL`);
-  return value;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:') throw new Error('not https');
+    return url.href;
+  } catch {
+    throw new Error(`INVALID_URL ${label} must be an https URL`);
+  }
 }
 
 function requireString(value, label) {
@@ -85,10 +90,10 @@ function selectedThemes(options, themesRoot) {
   return [themeDescriptor(themePathForSlug(themesRoot, options.theme))];
 }
 
-function writeReport(outputPath, value) {
+function writeReport(outputPath, value, writeJsonImpl) {
   if (!outputPath) return;
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  writeJsonAtomic(outputPath, value);
+  return writeJsonImpl(outputPath, value);
 }
 
 function buildFallbackSource(options) {
@@ -117,7 +122,7 @@ function buildFallbackSource(options) {
   };
 }
 
-function applyCollectedAssets({ theme, themePath, assets }) {
+function applyCollectedAssets({ theme, themePath, assets, writeJsonImpl }) {
   for (const asset of assets) validateScreenshotAsset(asset);
   const productScreenshots = {
     collection: 'review',
@@ -136,26 +141,27 @@ function applyCollectedAssets({ theme, themePath, assets }) {
   theme.display.previewImages = assets.map(({ type, path: assetPath }) => ({ type, path: assetPath }));
   theme.status.productScreenshots = productScreenshots;
   theme.status.displayPage = deriveDisplayPageStatus(productScreenshots);
-  writeJsonAtomic(themePath, theme);
+  return writeJsonImpl(themePath, theme);
 }
 
-async function collectTheme({ descriptor, assetUrls, source, fetchImpl, collectedAt }) {
+async function collectTheme({ descriptor, assetUrls, source, fetchImpl, collectedAt, writeJsonImpl }) {
   const assets = await normalizeScreenshotSet({
     assetUrls,
     outputDir: path.join(descriptor.themeDir, 'assets'),
     source,
     fetchImpl,
     collectedAt,
-  });
-  applyCollectedAssets({
-    theme: descriptor.theme,
-    themePath: path.join(descriptor.themeDir, 'theme.json'),
-    assets,
+    afterPromote: (promotedAssets) => applyCollectedAssets({
+      theme: descriptor.theme,
+      themePath: path.join(descriptor.themeDir, 'theme.json'),
+      assets: promotedAssets,
+      writeJsonImpl,
+    }),
   });
   return { theme: descriptor.slug, status: 'collected', actual: assets.length };
 }
 
-async function collectAppleTheme({ descriptor, storeId, storefront, fetchImpl, collectedAt }) {
+async function collectAppleTheme({ descriptor, storeId, storefront, fetchImpl, collectedAt, writeJsonImpl }) {
   const resolvedStoreId = requireString(storeId, '--store-id');
   const resolvedStorefront = storefront || 'us';
   const lookup = await lookupAppleScreenshots({
@@ -176,6 +182,7 @@ async function collectAppleTheme({ descriptor, storeId, storefront, fetchImpl, c
     },
     fetchImpl,
     collectedAt,
+    writeJsonImpl,
   });
 }
 
@@ -187,7 +194,7 @@ function readApprovedSources(filePath) {
   return approved.sources;
 }
 
-async function collectApprovedThemes({ descriptors, approvedSources, fetchImpl, collectedAt }) {
+async function collectApprovedThemes({ descriptors, approvedSources, fetchImpl, collectedAt, writeJsonImpl }) {
   const results = [];
   for (const descriptor of descriptors) {
     const approved = approvedSources[descriptor.slug];
@@ -203,6 +210,7 @@ async function collectApprovedThemes({ descriptors, approvedSources, fetchImpl, 
         storefront: approved.storefront,
         fetchImpl,
         collectedAt,
+        writeJsonImpl,
       }));
     } catch (error) {
       results.push({ theme: descriptor.slug, status: 'error', error: error.message });
@@ -216,6 +224,7 @@ export async function runCli(argv, {
   fetchImpl = fetch,
   collectedAt = new Date().toISOString(),
   now = () => new Date(),
+  writeJsonImpl = writeJsonAtomic,
 } = {}) {
   const { command, options } = parseCliArgs(argv);
   const themesRoot = path.join(clientRoot, 'src', 'themes');
@@ -245,7 +254,7 @@ export async function runCli(argv, {
       storefront: options.storefront || 'us',
       themes,
     };
-    writeReport(options.output, report);
+    await writeReport(options.output, report, writeJsonImpl);
     return report;
   }
 
@@ -260,6 +269,7 @@ export async function runCli(argv, {
       approvedSources: readApprovedSources(options.approvedsources),
       fetchImpl,
       collectedAt,
+      writeJsonImpl,
     });
   } else if (options.sourcekind || options.sourcepage || options.officialpage || options.assetUrls.length) {
     themes = [await collectTheme({
@@ -268,6 +278,7 @@ export async function runCli(argv, {
       source: buildFallbackSource(options),
       fetchImpl,
       collectedAt,
+      writeJsonImpl,
     })];
   } else {
     themes = [await collectAppleTheme({
@@ -276,6 +287,7 @@ export async function runCli(argv, {
       storefront: options.storefront,
       fetchImpl,
       collectedAt,
+      writeJsonImpl,
     })];
   }
   const report = {
@@ -284,7 +296,7 @@ export async function runCli(argv, {
     generatedAt: now().toISOString(),
     themes,
   };
-  writeReport(options.output, report);
+  await writeReport(options.output, report, writeJsonImpl);
   return report;
 }
 
