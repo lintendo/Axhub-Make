@@ -98,19 +98,6 @@ const variantLabels: Record<BatchShowcaseConfig['variant'], string> = {
   'mobile-product': '移动产品 - Mobile Product',
 };
 
-const mobileScenes: Record<MobilePreviewPattern, { eyebrow: string; title: string; body: string; detail: string }> = {
-  feed: { eyebrow: '今日动态', title: '为你更新的内容', body: '关注的主题正在发生新的讨论。', detail: '12 条新动态' },
-  chat: { eyebrow: '正在进行', title: '与团队保持同步', body: '设计评审已整理为可继续回复的线程。', detail: '3 条未读消息' },
-  finance: { eyebrow: '资产概览', title: '今天的资金动态', body: '余额与近期交易保持清晰可读。', detail: '本周 +8.4%' },
-  map: { eyebrow: '附近探索', title: '下一站就在眼前', body: '根据当前路线推荐更合适的停靠点。', detail: '步行 6 分钟' },
-  workspace: { eyebrow: '我的工作区', title: '把进展聚焦在一起', body: '下一项工作与协作状态在同一处更新。', detail: '4 个待完成' },
-  health: { eyebrow: '今日节奏', title: '照顾好你的状态', body: '用轻量记录看见今天的身体与心情变化。', detail: '连续 7 天' },
-  commerce: { eyebrow: '精选推荐', title: '为此刻挑选好物', body: '从收藏和浏览中继续发现适合你的选择。', detail: '限时精选' },
-  media: { eyebrow: '继续欣赏', title: '留在好内容里', body: '从上次停下的位置继续你的观看或收听。', detail: '剩余 18 分钟' },
-  dating: { eyebrow: '新的发现', title: '认识值得聊天的人', body: '用自然的对话开始一段新的连接。', detail: '2 个新匹配' },
-  assistant: { eyebrow: '下一步', title: '从一个想法开始', body: '把目标告诉我，我会帮你整理成清晰的行动。', detail: '准备就绪' },
-};
-
 const NON_SELECTION_TAGS = new Set([
   'DESIGN.md',
   '设计 Token',
@@ -401,53 +388,25 @@ function PreviewFigure({ config, onOpen }: { config: BatchShowcaseConfig; onOpen
   );
 }
 
-function MobilePreview({ config }: { config: BatchShowcaseConfig }) {
-  const preview = config.mobilePreview;
+function MobileScreenshotGallery({ config, onOpen }: { config: BatchShowcaseConfig; onOpen: (url: string) => void }) {
+  if (config.variant !== 'mobile-product') return null;
 
-  if (config.variant !== 'mobile-product' || !preview) return null;
-
-  const scene = mobileScenes[preview.pattern];
+  const screenshots = config.previewImages.filter(image => image.type === 'product-screenshot').slice(0, 3);
+  const imageLabel = config.brandAlias || config.brand;
 
   return (
-    <section className="dmb-mobile-preview" aria-label={`${config.brand} mobile product preview`}>
-      <header className="dmb-mobile-head">
-        <span className="dmb-mobile-status">09:41</span>
-        <strong className="dmb-mobile-brand">{config.brandAlias || config.brand}</strong>
-        <span className="dmb-mobile-status" aria-hidden="true">● ● ●</span>
-      </header>
-
-      <div className="dmb-mobile-content">
-        <p className="dmb-mobile-eyebrow">{scene.eyebrow}</p>
-        <h2>{scene.title}</h2>
-        <p className="dmb-mobile-copy">{scene.body}</p>
-
-        <article className={`dmb-mobile-scene dmb-mobile-scene-${preview.pattern}`}>
-          <div className="dmb-mobile-scene-top">
-            <span>{scene.detail}</span>
-            <i aria-hidden="true" />
-          </div>
-          <strong>{preview.pattern === 'chat' ? '设计讨论' : scene.title}</strong>
-          <p>{preview.pattern === 'chat' ? '已整理重点，随时可以继续回复。' : scene.body}</p>
-          <div className="dmb-mobile-scene-lines" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
-        </article>
-
-        <button className="dmb-mobile-primary-action" type="button">
-          {preview.primaryAction}
+    <section className="dmb-mobile-screenshot-gallery" aria-label={`${imageLabel} product screenshots`}>
+      {screenshots.map((image, index) => (
+        <button
+          className="dmb-mobile-screenshot"
+          key={`${image.url}-${index}`}
+          type="button"
+          onClick={() => onOpen(image.url)}
+          aria-label={`Open ${imageLabel} product screenshot ${index + 1}`}
+        >
+          <img src={image.url} alt={`${imageLabel} product screenshot ${index + 1}`} loading={index === 0 ? 'eager' : 'lazy'} />
         </button>
-      </div>
-
-      <nav className="dmb-mobile-nav" aria-label="移动端主导航">
-        {preview.navigation.map((label, index) => (
-          <button key={label} type="button" aria-current={index === 1 ? 'page' : undefined} aria-pressed={index === 1}>
-            <span className="dmb-mobile-nav-mark" aria-hidden="true" />
-            <span>{label}</span>
-          </button>
-        ))}
-      </nav>
+      ))}
     </section>
   );
 }
@@ -817,8 +776,8 @@ export function DesignMdBatchShowcase({ config, tabs = [], className = '' }: Des
 
   const overviewContent = (
     <>
-      <MobilePreview config={config} />
-      {config.variant === 'mobile-product' && config.mobilePreview ? null : <PreviewFigure config={config} onOpen={setZoomImage} />}
+      <MobileScreenshotGallery config={config} onOpen={setZoomImage} />
+      {config.variant === 'mobile-product' ? null : <PreviewFigure config={config} onOpen={setZoomImage} />}
 
       <div className="dmb-overview-meta">
         <div className="dmb-description">

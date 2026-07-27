@@ -17,12 +17,17 @@ const sharedConfig: Omit<BatchShowcaseConfig, 'variant' | 'mobilePreview'> = {
 };
 
 describe('DesignMdBatchShowcase mobile product preview', () => {
-  it('renders exactly three navigation controls, one primary action, and a selected navigation state', () => {
+  it('renders exactly three real product screenshots for a mobile theme', () => {
     const html = renderToStaticMarkup(
       <DesignMdBatchShowcase
         config={{
           ...sharedConfig,
           variant: 'mobile-product',
+          previewImages: [
+            { type: 'product-screenshot', url: '/screen-1.webp' },
+            { type: 'product-screenshot', url: '/screen-2.webp' },
+            { type: 'product-screenshot', url: '/screen-3.webp' },
+          ],
           mobilePreview: {
             pattern: 'chat',
             navigation: ['首页', '消息', '我的'],
@@ -32,17 +37,11 @@ describe('DesignMdBatchShowcase mobile product preview', () => {
       />,
     );
 
-    expect(html).toContain('dmb-mobile-preview');
-    const navigation = html.match(/<nav class="dmb-mobile-nav"[^>]*>([\s\S]*?)<\/nav>/);
-
-    expect(navigation).not.toBeNull();
-    expect(navigation?.[1].match(/<button\b/g)).toHaveLength(3);
-    expect(html.match(/<button class="dmb-mobile-primary-action"/g)).toHaveLength(1);
-    expect(navigation?.[1]).toMatch(/aria-current="page" aria-pressed="true"/);
-    expect(navigation?.[1]).toContain('首页');
-    expect(navigation?.[1]).toContain('消息');
-    expect(navigation?.[1]).toContain('我的');
-    expect(html).toContain('开始对话');
+    expect(html).toContain('dmb-mobile-screenshot-gallery');
+    expect(html.match(/class="dmb-mobile-screenshot"/g)).toHaveLength(3);
+    expect(html.match(/<img /g)).toHaveLength(3);
+    expect(html).not.toContain('dmb-mobile-primary-action');
+    expect(html).not.toContain('dmb-mobile-nav');
   });
 
   it('does not render a mobile preview for ordinary desktop configurations', () => {
@@ -50,6 +49,6 @@ describe('DesignMdBatchShowcase mobile product preview', () => {
       <DesignMdBatchShowcase config={{ ...sharedConfig, variant: 'dashboard' }} />,
     );
 
-    expect(html).not.toContain('dmb-mobile-preview');
+    expect(html).not.toContain('dmb-mobile-screenshot-gallery');
   });
 });
