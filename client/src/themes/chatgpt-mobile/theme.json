@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/chatgpt/id6448311069",
+          "officialPageUrl": "https://apps.apple.com/us/app/chatgpt/id6448311069",
+          "marketId": "6448311069",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/05/d5/4a/05d54ae7-3d1f-70ab-a95c-e0c440d02255/1_iPhone.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:16:51.219Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "b609777e21c54c9257262d091c9878d2067ad63c61972a260bc67949d8c9638e",
+          "byteLength": 46744,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/chatgpt/id6448311069",
+          "officialPageUrl": "https://apps.apple.com/us/app/chatgpt/id6448311069",
+          "marketId": "6448311069",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/bb/7d/a5/bb7da595-db66-80c5-efc2-0f9126b3ee96/2_iPhone.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:16:51.219Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "ff6f944560c8d8ac57d940477616d252827ccf005906788d861d4da26321fa5e",
+          "byteLength": 61712,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/chatgpt/id6448311069",
+          "officialPageUrl": "https://apps.apple.com/us/app/chatgpt/id6448311069",
+          "marketId": "6448311069",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/5e/fb/ad/5efbadef-3a01-9715-4de4-13aeb5ecf502/3_iPhone.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:16:51.219Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "7498ffe9b3480c1bed67ad95892d7126e1971441bf5aa84b72e04b71978c0648",
+          "byteLength": 50610,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -142,8 +212,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -197,7 +275,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

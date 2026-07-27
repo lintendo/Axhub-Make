@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/gb/app/binance-buy-bitcoin-crypto/id1436799971",
+          "officialPageUrl": "https://apps.apple.com/gb/app/binance-buy-bitcoin-crypto/id1436799971",
+          "marketId": "1436799971",
+          "storefront": "gb",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/9d/b3/8b/9db38b12-e92b-a24b-7c0c-8ba9a8f9b295/1242_2688.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:18:05.484Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "a12b85b9c48c580ea485f715e1a32dddcbebee1769f1425136e36ab034231e2e",
+          "byteLength": 26152,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/gb/app/binance-buy-bitcoin-crypto/id1436799971",
+          "officialPageUrl": "https://apps.apple.com/gb/app/binance-buy-bitcoin-crypto/id1436799971",
+          "marketId": "1436799971",
+          "storefront": "gb",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/64/39/03/64390320-5ab7-ef35-5732-d438db84c7e4/1242_2688-1.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:18:05.484Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "afab6c8305dc99a9ef688ac935c4694ba261f187976ef52f7eedc88605af579d",
+          "byteLength": 25372,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/gb/app/binance-buy-bitcoin-crypto/id1436799971",
+          "officialPageUrl": "https://apps.apple.com/gb/app/binance-buy-bitcoin-crypto/id1436799971",
+          "marketId": "1436799971",
+          "storefront": "gb",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/31/ab/c8/31abc8b1-4f77-e3df-1a5e-d836e9bf9f43/1242_2688-4.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:18:05.484Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "ac219527307e1b441e466d945d6fa7079db5d3189961e9657ee22b0ae5443ef9",
+          "byteLength": 36102,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -154,8 +224,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -209,7 +287,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/bumble-dating-app-meet-date/id930441707?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/bumble-dating-app-meet-date/id930441707?uo=4",
+          "marketId": "930441707",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/51/8f/51/518f5187-9f63-7cc0-f084-5e6d408b3fd4/4_APP_IPHONE_65_4.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:34.056Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "5d9476cd9942b271eeab3bd66e60516aef8ed2715a81b32c4f27a00b7e489e98",
+          "byteLength": 37328,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/bumble-dating-app-meet-date/id930441707?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/bumble-dating-app-meet-date/id930441707?uo=4",
+          "marketId": "930441707",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/2f/2d/83/2f2d830d-8f8c-b846-a7f3-b412b9c37b99/1_APP_IPHONE_55_1.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:34.056Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "9008d6018047ea8e81becfe47973e313ba283dae6eff5ba801453f649d27658a",
+          "byteLength": 31220,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/bumble-dating-app-meet-date/id930441707?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/bumble-dating-app-meet-date/id930441707?uo=4",
+          "marketId": "930441707",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/3d/28/33/3d2833e9-4698-c735-89e6-fd086c30d67c/2_APP_IPHONE_55_2.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:34.056Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "6602ae474a3e08f6b2600de4ffe4e834f158b9dc2b6d7aa1a6de77c5a276b4a9",
+          "byteLength": 31884,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -183,8 +253,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -238,7 +316,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

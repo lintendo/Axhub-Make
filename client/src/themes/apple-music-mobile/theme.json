@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/apple-music/id1108187390",
+          "officialPageUrl": "https://apps.apple.com/us/app/apple-music/id1108187390",
+          "marketId": "1108187390",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/09/d2/62/09d262c5-7fb2-0e48-6545-4a3e16dffb14/iPhone6p9-iOS26-USEN-Music-Wrapper1.png/720x1564bb.webp",
+          "collectedAt": "2026-07-27T19:16:33.781Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "261b6b9b50bd94c4f9cd9bc4db465be21589f62c99a073dae0ba35559fbbccab",
+          "byteLength": 64720,
+          "width": 720,
+          "height": 1564
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/apple-music/id1108187390",
+          "officialPageUrl": "https://apps.apple.com/us/app/apple-music/id1108187390",
+          "marketId": "1108187390",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/62/61/29/626129da-b55a-c00a-7629-da095e947ba9/iPhone6p9-iOS26-USEN-Music-Wrapper2.png/720x1564bb.webp",
+          "collectedAt": "2026-07-27T19:16:33.781Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "87fa0d6cd5ca86e25c3a51d441babf16270faf8c7107fdb974514fa7128d671a",
+          "byteLength": 69090,
+          "width": 720,
+          "height": 1564
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/apple-music/id1108187390",
+          "officialPageUrl": "https://apps.apple.com/us/app/apple-music/id1108187390",
+          "marketId": "1108187390",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/66/f9/e7/66f9e733-0174-ee61-1963-0ce4ceb518a6/iPhone6p9-iOS26-USEN-Music-Wrapper3.png/720x1564bb.webp",
+          "collectedAt": "2026-07-27T19:16:33.781Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "3dab4c22985b76408fbeb8842dd80a23f211d9257545119c120ecc3772ec36da",
+          "byteLength": 33554,
+          "width": 720,
+          "height": 1564
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -82,8 +144,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -178,8 +248,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -238,7 +316,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

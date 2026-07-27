@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/cash-app/id711923939",
+          "officialPageUrl": "https://apps.apple.com/us/app/cash-app/id711923939",
+          "marketId": "711923939",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/62/ba/44/62ba44b6-6c21-a8aa-c511-6b6f828a7d6c/US_MoneyMove_iPhone6.5__01.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:16:47.646Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "8924d620f1dc4be3a5758aa21124eee7c39b5feb3ff84ce80e91bf060434f1bf",
+          "byteLength": 41750,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/cash-app/id711923939",
+          "officialPageUrl": "https://apps.apple.com/us/app/cash-app/id711923939",
+          "marketId": "711923939",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/5e/14/30/5e1430d6-4446-2347-6422-57f15f86f9b3/US_P2P_iPhone6.5__03.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:16:47.646Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "c49f2078f2b99037a5e8ef2adb4ae266cc1caee81eb549d737cdc5b0b7627a8c",
+          "byteLength": 19924,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/cash-app/id711923939",
+          "officialPageUrl": "https://apps.apple.com/us/app/cash-app/id711923939",
+          "marketId": "711923939",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/f0/dc/8d/f0dc8d07-b3c8-cd32-33fe-d144062e8231/US_Teen_APY_iPhone6.5__black__3.25_.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:16:47.646Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "a8fec2ea7a9cb884efe1358f1dfd099f3ace7786a67d73d9375706a4220ff5d2",
+          "byteLength": 52054,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -148,8 +218,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -203,7 +281,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

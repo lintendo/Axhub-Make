@@ -6,7 +6,9 @@ import './style.css';
 import React from 'react';
 import { DesignMdBatchShowcase, type BatchMobilePreview, type BatchShowcaseConfig } from '../../common/DesignMdBatchShowcase';
 import themeData from './theme.json';
-import previewAsset0 from './assets/cover.svg?url';
+import productScreenshot01 from './assets/product-screenshot-01.webp?url';
+import productScreenshot02 from './assets/product-screenshot-02.webp?url';
+import productScreenshot03 from './assets/product-screenshot-03.webp?url';
 
 type ThemeDisplayData = Omit<BatchShowcaseConfig, 'previewImages' | 'mobilePreview'> & {
   previewImages: Array<{ type: string; path: string }>;
@@ -75,7 +77,9 @@ const config: BatchShowcaseConfig = {
   spacing: display.spacing,
   typography: display.typography,
   previewImages: [
-    { type: display.previewImages[0].type, url: previewAsset0 }
+    { type: 'product-screenshot', url: productScreenshot01 },
+    { type: 'product-screenshot', url: productScreenshot02 },
+    { type: 'product-screenshot', url: productScreenshot03 },
   ],
   usageGuidance: display.usageGuidance,
   shadows: display.shadows,

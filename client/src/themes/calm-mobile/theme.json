@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/calm/id571800810?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/calm/id571800810?uo=4",
+          "marketId": "571800810",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/ff/6a/bc/ff6abc49-7702-1818-9260-12ab3fe3cea6/dac9e900-7943-4ff4-8449-003ac65c4f94_Screen_04_a.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:34.557Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "0ef45b6a619a4799936dbc856b07a5a14240e3f31f629da09bd831d0746a00aa",
+          "byteLength": 58514,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/calm/id571800810?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/calm/id571800810?uo=4",
+          "marketId": "571800810",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/c4/d7/a0/c4d7a09f-9670-503d-548b-dac1f19012a2/92a594c0-f5b1-4739-bffd-88930991b524_iPhone_5.5_Inch_02.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:34.557Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "c0f067622202dbe5810de945e75c1dff976381aa38de57e50ae9ffc36b87f8ed",
+          "byteLength": 30330,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/calm/id571800810?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/calm/id571800810?uo=4",
+          "marketId": "571800810",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/c2/b9/78/c2b978bb-3fe0-c2ab-6777-917fc5a89bc0/6f697906-3d56-49aa-9a43-9450f30baa69_iPhone_5.5_Inch_03.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:34.557Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "1058c00529bf247186c725ad48fe502eb62893f44cad86b736c4a8789da0b18c",
+          "byteLength": 27192,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -143,8 +213,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -198,7 +276,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

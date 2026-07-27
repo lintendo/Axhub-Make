@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/audible-audiobooks-podcasts/id379693831",
+          "officialPageUrl": "https://apps.apple.com/us/app/audible-audiobooks-podcasts/id379693831",
+          "marketId": "379693831",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/39/56/f1/3956f155-f162-0197-da74-286b058bb914/iPhone__U00286.7-inch_U0029_-_04.jpg/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:27:33.532Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "d5f53af25c38be7c7a466a0a23c45bc00bbe7b90a44992bbfa0b0a96001c0a42",
+          "byteLength": 64042,
+          "width": 720,
+          "height": 1561
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/audible-audiobooks-podcasts/id379693831",
+          "officialPageUrl": "https://apps.apple.com/us/app/audible-audiobooks-podcasts/id379693831",
+          "marketId": "379693831",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/4a/e6/2e/4ae62e10-c339-973c-7223-480bb1d4022b/iPhone__U00286.7-inch_U0029_-_02.jpg/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:27:33.532Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "4d9e7313d3f4e349cfd5f38e317c4d260a68621a85c3813bb5e885deae4bf55e",
+          "byteLength": 88860,
+          "width": 720,
+          "height": 1561
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/audible-audiobooks-podcasts/id379693831",
+          "officialPageUrl": "https://apps.apple.com/us/app/audible-audiobooks-podcasts/id379693831",
+          "marketId": "379693831",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/b5/3b/4b/b53b4b3d-7f67-c1f6-6fc7-018aa027728c/iPhone__U00286.7-inch_U0029_-_03.jpg/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:27:33.532Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "a6a794c08a86e4e7c255125faacaef0cac1ead3d7513f3b921bb396cad35bf6c",
+          "byteLength": 46116,
+          "width": 720,
+          "height": 1561
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -161,8 +231,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -216,7 +294,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

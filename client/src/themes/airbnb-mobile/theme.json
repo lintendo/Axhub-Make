@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/airbnb/id401626263",
+          "officialPageUrl": "https://apps.apple.com/us/app/airbnb/id401626263",
+          "marketId": "401626263",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/f0/ac/bc/f0acbcae-22dd-00fd-4b92-ef19cd02a991/250509_AppStore_Mobile_Airbnb_Carousel_01_en-US.jpg/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:16:30.313Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "0cc6248772c33c2de944b35cfbe94473ab7900a7ea17810ccbfc603a59f33243",
+          "byteLength": 69826,
+          "width": 720,
+          "height": 1561
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/airbnb/id401626263",
+          "officialPageUrl": "https://apps.apple.com/us/app/airbnb/id401626263",
+          "marketId": "401626263",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/70/58/cc/7058ccd1-c027-5620-89c2-d45f820d1c98/250509_AppStore_Mobile_Airbnb_Carousel_02_en-US.jpg/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:16:30.313Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "ccbfcbb40ef2689371b4f65fcc4fb94e7d7609ef1ea0465dd5be7c251b0db788",
+          "byteLength": 58416,
+          "width": 720,
+          "height": 1561
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/airbnb/id401626263",
+          "officialPageUrl": "https://apps.apple.com/us/app/airbnb/id401626263",
+          "marketId": "401626263",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/58/83/bb/5883bbf3-bed7-5749-e045-69ea027eb7fb/250509_AppStore_Mobile_Airbnb_Carousel_03_en-US.jpg/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:16:30.313Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "57ec416534081b58a6f4895a40b81358777def0b6946f7ad73ffe9338f0eeb84",
+          "byteLength": 71800,
+          "width": 720,
+          "height": 1561
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -82,8 +144,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -194,8 +264,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -254,7 +332,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }
