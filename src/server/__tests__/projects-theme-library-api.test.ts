@@ -10,7 +10,6 @@ import {
   cleanupProjectApiTestRoots,
   createTempRoot,
   registerProject,
-  scopeProjectApiUrl,
   setActiveProject,
   startTestServer,
   writeProjectMetadata,
@@ -51,6 +50,16 @@ afterEach(() => {
   vi.restoreAllMocks();
   cleanupProjectApiTestRoots();
 });
+
+function scopeProjectApiUrl(projectRoot: string, rawUrl: string): string {
+  const metadataPath = getProjectMetadataPath(projectRoot);
+  const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+  const projectId = String(metadata?.project?.id || '').trim();
+  if (!projectId) throw new Error(`Missing project id in ${metadataPath}`);
+  const url = new URL(rawUrl);
+  if (!url.searchParams.has('projectId')) url.searchParams.set('projectId', projectId);
+  return url.toString();
+}
 
 function writeThemeImportEnabledProject(projectRoot: string, id = 'theme-library-client'): void {
   writeProjectMetadata(projectRoot, {
