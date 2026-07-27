@@ -22,7 +22,11 @@
     "check-ready": "node scripts/check-app-ready.mjs",
     "capture:theme": "node scripts/capture-theme-homepage.mjs",
     "capture:theme-source": "node scripts/capture-theme-source.mjs",
-    "font:subset:beginner-guide": "node scripts/subset-beginner-guide-fonts.mjs"
+    "font:subset:beginner-guide": "node scripts/subset-beginner-guide-fonts.mjs",
+    "screenshots:collect": "node scripts/collect-mobile-theme-screenshots.mjs",
+    "screenshots:status": "node scripts/report-mobile-theme-screenshot-status.mjs",
+    "screenshots:wire": "node scripts/sync-mobile-theme-screenshot-wiring.mjs",
+    "screenshots:regress": "node scripts/regress-mobile-theme-screenshots.mjs"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",
