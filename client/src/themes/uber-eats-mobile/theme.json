@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/uber-eats-food-groceries/id1058959277",
+          "officialPageUrl": "https://apps.apple.com/us/app/uber-eats-food-groceries/id1058959277",
+          "marketId": "1058959277",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/50/0e/37/500e37cc-f8c1-3ab8-10e9-7044ed7f95b3/Eats_US_iOS_iphoneX_1242x2688_SS01.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:42.657Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "b4c6760dad2b79a4c0389018d7663ce2633aaf00b772c9447a57cb83c1c3a93c",
+          "byteLength": 88604,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/uber-eats-food-groceries/id1058959277",
+          "officialPageUrl": "https://apps.apple.com/us/app/uber-eats-food-groceries/id1058959277",
+          "marketId": "1058959277",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/02/7c/97/027c972a-f7a8-14dd-94d1-910602bd5577/Eats_US_iOS_iphoneX_1242x2688_SS05.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:42.657Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "8fe00727834b69db9ff71e9c18a3db0836fe7f5b7f51eaa3c421e45ff5f3e2cc",
+          "byteLength": 46730,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/uber-eats-food-groceries/id1058959277",
+          "officialPageUrl": "https://apps.apple.com/us/app/uber-eats-food-groceries/id1058959277",
+          "marketId": "1058959277",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/25/11/82/251182f1-0545-200c-c010-0df881c3e12e/Eats_US_iOS_iphoneX_1242x2688_SS03.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:42.657Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "424b2580f4bd663a43c25f088eb927ab7d4decd693395a26137fb55da6e4cfce",
+          "byteLength": 73036,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -161,8 +231,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -216,7 +294,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

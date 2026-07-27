@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/x/id333903271",
+          "officialPageUrl": "https://apps.apple.com/us/app/x/id333903271",
+          "marketId": "333903271",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/21/82/3c/21823c75-d122-f771-fba1-2521b3f3237e/1242x2688-1.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:57.802Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "399cf54f4969cf469e85eddbe0a15bfd0ca377cc33c765f5f6a8ce7136903f41",
+          "byteLength": 72840,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/x/id333903271",
+          "officialPageUrl": "https://apps.apple.com/us/app/x/id333903271",
+          "marketId": "333903271",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/65/a8/8e/65a88e08-0c52-8675-0b0e-c7ef2dad4325/1242x2688-2.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:57.802Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "f2b57c6967f357f1377e5f78f70b91680a8d6f2952838fd66cbb3215ea69df30",
+          "byteLength": 49696,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/x/id333903271",
+          "officialPageUrl": "https://apps.apple.com/us/app/x/id333903271",
+          "marketId": "333903271",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/f3/05/b5/f305b570-fe21-58cc-a892-10108e6f162d/1242x2688-3.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:57.802Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "00342d2feb18b0e2e4a880b6f3ba03ced533caff7d8a5c75d68cc4bf24c94b12",
+          "byteLength": 53414,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -155,8 +225,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -210,7 +288,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

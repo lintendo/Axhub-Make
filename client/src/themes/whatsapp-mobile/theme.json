@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/fr/app/whatsapp-messenger/id310633997?uo=4",
+          "officialPageUrl": "https://apps.apple.com/fr/app/whatsapp-messenger/id310633997?uo=4",
+          "marketId": "310633997",
+          "storefront": "fr",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/45/0e/14/450e14af-4c66-95ff-e052-cc6939708065/b9952dbd-c918-4231-b5db-57f9189ebf3a_5.5__Display_1-fr_FR-fr_FR.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:12:15.806Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "14d38683ce2d6c6352b0da079176c835e4fa0433de420aa6b5f71100e361bf27",
+          "byteLength": 17050,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/fr/app/whatsapp-messenger/id310633997?uo=4",
+          "officialPageUrl": "https://apps.apple.com/fr/app/whatsapp-messenger/id310633997?uo=4",
+          "marketId": "310633997",
+          "storefront": "fr",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/b0/42/0a/b0420acb-ab60-8ff5-a964-e09e3d20ae16/7c127847-c0b2-4c49-b9e6-97b8f53a3ba1_5.5__Display_2-fr_FR-fr_FR.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:12:15.806Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "51dbe075e9227dd1478f60dbf02f09fd20baf873216f50587e5b21759c604f81",
+          "byteLength": 30908,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/fr/app/whatsapp-messenger/id310633997?uo=4",
+          "officialPageUrl": "https://apps.apple.com/fr/app/whatsapp-messenger/id310633997?uo=4",
+          "marketId": "310633997",
+          "storefront": "fr",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/36/20/36/36203600-97f7-c3fe-f67e-aef0398114b7/47eb4908-9934-4009-864a-cd5b1850cec7_5.5__Display_3-fr_FR-fr_FR.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:12:15.806Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "56c53c38d90412e6af0ac7af5483a450273d27746f43e2e4884c2362a32dd187",
+          "byteLength": 32238,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -143,8 +213,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -198,7 +276,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

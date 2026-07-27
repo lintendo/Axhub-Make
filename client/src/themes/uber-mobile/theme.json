@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/uber-request-a-ride/id368677368?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/uber-request-a-ride/id368677368?uo=4",
+          "marketId": "368677368",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/9c/b7/e7/9cb7e71e-7241-121f-3f24-ecb74cce25ce/6cf2abb7-d8c1-49e0-96f5-88dc3b1bdc20_SS01.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:43.147Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "3939a70c666e79c40437ece37a64a45034c2a2fb29a6b51da6465bd88b785e31",
+          "byteLength": 20732,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/uber-request-a-ride/id368677368?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/uber-request-a-ride/id368677368?uo=4",
+          "marketId": "368677368",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/a1/85/72/a18572a1-202f-a8fc-262e-69e702c626c5/6278c7a5-d250-447d-98a0-bf04f99466d2_SS04-1.png/720x1280bb.webp",
+          "collectedAt": "2026-07-27T19:27:43.147Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "c6637345a1d862ea957b18988e4eff0576c008ac79f6418c5989e9180f9cd190",
+          "byteLength": 38400,
+          "width": 720,
+          "height": 1280
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/uber-request-a-ride/id368677368?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/uber-request-a-ride/id368677368?uo=4",
+          "marketId": "368677368",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/d4/8f/69/d48f69f2-ce36-3b66-2cc3-39e32fd0ce78/ca2de83c-8c8e-4887-94f4-3ae11c83d7cc_SS03.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:43.147Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "36883a51ae4ea40f324f8aa51bef4532d9a293b924dd1264680ab007c163d313",
+          "byteLength": 16634,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -173,8 +243,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -228,7 +306,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

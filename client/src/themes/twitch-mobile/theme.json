@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/twitch-live-streaming/id460177396?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/twitch-live-streaming/id460177396?uo=4",
+          "marketId": "460177396",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/23/48/80/234880cc-db04-7d86-a3d5-70a0b46d6896/37b30cee-8c44-4162-944b-4def125308cf_01-1242x2208.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "8ddce49019646983cdad5becc72bfaf4134de0673101dc72568967b292967f8a",
+          "byteLength": 22274,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/twitch-live-streaming/id460177396?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/twitch-live-streaming/id460177396?uo=4",
+          "marketId": "460177396",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/60/aa/4e/60aa4eec-76de-e4dd-77b6-390b4bd323f7/121623e7-1287-49f0-9ea7-068ffc760e1f_02-1242x2208.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "a2a66df460d725ab290b028fc2104c40aaac625287aa8b05f495e4d9599ab93e",
+          "byteLength": 26256,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/twitch-live-streaming/id460177396?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/twitch-live-streaming/id460177396?uo=4",
+          "marketId": "460177396",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/22/58/1b/22581b48-e7bb-f8e4-d4bd-347ea0c89a58/77c505ba-b565-443b-83da-642a3bbc96f8_03-1242x2208.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "7a1835dcf1b1c6761d54c4392bc5130441b75886759c5fc1703d28b3c88ad837",
+          "byteLength": 34348,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -137,8 +207,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -192,7 +270,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

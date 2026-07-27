@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/waze-navigation-live-traffic/id323229106?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/waze-navigation-live-traffic/id323229106?uo=4",
+          "marketId": "323229106",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/65/54/e5/6554e54a-854b-8270-2d6d-ca73cb449412/98def561-b8fc-4650-8946-15239d81a878_Usecase_01.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "ce1e27be739812228e3bf4c648c4c580d3e279336735bbc6eea2ad8af0529875",
+          "byteLength": 20030,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/waze-navigation-live-traffic/id323229106?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/waze-navigation-live-traffic/id323229106?uo=4",
+          "marketId": "323229106",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/81/df/ed/81dfedae-d72e-a25d-24e7-2f43b64ab618/cf7d60dc-7f33-474b-ab60-bd3b9ff24dc0_Usecase_02.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "dd58a5504b85443993d3c0eca358c57ee2f8a56bff44747395dc8fd420f8f2de",
+          "byteLength": 18520,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/waze-navigation-live-traffic/id323229106?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/waze-navigation-live-traffic/id323229106?uo=4",
+          "marketId": "323229106",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/c7/04/84/c70484a3-4301-f9cf-9716-a95e0ac6bc8a/ff02c3c6-aaf3-439e-98e2-328fd053fe98_Usecase_03.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "24bb6a077ca930a28e15cec86a519d498135bd7489dd9085d6124b38bbb2ef54",
+          "byteLength": 20212,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -82,8 +144,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -190,8 +260,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -250,7 +328,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

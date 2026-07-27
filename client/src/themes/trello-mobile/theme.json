@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/trello-daily-task-tracker/id461504587",
+          "officialPageUrl": "https://apps.apple.com/us/app/trello-daily-task-tracker/id461504587",
+          "marketId": "461504587",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/89/d2/ef/89d2ef5d-82e2-532b-7534-189c8ec60550/Atlassian_Trello_US_iOS_ScreenshotMockups_Overview_260513_V2_01__U00283_U0029.png/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:17:49.349Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "611affba7c7565a3e72c3d4165e67d42966177b8c5ce3eed438203941083f774",
+          "byteLength": 52490,
+          "width": 720,
+          "height": 1561
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/trello-daily-task-tracker/id461504587",
+          "officialPageUrl": "https://apps.apple.com/us/app/trello-daily-task-tracker/id461504587",
+          "marketId": "461504587",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/1e/cf/1f/1ecf1f1e-5264-b04a-df28-170ff0aa258b/Atlassian_Trello_US_iOS_ScreenshotMockups_Overview_260513_V2_02__U00281_U0029.png/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:17:49.349Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "eb564f55b300573523e8da6610fca39ca11d3452114754a11fc5d11e78db61d0",
+          "byteLength": 36732,
+          "width": 720,
+          "height": 1561
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/trello-daily-task-tracker/id461504587",
+          "officialPageUrl": "https://apps.apple.com/us/app/trello-daily-task-tracker/id461504587",
+          "marketId": "461504587",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/95/29/86/952986f5-5d46-274b-6fbc-8b1f4ea08f1a/Atlassian_Trello_US_iOS_ScreenshotMockups_Overview_260513_V2_03__U00281_U0029.png/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:17:49.349Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "f04c197223bd64253f3d18e909397f11d406a7eca9eca69b73e354ce56b25f17",
+          "byteLength": 37884,
+          "width": 720,
+          "height": 1561
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -82,8 +144,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -160,8 +230,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -220,7 +298,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }
