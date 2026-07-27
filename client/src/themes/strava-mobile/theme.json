@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/strava-run-bike-walk/id426826309?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/strava-run-bike-walk/id426826309?uo=4",
+          "marketId": "426826309",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/3f/e3/d9/3fe3d9f8-9d63-7165-93bc-416169847f14/10ASO-5.5-StickerStats-en-US.jpg/720x1280bb.webp",
+          "collectedAt": "2026-07-27T19:27:41.224Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "6ae6c6b04761ede0ecf0a7a14dad36da08362a91778c83102dc37d16d7b7d9f7",
+          "byteLength": 30860,
+          "width": 720,
+          "height": 1280
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/strava-run-bike-walk/id426826309?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/strava-run-bike-walk/id426826309?uo=4",
+          "marketId": "426826309",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/c8/cc/89/c8cc893b-e911-84ad-9ace-4ad3d280ab64/05ASO-5.5-Community-en-US-CopyA.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:27:41.224Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "3d8be98fa44985bfcb975f56453e3b2f3e62d0cd45a7b08ea77b749ad81ef708",
+          "byteLength": 17824,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/strava-run-bike-walk/id426826309?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/strava-run-bike-walk/id426826309?uo=4",
+          "marketId": "426826309",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/0c/2f/79/0c2f7976-ae13-a7eb-0473-46f4f6cf36ad/01ASO-5.5-Track_Workouts-en-US.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:27:41.224Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "b8613ab1f5f8f2d6b91be9d16e2bdcd0c127b33eadd12a413004e34684c76d37",
+          "byteLength": 19190,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -165,8 +235,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -220,7 +298,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

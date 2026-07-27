@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/robinhood-trading-investing/id938003185?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/robinhood-trading-investing/id938003185?uo=4",
+          "marketId": "938003185",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/21/8d/5f/218d5f50-8c94-a422-211d-b77dfb9b2c00/ios-1242x2208__U00283_U0029.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:27:39.857Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "82030a56ebb21039aca41f8d5881d92ae5a7ea82035e79e41942230add17f0eb",
+          "byteLength": 17224,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/robinhood-trading-investing/id938003185?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/robinhood-trading-investing/id938003185?uo=4",
+          "marketId": "938003185",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/84/c3/7e/84c37eeb-0f75-a7b1-f06c-799f34c229f3/ios-1260x2736-1.jpg/720x1563bb.webp",
+          "collectedAt": "2026-07-27T19:27:39.857Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "7d2dd2ea126205fba363de30990a1306676a0f57eb4ac0b56741a25bb953c27a",
+          "byteLength": 46054,
+          "width": 720,
+          "height": 1563
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/robinhood-trading-investing/id938003185?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/robinhood-trading-investing/id938003185?uo=4",
+          "marketId": "938003185",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/20/c4/70/20c4705c-3db7-26ad-5502-f9229d8167ac/ios-1242x2208__U00287_U0029.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:27:39.857Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "7d5d62d882ead85163e139ffa632ca2bf534e72cf535e481ca977253849eae17",
+          "byteLength": 17064,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -147,8 +217,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -202,7 +280,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

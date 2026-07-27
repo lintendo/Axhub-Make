@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/slack/id618783545?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/slack/id618783545?uo=4",
+          "marketId": "618783545",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/e9/15/e3/e915e3f6-7cda-51f0-1f66-eb204dc7f0de/card4_-_coordinate.png/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:27:40.274Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "c7c8911404692a63010bbc66df575394d7922062dcdc45773c49cebb99706c42",
+          "byteLength": 41058,
+          "width": 720,
+          "height": 1561
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/slack/id618783545?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/slack/id618783545?uo=4",
+          "marketId": "618783545",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/5d/ca/6b/5dca6b63-1062-1f70-b072-84cf8cd5fd8d/9776126f-a44a-4ecb-aa3e-ac35f8128ba0_iOS-iPhone5.5-Screenshot02.en-GB@3x.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:40.274Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "4f53b810efbb79dfb1a1212350bb10c508e2135afa5b8bb8a066b3e6ebaa2850",
+          "byteLength": 19218,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/slack/id618783545?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/slack/id618783545?uo=4",
+          "marketId": "618783545",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/8a/08/e1/8a08e19d-4d6b-cd4e-05b3-d4b45bd9f075/b56b1f8b-323c-44c7-a6ce-f1b8c497af8c_iOS-iPhone5.5-Screenshot03.en-GB@3x.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:40.274Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "9291061e11b98aecec6a32313691b8431306647385918165a708645a6f13d77a",
+          "byteLength": 20286,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -152,8 +222,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -207,7 +285,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

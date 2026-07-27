@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/tiktok-videos-shop-live/id835599320?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/tiktok-videos-shop-live/id835599320?uo=4",
+          "marketId": "835599320",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/99/2e/c2/992ec242-7589-7262-cfd6-11a6115674d0/426a0b06-acb2-4cec-b9a0-b0e69a124d7e_Winter_AI_iOS_2208.png/720x1280bb.webp",
+          "collectedAt": "2026-07-27T19:27:41.614Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "a913f3e008806a1a2fb20ed2e441b43970c96af215b38227a08e828f49040604",
+          "byteLength": 45374,
+          "width": 720,
+          "height": 1280
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/tiktok-videos-shop-live/id835599320?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/tiktok-videos-shop-live/id835599320?uo=4",
+          "marketId": "835599320",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/27/ce/2f/27ce2fc4-a338-95ab-3bbe-1b9062cf537d/e6733d76-8afb-4efa-b9a1-9937cdd227f7_STEM_iOS_2208.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:41.614Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "0029ad121973705c506416c8b37a8a431c9088b20b30b22a03359eea195c8526",
+          "byteLength": 23910,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/tiktok-videos-shop-live/id835599320?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/tiktok-videos-shop-live/id835599320?uo=4",
+          "marketId": "835599320",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/b2/b8/d5/b2b8d5ce-7852-5c2c-1bce-4c812c04cb65/329e308a-8a6a-40d8-a1a1-ada1c34e45e8_Mother_iOS_2208.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:41.614Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "e5ed4426d0cd765b49cee8e1a72831a29b29ee6910a2c6f8992d675e11aa4ce6",
+          "byteLength": 23120,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -179,8 +249,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -234,7 +312,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

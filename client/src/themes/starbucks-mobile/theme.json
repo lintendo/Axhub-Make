@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/starbucks/id331177714",
+          "officialPageUrl": "https://apps.apple.com/us/app/starbucks/id331177714",
+          "marketId": "331177714",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/26/19/15/261915d9-5fed-c6f5-3971-116a5f450d9f/_Card5.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:40.721Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "395c79d184469783253339c25358fb1086e200605feb664547eedbf72e4e419a",
+          "byteLength": 35854,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/starbucks/id331177714",
+          "officialPageUrl": "https://apps.apple.com/us/app/starbucks/id331177714",
+          "marketId": "331177714",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/99/d1/68/99d16802-b98d-9aa4-529c-9477a4ee2ca0/_Card2.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:40.721Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "72cbe194dfc714bce2f2874fbe0043b0d54bc3712ff38395056cf9a9675ef417",
+          "byteLength": 36658,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/starbucks/id331177714",
+          "officialPageUrl": "https://apps.apple.com/us/app/starbucks/id331177714",
+          "marketId": "331177714",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/9e/a6/94/9ea6943f-9270-25a9-aa18-72b8db486640/_Card3.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:40.721Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "b2f4e95226b40f4fd55ee43ad06ed9587010c95109d71fbaa61b05eaab911007",
+          "byteLength": 50358,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -82,8 +144,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -176,8 +246,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -236,7 +314,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

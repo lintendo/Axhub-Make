@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/tinder-dating-app-date-chat/id547702041",
+          "officialPageUrl": "https://apps.apple.com/us/app/tinder-dating-app-date-chat/id547702041",
+          "marketId": "547702041",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/0e/81/d9/0e81d96c-075d-cbbf-ba7b-30b23550e6b8/Screen_04_ASENUK.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:42.173Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "286a4cec4f9e6a40fd63ad1ced48e27038e59eff0f9ff866ec890fbe8cfac5d5",
+          "byteLength": 69204,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/tinder-dating-app-date-chat/id547702041",
+          "officialPageUrl": "https://apps.apple.com/us/app/tinder-dating-app-date-chat/id547702041",
+          "marketId": "547702041",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/eb/fd/c4/ebfdc499-5709-8179-46d9-f3575f3556ed/Screen_09_ASENUK.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:42.173Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "f0ed929a7417e024de0f77a319ea1e735fa21c80e2056d2c17c1de6088e0e562",
+          "byteLength": 41062,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/tinder-dating-app-date-chat/id547702041",
+          "officialPageUrl": "https://apps.apple.com/us/app/tinder-dating-app-date-chat/id547702041",
+          "marketId": "547702041",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/20/f6/6c/20f66c18-394c-77fe-c512-867f66baa0d7/Screen_03_ASENUK.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:42.173Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "8f3cf419c27ed7012c0e8a33e8ff71bea772275fb031ce10f81831fbd82bb8dc",
+          "byteLength": 85836,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -82,8 +144,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -190,8 +260,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -250,7 +328,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

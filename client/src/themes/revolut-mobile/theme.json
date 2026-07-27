@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/revolut-send-spend-and-save/id932493382",
+          "officialPageUrl": "https://apps.apple.com/us/app/revolut-send-spend-and-save/id932493382",
+          "marketId": "932493382",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/b5/e2/58/b5e258dd-cc33-28d4-99c9-023aa93f8e5d/Screen_4_1242x2208.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:39.333Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "de2e4ee4f665fa5a905f847619f149e6d32d58f37b8c99e838ff0c431692ba26",
+          "byteLength": 22800,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/revolut-send-spend-and-save/id932493382",
+          "officialPageUrl": "https://apps.apple.com/us/app/revolut-send-spend-and-save/id932493382",
+          "marketId": "932493382",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/0a/9f/1f/0a9f1f65-3a95-97b0-714c-495baea1c9cc/Screen_2_1242x2208.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:39.333Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "32b28f513cdbf85e3c1f3646a2236c083b556a48756342201e92fa4569cf6f5f",
+          "byteLength": 63914,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/revolut-send-spend-and-save/id932493382",
+          "officialPageUrl": "https://apps.apple.com/us/app/revolut-send-spend-and-save/id932493382",
+          "marketId": "932493382",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/b1/12/3a/b1123ade-6cc7-d7fb-d1f7-81ef15023d01/Screen_3_1242x2208.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:39.333Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "73b047133f606dd579d538ead5b97a6a0f8bed05dd921c3c87fe30b09c2cfcda",
+          "byteLength": 35694,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -154,8 +224,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -209,7 +287,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }

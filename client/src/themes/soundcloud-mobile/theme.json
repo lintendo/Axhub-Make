@@ -50,7 +50,69 @@
       "publicPath": "assets/cover.svg",
       "importPath": "./assets/cover.svg?url",
       "sourcePath": "assets/cover.svg"
-    }
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/soundcloud-the-music-you-love/id336353151",
+          "officialPageUrl": "https://apps.apple.com/us/app/soundcloud-the-music-you-love/id336353151",
+          "marketId": "336353151",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/55/5c/b1/555cb18f-d974-428d-9233-e2b6d36f3694/01.jpg/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:17:36.512Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "824e8ba9bc949dfb3b78fbd9142e4e4100fb24c1e5b8c26cbd1254ff0ed069aa",
+          "byteLength": 113276,
+          "width": 720,
+          "height": 1561
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/soundcloud-the-music-you-love/id336353151",
+          "officialPageUrl": "https://apps.apple.com/us/app/soundcloud-the-music-you-love/id336353151",
+          "marketId": "336353151",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/a2/60/69/a26069d7-2b4a-2405-5643-c7c90338de09/02.jpg/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:17:36.512Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "7641ae987e48a81a43ac56d61501b186ff9702a8be31a6032897eb8e23d0ee6b",
+          "byteLength": 86390,
+          "width": 720,
+          "height": 1561
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/soundcloud-the-music-you-love/id336353151",
+          "officialPageUrl": "https://apps.apple.com/us/app/soundcloud-the-music-you-love/id336353151",
+          "marketId": "336353151",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/02/d7/d6/02d7d6c9-99a5-33ac-3d3b-f0c1d2980398/03.jpg/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:17:36.512Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "b9555ab820781a6457f3d725092f72125f503cb5d74fbd069d311b9d2ce47763",
+          "byteLength": 81548,
+          "width": 720,
+          "height": 1561
+        }
+      }
+    ]
   },
   "tokens": {
     "palette": [
@@ -77,8 +139,16 @@
   },
   "previewImages": [
     {
-      "type": "local-preview",
-      "path": "assets/cover.svg"
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
     }
   ],
   "display": {
@@ -161,8 +231,16 @@
     ],
     "previewImages": [
       {
-        "type": "local-preview",
-        "path": "assets/cover.svg"
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
       }
     ],
     "panels": [
@@ -216,7 +294,15 @@
     }
   },
   "status": {
-    "displayPage": "todo",
-    "collectionErrors": []
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
   }
 }
