@@ -90,6 +90,7 @@ export function syncProjectIdentitySource(
   options: {
     metadataPath?: string;
     fallback?: ProjectIdentityFallback;
+    projectId?: string;
   } = {},
 ): { identity: ProjectIdentity; metadata: ProjectMetadata } {
   const metadataStore = createProjectMetadataStore(projectRoot, { metadataPath: options.metadataPath });
@@ -97,7 +98,13 @@ export function syncProjectIdentitySource(
   const marker = readMakeClientMarker(projectRoot);
 
   if (marker) {
-    const normalizedMarker = writeMakeClientMarker(projectRoot, marker);
+    const normalizedMarker = writeMakeClientMarker(projectRoot, {
+      ...marker,
+      project: {
+        ...marker.project,
+        id: stringValue(options.projectId) || marker.project.id,
+      },
+    });
     const savedMetadata = saveMetadataIdentity(metadataStore, metadata, normalizedMarker.project);
     return {
       identity: {

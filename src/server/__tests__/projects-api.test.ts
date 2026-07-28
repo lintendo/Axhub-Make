@@ -649,7 +649,8 @@ describe('make-server project APIs', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ root: otherProjectRoot }),
       });
-      expect(duplicate.status).toBe(200);
+      expect(duplicate.status).toBe(409);
+      expect(await duplicate.json()).toMatchObject({ code: 'MAKE_PROJECT_PATH_CONFLICT' });
 
       const missingActive = await fetch(`${server.origin}/api/projects/active`, {
         method: 'PUT',
