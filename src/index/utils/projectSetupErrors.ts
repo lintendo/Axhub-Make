@@ -1,6 +1,7 @@
 const MAKE_CLIENT_ERROR_MESSAGES: Record<string, string> = {
     MAKE_STATE_DIR_NOT_WRITABLE: '本机项目列表保存失败',
     NOT_MAKE_CLIENT_PROJECT: '请选择包含 .axhub/make/client.json 的 Make 客户端项目',
+    MAKE_PROJECT_PATH_CONFLICT: '该项目路径已添加',
     MAKE_PROJECT_ID_CONFLICT: '项目 ID 已存在，请更换 Make 客户端项目 ID',
     MAKE_CLIENT_SOURCE_UNAVAILABLE: '无法获取 Make 客户端源码，请确认仓库权限或网络',
     MAKE_CLIENT_TEMPLATE_UNAVAILABLE: '无法下载 Make 客户端模板包，请检查网络或稍后重试',
