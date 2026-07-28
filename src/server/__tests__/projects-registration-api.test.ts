@@ -95,6 +95,12 @@ describe('Make client project registration identity', () => {
         project: { id: 'demo-3' },
         resources: { prototypes: [{ title: 'Home 3' }] },
       });
+      const activeUpdate = await fetch(`${server.origin}/api/projects/active`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: 'demo-2' }),
+      }).then((response) => response.json());
+      expect(activeUpdate.activeProject).toMatchObject({ id: 'demo-2', root: roots[1] });
     } finally {
       await server.close();
     }
