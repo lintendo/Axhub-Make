@@ -29,8 +29,8 @@ import {
     type MarkdownQuickEditMeta,
 } from './quickEdit';
 import {
+    resolveMarkdownDocumentLinkTarget,
     resolvePrototypeSpecAssetUrl,
-    resolvePrototypeSpecDocumentLink,
     resolvePrototypeSpecResourceUrl,
     stripMarkdownPreviewFrontmatter,
 } from './previewMarkdownContent';
@@ -1501,11 +1501,11 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
                         content={previewContent}
                         components={{
                             a: ((props: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
-                                const targetPath = resolvePrototypeSpecDocumentLink(
+                                const navigationTarget = resolveMarkdownDocumentLinkTarget(
                                     String(props.href || ''),
                                     String(currentDoc?.url || ''),
                                 );
-                                const resourceUrl = targetPath
+                                const resourceUrl = navigationTarget
                                     ? null
                                     : resolvePrototypeSpecResourceUrl(
                                         String(props.href || ''),
@@ -1517,9 +1517,20 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
                                         href={resourceUrl || props.href}
                                         onClick={(event) => {
                                             props.onClick?.(event);
-                                            if (event.defaultPrevented || !targetPath) return;
+                                            if (event.defaultPrevented || !navigationTarget) return;
                                             event.preventDefault();
-                                            postToParent({ type: 'axhub-prototype-spec:navigate', path: targetPath });
+                                            if (navigationTarget.kind === 'prototype-spec') {
+                                                postToParent({
+                                                    type: 'axhub-prototype-spec:navigate',
+                                                    path: navigationTarget.resourceId,
+                                                });
+                                                return;
+                                            }
+                                            postToParent({
+                                                type: 'axhub-document-resource:navigate',
+                                                resourceType: navigationTarget.kind,
+                                                resourceId: navigationTarget.resourceId,
+                                            });
                                         }}
                                     />
                                 );
