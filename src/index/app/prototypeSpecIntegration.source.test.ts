@@ -80,8 +80,12 @@ describe('prototype spec workspace integration', () => {
   it('guards automatic split-spec navigation with current-page commentary state', () => {
     const indexSource = readSource('./IndexPage.tsx');
     const controllerSource = readSource('./hooks/usePrototypeSpecController.ts');
+    const documentNavigationSource = readSource('./hooks/useDocumentResourceNavigation.ts');
     const guardSource = readSource('./hooks/usePrototypeSpecNavigationGuard.ts');
 
+    expect(indexSource).toContain('useDocumentResourceNavigation({');
+    expect(documentNavigationSource).toContain("event.data?.type !== 'axhub-document-resource:navigate'");
+    expect(documentNavigationSource).toContain('event.source !== sourceWindow');
     expect(indexSource).toContain('usePrototypeSpecNavigationGuard({');
     expect(indexSource).toContain('modifiedCount: preview.hostToolbarState?.modifiedCount ?? 0');
     expect(indexSource).toContain("type: 'clear-edits'");

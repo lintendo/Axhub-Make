@@ -26,6 +26,7 @@ import { useIndexPageSelectionSync } from './hooks/useIndexPageSelectionSync';
 import { useIndexPageSidebarPropsBuilder } from './hooks/useIndexPageSidebarPropsBuilder';
 import { useIndexPageUiBridge } from './hooks/useIndexPageUiBridge';
 import { usePrototypeSpecController } from './hooks/usePrototypeSpecController';
+import { useDocumentResourceNavigation } from './hooks/useDocumentResourceNavigation';
 import { usePrototypeSpecNavigationGuard } from './hooks/usePrototypeSpecNavigationGuard';
 import { resolveIndexContentMode, type IndexContentMode } from './index-page/contentMode';
 import { buildIndexDeepLinkUrl, parseResourceDeepLink, shouldSyncIndexDeepLinkUrl, type ResourceDeepLinkTarget } from './index-page/resourceDeepLink';
@@ -1078,6 +1079,20 @@ export default function IndexPage({
         }),
         onError: (message) => {
             messageApi.error(message);
+        },
+    });
+
+    useDocumentResourceNavigation({
+        enabled: contentMode === 'doc',
+        projectId: workspace.activeProjectId,
+        docs: workspace.docsItems,
+        getSourceWindow: () => preview.previewIframeRef.current?.contentWindow ?? null,
+        navigate: (item, nextViewMode) => {
+            setActiveTab('prototypes');
+            setSidebarTab('document');
+            resources.setSelectedResourceFolder(null);
+            resources.setSelectedDoc(item);
+            setViewMode(nextViewMode);
         },
     });
 
