@@ -369,6 +369,7 @@ const markdownStyles = `
     width: 100%;
     min-height: calc(100vh - 230px);
     height: auto;
+    overflow: visible;
   }
   .spec-editor-shell .simple-editor-content {
     max-width: 100%;

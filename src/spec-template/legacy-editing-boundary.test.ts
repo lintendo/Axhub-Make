@@ -108,6 +108,17 @@ describe('spec-template quick editing regression boundary', () => {
     expect(viewerSource).not.toContain('targetElement.scrollIntoView');
   });
 
+  it('keeps the document formatting toolbar sticky to the page viewport', () => {
+    const viewerSource = readSpecTemplateSource('MarkdownViewer.tsx');
+
+    expect(viewerSource).toMatch(
+      /\.spec-editor-shell \.simple-editor-wrapper\s*\{[^}]*overflow:\s*visible;/,
+    );
+    expect(viewerSource).toMatch(
+      /\.spec-editor-shell \.tiptap-toolbar\s*\{[^}]*top:\s*0;[^}]*position:\s*sticky;/,
+    );
+  });
+
   it('initializes text comment editing for Markdown documents', () => {
     const bootstrapSource = readSpecTemplateSource('index.tsx');
     const viewerSource = readSpecTemplateSource('MarkdownViewer.tsx');
