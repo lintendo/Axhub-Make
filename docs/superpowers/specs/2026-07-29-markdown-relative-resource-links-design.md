@@ -39,7 +39,7 @@ Make 的 Markdown 预览运行在 `spec-template.html` iframe 中。当前预览
 ## 架构与数据流
 
 1. `src/spec-template/previewMarkdownContent.ts` 从当前文档内容 URL 提取项目、文档路径和允许的资源根。
-2. 相对链接按照当前文档所在目录解析 `.`、`..`、查询参数和锚点；若路径越出允许根目录则拒绝接管。
+2. 相对链接按照当前文档所在目录解析 `.` 和 `..`，导航目标忽略查询参数及跨文档锚点；若路径越出允许根目录则拒绝接管。
 3. `MarkdownViewer` 对可接管链接阻止浏览器默认导航，并向父页面发送包含目标资源路径的导航消息。
 4. 父页面校验消息来自当前预览 iframe、目标属于当前项目且存在于当前资源列表。
 5. 父页面复用现有资源选择流程设置相应 `selectedDoc`，由资源的 `openMode` 决定 Markdown、图片或普通文件预览，并通过现有深链同步逻辑更新 URL。
@@ -50,14 +50,14 @@ Make 的 Markdown 预览运行在 `spec-template.html` iframe 中。当前预览
 - 项目内部文档：`/api/projects/:projectId/document-content?path=...`，当前路径来自 `path`，允许根为当前项目。
 - 原型规格文档：`/api/projects/:projectId/prototypes/:prototypeId/spec/content?path=...`，保留现有规格目录边界和导航行为。
 
-为避免让 iframe 猜测资源类型，导航消息传递规范化后的项目资源路径；父页面以当前资源列表作为权威来源。目标不存在时不切换资源，保留当前页面并输出可诊断警告。
+为避免让 iframe 猜测资源类型，导航消息传递规范化后的项目资源路径；父页面以当前资源列表作为权威来源。目标不存在时不切换资源并保留当前页面。
 
 ## 链接行为
 
 - `./PROJECT.md`、`../guide.md`：在当前 Make 主内容区打开目标 Markdown。
 - `./screenshot.png`：在当前 Make 主内容区打开图片预览。
 - `./data.json`、`./interactions.json`：在当前 Make 主内容区打开文件预览。
-- `./guide.md#section`：先打开目标 Markdown；锚点随导航消息保留，目标预览加载后滚动到对应标题。
+- `./guide.md#section`：打开目标 Markdown；当前修复不负责恢复目标文档中的跨文档锚点位置。
 - `#section`：继续在当前文档内滚动。
 - `https://...`、`mailto:...` 及其他显式协议：保持原行为。
 - `/absolute/path`、不存在的资源、越界的 `..`：不交给资源导航；不得构造项目外文件读取地址。
@@ -75,7 +75,7 @@ Make 的 Markdown 预览运行在 `spec-template.html` iframe 中。当前预览
 
 - 普通资源文档中的同目录 Markdown、嵌套 Markdown、图片和 JSON。
 - 项目内部文档与原型规格文档的现有行为不回退。
-- 查询参数、跨文档锚点、当前页锚点、外部链接和协议链接。
+- 带查询参数或跨文档锚点的资源链接、当前页锚点、外部链接和协议链接。
 - 越界路径、绝对路径、不存在资源以及非当前 iframe 消息。
 - 父页面按目标资源的 `openMode` 复用资源选择逻辑并同步深链。
 
@@ -93,4 +93,3 @@ Make 的 Markdown 预览运行在 `spec-template.html` iframe 中。当前预览
 - `src/spec-template/previewMarkdownContent.test.ts`：解析器回归测试。
 - `src/spec-template/MarkdownViewer.tsx`：发送通用资源导航消息并保留锚点。
 - 父页面现有 iframe 消息/资源选择控制器及其测试：校验并打开当前项目资源。
-
