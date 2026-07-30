@@ -35,7 +35,7 @@ function readIdentity(root: string) {
 afterEach(cleanupProjectApiTestRoots);
 
 describe('Make client project registration identity', () => {
-  it('rejects an already registered real path without rewriting identity files', async () => {
+  it('re-registers an already known real path without rewriting identity files', async () => {
     const root = createTempRoot('axhub-register-same-root-');
     writeProjectMetadata(root, { project: { id: 'demo', name: 'Demo' } });
     const server = await startTestServer(root);
@@ -45,8 +45,11 @@ describe('Make client project registration identity', () => {
       const metadataBefore = fs.readFileSync(getProjectMetadataPath(root), 'utf8');
 
       const second = await registerExisting(server.origin, root);
-      expect(second.response.status).toBe(409);
-      expect(second.payload).toMatchObject({ code: 'MAKE_PROJECT_PATH_CONFLICT', root });
+      expect(second.response.status).toBe(200);
+      expect(second.payload).toMatchObject({
+        success: true,
+        project: { id: 'demo', root },
+      });
       expect(fs.readFileSync(getMakeClientMarkerPath(root), 'utf8')).toBe(markerBefore);
       expect(fs.readFileSync(getProjectMetadataPath(root), 'utf8')).toBe(metadataBefore);
     } finally {

@@ -5128,6 +5128,85 @@ describe('make-server make client project APIs', () => {
     }
   });
 
+  it('keeps the old template version and allows retry after a mid-copy failure', async () => {
+    const defaultRoot = createTempRoot();
+    writeProjectMetadata(defaultRoot, {
+      project: { id: 'default-client', name: 'Default Client' },
+    });
+    const projectRoot = createTempRoot('axhub-make-client-update-retry-');
+    writeMakeClientMarker(projectRoot, 'update-retry-client', 'Update Retry Client', '0.1.0');
+    writeMakeClientPackage(projectRoot, '0.1.0');
+    writeMakeClientMetadata(projectRoot, 'update-retry-client', 'Update Retry Client');
+    installRemoteTemplateFetchMock();
+    installMakeClientUpdateCommandMock({
+      metadataId: 'update-retry-client',
+      metadataName: 'Update Retry Client',
+    });
+    const server = await startTestServer(defaultRoot);
+
+    try {
+      const registerResponse = await fetch(`${server.origin}/api/projects/make/register-existing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ root: projectRoot }),
+      });
+      expect(registerResponse.status).toBe(201);
+
+      const copyFileSync = fs.copyFileSync.bind(fs);
+      const failedTarget = path.join(projectRoot, 'src', 'prototypes', 'beginner-guide', 'index.tsx');
+      const copySpy = vi.spyOn(fs, 'copyFileSync').mockImplementation((...args) => {
+        if (path.resolve(String(args[1])) === failedTarget) {
+          const error = new Error('simulated mid-copy failure') as NodeJS.ErrnoException;
+          error.code = 'EACCES';
+          throw error;
+        }
+        return copyFileSync(...args);
+      });
+
+      const failedResponse = await fetch(`${server.origin}/api/projects/update-retry-client/make-client/update/apply`, {
+        method: 'POST',
+      });
+      const failedBody = await failedResponse.json();
+
+      expect(failedResponse.status).toBe(500);
+      expect(failedBody).toMatchObject({
+        projectId: 'update-retry-client',
+        currentVersion: '0.1.0',
+        targetVersion: DEFAULT_TEMPLATE_VERSION,
+        writtenFiles: expect.arrayContaining(['package.json']),
+      });
+      expect(JSON.parse(fs.readFileSync(getMakeClientMarkerPath(projectRoot), 'utf8'))).toMatchObject({
+        templateVersion: '0.1.0',
+      });
+
+      copySpy.mockRestore();
+
+      const retryStatus = await fetch(`${server.origin}/api/projects/update-retry-client/make-client/update/status`)
+        .then((response) => response.json());
+      expect(retryStatus).toMatchObject({
+        canApply: true,
+        currentVersion: '0.1.0',
+        targetVersion: DEFAULT_TEMPLATE_VERSION,
+      });
+
+      const retryResponse = await fetch(`${server.origin}/api/projects/update-retry-client/make-client/update/apply`, {
+        method: 'POST',
+      });
+      const retryBody = await retryResponse.json();
+      expect(retryResponse.status).toBe(200);
+      expect(retryBody).toMatchObject({
+        success: true,
+        currentVersion: '0.1.0',
+        targetVersion: DEFAULT_TEMPLATE_VERSION,
+      });
+      expect(JSON.parse(fs.readFileSync(getMakeClientMarkerPath(projectRoot), 'utf8'))).toMatchObject({
+        templateVersion: DEFAULT_TEMPLATE_VERSION,
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it('returns success with a post-update warning when metadata sync fails after template files are written', async () => {
     const defaultRoot = createTempRoot();
     writeProjectMetadata(defaultRoot, {

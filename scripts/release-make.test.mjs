@@ -365,6 +365,11 @@ describe('release make artifact helpers', () => {
     assert.equal(manifest.schemaVersion, 1);
     assert.equal(manifest.prototypeDefaults, undefined);
     assert.equal(manifest.themes.defaultAction, undefined);
+    assert(manifest.runtime.files.includes('THIRD_PARTY_NOTICES.md'));
+    const thirdPartyNotices = fs.readFileSync(path.resolve('client/THIRD_PARTY_NOTICES.md'), 'utf8');
+    assert.match(thirdPartyNotices, /Copyright \(c\) 2026 Muhammed Eliwat/u);
+    assert.match(thirdPartyNotices, /Permission is hereby granted, free of charge/u);
+    assert.match(thirdPartyNotices, /5d3aeca239caef3ea4080034eb22ab87cc77fa24/u);
     assert.deepEqual(manifest.prototypes.map(({ id }) => id), [
       'annotation-demo',
       'beginner-guide',
@@ -393,6 +398,17 @@ describe('release make artifact helpers', () => {
       ...manifest.makeMetadata.files,
     ];
     assert(rules.every(({ description }) => typeof description === 'string' && description.trim()));
+  });
+
+  it('keeps mobile theme source notices consistent with tracked provenance files', () => {
+    const themesRoot = path.resolve('client/src/themes');
+    const staleNotices = fs.readdirSync(themesRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && entry.name.endsWith('-mobile'))
+      .map((entry) => path.join(themesRoot, entry.name, 'SOURCE.md'))
+      .filter((sourcePath) => fs.existsSync(sourcePath))
+      .filter((sourcePath) => fs.readFileSync(sourcePath, 'utf8').includes('normalization.json'));
+
+    assert.deepEqual(staleNotices, []);
   });
 
   it('does not publish the triple ampersand test skill', () => {
@@ -597,6 +613,7 @@ describe('release make artifact helpers', () => {
         files: [
           '.gitignore',
           'package.json',
+          'THIRD_PARTY_NOTICES.md',
           'scripts/build-all.js',
           'scripts/capture-theme-homepage.mjs',
           'scripts/capture-theme-source.mjs',
@@ -658,6 +675,12 @@ describe('release make artifact helpers', () => {
       '!.axhub/make/axhub.config.json',
       '!.axhub/make/README.md',
       '!.axhub/make/sidebar-tree.json',
+      '',
+    ].join('\n'));
+    writeFile(path.join(clientRoot, 'THIRD_PARTY_NOTICES.md'), [
+      '# Third-Party Notices',
+      '',
+      'Permission is hereby granted, free of charge.',
       '',
     ].join('\n'));
     writeFile(path.join(clientRoot, 'src/prototypes/annotation-demo/index.tsx'), 'export {};\n');
@@ -771,6 +794,11 @@ describe('release make artifact helpers', () => {
     const packagedGitignore = Buffer.from(zipEntries['.gitignore']).toString('utf8');
     assert(entries.includes('package.json'));
     assert(entries.includes('pnpm-lock.yaml'));
+    assert(entries.includes('THIRD_PARTY_NOTICES.md'));
+    assert.match(
+      Buffer.from(zipEntries['THIRD_PARTY_NOTICES.md']).toString('utf8'),
+      /Permission is hereby granted, free of charge/u,
+    );
     assert.equal(packagedPackageJson.packageManager, 'pnpm@10.20.0');
     assert.equal(packagedPackageJson.scripts.test, undefined);
     assert.equal(packagedPackageJson.scripts['test:run'], undefined);

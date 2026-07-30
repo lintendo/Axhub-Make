@@ -278,10 +278,16 @@ function addOrUpdateRegistryProjectByRoot(
   const root = path.resolve(params.root);
   const existingByRoot = findRegisteredProjectByRoot(registry.listProjects(), root);
   if (existingByRoot) {
-    const error = new Error(`Project path already registered: ${root}`) as Error & { code?: string; status?: number };
-    error.code = 'MAKE_PROJECT_PATH_CONFLICT';
-    error.status = 409;
-    throw error;
+    const { identity } = syncProjectIdentitySource(root, {
+      metadataPath: params.metadataPath,
+      fallback: params,
+      projectId: existingByRoot.id,
+    });
+    return registry.updateProject(existingByRoot.id, {
+      name: identity.name,
+      root,
+      metadataPath: params.metadataPath,
+    });
   }
   const projectId = allocateRegisteredProjectId(
     params.id,

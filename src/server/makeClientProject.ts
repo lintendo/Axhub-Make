@@ -1607,6 +1607,7 @@ function readMakeClientPackageJsonForUpdate(
 }
 
 function collectMakeClientUpdateTemplateFiles(templateRoot: string): string[] {
+  const markerRelativePath = '.axhub/make/client.json';
   const files: string[] = [];
   const walk = (sourceDir: string, relativeDir = '') => {
     for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
@@ -1625,8 +1626,10 @@ function collectMakeClientUpdateTemplateFiles(templateRoot: string): string[] {
     }
   };
   walk(templateRoot);
-  files.push('.axhub/make/client.json');
-  return Array.from(new Set(files)).sort();
+  return [
+    ...Array.from(new Set(files.filter((relativePath) => relativePath !== markerRelativePath))).sort(),
+    markerRelativePath,
+  ];
 }
 
 function createMakeClientUpdateBackupRoot(projectRoot: string): string {
@@ -1756,25 +1759,10 @@ function writeMakeClientUpdateTemplateFiles(params: {
   marker: MakeClientMarker;
   source: MakeClientTemplateSource;
   targetVersion: string;
+  writtenFiles: string[];
 }): string[] {
-  const writtenFiles: string[] = [];
-  for (const relativePath of params.plannedFiles) {
-    if (relativePath === '.axhub/make/client.json') {
-      writeMakeClientMarker(params.projectRoot, {
-        schemaVersion: 1,
-        kind: 'axhub-make-client',
-        repository: params.source.markerRepository,
-        templateUrl: params.source.url,
-        templateVersion: params.source.templateVersion || params.targetVersion,
-        project: {
-          id: params.marker.project.id,
-          name: params.marker.project.name,
-        },
-      });
-      writtenFiles.push(relativePath);
-      continue;
-    }
-
+  const markerRelativePath = '.axhub/make/client.json';
+  for (const relativePath of params.plannedFiles.filter((file) => file !== markerRelativePath)) {
     const sourcePath = path.resolve(params.templateRoot, ...relativePath.split('/'));
     const targetPath = path.resolve(params.projectRoot, ...relativePath.split('/'));
     if (!isInsideRoot(params.templateRoot, sourcePath) || !isInsideRoot(params.projectRoot, targetPath)) {
@@ -1793,9 +1781,25 @@ function writeMakeClientUpdateTemplateFiles(params: {
     } else {
       fs.copyFileSync(sourcePath, targetPath);
     }
-    writtenFiles.push(relativePath);
+    params.writtenFiles.push(relativePath);
   }
-  return writtenFiles;
+
+  // The marker is the update commit point: write it only after every template file succeeds.
+  if (params.plannedFiles.includes(markerRelativePath)) {
+    writeMakeClientMarker(params.projectRoot, {
+      schemaVersion: 1,
+      kind: 'axhub-make-client',
+      repository: params.source.markerRepository,
+      templateUrl: params.source.url,
+      templateVersion: params.source.templateVersion || params.targetVersion,
+      project: {
+        id: params.marker.project.id,
+        name: params.marker.project.name,
+      },
+    });
+    params.writtenFiles.push(markerRelativePath);
+  }
+  return params.writtenFiles;
 }
 
 function hasPnpmLockfile(projectRoot: string): boolean {
@@ -2058,7 +2062,7 @@ export async function applyMakeClientUpdate(
       createdAt,
     });
 
-    writtenFiles = writeMakeClientUpdateTemplateFiles({
+    writeMakeClientUpdateTemplateFiles({
       projectRoot: root,
       templateRoot: extractedTemplate.templateRoot,
       plannedFiles,
@@ -2066,6 +2070,7 @@ export async function applyMakeClientUpdate(
       marker,
       source: extractedTemplate.source,
       targetVersion: status.targetVersion,
+      writtenFiles,
     });
 
     let metadataSynced = false;
