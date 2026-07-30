@@ -15,7 +15,6 @@ import {
   type StyleSnapshot,
 } from '../property-panel/react-design-panel';
 import { PromptCardScrollArea } from './prompt-card-scroll-area';
-import { EDITOR_CHROME } from './theme';
 
 type PromptCardDesignGroupId =
   | 'layout'
@@ -105,11 +104,7 @@ const tabStripStyle: React.CSSProperties = {
 };
 
 const editorShellStyle: React.CSSProperties = {
-  marginTop: 2,
-  padding: '8px 8px 6px',
-  borderRadius: 16,
-  background: `color-mix(in srgb, ${EDITOR_CHROME.surfaceMuted} 72%, ${EDITOR_CHROME.surface} 28%)`,
-  border: `1px solid ${EDITOR_CHROME.border}`,
+  padding: '0 8px 6px',
 };
 
 const contentStyle: React.CSSProperties = {

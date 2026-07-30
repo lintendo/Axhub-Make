@@ -1,0 +1,289 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/productivity/zoom/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-zoom-mobile",
+    "slug": "zoom-mobile",
+    "brand": "Zoom",
+    "titleZh": "Zoom 主题",
+    "titleEn": "Zoom",
+    "descriptionZh": "Zoom 的 Design.md 主题展示，围绕移动端、企业服务与生产力组织页面。",
+    "descriptionEn": "Zoom mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "企业服务与生产力"
+    ],
+    "distributionTags": [
+      "移动端",
+      "企业服务与生产力"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/zoom-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/zoom-workplace/id546505307",
+          "officialPageUrl": "https://apps.apple.com/us/app/zoom-workplace/id546505307",
+          "marketId": "546505307",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/f7/f4/9f/f7f49ffc-8ad3-fc51-2905-10ca1e6c7292/Apple_iOS_Meetings_1290x2796.jpg/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:27:43.520Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "b6a4d3da8a1f3883659cc2146c11087b23d9b78f1c3bea62056c7e0fe6911d45",
+          "byteLength": 69728,
+          "width": 720,
+          "height": 1561
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/zoom-workplace/id546505307",
+          "officialPageUrl": "https://apps.apple.com/us/app/zoom-workplace/id546505307",
+          "marketId": "546505307",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/9a/68/b2/9a68b2ac-5da2-c138-4b87-e0f95d057182/zoomate-04-1_U002c290_x_2_U002c796.jpg/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:27:43.520Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "ad998ed5154527c3220aa30cbb63737aaa717a4b36c427934cca69b44e5daa7c",
+          "byteLength": 36746,
+          "width": 720,
+          "height": 1561
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/zoom-workplace/id546505307",
+          "officialPageUrl": "https://apps.apple.com/us/app/zoom-workplace/id546505307",
+          "marketId": "546505307",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/7a/74/bc/7a74bc3c-17d7-017c-774e-edfe9bc23ba5/Apple_iOS_My_Notes_1290x2796.jpg/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:27:43.520Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "808bbba97b8084b0099f2c6bbd7bab3809bb85117c102bd41cea6f8e4dab62a0",
+          "byteLength": 42736,
+          "width": 720,
+          "height": 1561
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#2D8CFF",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Roboto",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Roboto",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Zoom 主题",
+    "brandAlias": "Zoom",
+    "description": "Zoom 的 Design.md 主题展示，围绕移动端、企业服务与生产力组织页面。",
+    "descriptionEn": "Zoom mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "企业服务与生产力"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#2D8CFF",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#3A3A3A",
+        "cssValue": "#3A3A3A",
+        "description": "Surface 2 (`#3A3A3A`): Higher elevation — popovers, pressed rows, video-tile placeholder."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#E5E5E5",
+        "cssValue": "#E5E5E5",
+        "description": "Light Divider (`#E5E5E5`): Hairline dividers in light appearance."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#2D8CFF",
+        "cssValue": "#2D8CFF",
+        "description": "The accent is Zoom Blue `#2D8CFF` — a confident, friendly blue used for the one action that matters on each screen: the big \"Join\" button, the \"Start\" pill, the active control state, links. It is the single brand color, used sparingly so that it always reads as *the* primary action. The one chromatic exception is the in-call red `#E02828`, reserved exclusively for \"Leave\"/\"End\" and the muted-microphone indicator — the two moments where the app needs to communicate urgency or a live-risk state. There is no third accent; status and structure are carried by gray, white, and the blue."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#2D2D2D",
+        "cssValue": "#2D2D2D",
+        "description": "Surface 1 (`#2D2D2D`): Cards, list rows, the in-call control bar, sheets."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Roboto",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use the committed dark theater ({#1A1A1A}) inside a call so video is the brightest element。",
+        "建议：Reserve Zoom Blue ({#2D8CFF}) for the primary action (Join/Start), active controls, and links。",
+        "建议：Reserve in-call red ({#E02828}) for Leave/End and the muted-mic state only。",
+        "建议：Make the Join button oversized (48pt tall, 17pt bold) — it is the app's center of gravity。",
+        "建议：Use rounded 8pt video tiles with small corner name labels so faces dominate。"
+      ],
+      "dont": [
+        "避免：keep a light background inside a call — it competes with participant video。",
+        "避免：introduce a third accent color — blue for action, red for leave/mute, gray for everything else。",
+        "避免：make name labels large — 13pt max; the gallery is about faces, not text。",
+        "避免：let the active-speaker border flicker — debounce it。",
+        "避免：keep the control bar permanently visible over video — auto-hide is the behavior。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "workspace",
+      "navigation": [
+        "工作台",
+        "项目",
+        "我的"
+      ],
+      "primaryAction": "新建项目"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

@@ -36,7 +36,6 @@ import type {
 import type { PromptImageAttachment } from '../../core/editor/state';
 import type {
   CommentarySkillOption,
-  CommentarySkillSettingsSnapshot,
 } from '../../web-editor-types';
 import {
   DEFAULT_WEB_EDITOR_UI_SETTINGS,
@@ -208,9 +207,6 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     CommentarySkillOption[]
   >(() => normalizeRuntimeSkillOptions(propertyPanelOptions?.commentarySkillOptions));
   const commentarySkillSelectionManaged = commentarySkillOptions.length > 0;
-  const [commentarySkillSettingsConfigured, setCommentarySkillSettingsConfigured] = React.useState(
-    () => propertyPanelOptions?.commentarySkillSettingsConfigured === true,
-  );
   const [enabledCommentarySkillIds, setEnabledCommentarySkillIds] = React.useState<string[]>(() =>
     resolveRuntimeSkillIds(
       propertyPanelOptions?.commentarySelectedSkillIds,
@@ -302,7 +298,6 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       propertyPanelOptions?.commentarySkillOptions,
     );
     setCommentarySkillOptions(nextSkillOptions);
-    setCommentarySkillSettingsConfigured(configured);
     setEnabledCommentarySkillIds(
       resolveRuntimeSkillIds(
         propertyPanelOptions?.commentarySelectedSkillIds,
@@ -315,73 +310,6 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     propertyPanelOptions?.commentarySkillOptions,
     propertyPanelOptions?.commentarySelectedSkillIds,
     propertyPanelOptions?.commentarySkillSettingsConfigured,
-  ]);
-
-  const effectivePropertyPanelOptions = React.useMemo(() => {
-    if (!propertyPanelOptions || !commentarySkillSelectionManaged) {
-      return propertyPanelOptions;
-    }
-
-    return {
-      ...propertyPanelOptions,
-      commentarySkillOptions,
-      commentarySelectedSkillIds: enabledCommentarySkillIds,
-      commentarySkillSettingsConfigured,
-      onCommentarySkillSelectionLoad: async () => {
-        const loadedSkillIds = await propertyPanelOptions.onCommentarySkillSelectionLoad?.();
-        const nextSkillIds = Array.isArray(loadedSkillIds)
-          ? normalizeRuntimeSkillIds(loadedSkillIds)
-          : normalizeRuntimeSkillIds(propertyPanelOptions.commentarySelectedSkillIds);
-        setEnabledCommentarySkillIds(nextSkillIds);
-        return nextSkillIds;
-      },
-      onCommentarySkillSelectionChange: async (skillIds: string[]) => {
-        const nextSkillIds = normalizeRuntimeSkillIds(skillIds);
-        await propertyPanelOptions.onCommentarySkillSelectionChange?.(nextSkillIds);
-        setCommentarySkillSettingsConfigured(true);
-        setEnabledCommentarySkillIds(nextSkillIds);
-      },
-      onCommentarySkillSettingsLoad: propertyPanelOptions.onCommentarySkillSettingsLoad
-        ? async () => {
-            const loaded = await propertyPanelOptions.onCommentarySkillSettingsLoad?.();
-            const nextSkillOptions = normalizeRuntimeSkillOptions(loaded?.skillOptions);
-            const nextSkillIds = normalizeRuntimeSkillIds(loaded?.selectedSkillIds);
-            setCommentarySkillOptions(nextSkillOptions);
-            setCommentarySkillSettingsConfigured(true);
-            setEnabledCommentarySkillIds(nextSkillIds);
-            return {
-              selectedSkillIds: nextSkillIds,
-              skillOptions: nextSkillOptions,
-            } satisfies CommentarySkillSettingsSnapshot;
-          }
-        : undefined,
-      onCommentarySkillSettingsChange: propertyPanelOptions.onCommentarySkillSettingsChange
-        ? async (settings: CommentarySkillSettingsSnapshot) => {
-            const normalizedSettings = {
-              selectedSkillIds: normalizeRuntimeSkillIds(settings.selectedSkillIds),
-              skillOptions: normalizeRuntimeSkillOptions(settings.skillOptions),
-            } satisfies CommentarySkillSettingsSnapshot;
-            const saved =
-              await propertyPanelOptions.onCommentarySkillSettingsChange?.(normalizedSettings);
-            const nextSettings = saved ?? normalizedSettings;
-            const nextSkillOptions = normalizeRuntimeSkillOptions(nextSettings.skillOptions);
-            const nextSkillIds = normalizeRuntimeSkillIds(nextSettings.selectedSkillIds);
-            setCommentarySkillOptions(nextSkillOptions);
-            setCommentarySkillSettingsConfigured(true);
-            setEnabledCommentarySkillIds(nextSkillIds);
-            return {
-              selectedSkillIds: nextSkillIds,
-              skillOptions: nextSkillOptions,
-            } satisfies CommentarySkillSettingsSnapshot;
-          }
-        : undefined,
-    };
-  }, [
-    commentarySkillSettingsConfigured,
-    commentarySkillSelectionManaged,
-    commentarySkillOptions,
-    enabledCommentarySkillIds,
-    propertyPanelOptions,
   ]);
 
   React.useEffect(() => {
@@ -659,7 +587,15 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       const element = elementOverride ?? currentTargetRef.current;
       if (!element || !propertyPanelOptions?.onAnnotationMarkdownChange) return false;
       if (!(propertyPanelOptions?.canEditAnnotationMarkdown?.(element) ?? false)) return false;
-      if (getAnnotationManualEditLocatorState(element).disabled) return false;
+      if (
+        propertyPanelOptions.annotationMarkdownEditorKind !== 'document-source'
+        && getAnnotationManualEditLocatorState(
+          element,
+          undefined,
+          propertyPanelOptions.getCreateAnnotationBlockReason,
+          propertyPanelOptions.resolveAnnotationTarget,
+        ).disabled
+      ) return false;
 
       const nextValue =
         typeof markdownOverride === 'string'
@@ -1420,10 +1356,10 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
           onDeleteCurrentAnnotationNode={handleDeleteCurrentAnnotationNode}
         />
       ) : null}
-      {effectivePropertyPanelOptions && propertyPanelVisible ? (
+      {propertyPanelOptions && propertyPanelVisible ? (
         <PropertyPanelView
           ref={propertyPanelRef}
-          options={effectivePropertyPanelOptions}
+          options={propertyPanelOptions}
           currentTarget={currentTarget}
           uiMode={uiMode}
           toolMinimized={toolMinimized}

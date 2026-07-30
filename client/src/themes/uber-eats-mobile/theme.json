@@ -1,0 +1,308 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/food/uber-eats/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-uber-eats-mobile",
+    "slug": "uber-eats-mobile",
+    "brand": "Uber Eats",
+    "titleZh": "Uber Eats 主题",
+    "titleEn": "Uber Eats",
+    "descriptionZh": "Uber Eats 的 Design.md 主题展示，围绕移动端、本地生活与餐饮组织页面。",
+    "descriptionEn": "Uber Eats mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "本地生活与餐饮"
+    ],
+    "distributionTags": [
+      "移动端",
+      "本地生活与餐饮"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/uber-eats-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/uber-eats-food-groceries/id1058959277",
+          "officialPageUrl": "https://apps.apple.com/us/app/uber-eats-food-groceries/id1058959277",
+          "marketId": "1058959277",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/50/0e/37/500e37cc-f8c1-3ab8-10e9-7044ed7f95b3/Eats_US_iOS_iphoneX_1242x2688_SS01.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:42.657Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "b4c6760dad2b79a4c0389018d7663ce2633aaf00b772c9447a57cb83c1c3a93c",
+          "byteLength": 88604,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/uber-eats-food-groceries/id1058959277",
+          "officialPageUrl": "https://apps.apple.com/us/app/uber-eats-food-groceries/id1058959277",
+          "marketId": "1058959277",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/02/7c/97/027c972a-f7a8-14dd-94d1-910602bd5577/Eats_US_iOS_iphoneX_1242x2688_SS05.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:42.657Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "8fe00727834b69db9ff71e9c18a3db0836fe7f5b7f51eaa3c421e45ff5f3e2cc",
+          "byteLength": 46730,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/uber-eats-food-groceries/id1058959277",
+          "officialPageUrl": "https://apps.apple.com/us/app/uber-eats-food-groceries/id1058959277",
+          "marketId": "1058959277",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/25/11/82/251182f1-0545-200c-c010-0df881c3e12e/Eats_US_iOS_iphoneX_1242x2688_SS03.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:42.657Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "424b2580f4bd663a43c25f088eb927ab7d4decd693395a26137fb55da6e4cfce",
+          "byteLength": 73036,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#06C167",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Roboto",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Roboto",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Uber Eats 主题",
+    "brandAlias": "Uber Eats",
+    "description": "Uber Eats 的 Design.md 主题展示，围绕移动端、本地生活与餐饮组织页面。",
+    "descriptionEn": "Uber Eats mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "本地生活与餐饮"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#06C167",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "阴影 1 - Shadow 1",
+        "value": "rgba(0,0,0,0.12) 0 -2px 12px",
+        "cssValue": "rgba(0,0,0,0.12) 0 -2px 12px",
+        "description": "Shadow: none by default; the sticky cart-bar variant uses `rgba(0,0,0,0.12) 0 -2px 12px` above it"
+      }
+    ],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#E8E8E8",
+        "cssValue": "#E8E8E8",
+        "description": "Divider (`#E8E8E8`): 1pt separators between menu items and list rows."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#2C2C2E",
+        "cssValue": "#2C2C2E",
+        "description": "Dark Surface 2 (`#2C2C2E`): Higher elevation, chip default."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#06C167",
+        "cssValue": "#06C167",
+        "description": "The accent system is a single green. Uber Eats Green (`#06C167`) — the brand's fresh, slightly cool green — owns every primary action: the \"Add to cart\" button, the sticky cart bar, active filter pills, the \"Track order\" CTA, and selected states. Near-black (`#000000`) carries titles and the secondary \"Schedule\" / outline actions, and a mid gray (`#6B6B6B`) handles metadata (ratings, ETA, fees). There is no second brand hue — against full-color food photography and a white canvas, the green reads instantly as \"order.\" A dark mode is fully supported (inverting to a near-black canvas) but the default and primary experience is light."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#000000",
+        "cssValue": "#000000",
+        "description": "The accent system is a single green. Uber Eats Green (`#06C167`) — the brand's fresh, slightly cool green — owns every primary action: the \"Add to cart\" button, the sticky cart bar, active filter pills, the \"Track order\" CTA, and selected states. Near-black (`#000000`) carries titles and the secondary \"Schedule\" / outline actions, and a mid gray (`#6B6B6B`) handles metadata (ratings, ETA, fees). There is no second brand hue — against full-color food photography and a white canvas, the green reads instantly as \"order.\" A dark mode is fully supported (inverting to a near-black canvas) but the default and primary experience is light."
+      },
+      {
+        "label": "边框 5 - Border 5",
+        "value": "#F3F3F3",
+        "cssValue": "#F3F3F3",
+        "description": "Surface (`#F3F3F3`): Card fills with no photo, search bar, skeleton loaders, pressed list rows."
+      },
+      {
+        "label": "边框 6 - Border 6",
+        "value": "rgba(255,255,255,0.96)",
+        "cssValue": "rgba(255,255,255,0.96)",
+        "description": "Background: `rgba(255,255,255,0.96)` (light) / `rgba(0,0,0,0.96)` (dark) with `translucent backdrop blur` blur, hairline top divider `#E8E8E8`"
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Roboto",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use a pure white canvas ({#FFFFFF}) by default — photo-first, gallery-like whitespace (dark mode inverts neutrals only)。",
+        "建议：Reserve Uber Eats Green ({#06C167}) for primary actions and selected states — cart bar, Add, Track, active pill。",
+        "建议：Keep the same green ({#06C167}) in dark mode — only neutrals invert。",
+        "建议：Let restaurant cards sit borderless and shadowless on white — the food photo provides the framing。",
+        "建议：Keep ratings monochrome (near-black star) — quiet merchandising so green = action stands out。"
+      ],
+      "dont": [
+        "避免：default to a dark canvas — the brand is bright and photo-first (dark mode is a supported alternate, not the default)。",
+        "避免：add a second accent hue — the single green is the entire action language。",
+        "避免：color the rating star yellow — Uber Eats keeps it monochrome and quiet。",
+        "避免：put borders/shadows on restaurant cards — they sit flat on white; the photo frames itself。",
+        "避免：use thin or black weights — Uber Move here is 400 / 500 / 700 only。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "commerce",
+      "navigation": [
+        "首页",
+        "订单",
+        "我的"
+      ],
+      "primaryAction": "立即购买"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

@@ -1,0 +1,316 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/finance/paypal/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-paypal-mobile",
+    "slug": "paypal-mobile",
+    "brand": "Paypal",
+    "titleZh": "Paypal 主题",
+    "titleEn": "Paypal",
+    "descriptionZh": "Paypal 的 Design.md 主题展示，围绕移动端、金融与支付组织页面。",
+    "descriptionEn": "Paypal mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "金融与支付"
+    ],
+    "distributionTags": [
+      "移动端",
+      "金融与支付"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/paypal-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/paypal-pay-send-save/id283646709",
+          "officialPageUrl": "https://apps.apple.com/us/app/paypal-pay-send-save/id283646709",
+          "marketId": "283646709",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/1c/45/8d/1c458df5-046f-52b7-4be4-70edd25cb14d/01_iPhone_65_US.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:26.916Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "526e9ae9d0d232267a6377bb86c79b35931090fa3d84f89460bfffafc5141917",
+          "byteLength": 46918,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/paypal-pay-send-save/id283646709",
+          "officialPageUrl": "https://apps.apple.com/us/app/paypal-pay-send-save/id283646709",
+          "marketId": "283646709",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/a1/af/f0/a1aff0c2-07ae-1398-3ec8-6886ed29d453/02_iPhone_65_US.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:26.916Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "3ec62862a408a7870d5d9e13a537f80b15a1e60bced7e1139eaad4d9cb39831e",
+          "byteLength": 49578,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/paypal-pay-send-save/id283646709",
+          "officialPageUrl": "https://apps.apple.com/us/app/paypal-pay-send-save/id283646709",
+          "marketId": "283646709",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/5e/da/ee/5edaee22-9514-30cd-b420-06d839e25ad3/03_iPhone_65_US.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:26.916Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "815d9b358128df02d80854402590d25d09397cab541ef10667e5f6e56c84cef1",
+          "byteLength": 64568,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#0070BA",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Helvetica Neue",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Helvetica Neue",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "spacing": {
+      "xxs": "2px",
+      "xs": "8px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Paypal 主题",
+    "brandAlias": "Paypal",
+    "description": "Paypal 的 Design.md 主题展示，围绕移动端、金融与支付组织页面。",
+    "descriptionEn": "Paypal mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "金融与支付"
+    ],
+    "fontStylesheets": [],
+    "palette": [
+      {
+        "color": "#0070BA",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "阴影 1 - Shadow 1",
+        "value": "rgba(0,0,0,0.06) 0 2px 8px",
+        "cssValue": "rgba(0,0,0,0.06) 0 2px 8px",
+        "description": "Shadow: `rgba(0,0,0,0.06) 0 2px 8px`"
+      }
+    ],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#E5E8ED",
+        "cssValue": "#E5E8ED",
+        "description": "Divider (`#E5E8ED`): Hairline row dividers, card outlines."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#2A3142",
+        "cssValue": "#2A3142",
+        "description": "Dark Divider (`#2A3142`): Hairlines."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#003087",
+        "cssValue": "#003087",
+        "description": "PayPal is the elder statesman of fintech rendered as a friendly, recognizable consumer-finance utility. The canvas is white, the brand is blue — specifically the deep navy PayPal Blue (`#003087`) that's been the company's identity since the original 1998 logo, paired with a lighter, more contemporary PayPal Sky (`#0070BA`) introduced in the 2014 rebrand. Where Cash App rebels and Robinhood streamlines, PayPal reassures: the design language signals 25 years of trusted money movement, not nightclub energy. The interface revolves around three things — your balance, your recent activity, and the Send/Request buttons — laid out in calm rectangular cards on a clean white canvas."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "rgba(0,0,0,0.06)",
+        "cssValue": "rgba(0,0,0,0.06)",
+        "description": "Light shadows (`rgba(0,0,0,0.06)`) — slightly more elevated than a pure tech-product feel, more like a card wallet"
+      },
+      {
+        "label": "边框 5 - Border 5",
+        "value": "#FFFFFF",
+        "cssValue": "#FFFFFF",
+        "description": "White canvas (`#FFFFFF`) with `#F5F7FA` for subtle section fills — calm institutional look"
+      },
+      {
+        "label": "边框 6 - Border 6",
+        "value": "#001435",
+        "cssValue": "#001435",
+        "description": "Text Primary (`#001435`): Almost-black with a slight blue tint — primary text, balance amounts, screen titles."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Helvetica Neue",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use PayPal Blue {#003087} for primary CTAs (\"Send\", \"Continue\") and active tab states — it's the core brand action color。",
+        "建议：Use PayPal Sky {#0070BA} as the secondary accent — link color, icon color, gradient highlight。",
+        "建议：Render the wordmark with the dual-blue P-P overlap — sky behind, blue front, NEVER a single color。",
+        "建议：Use PayPal Sans Big for headings, balance amounts, button text — the rounded display weight is the brand voice。",
+        "建议：Use PayPal Sans Small for body, metadata, transaction subtitles — Big at 14pt is wrong。"
+      ],
+      "dont": [
+        "避免：render the wordmark in a single solid color — the dual-blue P-P overlap is the brand。",
+        "避免：use pure black {#000000} for primary text — {#001435} (slight blue tint) is correct。",
+        "避免：use vivid greens or yellows as primary accents — green and amber are reserved for status (success / pending)。",
+        "避免：replace PayPal Sans with Helvetica or generic sans — the rounded terminals are intentional and warm。",
+        "避免：use sharp-corner buttons — primary CTAs are soft pills (radius equals half-height)。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "spacing": {
+      "xxs": "2px",
+      "xs": "8px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "finance",
+      "navigation": [
+        "资产",
+        "交易",
+        "我的"
+      ],
+      "primaryAction": "转账"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

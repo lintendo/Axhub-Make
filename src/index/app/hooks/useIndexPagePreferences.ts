@@ -72,6 +72,10 @@ export function useIndexPagePreferences({
             setInitialPreferencesLoaded(false);
             return undefined;
         }
+        if (!activeProjectId?.trim()) {
+            setInitialPreferencesLoaded(false);
+            return undefined;
+        }
 
         let canceled = false;
         apiService.getBootstrapConfig(requireProjectScope(activeProjectId))
@@ -114,6 +118,9 @@ export function useIndexPagePreferences({
 
     const handleSettingsSaved = useCallback(() => {
         if (!enabled) {
+            return;
+        }
+        if (!activeProjectId?.trim()) {
             return;
         }
 

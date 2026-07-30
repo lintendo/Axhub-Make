@@ -28,6 +28,10 @@ export interface ConversationTaskMonitor {
   stop(): void;
 }
 
+export interface ConversationTaskPageSettlement {
+  hasError: boolean;
+}
+
 const RETRY_DELAYS_MS = [1000, 3000, 10_000, 30_000] as const;
 
 function normalizeText(value: unknown): string {
@@ -80,11 +84,14 @@ export function createConversationTaskMonitor(options: {
   persistence: ConversationTaskPersistence;
   transport?: CommentaryConversationTaskTransport | null;
   logger?: Pick<Console, 'warn'>;
-  onTerminalPersisted?: () => void;
+  onTerminalPersisted?: (transition: ConversationTaskTerminalTransition) => void;
+  onPageSettled?: (settlement: ConversationTaskPageSettlement) => void | Promise<void>;
 }): ConversationTaskMonitor {
   const activeByCommentId = new Map<string, ActiveConversationTask>();
   const transport = options.transport ?? null;
   const logger = options.logger ?? console;
+  let pageCycleActive = false;
+  let pageCycleHadError = false;
 
   function isCurrent(entry: ActiveConversationTask): boolean {
     return activeByCommentId.get(entry.task.commentId) === entry;
@@ -127,12 +134,29 @@ export function createConversationTaskMonitor(options: {
       const applied = await options.persistence.transitionConversationTaskTerminal(entry.terminal);
       if (!isCurrent(entry)) return;
       if (applied) {
+        pageCycleHadError ||= entry.terminal.state === 'error';
         try {
-          options.onTerminalPersisted?.();
+          options.onTerminalPersisted?.(entry.terminal);
         } catch (error) {
           logger.warn('[Commentary] Failed to refresh persisted ACP terminal state:', error);
         }
         discard(entry);
+        if (
+          pageCycleActive
+          && activeByCommentId.size === 0
+          && options.persistence.listEditingConversationTasks().length === 0
+        ) {
+          const settlement = { hasError: pageCycleHadError };
+          pageCycleActive = false;
+          pageCycleHadError = false;
+          try {
+            void Promise.resolve(options.onPageSettled?.(settlement)).catch((error) => {
+              logger.warn('[Commentary] Failed to notify ACP page settlement:', error);
+            });
+          } catch (error) {
+            logger.warn('[Commentary] Failed to notify ACP page settlement:', error);
+          }
+        }
         return;
       }
       discard(entry);
@@ -194,9 +218,9 @@ export function createConversationTaskMonitor(options: {
 
   function reconcile(): void {
     if (!transport) return;
-    const nextByCommentId = new Map(
-      options.persistence.listEditingConversationTasks().map((task) => [task.commentId, task]),
-    );
+    const editingTasks = options.persistence.listEditingConversationTasks();
+    if (editingTasks.length > 0) pageCycleActive = true;
+    const nextByCommentId = new Map(editingTasks.map((task) => [task.commentId, task]));
     for (const entry of activeByCommentId.values()) {
       const next = nextByCommentId.get(entry.task.commentId);
       if (entry.terminal && !next) continue;

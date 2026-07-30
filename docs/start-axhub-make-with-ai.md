@@ -1,6 +1,6 @@
 # 让 AI Agent 帮你启动 Axhub Make
 
-这份文档给 AI Agent 使用。目标是在用户当前项目目录中启动 Axhub Make，并为用户创建一个以后可以一键启动的桌面脚本。
+这份文档给 AI Agent 使用。目标是启动 Axhub Make 管理服务，并为用户创建一个以后可以一键启动的桌面脚本。
 
 ## 目标命令
 
@@ -25,8 +25,7 @@ npx -y @axhub/make@latest
 - npm 是否可用；
 - npx 是否可用；
 - 当前终端是否可以访问 npm registry；
-- 当前系统是 macOS、Windows 还是 Linux；
-- 当前目录是否是用户希望运行 Axhub Make 的项目目录。
+- 当前系统是 macOS、Windows 还是 Linux。
 
 如果缺少 Node.js、npm 或 npx，请按当前操作系统安装或引导用户安装。
 
@@ -34,7 +33,7 @@ npx -y @axhub/make@latest
 
 ## 桌面启动脚本
 
-脚本需要进入用户当前项目目录，然后执行：
+脚本直接执行：
 
 ```bash
 npx -y @axhub/make@latest

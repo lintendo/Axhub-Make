@@ -80,4 +80,14 @@ describe('beginner guide annotation updates', () => {
     expect(source).toContain('时间不确定性');
     expect(source).toContain('平均效率提升');
   });
+
+  it('replaces the advanced chapter with help options', () => {
+    expect(source).toContain("{ id: 'advanced-guide', title: '获取帮助' }");
+    expect(source).toContain("title: '获取帮助'");
+    expect(source).toContain('https://axhub.im/');
+    expect(source).toContain('请读取这个文档，并按里面的要求指导我使用 Axhub Make：');
+    expect(source).toContain('https://raw.githubusercontent.com/lintendo/Axhub-Make/main/docs/guide-users-with-axhub-make.md');
+    expect(source).not.toContain('进阶指导不是新手必须马上学的内容');
+    expect(source).not.toContain("import onlineImportModalImage from './assets/online-import-modal.png';");
+  });
 });

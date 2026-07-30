@@ -5,6 +5,7 @@ import { MobileSelectionOverlay } from './mobile-selection-overlay';
 import {
   CaretRightFilled,
   CheckCircleFilled,
+  ClearOutlined,
   CloseOutlined,
   CopyOutlined,
   DeleteOutlined,
@@ -25,6 +26,7 @@ import {
   triggerAgentPromptAction,
 } from '../agent-prompt-action';
 import { executePromptCardCurrentElementAction } from './prompt-card-actions';
+import { resolvePromptCardCloseActionTitle } from './prompt-card-shortcut-label';
 import { CloseToolIcon, AgentSparkleIcon, IconActionButton } from './action-buttons';
 import { resolveExternalEditingStatusDescription } from './external-editing-status-hint';
 import { deriveAgentUiState } from './agent-ui-state';
@@ -115,9 +117,11 @@ const ANNOTATION_PANEL_NODE_ID_ATTR = 'data-axhub-annotation-panel-node-id';
 const ANNOTATION_MARKER_NODE_ID_ATTR = 'data-axhub-annotation-node-id';
 
 const ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE =
-  '当前元素无法可靠定位，请在 AI 输入框描述标注需求，由 AI 创建标注。';
+  '无法准确定位标注位置，该标注需要由 AI 生成';
 const ANNOTATION_MARKDOWN_PLACEHOLDER =
   '输入需求标注，支持 Markdown 格式。输入后即可创建标注节点。建议由 AI 创建标注，定位会更准确。';
+const DOCUMENT_SOURCE_MARKDOWN_PLACEHOLDER =
+  '编辑所选内容对应的原始 Markdown。保存后会直接更新本地文档。';
 
 function isAnnotationPanelTarget(element: Element | null): boolean {
   if (!element) return false;
@@ -142,21 +146,30 @@ function readCurrentAnnotationNodeId(element: Element | null): string {
 export function getAnnotationManualEditLocatorState(
   element: Element | null,
   resolveLocator: (locator: ElementLocator) => Element | null = locateElement,
+  getCreateBlockReason?: (element: Element | null) => string | undefined,
+  resolveAnnotationTarget?: (element: Element | null) => Element | null,
 ): { disabled: boolean; message: string } {
-  if (!element) {
+  const annotationTarget = resolveAnnotationTarget
+    ? resolveAnnotationTarget(element)
+    : element;
+  if (!annotationTarget) {
     return { disabled: true, message: ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE };
   }
-  const annotationNodeId = readCurrentAnnotationNodeId(element);
+  const annotationNodeId = readCurrentAnnotationNodeId(annotationTarget);
   if (annotationNodeId) {
     return { disabled: false, message: '' };
   }
-  const isPanelTarget = isAnnotationPanelTarget(element);
+  const createBlockReason = getCreateBlockReason?.(annotationTarget)?.trim();
+  if (createBlockReason) {
+    return { disabled: true, message: createBlockReason };
+  }
+  const isPanelTarget = isAnnotationPanelTarget(annotationTarget);
   if (isPanelTarget) {
     return { disabled: true, message: ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE };
   }
   let locator: ElementLocator;
   try {
-    locator = createElementLocator(element);
+    locator = createElementLocator(annotationTarget);
   } catch {
     return { disabled: true, message: ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE };
   }
@@ -171,7 +184,7 @@ export function getAnnotationManualEditLocatorState(
   if (!resolvedElement) {
     return { disabled: true, message: ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE };
   }
-  if (resolvedElement !== element) {
+  if (resolvedElement !== annotationTarget) {
     return { disabled: true, message: ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE };
   }
   return { disabled: false, message: '' };
@@ -344,6 +357,7 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
       onConfirmAnnotationMarkdown,
       onDeleteCurrentAnnotationNode,
     } = props;
+    const documentSourceMarkdownEditor = options.annotationMarkdownEditorKind === 'document-source';
 
     const rootRef = React.useRef<HTMLDivElement | null>(null);
     const textComposerRef = React.useRef<HTMLDivElement | null>(null);
@@ -354,6 +368,7 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
     const [sendingCurrentElementPrompt, setSendingCurrentElementPrompt] = React.useState(false);
     const [refreshKey, setRefreshKey] = React.useState(0);
     const [selectedSkills, setSelectedSkills] = React.useState<PromptCardSkill[]>([]);
+    const [promptDismissed, setPromptDismissed] = React.useState(false);
     const [annotationEditorOpen, setAnnotationEditorOpen] = React.useState(false);
     const [runningElementToolId, setRunningElementToolId] = React.useState<string | null>(null);
     const [elementToolError, setElementToolError] = React.useState('');
@@ -388,6 +403,10 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
       setRunningElementToolId(null);
       setElementToolError('');
     }, [enabledSkillIds, savedNoteMeta, currentTarget, skillOptions]);
+
+    React.useEffect(() => {
+      setPromptDismissed(false);
+    }, [currentTarget]);
 
     const onConfirmNoteWithSelectedSkills = React.useCallback(async () => {
       const payload = buildPromptCardSkillSavePayload(draftNote, selectedSkills);
@@ -591,7 +610,8 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
         promptPosition &&
         promptCardSize &&
         !toolMinimized &&
-        uiMode === 'bubble-card',
+        uiMode === 'bubble-card' &&
+        !promptDismissed,
     );
 
     React.useEffect(() => {
@@ -695,29 +715,54 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
     }, [onConfirmNoteWithSelectedSkills, onDismissSelection]);
 
     const saveAndDismissPromptCard = React.useCallback(async () => {
-      await onConfirmText();
-      await onConfirmNoteWithSelectedSkills();
-      if (!getAnnotationManualEditLocatorState(currentTarget).disabled) {
-        await onConfirmAnnotationMarkdown();
-      }
       setSelectedSkills([]);
+      setPromptDismissed(true);
 
       const activeElement = document.activeElement;
       if (activeElement instanceof HTMLElement && rootRef.current?.contains(activeElement)) {
         activeElement.blur();
       }
 
-      onDismissSelection?.();
+      // Hide immediately, but keep the current target alive while persistence
+      // callbacks capture and save its draft.
+      try {
+        await onConfirmText();
+        await onConfirmNoteWithSelectedSkills();
+        if (
+          documentSourceMarkdownEditor ||
+          !getAnnotationManualEditLocatorState(
+            currentTarget,
+            undefined,
+            options.getCreateAnnotationBlockReason,
+            options.resolveAnnotationTarget,
+          ).disabled
+        ) {
+          await onConfirmAnnotationMarkdown();
+        }
+      } finally {
+        onDismissSelection?.();
+      }
     }, [
       currentTarget,
+      documentSourceMarkdownEditor,
       onConfirmAnnotationMarkdown,
       onConfirmNoteWithSelectedSkills,
       onConfirmText,
       onDismissSelection,
+      options.getCreateAnnotationBlockReason,
+      options.resolveAnnotationTarget,
     ]);
 
     const saveAndCloseAnnotationMarkdownComposer = React.useCallback(async () => {
-      if (getAnnotationManualEditLocatorState(currentTarget).disabled) {
+      if (
+        !documentSourceMarkdownEditor &&
+        getAnnotationManualEditLocatorState(
+          currentTarget,
+          undefined,
+          options.getCreateAnnotationBlockReason,
+          options.resolveAnnotationTarget,
+        ).disabled
+      ) {
         return;
       }
       await onConfirmAnnotationMarkdown();
@@ -726,7 +771,14 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
         activeElement.blur();
       }
       onDismissSelection?.();
-    }, [currentTarget, onConfirmAnnotationMarkdown, onDismissSelection]);
+    }, [
+      currentTarget,
+      documentSourceMarkdownEditor,
+      onConfirmAnnotationMarkdown,
+      onDismissSelection,
+      options.getCreateAnnotationBlockReason,
+      options.resolveAnnotationTarget,
+    ]);
 
     const clearSelectedSkills = React.useCallback(() => {
       setSelectedSkills([]);
@@ -814,11 +866,7 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
           currentTaskTerminal,
           onDismissSelection,
         }),
-      [
-        currentTarget,
-        currentTaskTerminal,
-        onDismissSelection,
-      ],
+      [currentTarget, currentTaskTerminal, onDismissSelection],
     );
     const currentTaskSessionHref =
       currentAgentTask?.sessionUrl ??
@@ -1002,7 +1050,14 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
       && !bubbleStyleEditorOpen,
     );
     const annotationManualEditLocatorState = showAnnotationMarkdownEditor
-      ? getAnnotationManualEditLocatorState(currentTarget)
+      ? documentSourceMarkdownEditor
+        ? { disabled: false, message: '' }
+        : getAnnotationManualEditLocatorState(
+            currentTarget,
+            undefined,
+            options.getCreateAnnotationBlockReason,
+            options.resolveAnnotationTarget,
+          )
       : { disabled: false, message: '' };
     const annotationManualEditDisabled = annotationManualEditLocatorState.disabled;
     const annotationManualEditMessage = annotationManualEditLocatorState.message;
@@ -1031,7 +1086,9 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
       : `添加到 AI 对话${agentSelectionShortcutHint}`;
     const showContextAppendExecutionControls = !hideExecutionControls;
     const notePlaceholder = resolvePromptCardNotePlaceholder();
-    const promptCardCloseActionTitle = '关闭并保存 (Cmd/Ctrl + Enter / Esc)';
+    const promptCardCloseActionTitle = resolvePromptCardCloseActionTitle(
+      globalThis.navigator?.platform,
+    );
 
     const promptCardNode = (
       <div
@@ -1117,7 +1174,15 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {showAnnotationMarkdownEditorButton ? (
               <IconActionButton
-                title={annotationEditorOpen ? '关闭标注编辑' : '标注编辑'}
+                title={
+                  documentSourceMarkdownEditor
+                    ? annotationEditorOpen
+                      ? '关闭 Markdown 源码编辑'
+                      : 'Markdown 源码编辑'
+                    : annotationEditorOpen
+                      ? '关闭标注编辑'
+                      : '标注编辑'
+                }
                 icon={<FileTextOutlined />}
                 tone={annotationEditorOpen ? 'accent' : 'dark'}
                 disabled={annotationLoading}
@@ -1190,7 +1255,7 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
             ) : null}
             <IconActionButton
               title="清空批注"
-              icon={<DeleteOutlined />}
+              icon={<ClearOutlined />}
               tone="dark"
               disabled={!currentTarget}
               onClick={() => {
@@ -1216,7 +1281,7 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
               onClick={() => {
                 if (dismissTerminalTaskAndSelection()) return;
                 clearSelectedSkills();
-                void saveAndDismissPromptCard();
+                void saveAndDismissPromptCard().catch(() => undefined);
               }}
             />
           </div>
@@ -1514,38 +1579,48 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
                     color: EDITOR_CHROME.textSecondary,
                   }}
                 >
-                  需求标注
+                  {documentSourceMarkdownEditor ? 'Markdown 源码' : '需求标注'}
                 </span>
-                <Popconfirm
-                  title="删除标注"
-                  description="删除后该标注节点和页面上的 Marker 都会消失。"
-                  okText="删除"
-                  cancelText="取消"
-                  okButtonProps={{ danger: true }}
-                  disabled={annotationLoading || annotationSaving || !onDeleteCurrentAnnotationNode}
-                  getPopupContainer={resolveRuntimePopupContainer}
-                  onConfirm={() => {
-                    void onDeleteCurrentAnnotationNode?.();
-                  }}
-                >
-                  <span style={{ display: 'inline-flex' }}>
-                    <IconActionButton
-                      title="删除标注"
-                      icon={<DeleteOutlined />}
-                      tone="dark"
-                      disabled={
-                        annotationLoading || annotationSaving || !onDeleteCurrentAnnotationNode
-                      }
-                    />
-                  </span>
-                </Popconfirm>
+                {!documentSourceMarkdownEditor ? (
+                  <Popconfirm
+                    title="删除标注"
+                    description="删除后该标注节点和页面上的 Marker 都会消失。"
+                    okText="删除"
+                    cancelText="取消"
+                    okButtonProps={{ danger: true }}
+                    disabled={
+                      annotationLoading || annotationSaving || !onDeleteCurrentAnnotationNode
+                    }
+                    getPopupContainer={resolveRuntimePopupContainer}
+                    onConfirm={() => {
+                      void onDeleteCurrentAnnotationNode?.();
+                    }}
+                  >
+                    <span style={{ display: 'inline-flex' }}>
+                      <IconActionButton
+                        title="删除标注"
+                        icon={<DeleteOutlined />}
+                        tone="dark"
+                        disabled={
+                          annotationLoading || annotationSaving || !onDeleteCurrentAnnotationNode
+                        }
+                      />
+                    </span>
+                  </Popconfirm>
+                ) : null}
               </div>
               <Input.TextArea
                 className="we-runtime-prompt-card__textarea"
                 value={annotationDraftMarkdown}
                 disabled={annotationLoading || annotationManualEditDisabled}
                 autoSize={{ minRows: 4, maxRows: 10 }}
-                placeholder={ANNOTATION_MARKDOWN_PLACEHOLDER}
+                placeholder={
+                  documentSourceMarkdownEditor
+                    ? DOCUMENT_SOURCE_MARKDOWN_PLACEHOLDER
+                    : annotationManualEditDisabled
+                      ? annotationManualEditMessage
+                      : ANNOTATION_MARKDOWN_PLACEHOLDER
+                }
                 variant="borderless"
                 styles={{
                   textarea: {
@@ -1580,17 +1655,6 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
                   }
                 }}
               />
-              {annotationManualEditMessage ? (
-                <div
-                  style={{
-                    fontSize: 11,
-                    lineHeight: 1.45,
-                    color: EDITOR_CHROME.textMuted,
-                  }}
-                >
-                  {annotationManualEditMessage}
-                </div>
-              ) : null}
             </div>
           ) : null}
           {showPromptDesignEditor && transactionManager ? (
@@ -1706,7 +1770,9 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
                         marginLeft: 1,
                       }}
                       onClick={() => {
-                        void copyPromptCardTextToClipboard(currentTaskErrorMessage).catch(() => undefined);
+                        void copyPromptCardTextToClipboard(currentTaskErrorMessage).catch(
+                          () => undefined,
+                        );
                       }}
                     />
                   ) : null}
@@ -1740,7 +1806,7 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
         promptVisible={promptVisible}
         promptCardTop={promptPosition?.top ?? 0}
         onDismiss={() => {
-          void saveAndDismissPromptCard();
+          void saveAndDismissPromptCard().catch(() => undefined);
         }}
       />
     );

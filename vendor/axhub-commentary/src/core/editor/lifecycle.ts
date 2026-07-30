@@ -19,7 +19,7 @@ import {
 } from '../../design-tool-export';
 import { clearEditorRuntimeRefs, resetEditorTransientState } from './state';
 import type { EditorLifecycleDeps, ExternalEditingElementTarget } from './contracts';
-import { TEXT_COMMENT_TARGET_ATTR } from './text-comment-target';
+import { resolveTextCommentElementMeta, TEXT_COMMENT_TARGET_ATTR } from './text-comment-target';
 import { getGlobalCommentaryTweakProtocol } from '../../tweak/protocol';
 import { resolveWebEditorOptions } from './state';
 import type { PropertyPanelOptions } from '../../ui/property-panel';
@@ -108,6 +108,37 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
       ? 'text-comment'
       : 'design';
   }
+
+  function resolveAnnotationHostTarget(element: Element | null): Element | null {
+    if (element?.getAttribute?.(TEXT_COMMENT_TARGET_ATTR) !== 'true') return element;
+    return resolveTextCommentElementMeta(state, element)?.sourceElement ?? element;
+  }
+
+  const canEditAnnotationMarkdown = options.host.canEditAnnotationMarkdown
+    ? (element: Element | null): boolean => {
+        const target = resolveAnnotationHostTarget(element);
+        return Boolean(target && options.host.canEditAnnotationMarkdown?.(target));
+      }
+    : undefined;
+  const getCreateAnnotationBlockReason = options.host.getCreateAnnotationBlockReason
+    ? (element: Element | null): string | undefined =>
+        options.host.getCreateAnnotationBlockReason?.(resolveAnnotationHostTarget(element))
+    : undefined;
+  const getAnnotationDocumentEditUrl = options.host.getAnnotationDocumentEditUrl
+    ? (element: Element | null): string | null | undefined =>
+        options.host.getAnnotationDocumentEditUrl?.(resolveAnnotationHostTarget(element))
+    : undefined;
+  const getAnnotationMarkdown = options.host.getAnnotationMarkdown
+    ? (element: Element | null): string | Promise<string> =>
+        options.host.getAnnotationMarkdown?.(resolveAnnotationHostTarget(element)) ?? ''
+    : undefined;
+  const onAnnotationMarkdownChange = options.host.onAnnotationMarkdownChange
+    ? async (element: Element, markdown: string): Promise<void> => {
+        const target = resolveAnnotationHostTarget(element);
+        if (!target) throw new Error('The selected document source is no longer available.');
+        await options.host.onAnnotationMarkdownChange?.(target, markdown);
+      }
+    : undefined;
 
   function handleUiSettingsChange(settings: typeof state.uiSettings): void {
     const documentCommentModeChanged =
@@ -396,11 +427,13 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
   }
 
   async function handleDeleteCurrentAnnotationNode(element: Element): Promise<void> {
+    const hostTarget = resolveAnnotationHostTarget(element);
+    if (!hostTarget) return;
     if (options.host.onDeleteAnnotationNode) {
-      await options.host.onDeleteAnnotationNode(element);
-    } else if (options.host.onAnnotationMarkdownChange) {
-      if (options.host.canEditAnnotationMarkdown?.(element) === false) return;
-      await options.host.onAnnotationMarkdownChange(element, '');
+      await options.host.onDeleteAnnotationNode(hostTarget);
+    } else if (onAnnotationMarkdownChange) {
+      if (canEditAnnotationMarkdown?.(hostTarget) === false) return;
+      await onAnnotationMarkdownChange(hostTarget, '');
     } else {
       return;
     }
@@ -541,9 +574,7 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
     console.error(`${WEB_EDITOR_V2_LOG_PREFIX} Transaction apply error:`, error);
   }
 
-  function dismissVisibleElementAgentTaskStates(
-    target: 'completed' | 'all' = 'all',
-  ): void {
+  function dismissVisibleElementAgentTaskStates(target: 'completed' | 'all' = 'all'): void {
     const tasks = services.agentBridge.getVisibleTaskStates();
     for (const task of tasks) {
       if (target === 'completed' && task.status !== 'completed') {
@@ -581,11 +612,7 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
 
   function hasPrototypeComments(): boolean {
     const document = services.persistence.getPersistedPrototypeCommentsDocument?.() ?? null;
-    return Boolean(
-      document &&
-        (document.comments.length > 0 ||
-          document.images.length > 0),
-    );
+    return Boolean(document && (document.comments.length > 0 || document.images.length > 0));
   }
 
   function getTweakProtocol() {
@@ -1235,6 +1262,7 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
 
       const interactionProfile = resolveActiveInteractionProfile();
       const isTextComment = interactionProfile === 'text-comment';
+      const initialSelectionModeActive = !isTextComment && options.ui.initialSelectionModeActive;
 
       if (isTextComment) {
         const textCommentTarget = document.createElement('div');
@@ -1365,7 +1393,7 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
         isElementInteractionLocked: (element) =>
           services.agentBridge.isElementInteractionLocked(element),
       });
-      if (!options.ui.initialSelectionModeActive) {
+      if (!initialSelectionModeActive) {
         state.eventController.setMode('interaction', {
           allowPageInteraction: true,
         });
@@ -1480,6 +1508,7 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
           getUiSettings: () => state.uiSettings,
           interactionProfile,
           documentCommentModeAvailable: options.interactionProfile !== 'text-comment',
+          pageEditingSettingsAvailable: options.ui.pageEditingSettingsAvailable,
           onUiSettingsChange: handleUiSettingsChange,
           onLocateElement: (element) => {
             const target = services.agentBridge.resolveSelectableElement(element) ?? element;
@@ -1499,6 +1528,9 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
           getAnnotationEnabled: options.ui.getAnnotationEnabled,
           getAnnotationEnableAvailable: options.ui.getAnnotationEnableAvailable,
           getAnnotationEnableLoading: options.ui.getAnnotationEnableLoading,
+          markdownSourceEditorAvailable: options.ui.markdownSourceEditorAvailable,
+          getMarkdownSourceEditorOpen: options.ui.getMarkdownSourceEditorOpen,
+          onMarkdownSourceEditorOpenChange: options.ui.onMarkdownSourceEditorOpenChange,
           onWakeAgent: shouldDelegateAiActionToHost()
             ? () => runHostAiAction({ type: 'wake-agent' })
             : options.agentBridge.allowWake !== false
@@ -1637,33 +1669,6 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
           commentarySkillOptions: options.ui.commentarySkillOptions,
           commentarySelectedSkillIds: options.ui.commentarySelectedSkillIds,
           commentarySkillSettingsConfigured: options.ui.commentarySkillSettingsConfigured,
-          onCommentarySkillSelectionLoad: options.ui.onCommentarySkillSelectionLoad,
-          onCommentarySkillSelectionChange: options.ui.onCommentarySkillSelectionChange,
-          onCommentarySkillSettingsLoad: options.ui.onCommentarySkillSettingsLoad
-            ? async () => {
-                const settings = await options.ui.onCommentarySkillSettingsLoad?.();
-                if (!settings) {
-                  return {
-                    selectedSkillIds: options.ui.commentarySelectedSkillIds,
-                    skillOptions: options.ui.commentarySkillOptions,
-                  };
-                }
-                options.ui.commentarySelectedSkillIds = settings.selectedSkillIds;
-                options.ui.commentarySkillOptions = settings.skillOptions;
-                options.ui.commentarySkillSettingsConfigured = true;
-                return settings;
-              }
-            : undefined,
-          onCommentarySkillSettingsChange: options.ui.onCommentarySkillSettingsChange
-            ? async (settings) => {
-                const saved = await options.ui.onCommentarySkillSettingsChange?.(settings);
-                const nextSettings = saved ?? settings;
-                options.ui.commentarySelectedSkillIds = nextSettings.selectedSkillIds;
-                options.ui.commentarySkillOptions = nextSettings.skillOptions;
-                options.ui.commentarySkillSettingsConfigured = true;
-                return nextSettings;
-              }
-            : undefined,
           getAgentBridgeAvailable: () => services.agentBridge.isAvailable(),
           getAgentBridgeConnected: () => services.agentBridge.isConnected(),
           getCanAbortAgentPrompt: (element) => {
@@ -1785,10 +1790,13 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
             services.changes.setImagesForElement(element, images);
             state.positionTracker?.forceUpdate(true);
           },
-          canEditAnnotationMarkdown: options.host.canEditAnnotationMarkdown,
-          getAnnotationDocumentEditUrl: options.host.getAnnotationDocumentEditUrl,
-          getAnnotationMarkdown: options.host.getAnnotationMarkdown,
-          onAnnotationMarkdownChange: options.host.onAnnotationMarkdownChange,
+          canEditAnnotationMarkdown,
+          resolveAnnotationTarget: resolveAnnotationHostTarget,
+          getCreateAnnotationBlockReason,
+          annotationMarkdownEditorKind: options.host.annotationMarkdownEditorKind,
+          getAnnotationDocumentEditUrl,
+          getAnnotationMarkdown,
+          onAnnotationMarkdownChange,
           onDismissSelection: services.interaction.clearSelection,
           getChangeMarkersVisible: () => state.changeMarkersVisible,
           onChangeMarkersVisible: services.changes.setChangeMarkersVisible,
@@ -1814,11 +1822,19 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
             onStatusChange?.();
           },
           onToggleSelectionMode: (enabled, toggleOptions) => {
-            const selectedElement = state.selectedElement;
-            const hasSelection = !!selectedElement && selectedElement.isConnected;
             if (!state.eventController) {
               return;
             }
+
+            if (isTextComment) {
+              state.eventController.setMode('interaction', {
+                allowPageInteraction: true,
+              });
+              return;
+            }
+
+            const selectedElement = state.selectedElement;
+            const hasSelection = !!selectedElement && selectedElement.isConnected;
 
             if (enabled) {
               state.eventController.setMode(hasSelection ? 'selecting' : 'hover');
@@ -1835,7 +1851,7 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
           container: elements.uiRoot,
           shadowRoot: elements.shadowRoot,
           propertyPanelVisible: options.ui.propertyPanel,
-          initialSelectionModeActive: options.ui.initialSelectionModeActive,
+          initialSelectionModeActive,
           toolbarMode: options.ui.toolbarMode,
           breadcrumbsOptions: options.ui.breadcrumbs
             ? {
@@ -1862,10 +1878,13 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
                   services.changes.getMetaForElement(element)?.styleSummaryLines ?? [],
                 getElementTools: options.host.getElementTools,
                 onElementToolAction: options.host.onElementToolAction,
-                canEditAnnotationMarkdown: options.host.canEditAnnotationMarkdown,
-                getAnnotationDocumentEditUrl: options.host.getAnnotationDocumentEditUrl,
-                getAnnotationMarkdown: options.host.getAnnotationMarkdown,
-                onAnnotationMarkdownChange: options.host.onAnnotationMarkdownChange,
+                canEditAnnotationMarkdown,
+                resolveAnnotationTarget: resolveAnnotationHostTarget,
+                getCreateAnnotationBlockReason,
+                annotationMarkdownEditorKind: options.host.annotationMarkdownEditorKind,
+                getAnnotationDocumentEditUrl,
+                getAnnotationMarkdown,
+                onAnnotationMarkdownChange,
                 onDeleteCurrentAnnotationNode:
                   options.host.onDeleteAnnotationNode || options.host.onAnnotationMarkdownChange
                     ? handleDeleteCurrentAnnotationNode
@@ -1898,7 +1917,9 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
 
       services.changes.renderChangeMarkers();
       installParentSelectHotkey();
-      installSelectionModeHotkey();
+      if (!isTextComment) {
+        installSelectionModeHotkey();
+      }
       installUiResizeClamp();
       installRouteChangeRefresh();
 
@@ -2062,6 +2083,8 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
         darkMode: options.ui.initialDarkMode,
       };
       const interactionProfile = resolveActiveInteractionProfile();
+      const initialSelectionModeActive =
+        interactionProfile !== 'text-comment' && options.ui.initialSelectionModeActive;
 
       if (options.ui.propertyPanel) {
         state.tokensService = createDesignTokensService();
@@ -2087,6 +2110,7 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
           getUiSettings: () => state.uiSettings,
           interactionProfile,
           documentCommentModeAvailable: options.interactionProfile !== 'text-comment',
+          pageEditingSettingsAvailable: options.ui.pageEditingSettingsAvailable,
           onUiSettingsChange: handleUiSettingsChange,
           onLocateElement: () => {},
           onCommentShortcutDialogOpenChange: (open) => {
@@ -2099,6 +2123,9 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
           getAnnotationEnabled: options.ui.getAnnotationEnabled,
           getAnnotationEnableAvailable: options.ui.getAnnotationEnableAvailable,
           getAnnotationEnableLoading: options.ui.getAnnotationEnableLoading,
+          markdownSourceEditorAvailable: options.ui.markdownSourceEditorAvailable,
+          getMarkdownSourceEditorOpen: options.ui.getMarkdownSourceEditorOpen,
+          onMarkdownSourceEditorOpenChange: options.ui.onMarkdownSourceEditorOpenChange,
           onWakeAgent: undefined,
           onSendPromptToAgent: async () => {},
           onSendCurrentElementPromptToAgent: async () => {},
@@ -2125,10 +2152,6 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
           commentarySkillOptions: options.ui.commentarySkillOptions,
           commentarySelectedSkillIds: options.ui.commentarySelectedSkillIds,
           commentarySkillSettingsConfigured: options.ui.commentarySkillSettingsConfigured,
-          onCommentarySkillSelectionLoad: options.ui.onCommentarySkillSelectionLoad,
-          onCommentarySkillSelectionChange: options.ui.onCommentarySkillSelectionChange,
-          onCommentarySkillSettingsLoad: options.ui.onCommentarySkillSettingsLoad,
-          onCommentarySkillSettingsChange: options.ui.onCommentarySkillSettingsChange,
           getAgentBridgeAvailable: () => false,
           getAgentBridgeConnected: () => false,
           getCanAbortAgentPrompt: () => false,
@@ -2171,10 +2194,13 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
           onRememberSelectionAnchor: () => {},
           onAiNoteChange: () => {},
           onAiNoteImagesChange: () => {},
-          canEditAnnotationMarkdown: options.host.canEditAnnotationMarkdown,
-          getAnnotationDocumentEditUrl: options.host.getAnnotationDocumentEditUrl,
-          getAnnotationMarkdown: options.host.getAnnotationMarkdown,
-          onAnnotationMarkdownChange: options.host.onAnnotationMarkdownChange,
+          canEditAnnotationMarkdown,
+          resolveAnnotationTarget: resolveAnnotationHostTarget,
+          getCreateAnnotationBlockReason,
+          annotationMarkdownEditorKind: options.host.annotationMarkdownEditorKind,
+          getAnnotationDocumentEditUrl,
+          getAnnotationMarkdown,
+          onAnnotationMarkdownChange,
           onDeleteCurrentAnnotationNode:
             options.host.onDeleteAnnotationNode || options.host.onAnnotationMarkdownChange
               ? handleDeleteCurrentAnnotationNode
@@ -2193,7 +2219,7 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
           shadowRoot: elements.shadowRoot,
           propertyPanelVisible: true,
           initialPropertyPanelOpen: true,
-          initialSelectionModeActive: options.ui.initialSelectionModeActive,
+          initialSelectionModeActive,
           toolbarMode: options.ui.toolbarMode,
           breadcrumbsOptions: null,
           propertyPanelOptions,

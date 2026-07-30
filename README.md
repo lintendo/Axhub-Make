@@ -17,7 +17,7 @@
 
 ## 直接启动
 
-在你的项目目录里运行：
+运行：
 
 ```
 npx -y @axhub/make@latest
@@ -30,7 +30,7 @@ npx -y @axhub/make@latest
 把下面这段发给你的 AI Agent，让它读取启动说明，然后帮你检查环境、启动 Make，并创建一个以后可以直接双击运行的桌面脚本：
 
 ```
-请读取这个文档，并按里面的要求在当前项目目录启动 Axhub Make：
+请读取这个文档，并按里面的要求启动 Axhub Make：
 
 https://raw.githubusercontent.com/lintendo/Axhub-Make/main/docs/start-axhub-make-with-ai.md
 ```

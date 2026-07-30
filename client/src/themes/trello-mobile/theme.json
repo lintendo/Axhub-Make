@@ -1,0 +1,312 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/productivity/trello/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-trello-mobile",
+    "slug": "trello-mobile",
+    "brand": "Trello",
+    "titleZh": "Trello 主题",
+    "titleEn": "Trello",
+    "descriptionZh": "Trello 的 Design.md 主题展示，围绕移动端、企业服务与生产力组织页面。",
+    "descriptionEn": "Trello mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "企业服务与生产力"
+    ],
+    "distributionTags": [
+      "移动端",
+      "企业服务与生产力"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/trello-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/trello-daily-task-tracker/id461504587",
+          "officialPageUrl": "https://apps.apple.com/us/app/trello-daily-task-tracker/id461504587",
+          "marketId": "461504587",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/89/d2/ef/89d2ef5d-82e2-532b-7534-189c8ec60550/Atlassian_Trello_US_iOS_ScreenshotMockups_Overview_260513_V2_01__U00283_U0029.png/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:17:49.349Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "611affba7c7565a3e72c3d4165e67d42966177b8c5ce3eed438203941083f774",
+          "byteLength": 52490,
+          "width": 720,
+          "height": 1561
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/trello-daily-task-tracker/id461504587",
+          "officialPageUrl": "https://apps.apple.com/us/app/trello-daily-task-tracker/id461504587",
+          "marketId": "461504587",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/1e/cf/1f/1ecf1f1e-5264-b04a-df28-170ff0aa258b/Atlassian_Trello_US_iOS_ScreenshotMockups_Overview_260513_V2_02__U00281_U0029.png/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:17:49.349Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "eb564f55b300573523e8da6610fca39ca11d3452114754a11fc5d11e78db61d0",
+          "byteLength": 36732,
+          "width": 720,
+          "height": 1561
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/trello-daily-task-tracker/id461504587",
+          "officialPageUrl": "https://apps.apple.com/us/app/trello-daily-task-tracker/id461504587",
+          "marketId": "461504587",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/95/29/86/952986f5-5d46-274b-6fbc-8b1f4ea08f1a/Atlassian_Trello_US_iOS_ScreenshotMockups_Overview_260513_V2_03__U00281_U0029.png/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:17:49.349Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "f04c197223bd64253f3d18e909397f11d406a7eca9eca69b73e354ce56b25f17",
+          "byteLength": 37884,
+          "width": 720,
+          "height": 1561
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#0C66E4",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Roboto",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Roboto",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "spacing": {
+      "xxs": "12px",
+      "xs": "24px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Trello 主题",
+    "brandAlias": "Trello",
+    "description": "Trello 的 Design.md 主题展示，围绕移动端、企业服务与生产力组织页面。",
+    "descriptionEn": "Trello mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "企业服务与生产力"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#0C66E4",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "阴影 1 - Shadow 1",
+        "value": "rgba(9,30,66,0.13) 0 1px 1px, rgba(9,30,66,0.06) 0 0 1px",
+        "cssValue": "rgba(9,30,66,0.13) 0 1px 1px, rgba(9,30,66,0.06) 0 0 1px",
+        "description": "Shadow at rest: `rgba(9,30,66,0.13) 0 1px 1px, rgba(9,30,66,0.06) 0 0 1px`"
+      },
+      {
+        "label": "阴影 2 - Shadow 2",
+        "value": "rgba(9,30,66,0.25) 0 12px 24px",
+        "cssValue": "rgba(9,30,66,0.25) 0 12px 24px",
+        "description": "Dragging: scale 1.03, shadow `rgba(9,30,66,0.25) 0 12px 24px`, slight rotation optional; a placeholder gap (`#091E4224` dashed/filled) opens in the list"
+      },
+      {
+        "label": "阴影 3 - Shadow 3",
+        "value": "rgba(9,30,66,…)",
+        "cssValue": "rgba(9,30,66,…)",
+        "description": "Shadow Philosophy: Shadows use Trello's signature navy tint (`rgba(9,30,66,…)`) rather than pure black, so they read correctly on both pale lists and colored backdrops. Elevation is meaningful: a card at rest has a whisper-thin shadow; the moment you pick it up the shadow jumps dramatically — depth communicates \"this is now in your hand\". Lists have just enough shadow to lift off the backdrop."
+      }
+    ],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#DFE1E6",
+        "cssValue": "#DFE1E6",
+        "description": "Divider (`#DFE1E6`): Hairline rules between card sections and within sheets."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#C1C7D0",
+        "cssValue": "#C1C7D0",
+        "description": "Border Strong (`#C1C7D0`): Input outline at rest, checklist separators."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#0C66E4",
+        "cssValue": "#0C66E4",
+        "description": "The accent system is restrained against a backdrop that may be loud. Trello Blue for actions sits at `#0C66E4` (the modern Atlassian-era blue, distinct from the classic board blue `#0079BF`), used for the primary button, links, and the active state. Card label colors (a fixed palette of green/yellow/orange/red/purple/blue swatches) are the one place color runs free — they're functional tags, not decoration. Everything else is neutral ink (`#172B4D`) on white cards so cards stay readable regardless of how vivid the board behind them is."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Roboto",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Let the board background (solid {#0079BF}, gradient, or photo) define the screen — there is no fixed canvas。",
+        "建议：Float pale lists ({#F1F2F4}) of white cards on the backdrop。",
+        "建议：Use Trello Blue {#0C66E4} for actions/links; reserve the classic {#0079BF} for the default board color。",
+        "建议：Keep navy ink ({#172B4D}) on white cards so they read over any backdrop。",
+        "建议：Use the fixed six-color label palette as functional tags — the one place color is free。"
+      ],
+      "dont": [
+        "避免：impose a single canvas color — the board backdrop owns the screen。",
+        "避免：add a bottom tab bar — Trello navigates via the top bar and the horizontal board。",
+        "避免：tint card text with label colors — labels are bars/chips; titles stay navy ink。",
+        "避免：use pure black shadows — use the navy {rgba(9,30,66,…)} tint so they work on color and pale surfaces。",
+        "避免：make the drag lift subtle — picking up a card must feel like lifting a physical card。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "spacing": {
+      "xxs": "12px",
+      "xs": "24px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "workspace",
+      "navigation": [
+        "工作台",
+        "项目",
+        "我的"
+      ],
+      "primaryAction": "新建项目"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

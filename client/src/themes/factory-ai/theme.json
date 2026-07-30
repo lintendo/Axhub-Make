@@ -5,7 +5,37 @@
     "originalDetailUrl": "https://styles.refero.design/style/13d6fc89-eba2-4724-ac37-20f4f2e5efec",
     "fallbackRawUrl": "",
     "mirrorSource": "",
-    "websiteUrl": ""
+    "websiteUrl": "",
+    "localPaths": [
+      "DESIGN.md",
+      "theme.json",
+      "assets/tokens.json",
+      "index.tsx",
+      "style.css",
+      "tw.css",
+      "assets/source-preview.jpg"
+    ],
+    "pinnedCommit": {
+      "status": "not-applicable",
+      "reason": "Retained Refero URL/image evidence is not a Git repository and has no applicable upstream commit."
+    },
+    "license": {
+      "status": "unresolved",
+      "evidence": "No local license evidence is stored for the retained screenshot, brand imagery, or named proprietary fonts.",
+      "scope": "Internal design reference only; keep the retained client theme and exclude unresolved assets from redistribution claims."
+    },
+    "conversionNotes": "Curated retained URL/image metadata and local preview evidence into one responsive React/Web specification without claiming an official upstream design system.",
+    "evidence": {
+      "observed": [
+        "The retained Refero detail URL, theme-local preview image, palette metadata, CSS, and React entry were inspected."
+      ],
+      "inferred": [
+        "Component dimensions, interaction states, token roles, and responsive behavior beyond the retained still evidence are explicitly treated as implementation inference."
+      ],
+      "knownGaps": [
+        "Official source DESIGN.md, applicable Git commit, asset/font licenses, complete interaction states, and full responsive behavior remain unresolved."
+      ]
+    }
   },
   "identity": {
     "id": "P1R-035",
@@ -61,7 +91,7 @@
   "assets": {
     "designMd": {
       "path": "DESIGN.md",
-      "method": "derived_from_metadata"
+      "method": "curated_from_local_source_evidence"
     },
     "tailwind": {
       "path": "tw.css",
@@ -102,13 +132,38 @@
       "#2e2c2b"
     ],
     "typography": {
-      "display": "Geist Mono",
-      "body": "Geist",
-      "mono": "Geist Mono",
-      "hints": [
-        "Geist Mono",
-        "Geist"
-      ]
+      "fontFamily": {
+        "display": "Geist Mono",
+        "body": "Geist",
+        "mono": "Geist Mono"
+      },
+      "fontSize": {
+        "hero": "52px",
+        "section": "28px",
+        "command": "13px",
+        "body": "15px",
+        "navigation": "11px"
+      },
+      "lineHeight": {
+        "hero": "1.02",
+        "section": "1.15",
+        "command": "1.45",
+        "body": "1.55",
+        "navigation": "1.3"
+      },
+      "letterSpacing": {
+        "default": "0em"
+      }
+    },
+    "spacing": {
+      "mobileGutter": "16px",
+      "outerGutter": "32px",
+      "section": "72px"
+    },
+    "radius": {
+      "control": "4px",
+      "card": "4px",
+      "preview": "4px"
     }
   },
   "previewImages": [
@@ -247,10 +302,22 @@
         "避免：不要把 Factory.ai 套用到与 制造工业、工业工具、AI 明显无关的产品语境。",
         "避免：不要用通用行业模板覆盖 Factory.ai 的采集图风格；需要保留原图里的版式密度、留白和视觉重心。"
       ]
+    },
+    "spacing": {
+      "mobileGutter": "16px",
+      "outerGutter": "32px",
+      "section": "72px"
+    },
+    "radius": {
+      "control": "4px",
+      "card": "4px",
+      "preview": "4px"
     }
   },
   "status": {
     "displayPage": "done",
-    "collectionErrors": []
+    "collectionErrors": [
+      "Blocking license gap: retained external visual/font assets have no local license evidence; keep this client theme and exclude unresolved assets from redistribution claims."
+    ]
   }
 }

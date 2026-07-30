@@ -930,9 +930,36 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
   conversationTaskMonitor = createConversationTaskMonitor({
     persistence,
     transport: resolvedOptions.host.conversationTaskTransport,
-    onTerminalPersisted: () => {
+    onTerminalPersisted: (transition) => {
+      const taskRef = {
+        provider: transition.provider,
+        sessionId: transition.sessionId,
+        requestId: transition.requestId,
+      };
+      const elementKeys = new Set<WebEditorElementKey>();
+      const meta = Array.from(state.editMetaByKey.values()).find(
+        (candidate) => candidate.commentId === transition.commentId,
+      );
+      if (meta) {
+        elementKeys.add(meta.elementKey);
+      }
+      for (const task of agentBridge?.getVisibleTaskStates?.() ?? []) {
+        if (task.origin === 'external-editing' && task.requestId === transition.requestId) {
+          elementKeys.add(task.elementKey);
+        }
+      }
+      for (const elementKey of elementKeys) {
+        agentBridge?.clearExternalEditingStateByElementKey?.(elementKey, taskRef);
+      }
+      changes.renderChangeMarkers();
       state.propertyPanel?.refresh();
       notifyStatusChange();
+    },
+    onPageSettled: async ({ hasError }) => {
+      await resolvedOptions.ui.onHostToolbarAction?.({
+        type: 'play-notification-sound',
+        sound: hasError ? 'reminder' : 'completion',
+      });
     },
   });
 
@@ -1079,6 +1106,14 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
     notifyStatusChange();
   }
 
+  async function openCommentTarget(element: Element): Promise<boolean> {
+    if (destroyed || !interaction || !element?.isConnected) return false;
+    await interaction.handleSelect(element, DEFAULT_MODIFIERS);
+    interaction.enterCommentInput('bubble-card');
+    notifyStatusChange();
+    return true;
+  }
+
   function acknowledgeSavedTextChanges(): void {
     if (destroyed) return;
     persistence?.clearCachedChanges('text');
@@ -1200,6 +1235,7 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
     getHistoryCounts,
     revertElement,
     clearSelection,
+    openCommentTarget,
     acknowledgeSavedTextChanges,
     acknowledgeSavedStyleChanges,
     clearElementEdits,

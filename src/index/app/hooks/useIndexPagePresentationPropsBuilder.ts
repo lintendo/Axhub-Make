@@ -156,8 +156,8 @@ export function useIndexPagePresentationPropsBuilder({
             containerRef: preview.containerRef,
             previewIframeRef: preview.previewIframeRef,
             secondaryPreviewIframeRef: preview.secondaryPreviewIframeRef,
-            handlePreviewIframeLoad: () => {
-                preview.handlePreviewIframeLoad();
+            handlePreviewIframeLoad: (iframe?: HTMLIFrameElement | null) => {
+                preview.handlePreviewIframeLoad(iframe);
                 if (state.contentMode === 'prototype-spec') {
                     actions.handlePrototypeSpecPreviewReady?.();
                 }

@@ -31,13 +31,16 @@ describe('getManualChunkName', () => {
     ).toBe('vendor-react');
   });
 
-  it('routes markdown rendering packages into the spec-template vendor chunk', () => {
+  it('keeps Ant Design X runtime with Ant Design to avoid spec chunk initialization cycles', () => {
     expect(
       getManualChunkName('/repo/node_modules/.pnpm/@ant-design+x@2.1.1/node_modules/@ant-design/x/es/index.js'),
-    ).toBe('spec-template-vendor');
+    ).toBe('vendor-antd');
     expect(
       getManualChunkName('/repo/node_modules/.pnpm/@ant-design+x-markdown@2.1.1/node_modules/@ant-design/x-markdown/es/index.js'),
-    ).toBe('spec-template-vendor');
+    ).toBe('vendor-antd');
+  });
+
+  it('routes HTML parsing and highlighting packages into the spec-template vendor chunk', () => {
     expect(
       getManualChunkName('/repo/node_modules/.pnpm/highlight.js@10.7.3/node_modules/highlight.js/es/index.js'),
     ).toBe('spec-template-vendor');

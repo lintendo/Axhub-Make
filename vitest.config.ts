@@ -8,7 +8,10 @@ const coverageInclude = coverageScope === 'server'
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: [
+      'src/**/*.test.ts',
+      'scripts/client-template-production/**/*.test.mjs',
+    ],
     maxWorkers: 4,
     testTimeout: 15_000,
     coverage: {

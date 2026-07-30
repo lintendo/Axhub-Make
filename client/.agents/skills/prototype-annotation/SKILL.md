@@ -59,6 +59,7 @@ description: 原型标注替代 PRD 时使用：把页面目录、组件说明�
 - `pageId` 可以是字符串或字符串数组，用于限制 marker 出现在哪些页面/状态。
 - `hasMarkdown: false` 使用 `annotationText` 和 `images`。
 - `hasMarkdown: true` 使用 `markdownMap[node.id]`，运行时会忽略 `annotationText` 和 `images`。
+- 页面有对话框或遮罩层时，检查实际 DOM，把包含弹窗内容的活动层根选择器写入 `presentation.layerSelectors`。
 
 ## 组件状态
 

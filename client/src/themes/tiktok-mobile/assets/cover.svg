@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="960" viewBox="0 0 1440 960" role="img" aria-label="TikTok dark mobile theme token preview">
+  <defs>
+    <linearGradient id="video" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2F2F2F"/>
+      <stop offset="0.48" stop-color="#161823"/>
+      <stop offset="1" stop-color="#010101"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0.4" stop-color="#010101" stop-opacity="0"/>
+      <stop offset="1" stop-color="#010101" stop-opacity="0.88"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1" stdDeviation="4" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <rect width="1440" height="960" fill="#010101"/>
+  <rect x="0" y="0" width="10" height="960" fill="#25F4EE"/>
+  <rect x="10" y="0" width="10" height="960" fill="#FE2C55"/>
+
+  <g font-family="Proxima Nova, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">
+    <text x="94" y="104" fill="#25F4EE" font-size="18" font-weight="700" letter-spacing="2.4">MOBILE DESIGN SYSTEM</text>
+    <text x="86" y="229" fill="#25F4EE" font-size="92" font-weight="700">TikTok</text>
+    <text x="102" y="229" fill="#FE2C55" font-size="92" font-weight="700">TikTok</text>
+    <text x="94" y="229" fill="#FFFFFF" font-size="92" font-weight="700">TikTok</text>
+    <text x="94" y="284" fill="#E5E5E5" font-size="25" font-weight="400">Dark canvas. Full-bleed video. Action in rose.</text>
+
+    <g transform="translate(94 352)">
+      <rect width="190" height="132" rx="8" fill="#FE2C55"/>
+      <text x="20" y="32" fill="#FFFFFF" font-size="14" font-weight="700">PRIMARY ACTION</text>
+      <text x="20" y="104" fill="#FFFFFF" font-size="30" font-weight="700">#FE2C55</text>
+    </g>
+    <g transform="translate(300 352)">
+      <rect width="190" height="132" rx="8" fill="#25F4EE"/>
+      <text x="20" y="32" fill="#010101" font-size="14" font-weight="700">ACCENT</text>
+      <text x="20" y="104" fill="#010101" font-size="30" font-weight="700">#25F4EE</text>
+    </g>
+    <g transform="translate(506 352)">
+      <rect width="190" height="132" rx="8" fill="#161823" stroke="#FFFFFF" stroke-opacity="0.15"/>
+      <text x="20" y="32" fill="#E5E5E5" font-size="14" font-weight="700">SURFACE</text>
+      <text x="20" y="104" fill="#FFFFFF" font-size="30" font-weight="700">#161823</text>
+    </g>
+
+    <g transform="translate(94 548)">
+      <text x="0" y="0" fill="#FFFFFF" font-size="42" font-weight="700">Proxima Nova</text>
+      <text x="0" y="42" fill="#FFFFFF" fill-opacity="0.6" font-size="17">400 / 600 / 700 · compact overlay typography</text>
+      <rect x="0" y="88" width="214" height="52" rx="4" fill="#FE2C55"/>
+      <text x="107" y="121" fill="#FFFFFF" text-anchor="middle" font-size="17" font-weight="700">Follow</text>
+      <rect x="230" y="88" width="214" height="52" rx="4" fill="#2F2F2F"/>
+      <text x="337" y="121" fill="#FFFFFF" text-anchor="middle" font-size="17" font-weight="600">Following</text>
+      <text x="0" y="200" fill="#FFFFFF" fill-opacity="0.6" font-size="15">4 · 8 · 12 · 16 · 20 · 24 · 32 · 48 · 64 · 96</text>
+    </g>
+
+    <g transform="translate(888 64)">
+      <rect x="0" y="0" width="434" height="832" rx="52" fill="#161823" stroke="#FFFFFF" stroke-opacity="0.16" stroke-width="2"/>
+      <rect x="16" y="16" width="402" height="800" rx="38" fill="url(#video)"/>
+      <circle cx="217" cy="56" r="5" fill="#FFFFFF" fill-opacity="0.45"/>
+      <text x="166" y="92" fill="#FFFFFF" fill-opacity="0.6" font-size="15" font-weight="400">Following</text>
+      <text x="247" y="92" fill="#FFFFFF" font-size="15" font-weight="700">For You</text>
+      <rect x="250" y="101" width="34" height="2" fill="#FFFFFF"/>
+
+      <circle cx="348" cy="328" r="27" fill="#2F2F2F" stroke="#FFFFFF" stroke-width="2"/>
+      <circle cx="348" cy="364" r="10" fill="#FE2C55"/>
+      <text x="348" y="370" fill="#FFFFFF" text-anchor="middle" font-size="15" font-weight="700">+</text>
+      <text x="348" y="430" fill="#FE2C55" text-anchor="middle" font-size="39">♥</text>
+      <text x="348" y="452" fill="#FFFFFF" text-anchor="middle" font-size="12" font-weight="700">1.2M</text>
+      <circle cx="348" cy="495" r="18" fill="none" stroke="#FFFFFF" stroke-width="4"/>
+      <text x="348" y="530" fill="#FFFFFF" text-anchor="middle" font-size="12" font-weight="700">34.5K</text>
+      <path d="M333 577 L363 560 L354 593 Z" fill="#FFFFFF"/>
+      <circle cx="348" cy="652" r="24" fill="#010101" stroke="#2F2F2F" stroke-width="8"/>
+      <circle cx="348" cy="652" r="5" fill="#25F4EE"/>
+
+      <rect x="16" y="496" width="402" height="320" rx="0" fill="url(#fade)"/>
+      <g filter="url(#shadow)">
+        <text x="38" y="645" fill="#FFFFFF" font-size="17" font-weight="700">@creator</text>
+        <text x="38" y="678" fill="#FFFFFF" font-size="15">Video is the headline. <tspan font-weight="700">#foryou</tspan></text>
+        <text x="38" y="710" fill="#E5E5E5" font-size="13">♫ original sound — creator</text>
+      </g>
+      <line x1="16" y1="746" x2="418" y2="746" stroke="#FFFFFF" stroke-opacity="0.08"/>
+      <text x="51" y="782" fill="#FFFFFF" text-anchor="middle" font-size="11" font-weight="600">Home</text>
+      <text x="128" y="782" fill="#FFFFFF" fill-opacity="0.5" text-anchor="middle" font-size="11" font-weight="600">Discover</text>
+      <rect x="189" y="760" width="56" height="28" rx="8" fill="#25F4EE"/>
+      <rect x="195" y="760" width="56" height="28" rx="8" fill="#FE2C55"/>
+      <rect x="192" y="760" width="56" height="28" rx="8" fill="#FFFFFF"/>
+      <text x="220" y="781" fill="#010101" text-anchor="middle" font-size="22" font-weight="700">+</text>
+      <text x="306" y="782" fill="#FFFFFF" fill-opacity="0.5" text-anchor="middle" font-size="11" font-weight="600">Inbox</text>
+      <text x="380" y="782" fill="#FFFFFF" fill-opacity="0.5" text-anchor="middle" font-size="11" font-weight="600">Profile</text>
+    </g>
+  </g>
+</svg>

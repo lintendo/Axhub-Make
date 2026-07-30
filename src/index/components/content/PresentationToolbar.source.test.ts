@@ -34,4 +34,29 @@ describe('PresentationToolbar source', () => {
     expect(exportMenuSegment).not.toContain('复制 Runtime 组件');
     expect(exportMenuSegment).not.toContain('复制 runtime 组件');
   });
+
+  it('groups contextual actions and publish under the same adaptive visibility class', () => {
+    const source = readSource();
+
+    expect(source).toContain('ax-presentation-toolbar');
+    expect(source.match(/ax-toolbar-adaptive-action/g)).toHaveLength(2);
+    expect(source).toContain('{actionButtons}');
+    expect(source).toContain('{showExportMenuButton ? exportMenuButton : null}');
+  });
+
+  it('reuses the toolbar sidebar icon as the compact hover and focus trigger', () => {
+    const source = readSource();
+
+    expect(source).toContain("import ResponsiveSidebarTriggerButton from '../sidebar/ResponsiveSidebarTriggerButton';");
+    expect(source).toContain('<ResponsiveSidebarTriggerButton');
+    expect(source).toContain('collapsed={collapsed}');
+    expect(source).toContain('setCollapsed={setCollapsed}');
+  });
+
+  it('keeps pending prototype annotation entry available with a connecting tooltip', () => {
+    const source = readSource();
+
+    expect(source).toContain("quickEditRuntimeStatus === 'pending'");
+    expect(source).toContain("? '正在连接批注编辑器'");
+  });
 });

@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ClaudeCode, CodeBuddy, Codex, Cursor, DeepSeek, Grok, OpenCode, Qoder } from '@lobehub/icons';
+import { ClaudeCode, Codex, Cursor, DeepSeek, Grok, OpenCode } from '@lobehub/icons';
 import { QRCode } from 'antd';
 import { AlertTriangle, CheckCircle2, CircleHelp, Copy, Loader2, Play, RefreshCw, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+import codeBuddyIconUrl from '../assets/brand-icons/codebuddy.svg?url';
+import qoderIconUrl from '../assets/brand-icons/qoder.svg?url';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabelWithHint } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -33,6 +35,15 @@ import { requireProjectScope, withProjectScope } from '../services/projectScope'
 import { normalizePromptClientPreference } from '../../common/promptExecution';
 import { ACP_PROVIDER_OPTIONS, type AcpProviderKey } from '../../common/acpModelConfig';
 import { runAiText, type AiRunClientError } from '../domains/ai-generation/aiRunClient';
+import {
+    createNotificationPlayer,
+    type NotificationPlayer,
+} from '../domains/notifications/notificationPlayer';
+import {
+    readNotificationSettings,
+    type NotificationSettings,
+    writeNotificationSettings,
+} from '../domains/notifications/notificationSettings';
 import {
     buildMakeClientUpdateFailurePrompt,
     formatMakeClientUpdateError,
@@ -219,8 +230,8 @@ function getAgentProviderIcon(provider: AcpProviderKey): React.ReactNode {
     if (provider === 'claude') return <ClaudeCode.Color size={16} />;
     if (provider === 'opencode') return <OpenCode size={16} />;
     if (provider === 'cursor') return <Cursor size={16} />;
-    if (provider === 'qoder') return <Qoder.Color size={16} />;
-    if (provider === 'codebuddy') return <CodeBuddy.Color size={16} />;
+    if (provider === 'qoder') return <img src={qoderIconUrl} alt="" aria-hidden width={16} height={16} />;
+    if (provider === 'codebuddy') return <img src={codeBuddyIconUrl} alt="" aria-hidden width={16} height={16} />;
     if (provider === 'reasonix') return <DeepSeek.Color size={16} />;
     if (provider === 'grok-build') return <Grok size={16} />;
     return null;
@@ -390,7 +401,7 @@ function resolveLocalAcpRepairMessage(params: {
 }): string {
     const runtime = params.runtime;
     if (isLocalAcpCorsFailure(runtime, params.failureMessage)) {
-        return '本地 ACP 已响应，但未允许当前 Make 地址跨域访问。点击“重启修复”可自动重启并带上当前 Make 地址；下方命令仅作为手动备用。';
+        return '本地 ACP 已响应，但未允许当前 Make 地址跨域访问。为避免覆盖共享服务的跨域配置，Make 不会自动重启；请在 ACP 配置中追加该地址后重新检测。';
     }
     if (runtime?.health.status === 'missing_cli') {
         return '未检测到可用的 Node/npm/npx 命令。请先安装运行环境，再使用下方命令启动 ACP。';
@@ -438,6 +449,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
     const [loading, setLoading] = useState(false);
     const [formState, setFormState] = useState<SettingsFormState>(DEFAULT_FORM_STATE);
     const [activeTab, setActiveTab] = useState<SettingsDialogInitialTab>(initialTab);
+    const [notificationSettings, setNotificationSettings] = useState(readNotificationSettings);
     const [agentVersions, setAgentVersions] = useState<AgentVersionMap>({});
     const [latestAgentVersions, setLatestAgentVersions] = useState<AgentVersionMap>({});
     const [agentVersionsLoading, setAgentVersionsLoading] = useState(false);
@@ -458,20 +470,25 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
     const [localAcpRuntime, setLocalAcpRuntime] = useState<AssistantRuntimeResponse | null>(null);
     const [localAcpFailureContext, setLocalAcpFailureContext] = useState<{ source: string; message: string } | null>(null);
     const [localAcpConnecting, setLocalAcpConnecting] = useState(false);
-    const [localAcpRestarting, setLocalAcpRestarting] = useState(false);
+    const [localAcpRefreshing, setLocalAcpRefreshing] = useState(false);
     const [makeClientUpdateStatus, setMakeClientUpdateStatus] = useState<MakeClientUpdateStatus | null>(null);
     const [makeClientUpdateResult, setMakeClientUpdateResult] = useState<MakeClientUpdateApplyResult | null>(null);
     const [makeClientUpdateError, setMakeClientUpdateError] = useState<unknown>(null);
     const [makeClientUpdateStatusLoading, setMakeClientUpdateStatusLoading] = useState(false);
     const [makeClientUpdateApplying, setMakeClientUpdateApplying] = useState(false);
     const agentVersionCacheRef = useRef<AgentVersionCache | null>(null);
+    const notificationPlayerRef = useRef<NotificationPlayer | null>(null);
+    if (!notificationPlayerRef.current) {
+        notificationPlayerRef.current = createNotificationPlayer();
+    }
+    const notificationPlayer = notificationPlayerRef.current;
     const aiTabVersionLoadedRef = useRef(false);
     const initialAcpFailureAppliedRef = useRef(false);
     const localAcpAutoCloseBlockedRef = useRef(false);
     const localAcpConnected = localAcpRuntime?.health.status === 'ready';
-    const localAcpNeedsCorsRestart = isLocalAcpCorsFailure(localAcpRuntime, localAcpFailureContext?.message);
-    const localAcpActionLabel = localAcpConnected ? '重启' : localAcpNeedsCorsRestart ? '重启修复' : '链接';
-    const localAcpActionBusy = localAcpConnecting || localAcpRestarting;
+    const localAcpHasCorsFailure = isLocalAcpCorsFailure(localAcpRuntime, localAcpFailureContext?.message);
+    const localAcpActionLabel = localAcpConnected || localAcpHasCorsFailure ? '重新检测' : '链接';
+    const localAcpActionBusy = localAcpConnecting || localAcpRefreshing;
     const makeClientUpdateAvailable = makeClientUpdateStatus?.updateAvailable === true;
     const visibleMakeClientUpdateBlocker = makeClientUpdateAvailable ? getVisibleMakeClientUpdateBlocker(makeClientUpdateStatus) : '';
     const makeClientUpdateCanApply = Boolean(makeClientUpdateAvailable && makeClientUpdateStatus?.canApply);
@@ -525,6 +542,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
             return;
         }
 
+        setNotificationSettings(readNotificationSettings());
         setActiveTab(initialTab);
         if (initialTab === 'update') {
             onMakeClientUpdateReminderSeen?.();
@@ -549,6 +567,10 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
 
     const updateField = <K extends keyof SettingsFormState>(key: K, value: SettingsFormState[K]) => {
         setFormState((previous) => ({ ...previous, [key]: value }));
+    };
+
+    const updateNotificationSetting = (patch: Partial<NotificationSettings>) => {
+        setNotificationSettings(writeNotificationSettings(patch));
     };
 
     const updateAgentProviderTestState = (client: string, state: AgentProviderTestState) => {
@@ -747,26 +769,26 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
         });
     };
 
-    const handleLocalAcpRuntimeRestart = async () => {
+    const handleLocalAcpRuntimeRefresh = async () => {
         return preserveSettingsDialogDuringLocalAcpAction(async () => {
-            setLocalAcpRestarting(true);
+            setLocalAcpRefreshing(true);
             try {
-                const result = await apiService.bootstrapAssistant({ mode: 'restart_existing', projectId: activeProjectId || projectId });
-                setLocalAcpRuntime(result.runtime);
+                const runtime = await apiService.getAssistantRuntime({ autoStart: false, projectId: activeProjectId || projectId });
+                setLocalAcpRuntime(runtime);
                 setLocalAcpFailureContext(null);
-                loadLocalAiAgentVersionsAfterAcpReady(result.runtime);
-                if (result.runtime.health.status === 'ready') {
-                    toast.success('本地 ACP 服务已重启');
+                loadLocalAiAgentVersionsAfterAcpReady(runtime);
+                if (runtime.health.status === 'ready') {
+                    toast.success('本地 ACP 服务状态已更新');
                 } else {
-                    toast.warning(result.runtime.health.message || '本地 ACP 服务重启后未就绪');
+                    toast.warning(runtime.health.message || '本地 ACP 服务仍未就绪');
                 }
-                return result.runtime;
+                return runtime;
             } catch (error: any) {
-                console.error('Error restarting local ACP runtime:', error);
-                toast.error(error?.message || '重启本地 ACP 服务失败');
+                console.error('Error refreshing local ACP runtime:', error);
+                toast.error(error?.message || '重新检测本地 ACP 服务失败');
                 return null;
             } finally {
-                setLocalAcpRestarting(false);
+                setLocalAcpRefreshing(false);
             }
         });
     };
@@ -1574,10 +1596,10 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                                     variant="outline"
                                     size="sm"
                                     className="h-8 gap-1.5"
-                                    onClick={localAcpNeedsCorsRestart || localAcpConnected ? handleLocalAcpRuntimeRestart : handleLocalAcpRuntimeConnect}
+                                    onClick={localAcpHasCorsFailure || localAcpConnected ? handleLocalAcpRuntimeRefresh : handleLocalAcpRuntimeConnect}
                                     disabled={localAcpActionBusy}
                                 >
-                                    {localAcpConnecting || localAcpRestarting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                                    {localAcpConnecting || localAcpRefreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
                                     {localAcpActionLabel}
                                 </Button>
                             </div>
@@ -1782,6 +1804,63 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                                                 onChange={(event) => updateField('agentRunConcurrency', sanitizeAgentRunConcurrency(event.target.value))}
                                             />
                                         </Field>
+                                    </div>
+                                </section>
+
+                                <Separator className="my-5" />
+
+                                <section className="space-y-3">
+                                    <div className="space-y-1">
+                                        <h3 className="text-base font-semibold text-foreground">声音通知</h3>
+                                        <p className="text-xs text-muted-foreground">仅保存在当前浏览器；不影响项目配置和 AI 执行。</p>
+                                    </div>
+
+                                    <div className="space-y-2 rounded-md border border-border px-3 py-2.5">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="text-sm font-medium text-foreground">完成音</div>
+                                                <div className="text-xs text-muted-foreground">批注或侧边栏 AI 成功完成时播放</div>
+                                            </div>
+                                            <div className="flex shrink-0 items-center gap-1.5">
+                                                <Switch
+                                                    checked={notificationSettings.completionEnabled}
+                                                    onCheckedChange={(checked) => updateNotificationSetting({ completionEnabled: checked === true })}
+                                                    aria-label="启用完成音"
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon-xs"
+                                                    aria-label="试听完成音"
+                                                    onClick={() => { void notificationPlayer.play('completion'); }}
+                                                >
+                                                    <Play className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between gap-3 border-t border-border pt-2">
+                                            <div className="min-w-0">
+                                                <div className="text-sm font-medium text-foreground">提醒音</div>
+                                                <div className="text-xs text-muted-foreground">批注或侧边栏 AI 报错时播放</div>
+                                            </div>
+                                            <div className="flex shrink-0 items-center gap-1.5">
+                                                <Switch
+                                                    checked={notificationSettings.reminderEnabled}
+                                                    onCheckedChange={(checked) => updateNotificationSetting({ reminderEnabled: checked === true })}
+                                                    aria-label="启用提醒音"
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon-xs"
+                                                    aria-label="试听提醒音"
+                                                    onClick={() => { void notificationPlayer.play('reminder'); }}
+                                                >
+                                                    <Play className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </section>
 

@@ -462,270 +462,6 @@ export const PROPERTY_PANEL_LOCAL_STYLES = `
     color: ${EDITOR_CHROME.accent};
   }
 
-  .we-runtime-ai-settings-modal .ant-modal-content {
-    overflow: hidden;
-    border: 1px solid ${EDITOR_CHROME.border};
-    border-radius: 18px;
-    background: ${EDITOR_CHROME.surfaceElevated};
-    box-shadow: ${EDITOR_CHROME.shadow};
-  }
-
-  .we-runtime-ai-settings-modal .ant-modal-header {
-    margin-bottom: 18px;
-    background: transparent;
-  }
-
-  .we-runtime-ai-settings-modal .ant-modal-footer {
-    margin-top: 20px;
-    padding-top: 14px;
-    border-top: 1px solid ${EDITOR_CHROME.divider};
-  }
-
-  .we-runtime-ai-settings-dialog {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .we-runtime-ai-settings-dialog__row {
-    display: grid;
-    grid-template-columns: 104px minmax(0, 1fr);
-    align-items: center;
-    gap: 16px;
-    min-height: 36px;
-  }
-
-  .we-runtime-ai-settings-dialog__label {
-    color: ${EDITOR_CHROME.textPrimary};
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 20px;
-  }
-
-  .we-runtime-ai-settings-dialog__control {
-    min-width: 0;
-  }
-
-  .we-runtime-ai-settings-dialog__control .ant-select,
-  .we-runtime-ai-settings-dialog__control .ant-input-number,
-  .we-runtime-ai-settings-dialog__control .ant-input-affix-wrapper {
-    width: 100%;
-  }
-
-  .we-runtime-ai-settings-dialog__workspace-input input {
-    text-overflow: ellipsis;
-  }
-
-  .we-runtime-ai-settings-dialog__workspace-input .ant-input-suffix .ant-btn {
-    width: 28px;
-    min-width: 28px;
-    height: 28px;
-    padding: 0;
-    color: ${EDITOR_CHROME.textSecondary};
-  }
-
-  .we-runtime-commentary-skill-modal .ant-modal-content {
-    overflow: hidden;
-    border: 1px solid ${EDITOR_CHROME.border};
-    border-radius: 18px;
-    background: ${EDITOR_CHROME.surfaceElevated};
-    box-shadow: ${EDITOR_CHROME.shadow};
-  }
-
-  .we-runtime-commentary-skill-modal .ant-modal-header {
-    margin-bottom: 16px;
-    background: transparent;
-  }
-
-  .we-runtime-commentary-skill-modal .ant-modal-footer {
-    margin-top: 18px;
-    padding-top: 14px;
-    border-top: 1px solid ${EDITOR_CHROME.divider};
-  }
-
-  .we-runtime-commentary-skill-dialog__title {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    color: ${EDITOR_CHROME.textPrimary};
-    line-height: 1.25;
-  }
-
-  .we-runtime-commentary-skill-dialog__subtitle {
-    color: ${EDITOR_CHROME.textMuted};
-    font-size: 12px;
-    font-weight: 400;
-  }
-
-  .we-runtime-commentary-skill-dialog {
-    display: flex;
-    min-height: 0;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .we-runtime-commentary-skill-dialog__list {
-    display: flex;
-    max-height: min(55vh, 460px);
-    flex-direction: column;
-    gap: 8px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 1px;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  .we-runtime-commentary-skill-dialog__list::-webkit-scrollbar {
-    display: none;
-  }
-
-  .we-runtime-commentary-skill-dialog__section-title {
-    display: flex;
-    min-height: 26px;
-    align-items: center;
-    justify-content: space-between;
-    padding: 5px 2px 1px;
-    color: ${EDITOR_CHROME.textSecondary};
-    font-size: 12px;
-    font-weight: 650;
-  }
-
-  .we-runtime-commentary-skill-dialog__section-title--custom {
-    margin-top: 6px;
-    padding-top: 4px;
-  }
-
-  .we-runtime-commentary-skill-dialog__section-title .ant-btn-link {
-    height: 26px;
-    padding: 0 2px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-
-  .we-runtime-commentary-skill-dialog__item {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: 14px;
-    padding: 12px 14px;
-    border: 1px solid ${EDITOR_CHROME.border};
-    border-radius: 12px;
-    background: ${EDITOR_CHROME.surface};
-    box-shadow: 0 1px 2px ${EDITOR_CHROME.hoverGhost};
-    color: ${EDITOR_CHROME.textPrimary};
-    cursor: pointer;
-    outline: none;
-    transition:
-      border-color 160ms ease,
-      background-color 160ms ease,
-      box-shadow 160ms ease,
-      transform 160ms ease;
-  }
-
-  .we-runtime-commentary-skill-dialog__item:hover:not(.we-runtime-commentary-skill-dialog__item--disabled) {
-    border-color: ${EDITOR_CHROME.borderStrong};
-    background: ${EDITOR_CHROME.surfaceMuted};
-  }
-
-  .we-runtime-commentary-skill-dialog__item:focus-visible {
-    border-color: color-mix(in srgb, ${EDITOR_CHROME.accent} 46%, ${EDITOR_CHROME.border});
-    box-shadow: 0 0 0 3px ${EDITOR_CHROME.accentRing};
-  }
-
-  .we-runtime-commentary-skill-dialog__item--disabled {
-    cursor: not-allowed;
-    opacity: 0.62;
-  }
-
-  .we-runtime-commentary-skill-dialog__copy {
-    display: flex;
-    min-width: 0;
-    flex: 1 1 auto;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .we-runtime-commentary-skill-dialog__name {
-    overflow: hidden;
-    color: ${EDITOR_CHROME.textPrimary};
-    font-size: 13px;
-    font-weight: 650;
-    line-height: 1.35;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .we-runtime-commentary-skill-dialog__description {
-    overflow: hidden;
-    color: ${EDITOR_CHROME.textMuted};
-    font-size: 12px;
-    line-height: 1.45;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .we-runtime-commentary-skill-dialog__item > .ant-checkbox-wrapper {
-    flex: 0 0 auto;
-    margin: 0;
-  }
-
-  .we-runtime-commentary-skill-dialog__edit.ant-btn.ant-btn-text {
-    flex: 0 0 auto;
-    color: ${EDITOR_CHROME.textMuted};
-  }
-
-  .we-runtime-commentary-skill-dialog__edit.ant-btn.ant-btn-text:hover {
-    color: ${EDITOR_CHROME.textSecondary};
-    background: ${EDITOR_CHROME.hoverSubtle};
-  }
-
-  .we-runtime-commentary-skill-dialog__empty {
-    padding: 14px;
-    border: 1px dashed ${EDITOR_CHROME.border};
-    border-radius: 12px;
-    color: ${EDITOR_CHROME.textMuted};
-    font-size: 12px;
-    text-align: center;
-  }
-
-  .we-runtime-commentary-skill-editor {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .we-runtime-commentary-skill-editor__field {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    color: ${EDITOR_CHROME.textSecondary};
-    font-size: 12px;
-    font-weight: 600;
-  }
-
-  .we-runtime-commentary-skill-editor__error {
-    color: ${EDITOR_CHROME.textDanger};
-    font-size: 12px;
-    line-height: 1.4;
-  }
-
-  @media (max-width: 640px) {
-    .we-runtime-ai-settings-modal .ant-modal-content,
-    .we-runtime-commentary-skill-modal .ant-modal-content {
-      padding: 18px 16px 14px;
-    }
-
-    .we-runtime-ai-settings-dialog__row {
-      grid-template-columns: 1fr;
-      gap: 6px;
-    }
-
-    .we-runtime-commentary-skill-dialog__item {
-      padding: 11px 12px;
-    }
-  }
-
   .we-runtime-keyboard-shortcuts-modal,
   .we-runtime-keyboard-shortcuts-modal * {
     outline: none !important;
@@ -1255,8 +991,60 @@ export const PROPERTY_PANEL_LOCAL_STYLES = `
     cursor: grab;
   }
 
-  .we-runtime-prop-panel__drag-handle[data-dragging="true"] {
-    cursor: grabbing !important;
+  .we-runtime-toolbar__drag-grip {
+    position: relative;
+    z-index: 1;
+    width: 0;
+    min-width: 0;
+    margin-right: -4px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(-8px) scale(0.9);
+    transform-origin: left center;
+    transition:
+      width 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      margin-right 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 140ms ease,
+      visibility 0s linear 140ms,
+      transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .we-runtime-prop-panel__drag-handle:hover .we-runtime-toolbar__drag-grip,
+  .we-runtime-toolbar__drag-grip[data-dragging="true"] {
+    width: 12px;
+    margin-right: 0;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(0) scale(1);
+    transition-delay: 0s;
+  }
+
+  .we-runtime-toolbar__drag-grip[data-dragging="true"] {
+    cursor: grabbing;
+  }
+
+  @media (hover: none) {
+    .we-runtime-toolbar__drag-grip {
+      width: 12px;
+      margin-right: 0;
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: translateX(0) scale(1);
+      transition-delay: 0s;
+    }
   }
 
   .we-runtime-prop-panel__resize-handle {

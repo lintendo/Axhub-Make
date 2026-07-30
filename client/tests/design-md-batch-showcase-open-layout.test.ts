@@ -56,4 +56,18 @@ describe('DesignMdBatchShowcase open layout', () => {
     expect(appleCss).toContain('.dmb-variant-consumer-commerce .dmb-preview-label');
     expect(appleCss).toContain('display: none');
   });
+
+  it('uses the full content width for three mobile screenshots on desktop', () => {
+    const galleryRule = baseCss.match(/\.dmb-mobile-screenshot-gallery\s*\{[^}]+\}/)?.[0] ?? '';
+
+    expect(galleryRule).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))');
+    expect(galleryRule).toContain('width: 100%');
+    expect(galleryRule).not.toContain('390px');
+  });
+
+  it('keeps mobile screenshots in a horizontal snap row on narrow viewports', () => {
+    expect(baseCss).toMatch(/@media \(max-width: 760px\)[\s\S]*\.dmb-mobile-screenshot-gallery[\s\S]*overflow-x: auto/);
+    expect(baseCss).toMatch(/@media \(max-width: 760px\)[\s\S]*\.dmb-mobile-screenshot-gallery[\s\S]*grid-auto-flow: column/);
+    expect(baseCss).toContain('scroll-snap-type: x mandatory');
+  });
 });

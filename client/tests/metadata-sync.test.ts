@@ -334,10 +334,40 @@ export default function EditedPrototype() {
         { id: 'create-prototype', title: '创建原型' },
         { id: 'edit-prototype', title: '编辑原型' },
         { id: 'publish-prototype', title: '发布原型' },
-        { id: 'advanced-guide', title: '进阶指导' },
+        { id: 'advanced-guide', title: '获取帮助' },
       ],
       defaultPageId: 'install-agent',
     });
+  });
+
+  it('describes Touch And Talk capability requirements with current Make terminology', () => {
+    const source = fs.readFileSync(
+      path.join(makeProjectRoot, 'src/prototypes/touch-and-talk-annotation-demo/index.tsx'),
+      'utf8',
+    );
+
+    expect(source).toContain("title: '批注能力条件'");
+    expect(source).not.toContain("{ key: 'acpUi', label: '本地 ACP UI' }");
+    expect(source).toContain("{ key: 'executionAgent', label: '执行 Agent' }");
+    expect(source).toContain("{ key: 'commentarySkill', label: '批注技能' }");
+    expect(source).toContain("type CapabilityRequirement = '需要' | '不需要'");
+    expect(source).toContain("feature: '添加/编辑批注'");
+    expect(source).toContain("{ feature: '多种批注方式', executionAgent: '不需要', commentarySkill: '不需要' }");
+    expect(source).toContain("{ feature: '复制提示词', executionAgent: '不需要', commentarySkill: '不需要' }");
+    expect(source).toContain("feature: '文本编辑'");
+    expect(source).toContain("feature: '样式编辑'");
+    expect(source).toContain("feature: '粘贴图片或文案'");
+    expect(source).toContain("feature: 'AI 自动读取批注'");
+    expect(source).toContain("feature: 'AI 执行'");
+    expect(source).toContain("feature: '开启需求标注'");
+    expect(source).toContain("{ feature: '添加/编辑批注', executionAgent: '不需要', commentarySkill: '不需要' }");
+    expect(source).toContain("{ feature: 'AI 自动读取批注', executionAgent: '不需要', commentarySkill: '需要' }");
+    expect(source).toContain("{ feature: 'AI 执行', executionAgent: '需要', commentarySkill: '不需要' }");
+    expect(source).not.toContain('acpUi:');
+    expect(source).not.toContain('以下条件均以当前页面已启用 Axhub Runtime 批注为前提。');
+    expect(source).not.toContain('保存本地 HTML 修改');
+    expect(source).not.toContain("label: 'CLI Agent'");
+    expect(source).not.toContain("label: '配套 Skill'");
   });
 
   it('exposes the current official client prototypes without legacy template routes', () => {
@@ -370,6 +400,7 @@ export default function EditedPrototype() {
         { id: 'quick-flow', title: '快速批注' },
         { id: 'voice-annotation', title: '语音批注' },
         { id: 'common-tips', title: '常用技巧' },
+        { id: 'capability-matrix', title: '能力条件' },
         { id: 'quick-execute', title: '快速执行' },
         { id: 'more-scenarios', title: '更多场景' },
       ],

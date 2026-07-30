@@ -31,6 +31,9 @@ import {
     useAssistantIframePool,
 } from './useAssistantIframePool';
 import { useAssistantRuntime } from './useAssistantRuntime';
+import { createAssistantNotificationTracker } from '../../notifications/assistantNotificationEvents';
+import { notificationDiagnostics } from '../../notifications/notificationDiagnostics';
+import type { NotificationIntent } from '../../notifications/notificationCoordinator';
 import {
     type AcpContextItem,
     type AssistantImageGenerationConfig,
@@ -156,6 +159,23 @@ function readAcpNavigationChangedMessage(data: unknown): AcpNavigationChangedMes
         href,
         ...(threadId !== undefined ? { threadId } : {}),
         ...(conversationStorePath !== undefined ? { conversationStorePath } : {}),
+    };
+}
+
+function readAcpEventDiagnosticDetails(data: unknown): { kind: string; threadId: string | null } | null {
+    if (!data || typeof data !== 'object') {
+        return null;
+    }
+    const record = data as { type?: unknown; payload?: unknown };
+    if (record.type !== 'acp.event' || !record.payload || typeof record.payload !== 'object') {
+        return null;
+    }
+    const payload = record.payload as { kind?: unknown; threadId?: unknown };
+    const kind = typeof payload.kind === 'string' ? payload.kind.trim() : '';
+    const threadId = typeof payload.threadId === 'string' ? payload.threadId.trim() : '';
+    return {
+        kind: kind || 'unknown',
+        threadId: threadId || null,
     };
 }
 
@@ -311,6 +331,7 @@ interface UseAssistantPanelControllerParams {
     modal: AssistantModalApi;
     preferredPromptClient: PromptClientPreference;
     onOpenAISettings?: (runtime?: AssistantRuntimeState | null, message?: string) => void;
+    onAiNotification?: (intent: NotificationIntent) => void;
     activeProjectId: string | null;
     activeTab: TabType;
     viewMode: ViewMode;
@@ -329,6 +350,7 @@ export function useAssistantPanelController({
     messageApi,
     modal: _modal,
     onOpenAISettings,
+    onAiNotification,
     activeProjectId,
     activeTab,
     viewMode,
@@ -414,6 +436,7 @@ export function useAssistantPanelController({
     currentAssistantProjectIdRef.current = projectId || '';
     const assistantOpenRequestIdRef = useRef(0);
     const assistantIframePool = useAssistantIframePool();
+    const assistantNotificationTrackerRef = useRef(createAssistantNotificationTracker(notificationDiagnostics));
     const {
         runtime: assistantRuntime,
         setRuntime: setAssistantRuntime,
@@ -668,27 +691,90 @@ export function useAssistantPanelController({
 
     useEffect(() => {
         const handleAssistantIframeRunEvent = (event: MessageEvent) => {
+            const diagnosticEvent = readAcpEventDiagnosticDetails(event.data);
             const iframeKey = assistantIframePool.findKeyByWindow(event.source);
-            if (!iframeKey) return;
+            if (!iframeKey) {
+                if (diagnosticEvent) {
+                    notificationDiagnostics.record('assistant.event.received', {
+                        ...diagnosticEvent,
+                        origin: event.origin || null,
+                        expectedOrigin: null,
+                        sourceMatched: false,
+                        originMatched: false,
+                        reason: 'unmatched-source',
+                    });
+                }
+                return;
+            }
             const iframeEntry = assistantIframePool.entries.find((entry) => entry.key === iframeKey);
-            if (!iframeEntry) return;
+            if (!iframeEntry) {
+                if (diagnosticEvent) {
+                    notificationDiagnostics.record('assistant.event.received', {
+                        ...diagnosticEvent,
+                        origin: event.origin || null,
+                        expectedOrigin: null,
+                        sourceMatched: true,
+                        originMatched: false,
+                        reason: 'missing-iframe-entry',
+                    });
+                }
+                return;
+            }
             let expectedOrigin = '';
             try {
                 expectedOrigin = new URL(iframeEntry.src, window.location.origin).origin;
             } catch {
+                if (diagnosticEvent) {
+                    notificationDiagnostics.record('assistant.event.received', {
+                        ...diagnosticEvent,
+                        origin: event.origin || null,
+                        expectedOrigin: null,
+                        sourceMatched: true,
+                        originMatched: false,
+                        reason: 'invalid-iframe-origin',
+                    });
+                }
                 return;
             }
-            if (event.origin !== expectedOrigin) return;
+            if (event.origin !== expectedOrigin) {
+                if (diagnosticEvent) {
+                    notificationDiagnostics.record('assistant.event.received', {
+                        ...diagnosticEvent,
+                        origin: event.origin || null,
+                        expectedOrigin,
+                        sourceMatched: true,
+                        originMatched: false,
+                        reason: 'origin-mismatch',
+                    });
+                }
+                return;
+            }
             const runEvent = readAssistantIframeRunEvent(event.data);
-            if (!runEvent) return;
-            assistantIframePool.markRunState(iframeKey, runEvent.runState, runEvent.threadId);
+            if (diagnosticEvent) {
+                notificationDiagnostics.record('assistant.event.received', {
+                    ...diagnosticEvent,
+                    origin: event.origin || null,
+                    expectedOrigin,
+                    sourceMatched: true,
+                    originMatched: true,
+                    runState: runEvent?.runState ?? null,
+                    reason: 'accepted',
+                });
+            }
+            if (runEvent) {
+                assistantIframePool.markRunState(iframeKey, runEvent.runState, runEvent.threadId);
+            }
+            const notificationIntent = assistantNotificationTrackerRef.current.consume(event.data);
+            if (notificationIntent) {
+                onAiNotification?.(notificationIntent);
+            }
         };
 
         window.addEventListener('message', handleAssistantIframeRunEvent);
         return () => {
             window.removeEventListener('message', handleAssistantIframeRunEvent);
         };
-    }, [assistantIframePool]);
+    }, [assistantIframePool, onAiNotification]);
 
     useEffect(() => {
         localStorage.setItem(STORAGE_KEY_ASSISTANT_WIDTH, String(Math.round(assistantPanelWidth)));

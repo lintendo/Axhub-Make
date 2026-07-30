@@ -51,7 +51,7 @@ interface MultiPagePreviewCanvasProps {
     previewUrl: string;
     iframeKey: React.Key;
     previewIframeRef: React.MutableRefObject<HTMLIFrameElement | null>;
-    onPreviewIframeLoad?: () => void;
+    onPreviewIframeLoad?: (iframe?: HTMLIFrameElement | null) => void;
     handleChangeMultiPageColumns: (columns: MultiPageColumns) => void;
     handleSelectPreviewSinglePreset: (preset: PreviewSinglePreset) => void;
     handleSelectCustomPreview: () => void;
@@ -314,7 +314,7 @@ export default function MultiPagePreviewCanvas({
     }, [activeSlots, captureSlotScreenshot]);
 
     const handleLiveIframeLoad = React.useCallback((slotId: string, page: MultiPagePreviewPage) => {
-        onPreviewIframeLoad?.();
+        onPreviewIframeLoad?.(iframeRefs.current[slotId]);
         if (!capturedPageIdsRef.current.has(page.id)) {
             window.clearTimeout(loadScreenshotTimersRef.current[slotId]);
             loadScreenshotTimersRef.current[slotId] = window.setTimeout(() => {

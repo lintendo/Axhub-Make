@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+
+.dmb-page.netflix-theme {
+  color-scheme: dark;
+  --dmb-accent: #E50914;
+  --dmb-accent-pressed: #B7070F;
+  --dmb-accent-contrast: #FFFFFF;
+  --dmb-link: #54B9C5;
+  --dmb-muted: #2A2A2A;
+  --dmb-bg: #141414;
+  --dmb-surface: #1F1F1F;
+  --dmb-ink: #FFFFFF;
+  --dmb-ink-muted: #AAAAAA;
+  --dmb-ink-subtle: #777777;
+  --dmb-border: #2B2B2B;
+  --dmb-border-sample-bg: #141414;
+  --dmb-tab-bg: rgba(20, 20, 20, 0.92);
+  --dmb-tab-border: #2B2B2B;
+  --dmb-tab-color: #777777;
+  --dmb-tab-active-bg: #E50914;
+  --dmb-tab-active-border: #E50914;
+  --dmb-tab-active-color: #FFFFFF;
+  --dmb-radius-xs: 0;
+  --dmb-radius-control: 4px;
+  --dmb-radius-card: 4px;
+  --dmb-radius-preview: 4px;
+  --dmb-radius-pill: 500px;
+
+  --dmb-font-display: "Netflix Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display", Graphik, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --dmb-font-body: "Netflix Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display", Graphik, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --dmb-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.dmb-page.netflix-theme .dmb-token-card,
+.dmb-page.netflix-theme .dmb-type-list article,
+.dmb-page.netflix-theme .dmb-component-strip,
+.dmb-page.netflix-theme .dmb-component-grid,
+.dmb-page.netflix-theme .dmb-spacing-scale,
+.dmb-page.netflix-theme .dmb-radius-grid article,
+.dmb-page.netflix-theme .dmb-shadow-grid article,
+.dmb-page.netflix-theme .dmb-border-grid article,
+.dmb-page.netflix-theme .dmb-mobile-screenshot {
+  border-color: #2B2B2B;
+  background: #1F1F1F;
+}
+
+.dmb-page.netflix-theme .dmb-token-grid > div {
+  background: #2A2A2A;
+  color: #FFFFFF;
+}
+
+.dmb-page.netflix-theme .dmb-token-grid button,
+.dmb-page.netflix-theme .dmb-component-strip button {
+  border-color: #E50914;
+  border-radius: 4px;
+  background: #E50914;
+  color: #FFFFFF;
+}
+
+.dmb-page.netflix-theme .dmb-token-grid .dmb-text-button {
+  border-color: #3A3A3A;
+  background: #2A2A2A;
+  color: #FFFFFF;
+}
+
+.dmb-page.netflix-theme .dmb-outline-button {
+  border-color: #AAAAAA !important;
+  background: transparent !important;
+  color: #FFFFFF !important;
+}
+
+.dmb-page.netflix-theme .dmb-token-grid input,
+.dmb-page.netflix-theme .dmb-tags span,
+.dmb-page.netflix-theme .dmb-muted {
+  border-color: #2B2B2B;
+  background: #2A2A2A;
+  color: #AAAAAA;
+}
+
+.dmb-page.netflix-theme .dmb-do {
+  border-color: #3A3A3A;
+  background: #1F1F1F;
+  color: #FFFFFF;
+}
+
+.dmb-page.netflix-theme .dmb-dont {
+  border-color: color-mix(in srgb, #E50914 45%, transparent);
+  background: color-mix(in srgb, #E50914 10%, #141414);
+  color: #E50914;
+}
+
+.dmb-page.netflix-theme .dmb-lightbox > button {
+  border-radius: 4px;
+  background: #E50914;
+}

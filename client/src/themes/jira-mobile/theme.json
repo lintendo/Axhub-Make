@@ -1,0 +1,332 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/productivity/jira/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-jira-mobile",
+    "slug": "jira-mobile",
+    "brand": "Jira",
+    "titleZh": "Jira 主题",
+    "titleEn": "Jira",
+    "descriptionZh": "Jira 的 Design.md 主题展示，围绕移动端、企业服务与生产力组织页面。",
+    "descriptionEn": "Jira mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "企业服务与生产力"
+    ],
+    "distributionTags": [
+      "移动端",
+      "企业服务与生产力"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/jira-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/jira-cloud-by-atlassian/id1006972087?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/jira-cloud-by-atlassian/id1006972087?uo=4",
+          "marketId": "1006972087",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/67/5a/e5/675ae558-d9a7-7326-2de2-40c05f533eac/82cd19de-93a6-4455-84b6-2a48a1d57b75_1.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "ffad77aec02f5b77e2b26715e91be21ae7ab300e6881837a72d5354b51469b89",
+          "byteLength": 16546,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/jira-cloud-by-atlassian/id1006972087?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/jira-cloud-by-atlassian/id1006972087?uo=4",
+          "marketId": "1006972087",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/12/f2/fe/12f2fe9a-f0bd-2b3c-a4a6-4007c562bfb7/90344beb-3f63-41b5-b72a-f448ebbd862c_2.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "d1d55854fac807b941922f4ecbcaa6250039b769e034b4cefb1595981c6ef9f8",
+          "byteLength": 15592,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/jira-cloud-by-atlassian/id1006972087?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/jira-cloud-by-atlassian/id1006972087?uo=4",
+          "marketId": "1006972087",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/6a/f2/79/6af27929-7f24-748f-1fc9-872ec8d0ef67/f50ec98c-9f60-4f72-9632-162093b1906c_3.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "57c64f6e2c138d6efdd1ea7875388b38db19a616432d767d1636614e9c109d86",
+          "byteLength": 11848,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#0052CC",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Roboto",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Roboto",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Jira 主题",
+    "brandAlias": "Jira",
+    "description": "Jira 的 Design.md 主题展示，围绕移动端、企业服务与生产力组织页面。",
+    "descriptionEn": "Jira mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "企业服务与生产力"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#0052CC",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "阴影 1 - Shadow 1",
+        "value": "0 1px 1px rgba(9,30,66,0.13)",
+        "cssValue": "0 1px 1px rgba(9,30,66,0.13)",
+        "description": "Shadow: `0 1px 1px rgba(9,30,66,0.13), 0 0 1px rgba(9,30,66,0.16)` light / `0 1px 2px rgba(0,0,0,0.4)` dark"
+      },
+      {
+        "label": "阴影 2 - Shadow 2",
+        "value": "0 1px 1px rgba(9,30,66,0.13), 0 0 1px rgba(9,30,66,0.16)",
+        "cssValue": "0 1px 1px rgba(9,30,66,0.13), 0 0 1px rgba(9,30,66,0.16)",
+        "description": "Shadow: `0 1px 1px rgba(9,30,66,0.13), 0 0 1px rgba(9,30,66,0.16)` light / `0 1px 2px rgba(0,0,0,0.4)` dark"
+      },
+      {
+        "label": "阴影 3 - Shadow 3",
+        "value": "0 1px 2px rgba(0,0,0,0.4)",
+        "cssValue": "0 1px 2px rgba(0,0,0,0.4)",
+        "description": "Shadow: `0 1px 1px rgba(9,30,66,0.13), 0 0 1px rgba(9,30,66,0.16)` light / `0 1px 2px rgba(0,0,0,0.4)` dark"
+      },
+      {
+        "label": "阴影 4 - Shadow 4",
+        "value": "0 8px 12px rgba(9,30,66,0.15)",
+        "cssValue": "0 8px 12px rgba(9,30,66,0.15)",
+        "description": "Drag state: lifts to elevation 200 (`0 8px 12px rgba(9,30,66,0.15)`), 2° tilt, ghost placeholder in source column"
+      },
+      {
+        "label": "阴影 5 - Shadow 5",
+        "value": "rgba(9,30,66,…)",
+        "cssValue": "rgba(9,30,66,…)",
+        "description": "Shadow Philosophy: On light mode shadows are tinted with Atlassian Navy (`rgba(9,30,66,…)`) rather than pure black, keeping them cool and crisp. On dark mode shadows are nearly invisible, so elevation is signaled by a lighter surface step (`#22272B` → `#2C333A` → `#38414A`) plus a 1px border on overlays/menus."
+      }
+    ],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#0052CC",
+        "cssValue": "#0052CC",
+        "description": "Jira's iOS app is a work-tracking instrument — dense, structured, and deliberately utilitarian. Where consumer apps chase delight, Jira chases *legibility under load*: a single sprint board can hold dozens of issue cards across five columns, each card carrying an issue type, key, summary, labels, story points, and an assignee avatar. The design system exists to make that density scannable. The atmosphere is \"clean engineering tool\" — Atlassian's neutral grays, generous internal padding, hairline dividers, and exactly one saturated brand color (Jira Blue `#0052CC`) used sparingly so it always means \"primary action.\""
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#091E4224",
+        "cssValue": "#091E4224",
+        "description": "Divider (`#091E4224`): Hairline dividers between rows, fields, and sections (≈14% navy)."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#091E420F",
+        "cssValue": "#091E420F",
+        "description": "Border (`#091E420F`): Card and input borders (≈6% navy)."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#38414A",
+        "cssValue": "#38414A",
+        "description": "Dark Surface 3 (`#38414A`): Pressed states, neutral lozenge fill."
+      },
+      {
+        "label": "边框 5 - Border 5",
+        "value": "#22272B",
+        "cssValue": "#22272B",
+        "description": "Dark Surface 1 (`#22272B`): Issue cards, raised surfaces."
+      },
+      {
+        "label": "边框 6 - Border 6",
+        "value": "#44546F",
+        "cssValue": "#44546F",
+        "description": "Text Subtle Light (`#44546F`): Secondary text, field labels, metadata."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Roboto",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use Jira Blue ({#0052CC}) ONLY for primary actions, links, and selected states — never as a content background。",
+        "建议：Keep the canvas and chrome neutral gray so semantic colors carry meaning。",
+        "建议：Render status as a lozenge — uppercase, tracked, semantic-colored, 3pt radius。",
+        "建议：Use the correct issue-type icon + color (green Story / red Bug / blue Task / purple Epic / gray Sub-task)。",
+        "建议：Pair every card footer with issue-type icon + key on the left, points + assignee on the right。"
+      ],
+      "dont": [
+        "避免：use Jira Blue as a card or section background — it must read as \"action only\"。",
+        "避免：introduce new accent colors — the semantic set (blue/green/red/yellow/purple/neutral) is the whole palette。",
+        "避免：show status as plain text — always a colored lozenge。",
+        "避免：let issue cards grow unbounded — 2-line summary clamp is mandatory。",
+        "避免：use pure black text ({#000000}) — {#172B4D} navy ink is correct on light。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "workspace",
+      "navigation": [
+        "工作台",
+        "项目",
+        "我的"
+      ],
+      "primaryAction": "新建项目"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

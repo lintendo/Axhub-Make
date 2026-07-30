@@ -5,92 +5,86 @@ description: Use only when 用户明确要求把本地截图、设计稿或高�
 
 # Screenshot To Prototype
 
-用本地截图/设计稿还原 client 可运行原型：先提取必要素材，再写 React/CSS，最后做真实运行截图回归。正文保持中文、简洁。
+用本地截图还原可运行原型。先完成固定 viewport 下的 1:1 绝对定位视觉稿，再转换为 React；效果优先，评审信息集中在主规格，正文使用中文并保持简洁。
 
-## 退出规则
+## 适用范围
 
-任一条件不满足就停止：
+- 只处理用户明确要求还原的本地截图或设计稿。普通图片素材、风格参考、URL 克隆和主题提取不触发本技能。
+- 获取源图本地路径；聊天附件先落到本地。源图本身就是视觉依据，不再额外要求选择主题或创建设计规范。
+- 需要生成、编辑或派生位图素材时，使用 `ui-image-generation`；工具选择、配置读取和回退规则全部遵循该技能。截图还原只补充本地源图、bbox、裁切、修复和素材分流约束。
+- 所有素材提取、修复、高清化、设计分析都必须把用户本地图片路径作为参考图传入，不能只用文字描述生成素材。
+- 截图优先使用 Axhub Preview MCP 的 `preview_capture`；只有内置截图不支持当前内容时才换用现有浏览器截图能力。
 
-- 用户未提供源图。
-- 必须能获取源图的本地路径；如果源图没有本地路径，必须停止。
-- 图片生成能力可以来自 `ui-image-generation`、系统 `imagegen`、内部图片生成 MCP 或其他可用图片生成工具，或 Agent 图片配置。
-- 不能只因当前工具面板没有直接暴露图片生成工具就停止；停止前必须主动检查这些通道。
-- 确认所有图片生成通道都不可用或都不支持传入本地图片路径时，才停止。
-- 启动实现前必须确认存在视觉回归工具。
-- 视觉回归工具必须能获取产物真实运行截图；如果无法获取真实运行截图，必须停止。
-- 用户只是提供图片作为需求、内容、素材、风格上下文或普通参考图时，必须停止。
-- 普通建站、URL 克隆、主题提取、单纯图片生成不要使用本技能。
+## 目录
 
-## 路径
-
-所有路径都以 client 包根目录为基准，文档里不要写本机绝对路径、平台路径或外层仓库路径。
-
-- 原型：`src/prototypes/<slug>/`
 - 主规格：`src/prototypes/<slug>/.spec/spec.html`
+- 还原映射：`src/prototypes/<slug>/.spec/reconstruction/reconstruction-manifest.json`
+- 规格样式：`src/prototypes/<slug>/.spec/reconstruction/tailwind.css`
+- 成果截图：`src/prototypes/<slug>/.spec/reconstruction/visual-check/`
 - 最终素材：`src/prototypes/<slug>/assets/`
-- 最终素材清单：`src/prototypes/<slug>/assets/asset-manifest.json`
-- 临时文件：`.local/screenshot-to-prototype/<slug>/`
-- 候选矩阵：`.local/screenshot-to-prototype/<slug>/asset-sheet.png`
-- 候选切图：`.local/screenshot-to-prototype/<slug>/candidates/`
-- 候选清单：`.local/screenshot-to-prototype/<slug>/candidate-manifest.json`
+- 临时数据：`.local/screenshot-to-prototype/<slug>/`
+- 生成历史：实际二次生图时复用 `src/prototypes/<slug>/.spec/generation-artifacts.json`
 
-## 规格与评审（本技能特例）
+源图摘要、候选清单、候选切图、审计报告和中间指标都放在 `.local/`。不创建额外的素材文档或独立视觉对比文档。
 
-- 主规格强制使用 `.spec/spec.html`，从 HTML 模板创建，不提供 Markdown 选项。
-- 在 HTML 中先展示源截图，素材评审以逐项左右对照为主：左侧展示候选矩阵中的对应素材或候选切图，右侧展示最终裁切素材、重绘 SVG 或组件化结果；同项对齐并标注用途，后续实现采用右侧结果，不能只列文件路径。
-- 需求与设计完成第一轮对齐时必须确定 `DESIGN.md`。client 内没有符合需求的现成规范时主动创建；无论复用或新建，都把原文件路径和关键设计规范作为可评审内容直接呈现在 HTML 中。
-- 用户确认 HTML 主规格前不得开始实现；实现后同步规格中的素材、设计决策和实际结果。
-- 本节覆盖通用对齐规则中关于规格格式可选、不主动创建 `DESIGN.md` 以及主规格只引用设计基底的默认约定。
+## 使用主规格
 
-## 流程
+- 遵循 `rules/requirements-alignment-guide.md`。已有 `.spec/spec.html` 时直接扩展；没有时从通用 HTML 模板创建。不要修改通用规格模板。
+- 按当前项目需要使用 `data-page-target` 和 `data-spec-page`。不规定固定页数或页面名称。
+- 规格展示源图信息、绝对定位视觉稿、最终素材及用途，并把原图与真实运行截图左右并排，形成成果快速对比。
+- 素材评审区逐项使用相同预览框左右展示候选与最终真实内容，透明素材使用棋盘格背景，并标注名称或 ID、用途/来源和输出尺寸。图片、SVG 和组件都必须实际渲染，不得只提供文字、文件名或路径。
+- 视觉稿舞台等于源图 viewport，使用 `position: relative` 和 `overflow: hidden`；元素绝对定位并保留稳定的 `data-reconstruction-id`。
+- 成果对比是普通规格内容，不建立逐元素或全局审批状态。用户有意见时按评论迭代。
+- 用户要求先看视觉稿时停在规格阶段；用户明确要求完整原型时无需等待额外确认，更新成果对比后继续 React 实现。
 
-1. 先应用退出规则，确认用户明确要求把截图/设计稿还原成可运行原型，并确认源图本地路径、图片生成通道、视觉回归工具。
-2. 若图片生成通道不明确，先按 `ui-image-generation` 的工作流检查内部图片生成 MCP、Agent 图片配置和系统 `imagegen`，再决定是否停止。
-3. 所有素材提取、修复、高清化、设计分析都必须把用户本地图片路径作为参考图传入，不能只用文字描述生成素材。
-4. 让图片 AI 输出透明 PNG 候选素材矩阵；由图片 AI 判断具体提取对象，只说明筛选规则：保留可复用且 HTML/CSS 难快速稳定还原的视觉素材，包括背景图、背景纹理或复杂背景层；排除纯文本、简单布局容器、普通 CSS 形状和整页截图。
-5. 候选矩阵只用于定位和分流，不直接视为最终可消费素材。临时候选矩阵放 `.local/screenshot-to-prototype/<slug>/`，再切到 `.local/screenshot-to-prototype/<slug>/candidates/`：
+## 工作步骤
+
+1. 读取源图、现有规格、相关原型与素材。预处理结果写入本地临时目录：
 
 ```bash
-node .agents/skills/screenshot-to-prototype/scripts/slice-asset-sheet.mjs \
-  --input .local/screenshot-to-prototype/<slug>/asset-sheet.png \
-  --output-dir .local/screenshot-to-prototype/<slug>/candidates \
-  --grid 4x3 \
-  --names icon-search,logo-brand,avatar-user,banner-hero \
-  --manifest .local/screenshot-to-prototype/<slug>/candidate-manifest.json
+node .agents/skills/screenshot-to-prototype/scripts/prepare-reconstruction-source.mjs \
+  --input <source.png> \
+  --output .local/screenshot-to-prototype/<slug>/source-summary.json
 ```
 
-6. 审计候选切图：
+2. 由图片 AI 判断具体提取对象，只说明筛选规则：先按 UI 职责分流，再按视觉复杂度选择表示方式；信息与交互结构走 HTML/CSS，界面图形走 SVG，内容媒体和 HTML/CSS 难快速稳定还原的装饰视觉才进入位图候选。
+3. 位图默认按 bbox 单独裁切。只有同屏存在多个独立装饰位图且适合批量分离时，才用 `slice-asset-sheet.mjs` 或 `slice-alpha-components.mjs`；候选和 `candidate-manifest.json` 放在 `.local/`。
+4. 使用 `audit-assets.mjs` 审计候选。键色透明化只在候选需要透明背景且当前底色连续、纯净时使用，先运行 `probe-key-color.mjs`，再运行 `key-transparent-image.mjs`。
+5. 把元素 bbox、候选和选择结果整理到本地 `elements.json`，再构建并验证还原映射：
 
 ```bash
-node .agents/skills/screenshot-to-prototype/scripts/audit-assets.mjs \
-  --manifest .local/screenshot-to-prototype/<slug>/candidate-manifest.json
+node .agents/skills/screenshot-to-prototype/scripts/build-reconstruction-manifest.mjs \
+  --source-summary .local/screenshot-to-prototype/<slug>/source-summary.json \
+  --elements .local/screenshot-to-prototype/<slug>/elements.json \
+  --output src/prototypes/<slug>/.spec/reconstruction/reconstruction-manifest.json
+
+node .agents/skills/screenshot-to-prototype/scripts/validate-reconstruction-manifest.mjs \
+  --manifest src/prototypes/<slug>/.spec/reconstruction/reconstruction-manifest.json \
+  --project-root src/prototypes/<slug> \
+  --source <source.png>
 ```
 
-7. 逐个候选做最终化分流，最终素材必须从以下三类产生：
-   - SVG/组件重绘：简单图标、线性图标、几何 logo、少色块图形、需要颜色继承、交互状态或 hover/focus 状态的元素。
-   - 高清透明 PNG：复杂插画、拟物图标、纹理、照片、渐变阴影重的图形、banner/封面。
-   - 直接消费 PNG：仅当候选切图通过审计且人工视觉检查无明显污染、误切、模糊、低分辨率时使用。
-8. 做 SVG/组件重绘或高清透明 PNG 时，必须同时参考原始本地源图和候选切图；候选切图只提供对象范围和风格线索，不能作为唯一依据。
-9. 只把最终文件型素材放入 `src/prototypes/<slug>/assets/`。最终 `asset-manifest.json` 只登记最终 SVG/PNG 文件并指向最终文件名和尺寸；组件化图标可直接放在原型代码中，不必登记到清单。React 原型不得引用 `.local/` 候选切图。
-10. 页面用真实文本、React 结构、Grid/Flex、CSS variables、稳定 `aspect-ratio` 和响应式约束还原；不要把整张截图当背景。
-11. 运行 `node scripts/check-app-ready.mjs /prototypes/<slug>`，再用视觉回归工具检查真实运行截图。
-12. 最终回复提供轻量偏差报告，不新建长文档：
-    - 展示或链接原图与真实运行截图。
-    - 按 P0-P3 列出偏差，重点写未还原到位的问题，不写泛泛总结。
-    - P0：阻塞验收或页面不可用；P1：关键布局/比例/内容明显不符；P2：素材风格、间距、图标、阴影等显著偏差；P3：细节优化。
-    - 明确等待用户反馈选择是否继续修，不擅自进入下一轮大改。
+存在生成候选时追加 `--generation-artifacts src/prototypes/<slug>/.spec/generation-artifacts.json`。
 
-## 命名
+6. 在 `spec.html` 实现绝对定位视觉稿。需要 Tailwind 时运行 `compile-reconstruction-tailwind.mjs`，使用独立前缀；不使用 Tailwind CDN，不加载 Tailwind preflight。
+7. 调用 `preview_capture`，按源图 viewport、DPR 1 截取规格视觉页，输出到 `.spec/reconstruction/visual-check/render.png`。截图为空、尺寸错误或诊断异常时先修复捕获问题。
+8. 在当前 `spec.html` 增加成果快速对比区域，只引用稳定原图和 `render.png`；两张图使用相同 viewport 与比例左右并排，不创建独立对比文档。
+9. 转换为真实文本、React 组件、Grid/Flex、CSS variables、响应式约束和交互状态。React 不引用 `.local/`，也不把可编辑 UI 保留为整块截图。完成后按相同 viewport 再截图，并更新规格中的成果对比。
 
-素材名用 kebab-case：`icon-*`、`logo-*`、`avatar-*`、`image-*`、`banner-*`、`cover-*`、`background-*`、`decoration-*`、`border-*`。含义不清时用 `asset-01`。
+## 素材策略
 
-## 可消费素材标准
+- 先按 UI 职责分流，再按视觉复杂度处理，不以“看起来复杂”作为位图化依据。
+- 文本、按钮、输入框、导航、卡片、列表和表格使用 HTML/CSS；图标、Logo、进度和简单图表优先使用现有图标库或 SVG。
+- 照片、头像、商品图、插画、纹理和页面内嵌截图使用位图，默认保留 `clean-crop`；需要修复时增加 `generated-refined`。
+- 二次生图始终传入本地源图，不生成 UI 文案、控件、通用图标或数据内容；输出比例和清晰度按目标 bbox 和 DPR 确定。
+- 纯色生成背景需要透明化时使用 `generated-chroma`；连续复杂背景在其他方式效果不足时才使用 `clean-plate`。
+- `flatten-in-page` 只用于第一阶段视觉稿；最终 React 恢复文本、控件、重复结构和需要交互的数据图形。
+- 最终文件型素材直接放入原型 `assets/`，其使用位置和取舍写入主规格。
 
-- 候选切图是中间产物；最终可消费素材是 `src/prototypes/<slug>/assets/` 中的 SVG/高清透明 PNG，或原型代码里的组件化图标。
-- 默认不要把候选切图直接当最终素材。直接消费只适用于清晰、干净、尺寸足够、边缘不脏且没有误切的候选。
-- 简单图标优先 SVG/组件化；复杂视觉优先用源图参考单独高清化或修复为透明 PNG。
-- 最终清单只登记最终文件型素材，不登记 `.local/` 中间产物或代码组件。
+## 映射
 
-## 提示词
+`reconstruction-manifest.json` 只保存源图 hash/viewport，以及元素的 bbox、表示方式、候选、`selectedCandidateId`、`specElementId` 和 React 目标。验证器检查越界、资源缺失、生成记录、未知路线、重复元素 ID、候选审计和源图 hash。
 
-写图片生成提示词时再读 `references/prompts.md`。
+## 交付
+
+最终回复提供规格链接、原图与真实运行截图，以及轻量偏差说明。按 P0-P3 说明仍可见的问题；不另建总结文档。

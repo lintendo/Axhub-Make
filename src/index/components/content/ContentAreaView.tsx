@@ -581,7 +581,7 @@ interface ContentAreaProps {
     containerRef: React.RefObject<HTMLDivElement>;
     previewIframeRef: React.MutableRefObject<HTMLIFrameElement | null>;
     secondaryPreviewIframeRef: React.MutableRefObject<HTMLIFrameElement | null>;
-    onPreviewIframeLoad?: () => void;
+    onPreviewIframeLoad?: (iframe?: HTMLIFrameElement | null) => void;
     selectedItem: ItemData | null;
     activeTab: TabType;
     previewConfig: PreviewConfig;
@@ -1360,7 +1360,7 @@ function StartGuide({
     defaultThemeName?: string | null;
     onOpenPrototypeCreateDialog?: (options: PrototypeCreateDialogOpenOptions) => void;
     onRefreshPrototypes?: (preferredName?: string) => Promise<ItemData[]>;
-    onSubmitPrototypeStartRequest?: (request: CanvasAiGenerationRequest) => void | Promise<void>;
+    onSubmitPrototypeStartRequest?: (request: CanvasAiGenerationRequest) => boolean | Promise<boolean>;
     onUploadResourceFiles?: () => void;
     onCreateResourceCanvasFile?: () => void | Promise<void>;
     onCreateDrawioResourceFile?: () => void | Promise<void>;
@@ -1813,108 +1813,108 @@ function StartGuide({
 
     return (
         <div ref={placeholderDropZoneRef} className="relative h-full w-full overflow-auto bg-[#f7f9fb] px-6 py-10 text-center">
-            {shouldShowTopActions ? (
-                <div className="absolute right-6 top-5 z-10 flex flex-wrap items-center justify-end gap-2 text-[12px]">
-                    <TooltipProvider>
-                        {shouldShowPrototypeActions ? (
-                            <>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
-                                            onClick={() => onOpenPrototypeCreateDialog?.({ initialTab: 'upload', targetPrototypeName: draftActive ? undefined : item.name })}
-                                        >
-                                            <UploadCloud className="h-3.5 w-3.5" />
-                                            导入原型
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top">Axhub Make / Axure / V0 / aistudio / Stitch / Figma Make</TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <span className="inline-flex h-7 cursor-default items-center gap-1.5 rounded-md px-2 text-xs text-slate-600">
-                                            <Globe className="h-3.5 w-3.5" />
-                                            导入任意网页
-                                        </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top">使用 Chrome 扩展可以采集任意网页</TooltipContent>
-                                </Tooltip>
-                            </>
-                        ) : null}
-                        {shouldShowResourceActions ? (
-                            <>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
-                                            onClick={onUploadResourceFiles}
-                                        >
-                                            <UploadCloud className="h-3.5 w-3.5" />
-                                            上传资源
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top">上传资源文件</TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
-                                            onClick={() => { void onCreateResourceCanvasFile?.(); }}
-                                        >
-                                            <LayoutDashboard className="h-3.5 w-3.5" />
-                                            画布
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top">新建 Excalidraw 画布文件</TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
-                                            onClick={() => { void onCreateDrawioResourceFile?.(); }}
-                                        >
-                                            <Network className="h-3.5 w-3.5" />
-                                            Drawio 图表
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top">新建 Drawio 图表文件</TooltipContent>
-                                </Tooltip>
-                            </>
-                        ) : null}
-                        {shouldShowDesignImportAction ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
-                                        onClick={onOpenDesignImport}
-                                    >
-                                        <UploadCloud className="h-3.5 w-3.5" />
-                                        导入设计规范
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">导入设计规范</TooltipContent>
-                            </Tooltip>
-                        ) : null}
-                    </TooltipProvider>
-                </div>
-            ) : null}
             <div className="flex min-h-[76vh] w-full items-center justify-center">
                 <div className="flex min-h-full w-full max-w-[960px] flex-col items-center justify-center">
+                    {shouldShowTopActions ? (
+                        <div className="z-10 mb-5 flex w-full flex-wrap items-center justify-center gap-2 text-[12px] xl:absolute xl:right-6 xl:top-5 xl:mb-0 xl:w-auto xl:justify-end">
+                            <TooltipProvider>
+                                {shouldShowPrototypeActions ? (
+                                    <>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
+                                                    onClick={() => onOpenPrototypeCreateDialog?.({ initialTab: 'upload', targetPrototypeName: draftActive ? undefined : item.name })}
+                                                >
+                                                    <UploadCloud className="h-3.5 w-3.5" />
+                                                    导入原型
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top">Axhub Make / Axure / V0 / aistudio / Stitch / Figma Make</TooltipContent>
+                                        </Tooltip>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <span className="inline-flex h-7 cursor-default items-center gap-1.5 rounded-md px-2 text-xs text-slate-600">
+                                                    <Globe className="h-3.5 w-3.5" />
+                                                    导入任意网页
+                                                </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top">使用 Chrome 扩展可以采集任意网页</TooltipContent>
+                                        </Tooltip>
+                                    </>
+                                ) : null}
+                                {shouldShowResourceActions ? (
+                                    <>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
+                                                    onClick={onUploadResourceFiles}
+                                                >
+                                                    <UploadCloud className="h-3.5 w-3.5" />
+                                                    上传资源
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top">上传资源文件</TooltipContent>
+                                        </Tooltip>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
+                                                    onClick={() => { void onCreateResourceCanvasFile?.(); }}
+                                                >
+                                                    <LayoutDashboard className="h-3.5 w-3.5" />
+                                                    画布
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top">新建 Excalidraw 画布文件</TooltipContent>
+                                        </Tooltip>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
+                                                    onClick={() => { void onCreateDrawioResourceFile?.(); }}
+                                                >
+                                                    <Network className="h-3.5 w-3.5" />
+                                                    Drawio 图表
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top">新建 Drawio 图表文件</TooltipContent>
+                                        </Tooltip>
+                                    </>
+                                ) : null}
+                                {shouldShowDesignImportAction ? (
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
+                                                onClick={onOpenDesignImport}
+                                            >
+                                                <UploadCloud className="h-3.5 w-3.5" />
+                                                导入设计规范
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top">导入设计规范</TooltipContent>
+                                    </Tooltip>
+                                ) : null}
+                            </TooltipProvider>
+                        </div>
+                    ) : null}
                     <div className="w-full">
                         <h1 className="text-[28px] font-semibold leading-tight text-slate-950 sm:text-[34px]">
                             我们先从哪里开始呢?
@@ -2242,9 +2242,13 @@ export default function ContentArea({
         ? resolveCanvasFilePath(selectedResourceCanvas, selectedResourceCanvas.name)
         : '';
     const handleSubmitPrototypeStartRequest = async (request: CanvasAiGenerationRequest) => {
+        const submitCanvasAssistantPrompt = async (submittedRequest: CanvasAiGenerationRequest): Promise<boolean> => {
+            const result = await onSubmitCanvasAssistantPrompt?.(submittedRequest);
+            return result === true || (typeof result === 'object' && result?.ok === true);
+        };
+
         if (request.source === 'resource-start' || request.source === 'theme-start') {
-            await onSubmitCanvasAssistantPrompt?.(request);
-            return;
+            return submitCanvasAssistantPrompt(request);
         }
 
         const draftCreatedItem = prototypeStartDraftActive && !selectedItem
@@ -2253,7 +2257,7 @@ export default function ContentArea({
         const startItem = draftCreatedItem || selectedItem;
         if (!startItem) {
             toast.error('创建原型失败');
-            return;
+            return false;
         }
         const startPrototypeIndexPath = resolvePrototypeIndexFilePath(startItem);
         const startPrototypeLocalContextRef: CanvasLocalContextRef = {
@@ -2277,11 +2281,10 @@ export default function ContentArea({
                 submittedRequest.createdPrototype = refreshedStartItem;
             }
             setViewMode?.('demo');
-            await onSubmitCanvasAssistantPrompt?.(submittedRequest);
-            return;
+            return submitCanvasAssistantPrompt(submittedRequest);
         }
         setViewMode?.('canvas');
-        await onSubmitCanvasAssistantPrompt?.(submittedRequest);
+        return submitCanvasAssistantPrompt(submittedRequest);
     };
     const selectedPrototypeRuntimeUnavailable = viewMode === 'demo'
         && Boolean(selectedItem)
@@ -2519,7 +2522,7 @@ export default function ContentArea({
                 previous?.width === size.width && previous?.height === size.height ? previous : size
             ));
         });
-        onPreviewIframeLoad?.();
+        onPreviewIframeLoad?.(previewIframeRef.current);
     };
 
     const handleSplitPrimaryIframeLoad = () => {
@@ -2531,7 +2534,7 @@ export default function ContentArea({
                     : { ...previous, primary: size }
             ));
         });
-        onPreviewIframeLoad?.();
+        onPreviewIframeLoad?.(previewIframeRef.current);
     };
 
     const handleSplitSecondaryIframeLoad = () => {
@@ -2543,6 +2546,11 @@ export default function ContentArea({
                     : { ...previous, secondary: size }
             ));
         });
+        onPreviewIframeLoad?.(secondaryPreviewIframeRef.current);
+    };
+
+    const handleRawPreviewIframeLoad = (event: React.SyntheticEvent<HTMLIFrameElement>) => {
+        onPreviewIframeLoad?.(event.currentTarget);
     };
 
     const commitDimensionDraft = (draft: string, onCommit: (value: number) => void) => {
@@ -2833,7 +2841,7 @@ export default function ContentArea({
                     ref={previewIframeRef}
                     key={`${elementIframeKey}-${selectedMarkdownItem.name}`}
                     src={markdownIframeUrl}
-                    onLoad={onPreviewIframeLoad}
+                    onLoad={handleRawPreviewIframeLoad}
                     className="w-full h-full border-none block bg-background"
                     title={selectedMarkdownItem.displayName}
                 />
@@ -2906,7 +2914,7 @@ export default function ContentArea({
                         key={elementIframeKey}
                         src={themePreviewUrl}
                         allow="clipboard-write"
-                        onLoad={onPreviewIframeLoad}
+                        onLoad={handleRawPreviewIframeLoad}
                         className="w-full h-full border-none"
                         title={selectedTheme.displayName}
                     />
@@ -3150,7 +3158,7 @@ export default function ContentArea({
                             key={elementIframeKey}
                             src={primaryIframeUrl}
                             allow="clipboard-write"
-                            onLoad={onPreviewIframeLoad}
+                            onLoad={handleRawPreviewIframeLoad}
                             className="w-full h-full border-none block"
                             title={selectedItem.displayName}
                         />

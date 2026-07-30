@@ -6,6 +6,7 @@ import {
   DeleteOutlined,
   CaretRightFilled,
   ExclamationCircleFilled,
+  FileTextOutlined,
   FolderOpenOutlined,
   HomeOutlined,
   ArrowUpOutlined,
@@ -14,8 +15,6 @@ import {
   QuestionCircleOutlined,
   LinkOutlined,
   MoonOutlined,
-  PlusOutlined,
-  EditOutlined,
   PoweroffOutlined,
   ReloadOutlined,
   RightOutlined,
@@ -28,21 +27,16 @@ import {
 import { setPageAnimationsDisabled } from '../../utils/page-animation-toggle';
 import {
   Button,
-  Checkbox,
-  Dropdown,
   Input,
-  InputNumber,
   Modal,
   Popconfirm,
   Popover,
-  Select,
   Space,
   Switch,
   Timeline,
   Tooltip,
   Typography,
 } from 'antd';
-import type { MenuProps } from 'antd';
 import { setPageZoomEnabled } from '../../utils/page-zoom-toggle';
 import { installFloatingDrag, type FloatingPosition } from '../floating-drag';
 import {
@@ -69,7 +63,6 @@ import {
 } from './action-buttons';
 import { deriveAgentUiState } from './agent-ui-state';
 import { ShortcutCaptureCard, shortcutCaptureHintStyle } from './shortcut-capture-card';
-import { PROMPT_CARD_SKILL_OPTIONS } from './prompt-card-skills';
 import { notifyRuntimeMessage } from './runtime-feedback';
 import {
   buildAiWorkspaceBreadcrumbs,
@@ -104,11 +97,7 @@ import {
 } from './theme';
 import type { PropertyPanelHandle, PropertyPanelViewProps } from './types';
 import type { SessionActivityItem, SessionActivityTarget } from '../../core/editor/contracts';
-import type {
-  CommentaryHostToolbarAction,
-  CommentaryHostToolbarState,
-  CommentarySkillOption,
-} from '../../web-editor-types';
+import type { CommentaryHostToolbarAction, CommentaryHostToolbarState } from '../../web-editor-types';
 
 const AGENT_WAKE_FAILURE_MESSAGE = 'AI 唤醒失败，请在终端执行 npx @axhub/acp@latest，再重试';
 const AGENT_WAKE_TIMEOUT_MS = 12000;
@@ -120,88 +109,12 @@ const AGENT_MENU_OPTIONS = [
   { value: 'codex', label: 'Codex' },
   { value: 'opencode', label: 'OpenCode' },
 ] as const;
-const DEFAULT_AI_EXECUTION_PROVIDER = 'codex';
-const DEFAULT_AI_EXECUTION_RUN_CONCURRENCY = 5;
-const MIN_AI_EXECUTION_RUN_CONCURRENCY = 1;
-const MAX_AI_EXECUTION_RUN_CONCURRENCY = 10;
-const AI_EXECUTION_PROVIDER_OPTIONS = [
-  { value: 'codex', label: 'Codex' },
-  { value: 'claude', label: 'Claude' },
-  { value: 'opencode', label: 'OpenCode' },
-  { value: 'cursor', label: 'Cursor' },
-  { value: 'qoder', label: 'Qoder' },
-  { value: 'codebuddy', label: 'CodeBuddy' },
-  { value: 'reasonix', label: 'Reasonix' },
-] as const;
-const AGENT_DEFAULT_MENU_KEY = 'agent-provider:default';
 const PROPERTY_PANEL_HELP_TOOLTIP =
   '可以直接把需求发给你正在用的 IDE 或本地 agent，也可以先在页面上批注，让它帮你生成或整理设计决策。';
 const SELECTION_MODE_TOGGLE_SHORTCUT_LABEL = 'Ctrl / Cmd + S';
 const PARENT_SELECT_SHORTCUT_LABEL = '↑';
 const PARENT_RETURN_SHORTCUT_LABEL = '↓';
 const PARENT_SELECT_INPUT_TOUCHED_ATTR = 'data-we-parent-select-input-touched';
-
-function mergeCommentarySkillOptions(
-  options: readonly CommentarySkillOption[],
-): CommentarySkillOption[] {
-  const merged = new Map<string, CommentarySkillOption>();
-
-  for (const item of [...PROMPT_CARD_SKILL_OPTIONS, ...options]) {
-    const id = item.id.trim();
-    const label = item.label.trim();
-    if (!id || !label) continue;
-    merged.set(id, {
-      id,
-      label,
-      description: item.description?.trim() || undefined,
-      sourceUrl: 'sourceUrl' in item ? item.sourceUrl?.trim() || undefined : undefined,
-      prompt: 'prompt' in item ? item.prompt?.trim() || undefined : undefined,
-      custom: 'custom' in item ? item.custom === true : false,
-    });
-  }
-
-  return [...merged.values()];
-}
-
-function createCommentaryCustomSkillId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `custom-${crypto.randomUUID()}`;
-  }
-  return `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function summarizeCommentaryCustomSkillPrompt(prompt: string): string {
-  return prompt.replace(/\s+/gu, ' ').trim().slice(0, 80);
-}
-
-function normalizeCommentarySkillIds(value: unknown, options: readonly { id: string }[]): string[] {
-  const allowedIds = new Set(options.map((item) => item.id));
-  const rawValues = Array.isArray(value) ? value : [];
-  const result: string[] = [];
-  const seen = new Set<string>();
-
-  for (const item of rawValues) {
-    const id = typeof item === 'string' ? item.trim() : '';
-    if (!id || seen.has(id) || !allowedIds.has(id)) {
-      continue;
-    }
-    seen.add(id);
-    result.push(id);
-  }
-
-  return result;
-}
-
-function resolveCommentarySkillIds(
-  value: unknown,
-  options: readonly { id: string }[],
-  configured: boolean,
-): string[] {
-  if (!configured || !Array.isArray(value)) {
-    return options.map((item) => item.id);
-  }
-  return normalizeCommentarySkillIds(value, options);
-}
 
 function buildCommentarySkillGuidancePrompt(skillInstallSource?: string | null): string {
   const resolvedSkillInstallSource =
@@ -355,70 +268,13 @@ const lockPageScrollForRuntimeModal = (): (() => void) => {
   };
 };
 
-const normalizeAiExecutionProvider = (value: unknown): string =>
-  typeof value === 'string' && value.trim() ? value.trim() : DEFAULT_AI_EXECUTION_PROVIDER;
-
 const normalizeAiExecutionWorkspacePath = (value: unknown): string =>
   typeof value === 'string' ? value.trim() : '';
-
-const normalizeAiExecutionRunConcurrency = (value: unknown): number => {
-  const numeric = typeof value === 'string' ? Number(value.trim()) : Number(value);
-  if (!Number.isFinite(numeric)) {
-    return DEFAULT_AI_EXECUTION_RUN_CONCURRENCY;
-  }
-  return Math.min(
-    MAX_AI_EXECUTION_RUN_CONCURRENCY,
-    Math.max(MIN_AI_EXECUTION_RUN_CONCURRENCY, Math.trunc(numeric)),
-  );
-};
 
 const getPathDisplayName = (value: unknown): string => {
   const normalized = normalizeAiExecutionWorkspacePath(value).replace(/[\\/]+$/u, '');
   if (!normalized) return '';
   return normalized.split(/[\\/]/u).filter(Boolean).pop() || normalized;
-};
-
-const readAiExecutionConfigResult = (
-  value: unknown,
-): {
-  provider?: string;
-  workspacePath?: string;
-  runConcurrency?: number;
-  defaultWorkspacePath?: string;
-  providerOptions?: Array<{ value: string; label: string; disabled?: boolean }>;
-} => {
-  if (!value || typeof value !== 'object') return {};
-  const record = value as Record<string, unknown>;
-  const provider = normalizeAiExecutionProvider(record.provider);
-  const workspacePath = normalizeAiExecutionWorkspacePath(record.workspacePath);
-  const hasRunConcurrency = Object.prototype.hasOwnProperty.call(record, 'runConcurrency');
-  const runConcurrency = normalizeAiExecutionRunConcurrency(record.runConcurrency);
-  const defaultWorkspacePath = normalizeAiExecutionWorkspacePath(record.defaultWorkspacePath);
-  const providerOptions = Array.isArray(record.providerOptions)
-    ? record.providerOptions
-        .map((item) => {
-          if (!item || typeof item !== 'object') return null;
-          const itemRecord = item as Record<string, unknown>;
-          const optionValue = normalizeAiExecutionWorkspacePath(itemRecord.value);
-          if (!optionValue) return null;
-          const label = normalizeAiExecutionWorkspacePath(itemRecord.label) || optionValue;
-          return {
-            value: optionValue,
-            label,
-            disabled: itemRecord.disabled === true,
-          };
-        })
-        .filter((item): item is { value: string; label: string; disabled: boolean } =>
-          Boolean(item),
-        )
-    : undefined;
-  return {
-    ...(provider ? { provider } : {}),
-    ...(workspacePath ? { workspacePath } : {}),
-    ...(hasRunConcurrency ? { runConcurrency } : {}),
-    ...(defaultWorkspacePath ? { defaultWorkspacePath } : {}),
-    ...(providerOptions && providerOptions.length > 0 ? { providerOptions } : {}),
-  };
 };
 
 type LocalDirectoryBrowserState = {
@@ -476,7 +332,6 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       onPropertyPanelOpenChange,
       onAgentVisualStateChange,
       onUiSettingsChange,
-      onRefreshAgentProviderAvailabilities,
       onHoverSelectionSuppressedChange,
       onSelectionInteractionLockChange,
       onUiModeChange,
@@ -506,6 +361,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
     const toolbarMode = props.toolbarMode ?? options.toolbarMode ?? 'inline';
     const isHostToolbarMode = toolbarMode === 'host';
     const hideExecutionControls = Boolean(options.hideExecutionControls);
+    const selectionModeAvailable = interactionProfile !== 'text-comment';
 
     const rootRef = React.useRef<HTMLDivElement | null>(null);
     const pagePanelRef = React.useRef<HTMLDivElement | null>(null);
@@ -535,6 +391,9 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       Math.max(0, options.getModifiedElementCount?.() ?? 0),
     );
     const [actionBusy, setActionBusy] = React.useState(false);
+    const [markdownSourceEditorOpen, setMarkdownSourceEditorOpen] = React.useState(
+      () => options.getMarkdownSourceEditorOpen?.() === true,
+    );
     const [agentPromptSending, setAgentPromptSending] = React.useState(false);
     const [agentPromptInterrupting, setAgentPromptInterrupting] = React.useState(false);
     const [agentWakeChecking, setAgentWakeChecking] = React.useState(false);
@@ -565,52 +424,15 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
     const [settingsPopoverOpen, setSettingsPopoverOpen] = React.useState(false);
     const [skillInstallPromptCopied, setSkillInstallPromptCopied] = React.useState(false);
     const skillInstallFeedbackTimerRef = React.useRef<number | null>(null);
-    const [aiSettingsDialogOpen, setAiSettingsDialogOpen] = React.useState(false);
-    const [commentarySkillDialogOpen, setCommentarySkillDialogOpen] = React.useState(false);
-    const [commentarySkillDraftIds, setCommentarySkillDraftIds] = React.useState<string[]>(() =>
-      resolveCommentarySkillIds(
-        options.commentarySelectedSkillIds,
-        mergeCommentarySkillOptions(options.commentarySkillOptions ?? []),
-        options.commentarySkillSettingsConfigured === true,
-      ),
-    );
-    const [commentarySkillDraftOptions, setCommentarySkillDraftOptions] = React.useState<
-      CommentarySkillOption[]
-    >(() => mergeCommentarySkillOptions(options.commentarySkillOptions ?? []));
-    const [commentarySkillEditorDraft, setCommentarySkillEditorDraft] = React.useState<{
-      id: string;
-      label: string;
-      prompt: string;
-    } | null>(null);
-    const [commentarySkillEditorError, setCommentarySkillEditorError] = React.useState('');
-    const [commentarySkillSaving, setCommentarySkillSaving] = React.useState(false);
     const [keyboardShortcutsDialogOpen, setKeyboardShortcutsDialogOpen] = React.useState(false);
     const [annotationToolbarTick, setAnnotationToolbarTick] = React.useState(0);
-    const [agentProviderRefreshPending, setAgentProviderRefreshPending] = React.useState(false);
     const uiSettings = React.useMemo(
       () => options.getUiSettings?.() ?? propUiSettings,
       [options, panelRefreshKey, propUiSettings],
     );
-    const commentarySkillOptions = React.useMemo(
-      () => mergeCommentarySkillOptions(options.commentarySkillOptions ?? []),
-      [options.commentarySkillOptions],
-    );
-    const showCommentarySkillSettings =
-      commentarySkillOptions.length > 0 &&
-      (Boolean(options.onHostToolbarAction) || (options.commentarySkillOptions?.length ?? 0) > 0);
-    const [aiExecutionProvider, setAiExecutionProvider] = React.useState(() =>
-      normalizeAiExecutionProvider(options.aiExecutionProvider),
-    );
     const [aiExecutionWorkspacePath, setAiExecutionWorkspacePath] = React.useState(() =>
       normalizeAiExecutionWorkspacePath(options.aiExecutionWorkspacePath),
     );
-    const [aiExecutionRunConcurrency, setAiExecutionRunConcurrency] = React.useState(() =>
-      normalizeAiExecutionRunConcurrency(options.aiExecutionRunConcurrency),
-    );
-    const [aiExecutionProviderOptionsState, setAiExecutionProviderOptionsState] = React.useState<
-      Array<{ value: string; label: string; disabled?: boolean }>
-    >(() => [...AI_EXECUTION_PROVIDER_OPTIONS]);
-    const [aiExecutionConfigBusy, setAiExecutionConfigBusy] = React.useState(false);
     const [directoryPickerOpen, setDirectoryPickerOpen] = React.useState(false);
     const [directoryPickerBusy, setDirectoryPickerBusy] = React.useState(false);
     const [directoryPickerError, setDirectoryPickerError] = React.useState('');
@@ -632,20 +454,10 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       [agentProviderAvailabilities],
     );
     React.useEffect(() => {
-      setAiExecutionProvider(normalizeAiExecutionProvider(options.aiExecutionProvider));
-    }, [options.aiExecutionProvider]);
-
-    React.useEffect(() => {
       setAiExecutionWorkspacePath(
         normalizeAiExecutionWorkspacePath(options.aiExecutionWorkspacePath),
       );
     }, [options.aiExecutionWorkspacePath]);
-
-    React.useEffect(() => {
-      setAiExecutionRunConcurrency(
-        normalizeAiExecutionRunConcurrency(options.aiExecutionRunConcurrency),
-      );
-    }, [options.aiExecutionRunConcurrency]);
 
     React.useEffect(
       () => () => {
@@ -656,25 +468,6 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       [],
     );
 
-    React.useEffect(() => {
-      if (!Array.isArray(options.aiExecutionProviderOptions)) return;
-      const nextOptions = options.aiExecutionProviderOptions
-        .map((item) => {
-          const value = normalizeAiExecutionWorkspacePath(item?.value);
-          if (!value) return null;
-          return {
-            value,
-            label: normalizeAiExecutionWorkspacePath(item?.label) || value,
-            disabled: item?.disabled === true,
-          };
-        })
-        .filter((item): item is { value: string; label: string; disabled: boolean } =>
-          Boolean(item),
-        );
-      if (nextOptions.length > 0) {
-        setAiExecutionProviderOptionsState(nextOptions);
-      }
-    }, [options.aiExecutionProviderOptions]);
     React.useEffect(() => {
       inlineTextEditingRef.current = inlineTextEditing;
     }, [inlineTextEditing]);
@@ -701,7 +494,9 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
     );
     const hasPageTweakEntries = pageTweakEntries.length > 0;
     const showPropertyPanelToolbarButton = propertyPanelVisible && hasPageTweakEntries;
-    const showPropertyPanelSettingsItem = propertyPanelVisible && !showPropertyPanelToolbarButton;
+    const pageEditingSettingsAvailable = options.pageEditingSettingsAvailable !== false;
+    const showPropertyPanelSettingsItem =
+      pageEditingSettingsAvailable && propertyPanelVisible && !showPropertyPanelToolbarButton;
     const {
       currentTask: currentAgentTask,
       currentTaskRunning,
@@ -937,32 +732,31 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       [syncPanelMetaState],
     );
 
-    const handleHtmlFileSaveAction = React.useCallback(
-      async (): Promise<void> => {
-        if (actionBusy || !options.htmlFileSaveEnabled || !options.onHostToolbarAction) return;
+    const handleHtmlFileSaveAction = React.useCallback(async (): Promise<void> => {
+      if (actionBusy || !options.htmlFileSaveEnabled || !options.onHostToolbarAction) return;
 
-        try {
-          let result: unknown = false;
-          await runAction(async () => {
-            result = await options.onHostToolbarAction?.({ type: 'save-html-all' });
-            if (result === false) throw new Error('当前宿主无法保存 HTML 文件');
+      try {
+        let result: unknown = false;
+        await runAction(async () => {
+          result = await options.onHostToolbarAction?.({
+            type: 'save-html-all',
           });
-          const record =
-            result && typeof result === 'object' ? (result as Record<string, unknown>) : {};
-          const message =
-            typeof record.message === 'string' && record.message.trim()
-              ? record.message.trim()
-              : 'HTML 文本和样式已保存';
-          notifyRuntimeMessage(record.changed === false ? 'info' : 'success', message);
-        } catch (error) {
-          notifyRuntimeMessage(
-            'error',
-            error instanceof Error ? error.message : 'HTML 文件保存失败，请稍后重试',
-          );
-        }
-      },
-      [actionBusy, options.htmlFileSaveEnabled, options.onHostToolbarAction, runAction],
-    );
+          if (result === false) throw new Error('当前宿主无法保存 HTML 文件');
+        });
+        const record =
+          result && typeof result === 'object' ? (result as Record<string, unknown>) : {};
+        const message =
+          typeof record.message === 'string' && record.message.trim()
+            ? record.message.trim()
+            : 'HTML 文本和样式已保存';
+        notifyRuntimeMessage(record.changed === false ? 'info' : 'success', message);
+      } catch (error) {
+        notifyRuntimeMessage(
+          'error',
+          error instanceof Error ? error.message : 'HTML 文件保存失败，请稍后重试',
+        );
+      }
+    }, [actionBusy, options.htmlFileSaveEnabled, options.onHostToolbarAction, runAction]);
 
     const agentAwake = effectiveVisualState === 'awake';
 
@@ -1232,8 +1026,6 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
 
     const blockingLayerOpen =
       settingsPopoverOpen ||
-      aiSettingsDialogOpen ||
-      commentarySkillDialogOpen ||
       shortcutDialogOpen ||
       keyboardShortcutsDialogOpen ||
       directoryPickerOpen;
@@ -1327,7 +1119,6 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       if (!toolMinimized) return;
       setSessionActivityCardOpen(false);
       setSettingsPopoverOpen(false);
-      setCommentarySkillDialogOpen(false);
       setDirectoryPickerOpen(false);
     }, [toolMinimized]);
 
@@ -2005,208 +1796,23 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       }
     }, []);
 
-    const handleRefreshAgentProviders = React.useCallback(async () => {
-      if (!onRefreshAgentProviderAvailabilities) return;
-      setAgentProviderRefreshPending(true);
-      try {
-        await onRefreshAgentProviderAvailabilities(AGENT_MENU_OPTIONS.map((item) => item.value));
-      } finally {
-        setAgentProviderRefreshPending(false);
-      }
-    }, [onRefreshAgentProviderAvailabilities]);
-
-    const agentProviderSettingsMenuItems: NonNullable<MenuProps['items']> = AGENT_MENU_OPTIONS.map(
-      (item) => {
-        const availability = agentProviderAvailabilityMap.get(item.value) ?? null;
-        const agentInstalled = availability?.installed !== false;
-        return {
-          key: `agent-provider:${item.value}`,
-          label: `${item.label}${agentInstalled ? '' : '（未安装）'}`,
-          disabled: !agentInstalled,
-        };
-      },
-    );
-    const selectedAgentMenuKey = uiSettings.agentProvider
-      ? `agent-provider:${uiSettings.agentProvider}`
-      : AGENT_DEFAULT_MENU_KEY;
-    const agentProviderDropdownItems: NonNullable<MenuProps['items']> = hideExecutionControls
-      ? []
-      : [
-          {
-            key: AGENT_DEFAULT_MENU_KEY,
-            label: '默认',
-          },
-          ...agentProviderSettingsMenuItems,
-        ];
-    const handleAgentProviderMenuClick = React.useCallback<NonNullable<MenuProps['onClick']>>(
-      ({ key }) => {
-        if (key === AGENT_DEFAULT_MENU_KEY) {
-          onUiSettingsChange({ ...uiSettings, agentProvider: null });
-          return;
-        }
-        if (String(key).startsWith('agent-provider:')) {
-          const nextAgent = String(key).replace('agent-provider:', '').trim();
-          if (nextAgent && nextAgent !== uiSettings.agentProvider) {
-            onUiSettingsChange({
-              ...uiSettings,
-              agentProvider: nextAgent as typeof uiSettings.agentProvider,
-            });
-          }
-          return;
-        }
-      },
-      [onUiSettingsChange, uiSettings],
-    );
-
-    const selectedAgentMenuLabel = uiSettings.agentProvider
-      ? (AGENT_MENU_OPTIONS.find((item) => item.value === uiSettings.agentProvider)?.label ??
-        uiSettings.agentProvider)
-      : '默认';
-    const aiExecutionProviderOptions = React.useMemo(() => {
-      const merged = new Map<string, { value: string; label: string; disabled?: boolean }>();
-      for (const item of AI_EXECUTION_PROVIDER_OPTIONS) {
-        merged.set(item.value, item);
-      }
-      for (const item of aiExecutionProviderOptionsState) {
-        const value = normalizeAiExecutionWorkspacePath(item.value);
-        if (!value) continue;
-        merged.set(value, {
-          value,
-          label: normalizeAiExecutionWorkspacePath(item.label) || value,
-          disabled: item.disabled === true,
-        });
-      }
-      if (aiExecutionProvider && !merged.has(aiExecutionProvider)) {
-        merged.set(aiExecutionProvider, {
-          value: aiExecutionProvider,
-          label: aiExecutionProvider,
-        });
-      }
-      return [...merged.values()];
-    }, [aiExecutionProvider, aiExecutionProviderOptionsState]);
-    const applyAiExecutionConfigResult = React.useCallback((result: unknown) => {
-      const resultRecord =
-        result && typeof result === 'object' ? (result as Record<string, unknown>) : null;
-      const resolved = readAiExecutionConfigResult(result);
-      if (resultRecord && Object.prototype.hasOwnProperty.call(resultRecord, 'provider')) {
-        setAiExecutionProvider(normalizeAiExecutionProvider(resultRecord.provider));
-      } else if (resolved.provider) {
-        setAiExecutionProvider(resolved.provider);
-      }
-      if (resultRecord && Object.prototype.hasOwnProperty.call(resultRecord, 'workspacePath')) {
-        setAiExecutionWorkspacePath(normalizeAiExecutionWorkspacePath(resultRecord.workspacePath));
-      } else if (resolved.workspacePath) {
-        setAiExecutionWorkspacePath(resolved.workspacePath);
-      }
-      if (resultRecord && Object.prototype.hasOwnProperty.call(resultRecord, 'runConcurrency')) {
-        setAiExecutionRunConcurrency(
-          normalizeAiExecutionRunConcurrency(resultRecord.runConcurrency),
-        );
-      } else if (resolved.runConcurrency) {
-        setAiExecutionRunConcurrency(resolved.runConcurrency);
-      }
-      if (resolved.providerOptions?.length) {
-        setAiExecutionProviderOptionsState(resolved.providerOptions);
-      }
-      return resolved;
-    }, []);
-    const commitAiExecutionConfig = React.useCallback(
-      async (
-        nextProvider: string,
-        nextWorkspacePath: string,
-        nextRunConcurrency: number,
-      ): Promise<unknown> => {
-        const result = await options.onHostToolbarAction?.({
-          type: 'set-ai-execution-config',
-          provider: normalizeAiExecutionProvider(nextProvider),
-          workspacePath: normalizeAiExecutionWorkspacePath(nextWorkspacePath),
-          runConcurrency: normalizeAiExecutionRunConcurrency(nextRunConcurrency),
-        });
-        applyAiExecutionConfigResult(result);
-        return result;
-      },
-      [applyAiExecutionConfigResult, options],
-    );
-    const handleRefreshAiExecutionConfig = React.useCallback(async () => {
+    const handleRefreshAiExecutionWorkspace = React.useCallback(async () => {
       if (!options.onHostToolbarAction) return;
-      setAiExecutionConfigBusy(true);
       try {
         const result = await options.onHostToolbarAction({
           type: 'get-ai-execution-config',
         });
-        applyAiExecutionConfigResult(result);
+        const resultRecord =
+          result && typeof result === 'object' ? (result as Record<string, unknown>) : null;
+        if (resultRecord && Object.prototype.hasOwnProperty.call(resultRecord, 'workspacePath')) {
+          setAiExecutionWorkspacePath(
+            normalizeAiExecutionWorkspacePath(resultRecord.workspacePath),
+          );
+        }
       } catch (error) {
         notifyRuntimeMessage('warning', error instanceof Error ? error.message : String(error));
-      } finally {
-        setAiExecutionConfigBusy(false);
       }
-    }, [applyAiExecutionConfigResult, options]);
-    const handleOpenAiSettingsDialog = React.useCallback(() => {
-      setSettingsPopoverOpen(false);
-      setAiSettingsDialogOpen(true);
-    }, []);
-    const handleAiExecutionProviderChange = React.useCallback(
-      (nextProvider: string) => {
-        const normalizedProvider = normalizeAiExecutionProvider(nextProvider);
-        setAiExecutionProvider(normalizedProvider);
-        setAiExecutionConfigBusy(true);
-        void commitAiExecutionConfig(
-          normalizedProvider,
-          aiExecutionWorkspacePath,
-          aiExecutionRunConcurrency,
-        )
-          .catch((error) => {
-            notifyRuntimeMessage('error', error instanceof Error ? error.message : String(error));
-          })
-          .finally(() => {
-            setAiExecutionConfigBusy(false);
-          });
-      },
-      [aiExecutionRunConcurrency, aiExecutionWorkspacePath, commitAiExecutionConfig],
-    );
-    const handleAiExecutionWorkspacePathCommit = React.useCallback(() => {
-      const normalizedWorkspacePath = normalizeAiExecutionWorkspacePath(aiExecutionWorkspacePath);
-      setAiExecutionWorkspacePath(normalizedWorkspacePath);
-      setAiExecutionConfigBusy(true);
-      void commitAiExecutionConfig(
-        aiExecutionProvider,
-        normalizedWorkspacePath,
-        aiExecutionRunConcurrency,
-      )
-        .catch((error) => {
-          notifyRuntimeMessage('error', error instanceof Error ? error.message : String(error));
-        })
-        .finally(() => {
-          setAiExecutionConfigBusy(false);
-        });
-    }, [
-      aiExecutionProvider,
-      aiExecutionRunConcurrency,
-      aiExecutionWorkspacePath,
-      commitAiExecutionConfig,
-    ]);
-    const handleAiExecutionRunConcurrencyCommit = React.useCallback(() => {
-      const normalizedRunConcurrency =
-        normalizeAiExecutionRunConcurrency(aiExecutionRunConcurrency);
-      setAiExecutionRunConcurrency(normalizedRunConcurrency);
-      setAiExecutionConfigBusy(true);
-      void commitAiExecutionConfig(
-        aiExecutionProvider,
-        aiExecutionWorkspacePath,
-        normalizedRunConcurrency,
-      )
-        .catch((error) => {
-          notifyRuntimeMessage('error', error instanceof Error ? error.message : String(error));
-        })
-        .finally(() => {
-          setAiExecutionConfigBusy(false);
-        });
-    }, [
-      aiExecutionProvider,
-      aiExecutionRunConcurrency,
-      aiExecutionWorkspacePath,
-      commitAiExecutionConfig,
-    ]);
+    }, [options]);
     const browseAiExecutionDirectories = React.useCallback(
       async (path?: string) => {
         if (!options.onHostToolbarAction) return;
@@ -2398,7 +2004,17 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       setDirectoryPickerBusy(true);
       try {
         setAiExecutionWorkspacePath(selectedPath);
-        await commitAiExecutionConfig(aiExecutionProvider, selectedPath, aiExecutionRunConcurrency);
+        const result = await options.onHostToolbarAction?.({
+          type: 'set-ai-execution-config',
+          workspacePath: selectedPath,
+        });
+        const resultRecord =
+          result && typeof result === 'object' ? (result as Record<string, unknown>) : null;
+        if (resultRecord && Object.prototype.hasOwnProperty.call(resultRecord, 'workspacePath')) {
+          setAiExecutionWorkspacePath(
+            normalizeAiExecutionWorkspacePath(resultRecord.workspacePath),
+          );
+        }
         const optimisticRecentWorkspaces = recordAiExecutionRecentWorkspace(
           directoryPickerRecentWorkspaces,
           selectedPath,
@@ -2425,23 +2041,11 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         setDirectoryPickerBusy(false);
       }
     }, [
-      aiExecutionProvider,
-      aiExecutionRunConcurrency,
-      commitAiExecutionConfig,
       directoryPickerRecentWorkspaces,
       directoryPickerState?.path,
       options,
     ]);
-    const aiExecutionProviderLabel =
-      aiExecutionProviderOptions.find((item) => item.value === aiExecutionProvider)?.label ??
-      aiExecutionProvider ??
-      DEFAULT_AI_EXECUTION_PROVIDER;
     const aiExecutionWorkspaceDisplayName = getPathDisplayName(aiExecutionWorkspacePath);
-    const aiExecutionConfigSummary = aiExecutionWorkspaceDisplayName
-      ? `${aiExecutionProviderLabel} / ${aiExecutionWorkspaceDisplayName}`
-      : `${aiExecutionProviderLabel} / 未配置 AI 工作目录`;
-    const aiExecutionConfigConfigured =
-      Boolean(aiExecutionWorkspacePath) || options.aiExecutionConfigConfigured === true;
     const toggleSelectionMode = React.useCallback(() => {
       const nextSelectionModeActive = !selectionModeActive;
       if (!nextSelectionModeActive) {
@@ -2463,207 +2067,6 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       onTargetChange,
       selectionModeActive,
     ]);
-    const handleOpenCommentarySkillDialog = React.useCallback(async () => {
-      setSettingsPopoverOpen(false);
-      setCommentarySkillEditorDraft(null);
-      setCommentarySkillEditorError('');
-      setCommentarySkillDraftOptions(commentarySkillOptions);
-      setCommentarySkillDraftIds(
-        resolveCommentarySkillIds(
-          options.commentarySelectedSkillIds,
-          commentarySkillOptions,
-          options.commentarySkillSettingsConfigured === true,
-        ),
-      );
-      setCommentarySkillDialogOpen(true);
-      try {
-        const settings = await options.onCommentarySkillSettingsLoad?.();
-        if (settings) {
-          const nextSkillOptions = mergeCommentarySkillOptions(settings.skillOptions);
-          setCommentarySkillDraftOptions(nextSkillOptions);
-          setCommentarySkillDraftIds(
-            normalizeCommentarySkillIds(settings.selectedSkillIds, nextSkillOptions),
-          );
-          return;
-        }
-        const selectedSkillIds = await options.onCommentarySkillSelectionLoad?.();
-        if (selectedSkillIds) {
-          setCommentarySkillDraftIds(
-            normalizeCommentarySkillIds(selectedSkillIds, commentarySkillOptions),
-          );
-        }
-      } catch {
-        notifyRuntimeMessage('error', '读取技能配置失败');
-      }
-    }, [commentarySkillOptions, options]);
-
-    const handleSaveCommentarySkillSelection = React.useCallback(async () => {
-      const nextSkillIds = normalizeCommentarySkillIds(
-        commentarySkillDraftIds,
-        commentarySkillDraftOptions,
-      );
-      setCommentarySkillSaving(true);
-      try {
-        const saved = options.onCommentarySkillSettingsChange
-          ? await options.onCommentarySkillSettingsChange({
-              selectedSkillIds: nextSkillIds,
-              skillOptions: commentarySkillDraftOptions,
-            })
-          : undefined;
-        if (!options.onCommentarySkillSettingsChange) {
-          await options.onCommentarySkillSelectionChange?.(nextSkillIds);
-        }
-        const savedSkillOptions = mergeCommentarySkillOptions(
-          saved?.skillOptions ?? commentarySkillDraftOptions,
-        );
-        setCommentarySkillDraftOptions(savedSkillOptions);
-        setCommentarySkillDraftIds(
-          normalizeCommentarySkillIds(saved?.selectedSkillIds ?? nextSkillIds, savedSkillOptions),
-        );
-        setCommentarySkillDialogOpen(false);
-        notifyRuntimeMessage('success', '技能配置已保存');
-      } catch {
-        notifyRuntimeMessage('error', '保存技能配置失败');
-      } finally {
-        setCommentarySkillSaving(false);
-      }
-    }, [commentarySkillDraftIds, commentarySkillDraftOptions, options]);
-
-    const handleSaveCommentaryCustomSkillDraft = React.useCallback(() => {
-      if (!commentarySkillEditorDraft) return;
-      const label = commentarySkillEditorDraft.label.trim();
-      const prompt = commentarySkillEditorDraft.prompt.trim();
-      if (!label) {
-        setCommentarySkillEditorError('请输入技能名称');
-        return;
-      }
-      if (label.length > 30) {
-        setCommentarySkillEditorError('技能名称不能超过 30 个字');
-        return;
-      }
-      if (!prompt) {
-        setCommentarySkillEditorError('请输入提示词');
-        return;
-      }
-      if (prompt.length > 4000) {
-        setCommentarySkillEditorError('提示词不能超过 4000 个字');
-        return;
-      }
-      const nextSkill: CommentarySkillOption = {
-        id: commentarySkillEditorDraft.id,
-        label,
-        prompt,
-        description: summarizeCommentaryCustomSkillPrompt(prompt),
-        custom: true,
-      };
-      setCommentarySkillDraftOptions((current) =>
-        mergeCommentarySkillOptions([
-          ...current.filter((skill) => skill.id !== nextSkill.id),
-          nextSkill,
-        ]),
-      );
-      setCommentarySkillDraftIds((current) =>
-        current.includes(nextSkill.id) ? current : [...current, nextSkill.id],
-      );
-      setCommentarySkillEditorDraft(null);
-      setCommentarySkillEditorError('');
-    }, [commentarySkillEditorDraft]);
-
-    const commentarySystemSkillDraftOptions = commentarySkillDraftOptions.filter(
-      (skill) => skill.custom !== true,
-    );
-    const commentaryCustomSkillDraftOptions = commentarySkillDraftOptions.filter(
-      (skill) => skill.custom === true,
-    );
-    const commentarySkillEditorIsExisting = Boolean(
-      commentarySkillEditorDraft &&
-        commentaryCustomSkillDraftOptions.some(
-          (skill) => skill.id === commentarySkillEditorDraft.id,
-        ),
-    );
-    const renderCommentarySkillOption = (skill: CommentarySkillOption) => {
-      const checked = commentarySkillDraftIds.includes(skill.id);
-      const toggleSkill = () => {
-        if (commentarySkillSaving) return;
-        setCommentarySkillDraftIds((prev) => {
-          const current = new Set(prev);
-          if (current.has(skill.id)) {
-            current.delete(skill.id);
-          } else {
-            current.add(skill.id);
-          }
-          return normalizeCommentarySkillIds([...current], commentarySkillDraftOptions);
-        });
-      };
-      return (
-        <div
-          key={skill.id}
-          role="checkbox"
-          aria-checked={checked}
-          aria-label={`${skill.label}：${checked ? '已启用' : '未启用'}`}
-          tabIndex={commentarySkillSaving ? -1 : 0}
-          className={`we-runtime-commentary-skill-dialog__item${
-            commentarySkillSaving ? ' we-runtime-commentary-skill-dialog__item--disabled' : ''
-          }`}
-          onClick={toggleSkill}
-          onKeyDown={(event) => {
-            if (commentarySkillSaving) return;
-            if (event.key !== 'Enter' && event.key !== ' ') return;
-            event.preventDefault();
-            toggleSkill();
-          }}
-        >
-          <div className="we-runtime-commentary-skill-dialog__copy">
-            <span className="we-runtime-commentary-skill-dialog__name">{skill.label}</span>
-            {skill.description ? (
-              <span className="we-runtime-commentary-skill-dialog__description">
-                {skill.description}
-              </span>
-            ) : null}
-          </div>
-          {skill.custom === true ? (
-            <Button
-              type="text"
-              size="small"
-              className="we-runtime-commentary-skill-dialog__edit"
-              aria-label={`编辑${skill.label}`}
-              icon={<EditOutlined />}
-              disabled={commentarySkillSaving}
-              onClick={(event) => {
-                event.stopPropagation();
-                setCommentarySkillEditorDraft({
-                  id: skill.id,
-                  label: skill.label,
-                  prompt: skill.prompt ?? '',
-                });
-                setCommentarySkillEditorError('');
-              }}
-            />
-          ) : null}
-          <Checkbox
-            checked={checked}
-            disabled={commentarySkillSaving}
-            aria-label={`${checked ? '停用' : '启用'}${skill.label}`}
-            onClick={(event) => {
-              event.stopPropagation();
-            }}
-            onChange={(event) => {
-              const nextChecked = event.target.checked;
-              setCommentarySkillDraftIds((prev) => {
-                const current = new Set(prev);
-                if (nextChecked) {
-                  current.add(skill.id);
-                } else {
-                  current.delete(skill.id);
-                }
-                return normalizeCommentarySkillIds([...current], commentarySkillDraftOptions);
-              });
-            }}
-          />
-        </div>
-      );
-    };
-
     type SettingsItem = {
       key: string;
       label?: React.ReactNode;
@@ -2701,55 +2104,21 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         </Tooltip>
       ),
     };
-    const agentProviderSettingsItem: SettingsItem | null =
-      hideExecutionControls || options.onHostToolbarAction
-        ? null
-        : {
-            key: 'agent-provider',
-            label: '执行 AI',
-            control: (
-              <Dropdown
-                trigger={['click']}
-                placement="bottomRight"
-                getPopupContainer={resolveRuntimePopupContainer}
-                overlayClassName="we-runtime-agent-menu-dropdown"
-                menu={{
-                  items: agentProviderDropdownItems,
-                  onClick: handleAgentProviderMenuClick,
-                  selectedKeys: [selectedAgentMenuKey],
-                }}
-                onOpenChange={(open) => {
-                  if (open) {
-                    void handleRefreshAgentProviders();
-                  }
-                }}
-              >
-                <Button
-                  type="text"
-                  size="small"
-                  loading={agentProviderRefreshPending}
-                  disabled={agentProviderRefreshPending}
-                  style={{
-                    color: EDITOR_CHROME.textSecondary,
-                    paddingInline: 4,
-                    height: 24,
-                  }}
-                >
-                  {selectedAgentMenuLabel}
-                </Button>
-              </Dropdown>
-            ),
-          };
-    const aiSettingsItem: SettingsItem | null =
+    const aiWorkspaceSettingsItem: SettingsItem | null =
       hideExecutionControls || !options.onHostToolbarAction
         ? null
         : {
-            key: 'ai-settings',
-            label: 'AI 设置',
-            action: handleOpenAiSettingsDialog,
+            key: 'ai-workspace',
+            label: 'AI 工作目录',
+            action: handleOpenDirectoryPicker,
             control: (
-              <span className="we-runtime-settings-card__value">
-                <span>3 项</span>
+              <span
+                className="we-runtime-settings-card__value we-runtime-settings-card__workspace-value"
+                title={aiExecutionWorkspacePath || undefined}
+              >
+                <span className="we-runtime-settings-card__workspace-value-text">
+                  {aiExecutionWorkspaceDisplayName || '未配置'}
+                </span>
                 <RightOutlined style={{ fontSize: 10 }} />
               </span>
             ),
@@ -2768,96 +2137,48 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
           ),
         }
       : null;
-    const agentRunConcurrencySettingsItem: SettingsItem | null =
-      hideExecutionControls || options.onHostToolbarAction
-        ? null
-        : {
-            key: 'agent-run-concurrency',
-            label: 'AI 并发数',
-            control: (
-              <InputNumber
-                min={MIN_AI_EXECUTION_RUN_CONCURRENCY}
-                max={MAX_AI_EXECUTION_RUN_CONCURRENCY}
-                precision={0}
-                size="small"
-                value={uiSettings.agentRunConcurrency}
-                onChange={(value) => {
-                  onUiSettingsChange({
-                    ...uiSettings,
-                    agentRunConcurrency:
-                      typeof value === 'number' ? value : uiSettings.agentRunConcurrency,
-                  });
-                }}
-                style={{ width: 64 }}
-              />
-            ),
-          };
-    const commentarySkillSettingsItem: SettingsItem | null = showCommentarySkillSettings
-      ? {
-          key: 'commentary-skills',
-          label: '技能管理',
-          action: handleOpenCommentarySkillDialog,
-          control: (
-            <span
-              style={{
-                color: EDITOR_CHROME.textSecondary,
-                fontSize: 13,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              <span>
-                {commentarySkillDraftIds.length > 0
-                  ? `${commentarySkillDraftIds.length} 项`
-                  : '未选择'}
-              </span>
-              <RightOutlined style={{ fontSize: 10 }} />
-            </span>
-          ),
-        }
-      : null;
     const settingsItems: SettingsItem[] = [
       commentarySkillInstallSettingsItem,
-      ...(aiSettingsItem ? [aiSettingsItem] : []),
-      ...(agentProviderSettingsItem ? [agentProviderSettingsItem] : []),
-      ...(commentarySkillSettingsItem ? [commentarySkillSettingsItem] : []),
+      ...(aiWorkspaceSettingsItem ? [aiWorkspaceSettingsItem] : []),
       ...(propertyPanelSettingsItem ? [propertyPanelSettingsItem] : []),
-      ...(agentRunConcurrencySettingsItem ? [agentRunConcurrencySettingsItem] : []),
-      {
-        key: 'disable-page-animations',
-        label: '关闭页面动画',
-        control: (
-          <Switch
-            checked={uiSettings.disablePageAnimations}
-            onChange={(checked) => {
-              onUiSettingsChange({
-                ...uiSettings,
-                disablePageAnimations: checked,
-              });
-            }}
-          />
-        ),
-      },
-      ...(options.documentCommentModeAvailable === false
-        ? []
-        : [
+      ...(pageEditingSettingsAvailable
+        ? [
             {
-              key: 'document-comment-mode',
-              label: '文档批注模式',
+              key: 'disable-page-animations',
+              label: '关闭页面动画',
               control: (
                 <Switch
-                  checked={uiSettings.documentCommentMode}
+                  checked={uiSettings.disablePageAnimations}
                   onChange={(checked) => {
                     onUiSettingsChange({
                       ...uiSettings,
-                      documentCommentMode: checked,
+                      disablePageAnimations: checked,
                     });
                   }}
                 />
               ),
             },
-          ]),
+            ...(options.documentCommentModeAvailable === false
+              ? []
+              : [
+                  {
+                    key: 'document-comment-mode',
+                    label: '文档批注模式',
+                    control: (
+                      <Switch
+                        checked={uiSettings.documentCommentMode}
+                        onChange={(checked) => {
+                          onUiSettingsChange({
+                            ...uiSettings,
+                            documentCommentMode: checked,
+                          });
+                        }}
+                      />
+                    ),
+                  },
+                ]),
+          ]
+        : []),
       {
         key: 'keyboard-shortcuts',
         label: '快捷键',
@@ -2962,7 +2283,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
           if (actionBusy && nextOpen) return;
           setSettingsPopoverOpen(nextOpen);
           if (nextOpen) {
-            void handleRefreshAiExecutionConfig();
+            void handleRefreshAiExecutionWorkspace();
           }
         }}
         content={settingsCardContent}
@@ -2981,7 +2302,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
     const selectionModeToolbarTitle = `${
       selectionModeActive ? '关闭选择元素' : '开启选择元素'
     }（${SELECTION_MODE_TOGGLE_SHORTCUT_LABEL}）`;
-    const selectionModeToolbarButton = (
+    const selectionModeToolbarButton = selectionModeAvailable ? (
       <AgentToolbarIconButton
         title={selectionModeToolbarTitle}
         icon={<SelectOutlined />}
@@ -2991,7 +2312,42 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         disabled={actionBusy}
         onClick={toggleSelectionMode}
       />
-    );
+    ) : null;
+    const markdownSourceEditorToolbarButton = options.markdownSourceEditorAvailable ? (
+      <AgentToolbarIconButton
+        title={markdownSourceEditorOpen ? '隐藏 Markdown 原文' : '显示 Markdown 原文'}
+        icon={<FileTextOutlined />}
+        ariaLabel={markdownSourceEditorOpen ? '隐藏 Markdown 原文' : '显示 Markdown 原文'}
+        awake={agentShellAwake}
+        active={markdownSourceEditorOpen}
+        disabled={actionBusy || !options.onMarkdownSourceEditorOpenChange}
+        onClick={() => {
+          if (actionBusy || !options.onMarkdownSourceEditorOpenChange) return;
+          const requestedOpen = !markdownSourceEditorOpen;
+          void (async () => {
+            try {
+              const result = await runAction(() =>
+                options.onMarkdownSourceEditorOpenChange?.(requestedOpen),
+              );
+              const actualOpen =
+                typeof result === 'boolean'
+                  ? result
+                  : options.getMarkdownSourceEditorOpen?.() === true;
+              setMarkdownSourceEditorOpen(actualOpen);
+              if (!requestedOpen && actualOpen) {
+                notifyRuntimeMessage('warning', 'Markdown 尚未保存，已保留原文编辑区');
+              }
+            } catch (error) {
+              setMarkdownSourceEditorOpen(options.getMarkdownSourceEditorOpen?.() === true);
+              notifyRuntimeMessage(
+                'error',
+                error instanceof Error ? error.message : 'Markdown 编辑视图切换失败',
+              );
+            }
+          })();
+        }}
+      />
+    ) : null;
     const closeToolbarButton = (
       <AgentToolbarIconButton
         title={options.onRequestFullExit ? '退出批注' : '关闭工具栏'}
@@ -3027,17 +2383,19 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         >
           暂时没有需要处理的设计决策。可以先生成多个设计方案，再进行对比和决策。
         </Typography.Text>
-        <Button
-          type="default"
-          size="small"
-          icon={<CopyOutlined />}
-          onClick={() => {
-            void handleCopyGlobalPanelPrompt();
-          }}
-          style={{ alignSelf: 'flex-start' }}
-        >
-          复制提示词
-        </Button>
+        {showCopyPromptAction ? (
+          <Button
+            type="default"
+            size="small"
+            icon={<CopyOutlined />}
+            onClick={() => {
+              void handleCopyGlobalPanelPrompt();
+            }}
+            style={{ alignSelf: 'flex-start' }}
+          >
+            复制提示词
+          </Button>
+        ) : null}
       </div>
     );
 
@@ -3106,17 +2464,18 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         terminalTaskCount: visibleTerminalTaskCount,
         selectedAgent: hideExecutionControls ? null : uiSettings.agentProvider,
         agentOptions: hideExecutionControls ? [] : agentOptions,
-        aiExecutionConfigSummary,
-        aiExecutionConfigConfigured,
-        aiExecutionProvider,
+        aiExecutionConfigSummary: options.aiExecutionConfigSummary ?? '',
+        aiExecutionConfigConfigured:
+          Boolean(aiExecutionWorkspacePath) || options.aiExecutionConfigConfigured === true,
+        aiExecutionProvider: options.aiExecutionProvider?.trim() || 'codex',
         aiExecutionWorkspacePath,
-        aiExecutionRunConcurrency,
-        aiExecutionProviderOptions,
+        aiExecutionRunConcurrency: options.aiExecutionRunConcurrency ?? 5,
+        aiExecutionProviderOptions: options.aiExecutionProviderOptions ?? [],
         darkMode: uiSettings.darkMode,
         disablePageAnimations: uiSettings.disablePageAnimations,
         pageZoomEnabled: uiSettings.pageZoomEnabled,
-        copySkillInstallPromptDisabled: actionBusy || agentProviderRefreshPending,
-        selectionModeActive: selectionModeActive,
+        copySkillInstallPromptDisabled: actionBusy,
+        selectionModeActive: selectionModeAvailable && selectionModeActive,
         fullExitAvailable: Boolean(options.onRequestFullExit),
         annotationEnabled,
         annotationEnableAvailable,
@@ -3140,13 +2499,9 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       copyReason,
       agentPromptToolbarAction,
       agentProviderAvailabilityMap,
-      agentProviderRefreshPending,
       hideExecutionControls,
       hostSendVisible,
       isHostToolbarMode,
-      aiExecutionProvider,
-      aiExecutionProviderOptions,
-      aiExecutionRunConcurrency,
       aiExecutionWorkspacePath,
       modifiedCount,
       options.getAnnotationEnabled,
@@ -3154,8 +2509,11 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       options.getAnnotationEnableLoading,
       options.onEnableAnnotation,
       options.onRequestFullExit,
-      aiExecutionConfigConfigured,
-      aiExecutionConfigSummary,
+      options.aiExecutionConfigConfigured,
+      options.aiExecutionConfigSummary,
+      options.aiExecutionProvider,
+      options.aiExecutionProviderOptions,
+      options.aiExecutionRunConcurrency,
       propertyPanelOpen,
       showPropertyPanelToolbarButton,
       selectionModeActive,
@@ -3229,8 +2587,6 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
             onUiSettingsChange({ ...uiSettings, agentProvider: nextAgent });
             return true;
           }
-          case 'open-ai-settings':
-            return Boolean(await options.onHostToolbarAction?.(action));
           case 'get-acp-ui-status':
             return Boolean(await options.onHostToolbarAction?.(action));
           case 'save-html-all':
@@ -3276,6 +2632,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
             handleTogglePageZoom();
             return true;
           case 'toggle-selection-mode': {
+            if (!selectionModeAvailable) return false;
             const nextSelectionModeActive = action.active ?? !selectionModeActive;
             if (!nextSelectionModeActive) {
               onDismissSelection?.();
@@ -3333,6 +2690,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         options,
         propertyPanelOpen,
         runAction,
+        selectionModeAvailable,
         selectionModeActive,
         uiSettings,
         wakeAgentForAction,
@@ -3475,6 +2833,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         >
           <Space size={4} style={{ minWidth: 0, flex: '0 0 auto' }}>
             {selectionModeToolbarButton}
+            {markdownSourceEditorToolbarButton}
             {agentExecutionToolbarButton}
             {copyToolbarButton}
             {propertyPanelToggleButton}
@@ -3680,262 +3039,6 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         >
           <style>{PROPERTY_PANEL_LOCAL_STYLES}</style>
           {isHostToolbarMode ? null : toolMinimized ? minimizedToolbar : expandedToolbar}
-          <Modal
-            title="AI 设置"
-            open={aiSettingsDialogOpen}
-            centered
-            width={500}
-            className="we-runtime-ai-settings-modal"
-            getContainer={false}
-            onCancel={() => setAiSettingsDialogOpen(false)}
-            footer={[
-              <Button
-                key="done"
-                type="primary"
-                onClick={() => setAiSettingsDialogOpen(false)}
-              >
-                完成
-              </Button>,
-            ]}
-          >
-            <div className="we-runtime-ai-settings-dialog">
-              <div className="we-runtime-ai-settings-dialog__row">
-                <label className="we-runtime-ai-settings-dialog__label" htmlFor="we-ai-provider">
-                  执行 AI
-                </label>
-                <div className="we-runtime-ai-settings-dialog__control">
-                  <Select
-                    id="we-ai-provider"
-                    value={aiExecutionProvider}
-                    options={aiExecutionProviderOptions}
-                    disabled={aiExecutionConfigBusy}
-                    onChange={handleAiExecutionProviderChange}
-                    getPopupContainer={resolveRuntimePopupContainer}
-                    popupClassName="we-runtime-ai-execution-provider-dropdown"
-                    placement="bottomRight"
-                    style={{ width: '100%' }}
-                  />
-                </div>
-              </div>
-              <div className="we-runtime-ai-settings-dialog__row">
-                <label
-                  className="we-runtime-ai-settings-dialog__label"
-                  htmlFor="we-ai-run-concurrency"
-                >
-                  AI 并发数
-                </label>
-                <div className="we-runtime-ai-settings-dialog__control">
-                  <InputNumber
-                    id="we-ai-run-concurrency"
-                    min={MIN_AI_EXECUTION_RUN_CONCURRENCY}
-                    max={MAX_AI_EXECUTION_RUN_CONCURRENCY}
-                    precision={0}
-                    value={aiExecutionRunConcurrency}
-                    disabled={aiExecutionConfigBusy}
-                    onChange={(value) => {
-                      setAiExecutionRunConcurrency(normalizeAiExecutionRunConcurrency(value));
-                    }}
-                    onBlur={handleAiExecutionRunConcurrencyCommit}
-                    style={{ width: '100%' }}
-                  />
-                </div>
-              </div>
-              <div className="we-runtime-ai-settings-dialog__row">
-                <label
-                  className="we-runtime-ai-settings-dialog__label"
-                  htmlFor="we-ai-workspace-path"
-                >
-                  AI 工作目录
-                </label>
-                <div className="we-runtime-ai-settings-dialog__control">
-                  <Input
-                    id="we-ai-workspace-path"
-                    className="we-runtime-ai-settings-dialog__workspace-input"
-                    value={aiExecutionWorkspacePath}
-                    placeholder="工作目录"
-                    title={aiExecutionWorkspacePath || undefined}
-                    disabled={aiExecutionConfigBusy}
-                    onChange={(event) => {
-                      setAiExecutionWorkspacePath(event.target.value);
-                    }}
-                    onBlur={handleAiExecutionWorkspacePathCommit}
-                    onPressEnter={(event) => {
-                      event.currentTarget.blur();
-                    }}
-                    suffix={
-                      <Tooltip
-                        title="选择 AI 工作目录"
-                        placement="bottomRight"
-                        getPopupContainer={resolveRuntimePopupContainer}
-                      >
-                        <Button
-                          type="text"
-                          aria-label="选择 AI 工作目录"
-                          icon={<FolderOpenOutlined />}
-                          loading={directoryPickerBusy}
-                          disabled={aiExecutionConfigBusy || directoryPickerBusy}
-                          onMouseDown={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                          }}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleOpenDirectoryPicker();
-                          }}
-                        />
-                      </Tooltip>
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-          </Modal>
-          <Modal
-            title={
-              <div className="we-runtime-commentary-skill-dialog__title">
-                <span>
-                  {commentarySkillEditorDraft
-                    ? commentarySkillEditorIsExisting
-                      ? '编辑自定义技能'
-                      : '新建自定义技能'
-                    : '技能管理'}
-                </span>
-                {!commentarySkillEditorDraft ? (
-                  <span className="we-runtime-commentary-skill-dialog__subtitle">
-                    管理批注中可使用的技能
-                  </span>
-                ) : null}
-              </div>
-            }
-            open={commentarySkillDialogOpen}
-            centered
-            width={560}
-            className="we-runtime-commentary-skill-modal"
-            getContainer={false}
-            maskClosable={!commentarySkillSaving}
-            onCancel={() => {
-              if (commentarySkillSaving) return;
-              if (commentarySkillEditorDraft) {
-                setCommentarySkillEditorDraft(null);
-                setCommentarySkillEditorError('');
-                return;
-              }
-              setCommentarySkillDialogOpen(false);
-            }}
-            footer={
-              commentarySkillEditorDraft
-                ? [
-                    <Button
-                      key="cancel-editor"
-                      onClick={() => {
-                        setCommentarySkillEditorDraft(null);
-                        setCommentarySkillEditorError('');
-                      }}
-                    >
-                      取消
-                    </Button>,
-                    <Button
-                      key="save-editor"
-                      type="primary"
-                      onClick={handleSaveCommentaryCustomSkillDraft}
-                    >
-                      保存
-                    </Button>,
-                  ]
-                : [
-                    <Button
-                      key="cancel"
-                      disabled={commentarySkillSaving}
-                      onClick={() => setCommentarySkillDialogOpen(false)}
-                    >
-                      取消
-                    </Button>,
-                    <Button
-                      key="save"
-                      type="primary"
-                      loading={commentarySkillSaving}
-                      onClick={() => {
-                        void handleSaveCommentarySkillSelection();
-                      }}
-                    >
-                      保存
-                    </Button>,
-                  ]
-            }
-          >
-            {commentarySkillEditorDraft ? (
-              <div className="we-runtime-commentary-skill-editor">
-                <label className="we-runtime-commentary-skill-editor__field">
-                  <span>名称</span>
-                  <Input
-                    value={commentarySkillEditorDraft.label}
-                    maxLength={30}
-                    autoFocus
-                    placeholder="例如：竞品文案审查"
-                    onChange={(event) => {
-                      setCommentarySkillEditorDraft((current) =>
-                        current ? { ...current, label: event.target.value } : current,
-                      );
-                      setCommentarySkillEditorError('');
-                    }}
-                  />
-                </label>
-                <label className="we-runtime-commentary-skill-editor__field">
-                  <span>提示词</span>
-                  <Input.TextArea
-                    value={commentarySkillEditorDraft.prompt}
-                    maxLength={4000}
-                    autoSize={{ minRows: 7, maxRows: 12 }}
-                    placeholder="输入希望 AI 执行的提示词"
-                    onChange={(event) => {
-                      setCommentarySkillEditorDraft((current) =>
-                        current ? { ...current, prompt: event.target.value } : current,
-                      );
-                      setCommentarySkillEditorError('');
-                    }}
-                  />
-                </label>
-                {commentarySkillEditorError ? (
-                  <div className="we-runtime-commentary-skill-editor__error">
-                    {commentarySkillEditorError}
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <div className="we-runtime-commentary-skill-dialog">
-                <div className="we-runtime-commentary-skill-dialog__list">
-                  <div className="we-runtime-commentary-skill-dialog__section-title">
-                    <span>系统技能</span>
-                  </div>
-                  {commentarySystemSkillDraftOptions.map(renderCommentarySkillOption)}
-                  <div className="we-runtime-commentary-skill-dialog__section-title we-runtime-commentary-skill-dialog__section-title--custom">
-                    <span>我的技能</span>
-                    <Button
-                      type="link"
-                      size="small"
-                      icon={<PlusOutlined />}
-                      disabled={commentarySkillSaving}
-                      onClick={() => {
-                        setCommentarySkillEditorDraft({
-                          id: createCommentaryCustomSkillId(),
-                          label: '',
-                          prompt: '',
-                        });
-                        setCommentarySkillEditorError('');
-                      }}
-                    >
-                      自定义
-                    </Button>
-                  </div>
-                  {commentaryCustomSkillDraftOptions.length > 0 ? (
-                    commentaryCustomSkillDraftOptions.map(renderCommentarySkillOption)
-                  ) : (
-                    <div className="we-runtime-commentary-skill-dialog__empty">暂无自定义技能</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </Modal>
           <Modal
             title="语音快捷键"
             open={shortcutDialogOpen}
@@ -4414,11 +3517,15 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
                   label: '粘贴图片或文案',
                   desc: 'AI 开启时，在气泡卡片或待选框中可直接粘贴图片和文案',
                 },
-                {
-                  keys: [SELECTION_MODE_TOGGLE_SHORTCUT_LABEL],
-                  label: '开启 / 关闭选择元素',
-                  desc: '关闭后页面点击恢复原生交互，再按一次重新开启元素选择',
-                },
+                ...(selectionModeAvailable
+                  ? [
+                      {
+                        keys: [SELECTION_MODE_TOGGLE_SHORTCUT_LABEL],
+                        label: '开启 / 关闭选择元素',
+                        desc: '关闭后页面点击恢复原生交互，再按一次重新开启元素选择',
+                      },
+                    ]
+                  : []),
                 {
                   keys: [PARENT_SELECT_SHORTCUT_LABEL, PARENT_RETURN_SHORTCUT_LABEL],
                   label: '选择上 / 下级元素',

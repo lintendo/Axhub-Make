@@ -458,6 +458,108 @@
     min-height: 320px;
 }
 
+.tat-capability-slide {
+    display: grid;
+    gap: 24px;
+}
+
+.tat-capability-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line-strong);
+    background: rgba(var(--paper-rgb), 0.72);
+}
+
+.tat-capability-table {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.tat-capability-table th,
+.tat-capability-table td {
+    border-bottom: 1px solid var(--line);
+    padding: 17px 18px;
+    text-align: left;
+    font-size: 15px;
+    line-height: 1.45;
+}
+
+.tat-capability-table thead th {
+    background: rgba(var(--ink-rgb), 0.045);
+    color: var(--text);
+    font-family: var(--serif);
+    font-size: 21px;
+    font-weight: 600;
+}
+
+.tat-capability-table thead th:first-child,
+.tat-capability-table tbody th {
+    width: 34%;
+}
+
+.tat-capability-table tbody th {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.tat-capability-table tbody tr:last-child th,
+.tat-capability-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.tat-capability-table td {
+    text-align: center;
+    color: var(--muted);
+}
+
+.tat-capability-table td.is-required {
+    color: #008c5b;
+    font-weight: 700;
+}
+
+.tat-capability-table td.is-optional {
+    color: rgba(var(--ink-rgb), 0.48);
+}
+
+.tat-capability-legend {
+    margin: 0;
+    display: grid;
+    gap: 13px;
+}
+
+.tat-capability-legend div {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 18px;
+}
+
+.tat-capability-legend dt {
+    color: var(--text);
+    font-family: var(--serif);
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.tat-capability-legend dd {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+.tat-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 .tat-voice-slide {
     display: grid;
     gap: 36px;
@@ -731,6 +833,25 @@
     .tat-transcript span,
     .tat-transcript strong {
         font-size: 19px;
+    }
+
+    .tat-capability-slide {
+        gap: 18px;
+    }
+
+    .tat-capability-table th,
+    .tat-capability-table td {
+        padding: 14px 13px;
+        font-size: 13px;
+    }
+
+    .tat-capability-table thead th {
+        font-size: 17px;
+    }
+
+    .tat-capability-legend div {
+        grid-template-columns: 1fr;
+        gap: 3px;
     }
 
     .tat-slide-footer {

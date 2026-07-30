@@ -41,4 +41,12 @@ describe('dev template editor bridge launch options', () => {
     expect(source).toContain("event.data.type === 'AXHUB_PROTOTYPE_EDITOR_QUERY_STATE'");
     expect(source).toContain('debugState: editorModeManager?.api.getWebEditorDebugState?.() ?? null');
   });
+
+  it('returns modified annotation elements with prompt bridge responses', () => {
+    const source = readFileSync(resolve(__dirname, './index.tsx'), 'utf8');
+
+    expect(source).toContain('modifiedElements?: CommentaryModifiedElementSummary[];');
+    expect(source).toContain('editorModeManager?.api.getEditedSnapshot?.()?.modifiedElements ?? []');
+    expect(source).toContain('modifiedElements,');
+  });
 });

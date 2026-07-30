@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+.dmb-page.discord-theme {
+  color-scheme: dark;
+
+  --dmb-bg: #313338;
+  --dmb-surface: #2B2D31;
+  --dmb-accent: #5865F2;
+  --dmb-accent-pressed: #4752C4;
+  --dmb-accent-contrast: #FFFFFF;
+  --dmb-link: #00A8FC;
+  --dmb-muted: #383A40;
+  --dmb-ink: #F2F3F5;
+  --dmb-ink-muted: #B5BAC1;
+  --dmb-ink-subtle: #949BA4;
+  --dmb-border: #3F4147;
+  --dmb-border-sample-bg: #313338;
+
+  --dmb-tab-bg: #1E1F22;
+  --dmb-tab-border: #3F4147;
+  --dmb-tab-color: #949BA4;
+  --dmb-tab-active-bg: #5865F2;
+  --dmb-tab-active-border: #5865F2;
+  --dmb-tab-active-color: #FFFFFF;
+
+  --dmb-radius-xs: 4px;
+  --dmb-radius-control: 8px;
+  --dmb-radius-card: 12px;
+  --dmb-radius-preview: 16px;
+  --dmb-radius-pill: 9999px;
+
+  --dmb-spacing-xs: 4px;
+  --dmb-spacing-sm: 8px;
+  --dmb-spacing-md: 12px;
+  --dmb-spacing-lg: 16px;
+  --dmb-spacing-xl: 20px;
+  --dmb-spacing-2xl: 24px;
+  --dmb-spacing-3xl: 32px;
+  --dmb-spacing-4xl: 40px;
+  --dmb-spacing-5xl: 48px;
+  --dmb-spacing-6xl: 56px;
+  --dmb-spacing-7xl: 72px;
+
+  --dmb-font-display: "gg sans", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --dmb-font-body: "gg sans", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --dmb-font-mono: "gg mono", Consolas, "SF Mono", monospace;
+}
+
+.dmb-page.discord-theme .dmb-sheet-head,
+.dmb-page.discord-theme .dmb-overview-meta,
+.dmb-page.discord-theme .dmb-token-card,
+.dmb-page.discord-theme .dmb-type-list article,
+.dmb-page.discord-theme .dmb-component-strip,
+.dmb-page.discord-theme .dmb-component-grid,
+.dmb-page.discord-theme .dmb-spacing-scale,
+.dmb-page.discord-theme .dmb-radius-grid article,
+.dmb-page.discord-theme .dmb-shadow-grid article,
+.dmb-page.discord-theme .dmb-border-grid article,
+.dmb-page.discord-theme .dmb-component-grid article,
+.dmb-page.discord-theme .dmb-mobile-screenshot {
+  border-color: #3F4147;
+}
+
+.dmb-page.discord-theme .dmb-token-card,
+.dmb-page.discord-theme .dmb-type-list article,
+.dmb-page.discord-theme .dmb-component-strip,
+.dmb-page.discord-theme .dmb-component-grid,
+.dmb-page.discord-theme .dmb-spacing-scale,
+.dmb-page.discord-theme .dmb-radius-grid article,
+.dmb-page.discord-theme .dmb-shadow-grid article,
+.dmb-page.discord-theme .dmb-border-grid article,
+.dmb-page.discord-theme .dmb-component-grid article,
+.dmb-page.discord-theme .dmb-mobile-screenshot {
+  background: #2B2D31;
+}
+
+.dmb-page.discord-theme .dmb-token-grid > div {
+  background: #383A40;
+  color: #F2F3F5;
+}
+
+.dmb-page.discord-theme .dmb-token-grid button,
+.dmb-page.discord-theme .dmb-component-strip button {
+  border-color: #5865F2;
+  background: #5865F2;
+  color: #FFFFFF;
+}
+
+.dmb-page.discord-theme .dmb-token-grid button:hover,
+.dmb-page.discord-theme .dmb-token-grid button:focus-visible,
+.dmb-page.discord-theme .dmb-component-strip button:hover,
+.dmb-page.discord-theme .dmb-component-strip button:focus-visible {
+  border-color: #4752C4;
+  background: #4752C4;
+}
+
+.dmb-page.discord-theme .dmb-token-grid .dmb-text-button {
+  border-color: #4E5058;
+  background: #4E5058;
+  color: #FFFFFF;
+}
+
+.dmb-page.discord-theme .dmb-outline-button {
+  border-color: #B5BAC1 !important;
+  background: transparent !important;
+  color: #F2F3F5 !important;
+}
+
+.dmb-page.discord-theme .dmb-token-grid input {
+  border-color: #3F4147;
+  background: #383A40;
+  color: #F2F3F5;
+  caret-color: #5865F2;
+}
+
+.dmb-page.discord-theme .dmb-token-grid input::placeholder,
+.dmb-page.discord-theme .dmb-token-grid small,
+.dmb-page.discord-theme .dmb-type-list span,
+.dmb-page.discord-theme .dmb-spacing-scale div {
+  color: #949BA4;
+}
+
+.dmb-page.discord-theme .dmb-tags span,
+.dmb-page.discord-theme .dmb-muted {
+  border-color: #3F4147;
+  background: #2B2D31;
+  color: #B5BAC1;
+}
+
+.dmb-page.discord-theme .dmb-do {
+  border-color: color-mix(in srgb, #23A55A 45%, transparent);
+  background: color-mix(in srgb, #23A55A 10%, #2B2D31);
+  color: #57F287;
+}
+
+.dmb-page.discord-theme .dmb-dont {
+  border-color: color-mix(in srgb, #F23F43 45%, transparent);
+  background: color-mix(in srgb, #F23F43 10%, #2B2D31);
+  color: #F23F43;
+}
+
+.dmb-page.discord-theme .dmb-lightbox > button {
+  border-radius: 8px;
+  background: #5865F2;
+}

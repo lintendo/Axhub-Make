@@ -10,29 +10,39 @@ import type {
     CommentaryExternalEditingTargetRef,
     CommentaryHostToolbarAction,
     CommentaryHostToolbarState,
+    CommentaryModifiedElementSummary,
 } from '@/common/web-editor-types';
+import type { PreviewConfig } from '../../domains/device/preview-layout';
 import {
     createDefaultHostToolbarState,
     PROTOTYPE_EDITOR_BRIDGE_TIMEOUT_MS,
     readPreviewFrameEditorApi,
     resolveHostToolbarStateForDisplay,
+    resolvePrototypeEditorMobileMode,
     type PreviewPane,
     type PrototypeEditorApi,
-    type PrototypeEditorBridgePendingRequest,
-    type PrototypeEditorBridgeStateMessage,
+    type PrototypeEditorBridgeStateMessage as BasePrototypeEditorBridgeStateMessage,
     type PrototypeEditorContext,
     type PrototypeEditorSaveActionMessage,
     type QuickEditSaveAction,
 } from './previewActions.helpers';
+import { postIframeMessageRequest } from './iframeMessageRequest';
+
+type PrototypeEditorBridgeStateMessage = BasePrototypeEditorBridgeStateMessage & {
+    modifiedElements?: CommentaryModifiedElementSummary[];
+};
 
 type UsePrototypeEditorBridgeActionsParams = {
     projectId?: string;
     getPrimaryPreviewIframe: () => HTMLIFrameElement | null;
     getSecondaryPreviewIframe: () => HTMLIFrameElement | null;
     getPreviewIframes: () => HTMLIFrameElement[];
+    getPreviewIframeGeneration: (iframe: HTMLIFrameElement | null | undefined) => number;
+    getPreviewIframeTargetUrl: (iframe: HTMLIFrameElement) => string;
     getIframeOrigin: (iframe?: HTMLIFrameElement | null) => string;
     selectedEditablePreviewResource: any;
     resourceType: 'prototype' | 'theme';
+    previewConfig: PreviewConfig;
     selectedPageId?: string | null;
     isDarkMode: boolean;
     isDarkModeRef: MutableRefObject<boolean>;
@@ -106,12 +116,36 @@ const HTML_TEMPLATE_BOOTSTRAP_SRC = '/assets/html-template-bootstrap.js';
 const HTML_TEMPLATE_BOOTSTRAP_WAIT_MS = 2000;
 const HTML_TEMPLATE_BOOTSTRAP_POLL_MS = 50;
 
-function isHtmlDocumentPreviewIframe(iframe: HTMLIFrameElement): boolean {
-    const src = iframe.getAttribute('src') || iframe.src || '';
-    if (!/\.html(?:[?#]|$)/iu.test(src)) {
+export function isHtmlDocumentPreviewUrl(src: string, hostOrigin: string): boolean {
+    let url: URL;
+    try {
+        url = new URL(src, hostOrigin);
+    } catch {
         return false;
     }
-    return src.includes('/api/docs/') || src.includes('/api/markdown-file');
+    const isHtmlPath = /\.html$/iu.test(url.searchParams.get('path') || '')
+        || /\.html$/iu.test(url.pathname);
+    if (!isHtmlPath) {
+        return false;
+    }
+    return url.pathname.includes('/api/docs/')
+        || url.pathname.includes('/api/markdown-file')
+        || (url.pathname.includes('/prototypes/') && url.pathname.endsWith('/spec/content'));
+}
+
+function isHtmlDocumentPreviewIframe(iframe: HTMLIFrameElement): boolean {
+    const src = iframe.getAttribute('src') || iframe.src || '';
+    return isHtmlDocumentPreviewUrl(src, window.location.origin);
+}
+
+function isPreviewIframeAtTargetUrl(iframe: HTMLIFrameElement, targetUrl: string): boolean {
+    const currentUrl = iframe.getAttribute('src') || iframe.src;
+    try {
+        return new URL(currentUrl, window.location.origin).href
+            === new URL(targetUrl, window.location.origin).href;
+    } catch {
+        return false;
+    }
 }
 
 function waitForHtmlDocumentPreviewEditorApi(iframe: HTMLIFrameElement): Promise<PrototypeEditorApi | null> {
@@ -170,9 +204,12 @@ export function usePrototypeEditorBridgeActions({
     getPrimaryPreviewIframe,
     getSecondaryPreviewIframe,
     getPreviewIframes,
+    getPreviewIframeGeneration,
+    getPreviewIframeTargetUrl,
     getIframeOrigin,
     selectedEditablePreviewResource,
     resourceType,
+    previewConfig,
     selectedPageId,
     isDarkMode,
     isDarkModeRef,
@@ -183,7 +220,6 @@ export function usePrototypeEditorBridgeActions({
     setHostToolbarState,
 }: UsePrototypeEditorBridgeActionsParams): PrototypeEditorBridgeActions {
     const prototypeEditorBridgeRequestSeqRef = useRef(0);
-    const prototypeEditorBridgePendingRequestsRef = useRef<Map<string, PrototypeEditorBridgePendingRequest>>(new Map());
 
     const normalizePrototypeEditorPageId = useCallback((value: unknown): string => {
         const pageId = typeof value === 'string' ? value.trim() : '';
@@ -230,11 +266,16 @@ export function usePrototypeEditorBridgeActions({
             resourceType,
             pane,
             pageId: normalizePrototypeEditorPageId(selectedPageId) || readPrototypeEditorPageIdFromIframe(iframe),
-            mobileMode: resourceType === 'prototype' ? pane === 'secondary' : false,
+            mobileMode: resolvePrototypeEditorMobileMode(
+                resourceType,
+                pane,
+                previewConfig,
+            ),
         };
     }, [
         getSecondaryPreviewIframe,
         normalizePrototypeEditorPageId,
+        previewConfig,
         readPrototypeEditorPageIdFromIframe,
         resourceType,
         selectedEditablePreviewResource,
@@ -267,27 +308,40 @@ export function usePrototypeEditorBridgeActions({
         iframe: HTMLIFrameElement,
         payload: Record<string, unknown>,
     ): Promise<PrototypeEditorBridgeStateMessage | null> => {
-        if (!iframe.contentWindow) {
+        const targetWindow = iframe.contentWindow;
+        if (!targetWindow) {
             return Promise.resolve(null);
         }
         const requestId = `prototype-editor-${Date.now()}-${prototypeEditorBridgeRequestSeqRef.current += 1}`;
-        return new Promise((resolve) => {
-            const timeoutId = window.setTimeout(() => {
-                prototypeEditorBridgePendingRequestsRef.current.delete(requestId);
-                resolve(null);
-            }, PROTOTYPE_EDITOR_BRIDGE_TIMEOUT_MS);
-            const normalizedTimeoutId = Number(timeoutId);
-            prototypeEditorBridgePendingRequestsRef.current.set(requestId, {
-                iframe,
-                resolve,
-                timeoutId: normalizedTimeoutId,
-            });
-            iframe.contentWindow?.postMessage({
+        const targetUrl = getPreviewIframeTargetUrl(iframe);
+        const generation = getPreviewIframeGeneration(iframe);
+        if (!targetUrl || generation <= 0) {
+            return Promise.resolve(null);
+        }
+        return postIframeMessageRequest({
+            host: {
+                hostOrigin: window.location.origin,
+                addEventListener: (type, listener) => window.addEventListener(type, listener as unknown as EventListener),
+                removeEventListener: (type, listener) => window.removeEventListener(type, listener as unknown as EventListener),
+                setTimeout: (callback, delay) => window.setTimeout(callback, delay),
+                clearTimeout: (timer) => window.clearTimeout(timer as number),
+            },
+            targetUrl,
+            targetWindow,
+            message: {
                 ...payload,
                 requestId,
-            }, getIframeOrigin(iframe));
-        });
-    }, [getIframeOrigin]);
+            },
+            requestId,
+            successType: 'AXHUB_PROTOTYPE_EDITOR_STATE',
+            timeoutMs: Math.max(PROTOTYPE_EDITOR_BRIDGE_TIMEOUT_MS, 3000),
+            isCurrent: () => iframe.contentWindow === targetWindow
+                && getPreviewIframeTargetUrl(iframe) === targetUrl
+                && isPreviewIframeAtTargetUrl(iframe, targetUrl)
+                && getPreviewIframeGeneration(iframe) === generation
+                && getPreviewIframes().includes(iframe),
+        }).then((message) => message as PrototypeEditorBridgeStateMessage | null);
+    }, [getPreviewIframeGeneration, getPreviewIframeTargetUrl, getPreviewIframes]);
 
     const postPrototypeEditorEnable = useCallback((
         iframe: HTMLIFrameElement,
@@ -361,6 +415,9 @@ export function usePrototypeEditorBridgeActions({
         }
         const context = buildPrototypeEditorContext(iframe);
         const enableEditors = async (resolvedEditors: PrototypeEditorApi) => {
+            if (!resolvedEditors.enable) {
+                return false;
+            }
             resolvedEditors.setContext?.(buildPrototypeEditorScopedContext(context));
             await Promise.resolve(resolvedEditors.enable('webEditorV2', buildPrototypeEditorEnableOptions(context)));
 
@@ -430,37 +487,19 @@ export function usePrototypeEditorBridgeActions({
         setHostToolbarState,
     ]);
 
-    useEffect(() => () => {
-        prototypeEditorBridgePendingRequestsRef.current.forEach((pendingRequest) => {
-            window.clearTimeout(pendingRequest.timeoutId);
-            pendingRequest.resolve(null);
-        });
-        prototypeEditorBridgePendingRequestsRef.current.clear();
-    }, []);
-
     useEffect(() => {
         const handlePrototypeEditorBridgeMessage = (event: MessageEvent) => {
             if (event.data?.type !== 'AXHUB_PROTOTYPE_EDITOR_STATE') {
                 return;
             }
             const message = event.data as PrototypeEditorBridgeStateMessage;
-            const requestId = typeof message.requestId === 'string' ? message.requestId : '';
-            const pendingRequest = requestId
-                ? prototypeEditorBridgePendingRequestsRef.current.get(requestId)
-                : null;
-            const targetIframe = pendingRequest?.iframe
-                ?? getPreviewIframes().find((iframe) => iframe.contentWindow === event.source)
+            const targetIframe = getPreviewIframes().find((iframe) => iframe.contentWindow === event.source)
                 ?? null;
             if (!targetIframe || event.source !== targetIframe.contentWindow) {
                 return;
             }
             if (event.origin !== getIframeOrigin(targetIframe)) {
                 return;
-            }
-            if (pendingRequest) {
-                window.clearTimeout(pendingRequest.timeoutId);
-                prototypeEditorBridgePendingRequestsRef.current.delete(requestId);
-                pendingRequest.resolve(message);
             }
             if (message.hostToolbarState && targetIframe === getPrimaryPreviewIframe()) {
                 setHostToolbarState((previousState) => resolveHostToolbarStateForDisplay(

@@ -178,7 +178,7 @@ describe('createWebEditorV2Controller launch options', () => {
       location: {
         search: '',
         pathname: '/prototypes/home',
-        href: 'http://localhost:53817/prototypes/home',
+        href: 'http://localhost:51720/prototypes/home',
         protocol: 'http:',
         hostname: 'localhost',
       },
@@ -187,7 +187,10 @@ describe('createWebEditorV2Controller launch options', () => {
     });
 
     const controller = createWebEditorV2Controller();
-    await controller.enable({ annotationProjectId: 'project-a' });
+    await controller.enable({
+      annotationApiBaseUrl: 'http://localhost:53817',
+      annotationProjectId: 'project-a',
+    });
     const transport = mocked.createCommentary.mock.calls[0]?.[0]?.host?.conversationTaskTransport;
     const next = vi.fn();
     const subscription = transport.watch({
@@ -199,8 +202,8 @@ describe('createWebEditorV2Controller launch options', () => {
     await subscription.done;
 
     expect(mocked.subscribeAcpRuntimeStatuses).toHaveBeenCalledWith({
-      eventsUrl: '/api/acp/conversations/runtime/events?projectId=project-a&targetPath=prototypes%2Fhome',
-      runtimeUrl: '/api/acp/conversations/runtime/status?projectId=project-a&targetPath=prototypes%2Fhome&threadId=thread-1',
+      eventsUrl: 'http://localhost:53817/api/acp/conversations/runtime/events?projectId=project-a&targetPath=prototypes%2Fhome',
+      runtimeUrl: 'http://localhost:53817/api/acp/conversations/runtime/status?projectId=project-a&targetPath=prototypes%2Fhome&threadId=thread-1',
       threadId: 'thread-1',
       provider: 'codex',
     }, next);
@@ -512,6 +515,7 @@ describe('createWebEditorV2Controller', () => {
         host: expect.objectContaining({
           buildCopyPrompt: expect.any(Function),
           canEditAnnotationMarkdown: expect.any(Function),
+          getCreateAnnotationBlockReason: expect.any(Function),
           getAnnotationDocumentEditUrl: expect.any(Function),
           getAnnotationMarkdown: expect.any(Function),
           onDeleteAnnotationNode: expect.any(Function),
@@ -537,6 +541,251 @@ describe('createWebEditorV2Controller', () => {
       },
     });
     expect(start).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks only new annotations whose URL page differs from the mounted Runtime page', async () => {
+    const start = vi.fn();
+    const runtime = {
+      getMetadata: vi.fn(() => ({ currentPageId: 'merchant-dashboard' })),
+    };
+    const location = {
+      search: '?projectId=make-project&p=merchant-dashboard&page=overview',
+      pathname: '/',
+      href: 'http://localhost:53817/?projectId=make-project&p=merchant-dashboard&page=overview',
+      protocol: 'http:',
+      hostname: 'localhost',
+    };
+
+    mocked.createCommentary.mockReturnValue({
+      start,
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: false, version: 2 })),
+      getStatus: vi.fn(() => ({ active: false, undoCount: 0, redoCount: 0 })),
+      acknowledgeSavedTextChanges: vi.fn(),
+      acknowledgeSavedStyleChanges: vi.fn(),
+    });
+    vi.stubGlobal('window', {
+      location,
+      __AXHUB_ANNOTATION_RUNTIME__: runtime,
+      confirm: vi.fn(() => true),
+      alert: vi.fn(),
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ enabled: true, source: null }),
+    })) as typeof fetch);
+
+    const controller = createWebEditorV2Controller();
+    await controller.enable();
+    const host = mocked.createCommentary.mock.calls[0]?.[0]?.host;
+
+    expect(host.getCreateAnnotationBlockReason?.({} as Element)).toBe(
+      '无法准确定位标注位置，该标注需要由 AI 生成',
+    );
+
+    const runtimeWindow = window as Window & {
+      __AXHUB_ANNOTATION_RUNTIME__?: typeof runtime | Record<string, never>;
+      __AXHUB_MAKE_ANNOTATION_RUNTIME__?: typeof runtime;
+    };
+    runtimeWindow.__AXHUB_ANNOTATION_RUNTIME__ = undefined;
+    runtimeWindow.__AXHUB_MAKE_ANNOTATION_RUNTIME__ = runtime;
+    expect(host.getCreateAnnotationBlockReason?.({} as Element)).toBe(
+      '无法准确定位标注位置，该标注需要由 AI 生成',
+    );
+    runtimeWindow.__AXHUB_ANNOTATION_RUNTIME__ = runtime;
+    runtimeWindow.__AXHUB_MAKE_ANNOTATION_RUNTIME__ = undefined;
+
+    runtime.getMetadata.mockReturnValue({ currentPageId: 'overview' });
+    expect(host.getCreateAnnotationBlockReason?.({} as Element)).toBeUndefined();
+
+    runtime.getMetadata.mockReturnValue({ currentPageId: '' });
+    expect(host.getCreateAnnotationBlockReason?.({} as Element)).toBeUndefined();
+
+    runtimeWindow.__AXHUB_ANNOTATION_RUNTIME__ = {};
+    expect(host.getCreateAnnotationBlockReason?.({} as Element)).toBeUndefined();
+
+    runtimeWindow.__AXHUB_ANNOTATION_RUNTIME__ = runtime;
+    runtime.getMetadata.mockReturnValue({ currentPageId: 'merchant-dashboard' });
+    location.href = 'http://localhost:53817/?projectId=make-project&p=merchant-dashboard';
+    expect(host.getCreateAnnotationBlockReason?.({} as Element)).toBeUndefined();
+  });
+
+  it('blocks new annotations using the cached annotation source page when the Runtime global is unavailable', async () => {
+    const start = vi.fn();
+    const location = {
+      search: '?projectId=make-project&p=merchant-dashboard&page=overview',
+      pathname: '/',
+      href: 'http://localhost:53817/?projectId=make-project&p=merchant-dashboard&page=overview',
+      protocol: 'http:',
+      hostname: 'localhost',
+    };
+
+    mocked.createCommentary.mockReturnValue({
+      start,
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: false, version: 2 })),
+      getStatus: vi.fn(() => ({ active: false, undoCount: 0, redoCount: 0 })),
+      acknowledgeSavedTextChanges: vi.fn(),
+      acknowledgeSavedStyleChanges: vi.fn(),
+    });
+    vi.stubGlobal('window', {
+      location,
+      confirm: vi.fn(() => true),
+      alert: vi.fn(),
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        enabled: true,
+        source: {
+          documentVersion: 1,
+          format: 'axhub-annotation-source',
+          data: {
+            version: 2,
+            prototypeName: 'merchant-dashboard',
+            pageId: 'merchant-dashboard',
+            nodes: [],
+            updatedAt: 1,
+          },
+        },
+      }),
+    })) as typeof fetch);
+
+    const controller = createWebEditorV2Controller();
+    await controller.enable({ annotationProjectId: 'make-project' });
+    const host = mocked.createCommentary.mock.calls[0]?.[0]?.host;
+
+    expect(host.getCreateAnnotationBlockReason?.({} as Element)).toBe(
+      '无法准确定位标注位置，该标注需要由 AI 生成',
+    );
+  });
+
+  it('reads an updated mounted source page when the API does not provide a source', async () => {
+    const start = vi.fn();
+    const location = {
+      search: '?projectId=make-project&p=merchant-dashboard&page=overview',
+      pathname: '/',
+      href: 'http://localhost:53817/?projectId=make-project&p=merchant-dashboard&page=overview',
+      protocol: 'http:',
+      hostname: 'localhost',
+    };
+    const createSource = (pageId: string) => ({
+      documentVersion: 1,
+      format: 'axhub-annotation-source',
+      data: {
+        version: 2,
+        prototypeName: 'merchant-dashboard',
+        pageId,
+        nodes: [],
+        updatedAt: 1,
+      },
+    });
+
+    mocked.createCommentary.mockReturnValue({
+      start,
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: false, version: 2 })),
+      getStatus: vi.fn(() => ({ active: false, undoCount: 0, redoCount: 0 })),
+      acknowledgeSavedTextChanges: vi.fn(),
+      acknowledgeSavedStyleChanges: vi.fn(),
+    });
+    vi.stubGlobal('window', {
+      location,
+      __AXHUB_ANNOTATION_SOURCE_DOCUMENT__: createSource('merchant-dashboard'),
+      confirm: vi.fn(() => true),
+      alert: vi.fn(),
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ enabled: true, source: null }),
+    })) as typeof fetch);
+
+    const controller = createWebEditorV2Controller();
+    await controller.enable({ annotationProjectId: 'make-project' });
+    const host = mocked.createCommentary.mock.calls[0]?.[0]?.host;
+
+    expect(host.getCreateAnnotationBlockReason?.({} as Element)).toBe(
+      '无法准确定位标注位置，该标注需要由 AI 生成',
+    );
+
+    (window as Window & {
+      __AXHUB_ANNOTATION_SOURCE_DOCUMENT__?: ReturnType<typeof createSource>;
+    }).__AXHUB_ANNOTATION_SOURCE_DOCUMENT__ = createSource('overview');
+
+    expect(host.getCreateAnnotationBlockReason?.({} as Element)).toBeUndefined();
+  });
+
+  it('clears a cached API page when a later status refresh rejects', async () => {
+    const start = vi.fn();
+    const location = {
+      search: '?projectId=make-project&p=merchant-dashboard&page=overview',
+      pathname: '/',
+      href: 'http://localhost:53817/?projectId=make-project&p=merchant-dashboard&page=overview',
+      protocol: 'http:',
+      hostname: 'localhost',
+    };
+    const createSource = (pageId: string) => ({
+      documentVersion: 1,
+      format: 'axhub-annotation-source',
+      data: {
+        version: 2,
+        prototypeName: 'merchant-dashboard',
+        pageId,
+        nodes: [],
+        updatedAt: 1,
+      },
+    });
+    let annotationStatusRequests = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/__axhub/make-server/status') {
+        return { ok: false, json: async () => ({}) };
+      }
+      if (url.startsWith('/api/prototype-annotation?')) {
+        annotationStatusRequests += 1;
+        if (annotationStatusRequests === 1) {
+          return {
+            ok: true,
+            json: async () => ({ enabled: true, source: createSource('merchant-dashboard') }),
+          };
+        }
+        throw new Error('status unavailable');
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    mocked.createCommentary.mockReturnValue({
+      start,
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: false, version: 2 })),
+      getStatus: vi.fn(() => ({ active: false, undoCount: 0, redoCount: 0 })),
+      acknowledgeSavedTextChanges: vi.fn(),
+      acknowledgeSavedStyleChanges: vi.fn(),
+    });
+    vi.stubGlobal('window', {
+      location,
+      __AXHUB_ANNOTATION_SOURCE_DOCUMENT__: createSource('merchant-dashboard'),
+      confirm: vi.fn(() => true),
+      alert: vi.fn(),
+    });
+    vi.stubGlobal('fetch', fetchMock as typeof fetch);
+
+    const controller = createWebEditorV2Controller();
+    await controller.enable({ annotationProjectId: 'make-project' });
+    const host = mocked.createCommentary.mock.calls[0]?.[0]?.host;
+
+    expect(host.getCreateAnnotationBlockReason?.({} as Element)).toBe(
+      '无法准确定位标注位置，该标注需要由 AI 生成',
+    );
+
+    (window as Window & {
+      __AXHUB_ANNOTATION_SOURCE_DOCUMENT__?: ReturnType<typeof createSource>;
+    }).__AXHUB_ANNOTATION_SOURCE_DOCUMENT__ = createSource('overview');
+
+    await controller.enable({ annotationProjectId: 'make-project' });
+
+    expect(annotationStatusRequests).toBe(2);
+    expect(host.getCreateAnnotationBlockReason?.({} as Element)).toBeUndefined();
   });
 
   it('uses prototype comment file adapter for host persistence', async () => {
@@ -3522,6 +3771,149 @@ describe('createWebEditorV2Controller', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(acknowledgeSavedTextChanges).not.toHaveBeenCalled();
+  });
+
+  it('does not fall back to a second native confirm when the parent dialog times out', async () => {
+    const acknowledgeSavedTextChanges = vi.fn();
+    mocked.createCommentary.mockReturnValue({
+      start: vi.fn(),
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: true, version: 2 })),
+      getStatus: vi.fn(() => ({ active: true, undoCount: 0, redoCount: 0 })),
+      getEditedSnapshot: vi.fn(() => ({
+        resource: { kind: 'prototype-entry', path: 'prototypes/home' },
+        selectedElement: null,
+        modifiedElements: [],
+        textChanges: [{ before: '旧标题', after: '新标题' }],
+        styleChanges: { cssText: '' },
+      })),
+      getTextChanges: vi.fn(() => [{ before: '旧标题', after: '新标题' }]),
+      getStyleChanges: vi.fn(() => ({ cssText: '' })),
+      acknowledgeSavedTextChanges,
+      acknowledgeSavedStyleChanges: vi.fn(),
+    });
+
+    let timeoutCallback: (() => void) | null = null;
+    const nativeConfirm = vi.fn(() => true);
+    vi.stubGlobal('window', {
+      location: {
+        search: '',
+        pathname: '/prototypes/home',
+        href: 'http://localhost:51720/prototypes/home',
+      },
+      parent: { postMessage: vi.fn() },
+      confirm: nativeConfirm,
+      alert: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      setTimeout: vi.fn((callback: () => void) => {
+        timeoutCallback = callback;
+        return 1;
+      }),
+      clearTimeout: vi.fn(),
+    });
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === '/api/text-replace/count') {
+        return { ok: true, json: async () => ({ totalCount: 1 }) };
+      }
+      if (input === '/api/text-replace/replace') {
+        return { ok: true, json: async () => ({ success: true, changedFiles: 1 }) };
+      }
+      throw new Error(`Unexpected fetch: ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock as typeof fetch);
+
+    const controller = createWebEditorV2Controller();
+    const savePromise = controller.saveTextChanges();
+    await vi.waitFor(() => expect(timeoutCallback).not.toBeNull());
+    timeoutCallback?.();
+    await savePromise;
+
+    expect(nativeConfirm).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(acknowledgeSavedTextChanges).not.toHaveBeenCalled();
+  });
+
+  it('keeps waiting for the parent result after the host acknowledges dialog ownership', async () => {
+    const acknowledgeSavedTextChanges = vi.fn();
+    mocked.createCommentary.mockReturnValue({
+      start: vi.fn(),
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: true, version: 2 })),
+      getStatus: vi.fn(() => ({ active: true, undoCount: 0, redoCount: 0 })),
+      getEditedSnapshot: vi.fn(() => ({
+        resource: { kind: 'prototype-entry', path: 'prototypes/home' },
+        selectedElement: null,
+        modifiedElements: [],
+        textChanges: [{ before: '旧标题', after: '新标题' }],
+        styleChanges: { cssText: '' },
+      })),
+      getTextChanges: vi.fn(() => [{ before: '旧标题', after: '新标题' }]),
+      getStyleChanges: vi.fn(() => ({ cssText: '' })),
+      acknowledgeSavedTextChanges,
+      acknowledgeSavedStyleChanges: vi.fn(),
+    });
+
+    let messageHandler: ((event: MessageEvent) => void) | null = null;
+    let timeoutCallback: (() => void) | null = null;
+    let confirmRequestId = '';
+    const parentWindow = {
+      postMessage: vi.fn((payload: { type?: string; requestId?: string }) => {
+        if (payload.type !== 'WEB_EDITOR_DIALOG_REQUEST') return;
+        confirmRequestId = payload.requestId ?? '';
+        messageHandler?.({
+          data: { type: 'WEB_EDITOR_DIALOG_ACK', requestId: confirmRequestId },
+        } as MessageEvent);
+      }),
+    };
+    const nativeConfirm = vi.fn(() => true);
+    vi.stubGlobal('window', {
+      location: {
+        search: '',
+        pathname: '/prototypes/home',
+        href: 'http://localhost:51720/prototypes/home',
+      },
+      parent: parentWindow,
+      confirm: nativeConfirm,
+      alert: vi.fn(),
+      addEventListener: vi.fn((_type: string, handler: (event: MessageEvent) => void) => {
+        messageHandler = handler;
+      }),
+      removeEventListener: vi.fn(),
+      setTimeout: vi.fn((callback: () => void) => {
+        timeoutCallback = callback;
+        return 1;
+      }),
+      clearTimeout: vi.fn(),
+    });
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === '/api/text-replace/count') {
+        return { ok: true, json: async () => ({ totalCount: 1 }) };
+      }
+      if (input === '/api/text-replace/replace') {
+        return { ok: true, json: async () => ({ success: true, changedFiles: 1 }) };
+      }
+      throw new Error(`Unexpected fetch: ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock as typeof fetch);
+
+    const controller = createWebEditorV2Controller();
+    const savePromise = controller.saveTextChanges();
+    await vi.waitFor(() => expect(timeoutCallback).not.toBeNull());
+    timeoutCallback?.();
+    messageHandler?.({
+      data: {
+        type: 'WEB_EDITOR_DIALOG_RESPONSE',
+        requestId: confirmRequestId,
+        confirmed: true,
+      },
+      source: parentWindow,
+    } as MessageEvent);
+    await savePromise;
+
+    expect(nativeConfirm).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(acknowledgeSavedTextChanges).toHaveBeenCalledTimes(1);
   });
 
   it('does not acknowledge local text changes when replace fails', async () => {

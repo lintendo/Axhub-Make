@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="960" viewBox="0 0 1440 960" role="img" aria-label="DoorDash light commerce theme token preview">
+  <defs>
+    <linearGradient id="food" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF8000"/>
+      <stop offset="0.55" stop-color="#EB1700"/>
+      <stop offset="1" stop-color="#C31500"/>
+    </linearGradient>
+    <filter id="card-shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+
+  <rect width="1440" height="960" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="16" height="960" fill="#EB1700"/>
+  <circle cx="1268" cy="118" r="240" fill="#FFEBE8"/>
+
+  <g font-family="TT Norms Pro, -apple-system, BlinkMacSystemFont, SF Pro Text, Segoe UI, sans-serif">
+    <text x="86" y="102" fill="#EB1700" font-size="18" font-weight="700" letter-spacing="2.2">MOBILE COMMERCE SYSTEM</text>
+    <text x="86" y="226" fill="#191919" font-size="92" font-weight="700" letter-spacing="-2">DoorDash</text>
+    <text x="86" y="282" fill="#757575" font-size="25" font-weight="400">Food first. Fast decisions. Checkout in red.</text>
+
+    <g transform="translate(86 354)">
+      <rect width="190" height="130" rx="16" fill="#EB1700"/>
+      <text x="20" y="32" fill="#FFFFFF" font-size="14" font-weight="700">PRIMARY ACTION</text>
+      <text x="20" y="101" fill="#FFFFFF" font-size="29" font-weight="700">#EB1700</text>
+    </g>
+    <g transform="translate(292 354)">
+      <rect width="190" height="130" rx="16" fill="#FFEBE8"/>
+      <text x="20" y="32" fill="#C31500" font-size="14" font-weight="700">PROMO TINT</text>
+      <text x="20" y="101" fill="#191919" font-size="29" font-weight="700">#FFEBE8</text>
+    </g>
+    <g transform="translate(498 354)">
+      <rect width="190" height="130" rx="16" fill="#008B4A"/>
+      <text x="20" y="32" fill="#FFFFFF" font-size="14" font-weight="700">$0 DELIVERY</text>
+      <text x="20" y="101" fill="#FFFFFF" font-size="29" font-weight="700">#008B4A</text>
+    </g>
+
+    <g transform="translate(86 554)">
+      <text x="0" y="0" fill="#191919" font-size="42" font-weight="700" letter-spacing="-0.6">TT Norms Pro</text>
+      <text x="0" y="42" fill="#757575" font-size="17">400 / 600 / 700 · dense and decisive</text>
+      <rect x="0" y="88" width="256" height="56" rx="28" fill="#EB1700"/>
+      <text x="128" y="124" fill="#FFFFFF" text-anchor="middle" font-size="17" font-weight="700">Checkout · $23.40</text>
+      <rect x="272" y="88" width="164" height="56" rx="28" fill="#191919"/>
+      <text x="354" y="124" fill="#FFFFFF" text-anchor="middle" font-size="15" font-weight="600">View menu</text>
+      <text x="0" y="204" fill="#757575" font-size="15">2 · 4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 56 · 72</text>
+    </g>
+
+    <g transform="translate(868 78)" filter="url(#card-shadow)">
+      <rect width="448" height="804" rx="52" fill="#191919"/>
+      <rect x="16" y="16" width="416" height="772" rx="38" fill="#FFFFFF"/>
+
+      <text x="46" y="75" fill="#191919" font-size="18" font-weight="700">Home ▾</text>
+      <circle cx="382" cy="68" r="18" fill="#F7F7F7"/>
+      <path d="M376 68a6 6 0 1 1 12 0a6 6 0 0 1-12 0m11 5l5 5" fill="none" stroke="#191919" stroke-width="2.5" stroke-linecap="round"/>
+
+      <rect x="42" y="104" width="364" height="48" rx="12" fill="#F7F7F7"/>
+      <circle cx="65" cy="128" r="7" fill="none" stroke="#757575" stroke-width="2"/>
+      <path d="M70 133l6 6" stroke="#757575" stroke-width="2" stroke-linecap="round"/>
+      <text x="88" y="135" fill="#757575" font-size="15">Find food or restaurants</text>
+
+      <text x="42" y="204" fill="#191919" font-size="30" font-weight="700" letter-spacing="-0.5">Trending near you</text>
+
+      <g transform="translate(42 230)">
+        <rect width="364" height="328" rx="16" fill="#FFFFFF" stroke="#E5E5E5"/>
+        <rect width="364" height="205" rx="16" fill="url(#food)"/>
+        <circle cx="325" cy="38" r="20" fill="#FFFFFF" fill-opacity="0.88"/>
+        <text x="325" y="46" fill="#EB1700" text-anchor="middle" font-size="22">♥</text>
+        <rect x="16" y="16" width="96" height="28" rx="4" fill="#FFEBE8"/>
+        <text x="64" y="35" fill="#EB1700" text-anchor="middle" font-size="11" font-weight="700">20% OFF</text>
+        <text x="18" y="247" fill="#191919" font-size="20" font-weight="700">Neighborhood Kitchen</text>
+        <text x="18" y="279" fill="#FF8000" font-size="15">★</text>
+        <text x="39" y="279" fill="#757575" font-size="14">4.8 · 20 min ·</text>
+        <text x="142" y="279" fill="#008B4A" font-size="14" font-weight="600">$0 delivery</text>
+        <rect x="18" y="295" width="92" height="22" rx="11" fill="#006B82"/>
+        <text x="64" y="311" fill="#FFFFFF" text-anchor="middle" font-size="11" font-weight="700">DASHPASS</text>
+      </g>
+
+      <rect x="42" y="602" width="364" height="56" rx="28" fill="#EB1700"/>
+      <circle cx="72" cy="630" r="14" fill="#FFFFFF"/>
+      <text x="72" y="635" fill="#EB1700" text-anchor="middle" font-size="12" font-weight="700">2</text>
+      <text x="98" y="636" fill="#FFFFFF" font-size="16" font-weight="700">Checkout</text>
+      <text x="382" y="636" fill="#FFFFFF" text-anchor="end" font-size="16" font-weight="700">$23.40</text>
+
+      <line x1="16" y1="702" x2="432" y2="702" stroke="#E5E5E5"/>
+      <text x="68" y="742" fill="#EB1700" text-anchor="middle" font-size="12" font-weight="700">Home</text>
+      <text x="172" y="742" fill="#757575" text-anchor="middle" font-size="12" font-weight="600">Offers</text>
+      <text x="276" y="742" fill="#757575" text-anchor="middle" font-size="12" font-weight="600">Orders</text>
+      <text x="380" y="742" fill="#757575" text-anchor="middle" font-size="12" font-weight="600">Account</text>
+    </g>
+  </g>
+</svg>

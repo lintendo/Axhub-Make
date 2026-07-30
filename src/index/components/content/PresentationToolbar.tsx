@@ -21,8 +21,6 @@ import {
     List,
     ListChecks,
     Monitor,
-    PanelLeftClose,
-    PanelLeftOpen,
     PencilRuler,
     ScanSearch,
     RotateCw,
@@ -64,6 +62,7 @@ import type {
 } from '../../domains/device/preview-layout';
 import type { ConfigurableCloudPublishTarget, ExportAvailability, QuickEditRuntimeStatus, QuickEditSaveAction } from '../../types/index-page.types';
 import type { CloudPublishTarget } from '../../services/api';
+import ResponsiveSidebarTriggerButton from '../sidebar/ResponsiveSidebarTriggerButton';
 
 function PreviewSplitIcon() {
     return (
@@ -398,6 +397,8 @@ export default function PresentationToolbar({
         ? (
             isQuickEditActive
                 ? '退出快速编辑'
+                : quickEditRuntimeStatus === 'pending'
+                    ? '正在连接批注编辑器'
                 : quickEditRuntimeStatus !== 'ready'
                     ? '当前客户端页面尚未接入 /runtime/quick-edit.js'
                     : '批注后快速微调'
@@ -1541,31 +1542,28 @@ export default function PresentationToolbar({
         </DropdownMenu>
     );
     return (
-        <div className="relative h-10 flex items-center justify-between border-b px-2 bg-background shrink-0 text-[12px]">
+        <div className="ax-presentation-toolbar relative h-10 flex items-center justify-between border-b px-2 bg-background shrink-0 text-[12px]">
             {/* Left: Sidebar Collapse */}
             <div className="flex items-center gap-1 z-10">
                 {showSidebarToggle ? (
-                    <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() => setCollapsed(!collapsed)}
+                    <ResponsiveSidebarTriggerButton
+                        collapsed={collapsed}
+                        setCollapsed={setCollapsed}
                         className={edgeIconButtonClass}
-                    >
-                        {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
-                    </Button>
+                    />
                 ) : null}
                 {deviceSwitcher}
             </div>
 
             {/* Center: Tools */}
-            <div className="flex-1 flex justify-center items-center gap-1 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="ax-toolbar-adaptive-action flex-1 flex justify-center items-center gap-1 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
                 <div className="flex items-center gap-1 [&>*]:self-center text-[12px]">
                     {actionButtons}
                 </div>
             </div>
 
             {/* Right: Export */}
-            <div className="flex items-center justify-end gap-1.5 z-10">
+            <div className="ax-toolbar-adaptive-action flex items-center justify-end gap-1.5 z-10">
                 {showExportMenuButton ? exportMenuButton : null}
             </div>
         </div>

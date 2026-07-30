@@ -112,7 +112,6 @@ function normalizeOnlineBaseUrlOption(value: string, optionName: string): string
 }
 
 export function parseCliArgs(args: string[], cwd = process.cwd()): MakeServerCliOptions {
-  let legacyProjectRoot = '';
   let port = DEFAULT_MAKE_SERVER_PORT;
   let host: string | undefined;
   let runtimeOrigin: string | undefined;
@@ -189,13 +188,10 @@ export function parseCliArgs(args: string[], cwd = process.cwd()): MakeServerCli
     if (arg.startsWith('--')) {
       throw new Error(`Unknown option: ${arg}`);
     }
-    if (!legacyProjectRoot && arg === 'canvas') {
+    if (arg === 'canvas') {
       throw new Error('Unknown command: canvas');
     }
-    if (legacyProjectRoot) {
-      throw new Error(`Unexpected argument: ${arg}`);
-    }
-    legacyProjectRoot = arg;
+    throw new Error(`Unexpected argument: ${arg}`);
   }
 
   return {

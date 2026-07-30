@@ -1,0 +1,330 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/music/apple-music/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-apple-music-mobile",
+    "slug": "apple-music-mobile",
+    "brand": "Apple Music",
+    "titleZh": "Apple Music 主题",
+    "titleEn": "Apple Music",
+    "descriptionZh": "Apple Music 的 Design.md 主题展示，围绕移动端、媒体、音乐、视频与阅读组织页面。",
+    "descriptionEn": "Apple Music mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "媒体、音乐、视频与阅读"
+    ],
+    "distributionTags": [
+      "移动端",
+      "媒体、音乐、视频与阅读"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/apple-music-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/apple-music/id1108187390",
+          "officialPageUrl": "https://apps.apple.com/us/app/apple-music/id1108187390",
+          "marketId": "1108187390",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/09/d2/62/09d262c5-7fb2-0e48-6545-4a3e16dffb14/iPhone6p9-iOS26-USEN-Music-Wrapper1.png/720x1564bb.webp",
+          "collectedAt": "2026-07-27T19:16:33.781Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "261b6b9b50bd94c4f9cd9bc4db465be21589f62c99a073dae0ba35559fbbccab",
+          "byteLength": 64720,
+          "width": 720,
+          "height": 1564
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/apple-music/id1108187390",
+          "officialPageUrl": "https://apps.apple.com/us/app/apple-music/id1108187390",
+          "marketId": "1108187390",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/62/61/29/626129da-b55a-c00a-7629-da095e947ba9/iPhone6p9-iOS26-USEN-Music-Wrapper2.png/720x1564bb.webp",
+          "collectedAt": "2026-07-27T19:16:33.781Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "87fa0d6cd5ca86e25c3a51d441babf16270faf8c7107fdb974514fa7128d671a",
+          "byteLength": 69090,
+          "width": 720,
+          "height": 1564
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/apple-music/id1108187390",
+          "officialPageUrl": "https://apps.apple.com/us/app/apple-music/id1108187390",
+          "marketId": "1108187390",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/66/f9/e7/66f9e733-0174-ee61-1963-0ce4ceb518a6/iPhone6p9-iOS26-USEN-Music-Wrapper3.png/720x1564bb.webp",
+          "collectedAt": "2026-07-27T19:16:33.781Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "3dab4c22985b76408fbeb8842dd80a23f211d9257545119c120ecc3772ec36da",
+          "byteLength": 33554,
+          "width": 720,
+          "height": 1564
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#FC3C44",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Inter",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Inter",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "8px",
+      "card": "8px",
+      "preview": "8px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "spacing": {
+      "xxs": "4px",
+      "xs": "16px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Apple Music 主题",
+    "brandAlias": "Apple Music",
+    "description": "Apple Music 的 Design.md 主题展示，围绕移动端、媒体、音乐、视频与阅读组织页面。",
+    "descriptionEn": "Apple Music mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "媒体、音乐、视频与阅读"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#FC3C44",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "阴影 1 - Shadow 1",
+        "value": "rgba(0,0,0,0.2)",
+        "cssValue": "rgba(0,0,0,0.2)",
+        "description": "Thumb: 16pt circle `#FFFFFF` with `rgba(0,0,0,0.2)` shadow, scale 1.2× during drag"
+      },
+      {
+        "label": "阴影 2 - Shadow 2",
+        "value": "rgba(0,0,0,0.08)",
+        "cssValue": "rgba(0,0,0,0.08)",
+        "description": "Art with 12pt radius, `rgba(0,0,0,0.08)` 0 4 16 shadow (light only — dark mode has no shadow)"
+      },
+      {
+        "label": "阴影 3 - Shadow 3",
+        "value": "rgba(0,0,0,0.1)",
+        "cssValue": "rgba(0,0,0,0.1)",
+        "description": "Track: 4pt tall, `rgba(0,0,0,0.1)` light / `rgba(255,255,255,0.2)` dark"
+      },
+      {
+        "label": "阴影 4 - Shadow 4",
+        "value": "rgba(0,0,0,0.3)",
+        "cssValue": "rgba(0,0,0,0.3)",
+        "description": "Overlay gradient if text needs contrast: `rgba(0,0,0,0.3)` bottom 40%"
+      },
+      {
+        "label": "阴影 5 - Shadow 5",
+        "value": "rgba(0,0,0,0.08) 0 4px 16px",
+        "cssValue": "rgba(0,0,0,0.08) 0 4px 16px",
+        "description": "| Standard Card (Level 2) | `rgba(0,0,0,0.08) 0 4px 16px` (light only) | Album detail hero, playlist art |"
+      },
+      {
+        "label": "阴影 6 - Shadow 6",
+        "value": "rgba(0,0,0,0.3) 0 20px 40px",
+        "cssValue": "rgba(0,0,0,0.3) 0 20px 40px",
+        "description": "| Now Playing Art | `rgba(0,0,0,0.3) 0 20px 40px` | Centered album art on Now Playing full screen |"
+      }
+    ],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#C6C6C8",
+        "cssValue": "#C6C6C8",
+        "description": "Divider (`#C6C6C8`): iOS system separator at 1/3 alpha; 1pt hairline between list rows."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#38383A",
+        "cssValue": "#38383A",
+        "description": "Divider Dark (`#38383A`): Hairlines in dark mode."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#E5E5EA",
+        "cssValue": "#E5E5EA",
+        "description": "Surface 3 (`#E5E5EA`): Tertiary surface — pressed rows, divider-adjacent areas."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Inter",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use SF Pro exclusively — Apple Music is Apple's flagship first-party app; resist adding custom fonts。",
+        "建议：Use {#000000} as the dark canvas — full-contrast black, not {#121212}。",
+        "建议：Use 12pt corner radius on album art tiles — larger than most media apps, Apple Music's signature。",
+        "建议：Reserve Apple Music Red ({#FA2D48}) for the Play button, Now Playing indicator, heart, shuffle active, and scrubber fill。",
+        "建议：Use iOS system materials ({translucent backdrop blur}) for nav, tab bar, and mini-player backgrounds。"
+      ],
+      "dont": [
+        "避免：use a custom font — SF Pro covers every need in Apple Music。",
+        "避免：use {#121212} or warmer dark canvases — Apple Music goes full {#000000}。",
+        "避免：use 6pt corner radius on album art — 12pt is signature, softer。",
+        "避免：use Apple Music Red for secondary actions, borders, or generic accents — use system blue, gray, or label colors。",
+        "避免：roll your own Play button when web-accessible icon {play.fill} exists。"
+      ]
+    },
+    "radius": {
+      "control": "8px",
+      "card": "8px",
+      "preview": "8px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "spacing": {
+      "xxs": "4px",
+      "xs": "16px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "media",
+      "navigation": [
+        "推荐",
+        "收藏",
+        "我的"
+      ],
+      "primaryAction": "开始播放"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

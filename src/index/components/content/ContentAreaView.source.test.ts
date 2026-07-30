@@ -830,7 +830,7 @@ describe('ContentAreaView review zoom source', () => {
     const topActionsSegment = getSourceSegment(
       startGuideSegment,
       '{shouldShowTopActions ? (',
-      '<div className="flex min-h-[76vh]',
+      '<div className="w-full">',
     );
     const prototypeCasesSegment = getSourceSegment(
       startGuideSegment,
@@ -864,6 +864,25 @@ describe('ContentAreaView review zoom source', () => {
     expect(startGuideSegment).not.toContain('hover:underline');
   });
 
+  it('keeps placeholder header actions on a separate row below the desktop xl breakpoint', () => {
+    const source = readContentAreaViewSource();
+    const startGuideSegment = getSourceSegment(
+      source,
+      'function StartGuide({',
+      'export default function ContentArea({',
+    );
+    const contentStartIndex = startGuideSegment.indexOf('<div className="flex min-h-[76vh]');
+    const topActionsIndex = startGuideSegment.indexOf('{shouldShowTopActions ? (');
+    const titleIndex = startGuideSegment.indexOf('我们先从哪里开始呢?');
+
+    expect(contentStartIndex).toBeGreaterThan(-1);
+    expect(topActionsIndex).toBeGreaterThan(contentStartIndex);
+    expect(topActionsIndex).toBeLessThan(titleIndex);
+    expect(startGuideSegment).toContain(
+      'className="z-10 mb-5 flex w-full flex-wrap items-center justify-center gap-2 text-[12px] xl:absolute xl:right-6 xl:top-5 xl:mb-0 xl:w-auto xl:justify-end"',
+    );
+  });
+
   it('threads the resource upload start action through content area props', () => {
     const source = readContentAreaViewSource();
     const propsSegment = getSourceSegment(
@@ -885,6 +904,23 @@ describe('ContentAreaView review zoom source', () => {
     expect(propsSegment).toContain('onUploadResourceFiles?: () => void;');
     expect(contentDestructureSegment).toContain('onUploadResourceFiles,');
     expect(resourceStartBranch).toContain('onUploadResourceFiles={onUploadResourceFiles}');
+  });
+
+  it('returns canvas assistant submission success to the start-page composer', () => {
+    const source = readContentAreaViewSource();
+    const startSubmitSegment = getSourceSegment(
+      source,
+      'const handleSubmitPrototypeStartRequest = async (request: CanvasAiGenerationRequest) => {',
+      '    if (projectAccessDeniedReason) {',
+    );
+
+    expect(source).toContain('onSubmitPrototypeStartRequest?: (request: CanvasAiGenerationRequest) => boolean | Promise<boolean>;');
+    expect(startSubmitSegment).toContain('const submitCanvasAssistantPrompt = async (submittedRequest: CanvasAiGenerationRequest): Promise<boolean> => {');
+    expect(startSubmitSegment).toContain('const result = await onSubmitCanvasAssistantPrompt?.(submittedRequest);');
+    expect(startSubmitSegment).toContain("return result === true || (typeof result === 'object' && result?.ok === true);");
+    expect(startSubmitSegment).toContain('return submitCanvasAssistantPrompt(request);');
+    expect(startSubmitSegment).toContain('return false;');
+    expect(startSubmitSegment).toContain('return submitCanvasAssistantPrompt(submittedRequest);');
   });
 
   it('adds a PNG-only transparent background switch to image start settings', () => {
@@ -1077,20 +1113,16 @@ describe('ContentAreaView review zoom source', () => {
     expect(submitHandlerSegment).toContain('await apiService.startPlaceholderPrototypeGeneration(startItem.name, requireProjectScope(activeProjectId));');
     expect(submitHandlerSegment).toContain('const refreshedPrototypes = await onRefreshPrototypes?.(startItem.name);');
     expect(submitHandlerSegment).toContain("setViewMode?.('demo');");
-    expect(submitHandlerSegment).toContain('return;');
     expect(submitHandlerSegment).toContain("setViewMode?.('canvas');");
-    expect(submitHandlerSegment).toContain('await onSubmitCanvasAssistantPrompt?.(submittedRequest);');
+    expect(submitHandlerSegment).toContain('return submitCanvasAssistantPrompt(submittedRequest);');
     expect(submitHandlerSegment.indexOf('await apiService.startPlaceholderPrototypeGeneration(startItem.name, requireProjectScope(activeProjectId));'))
       .toBeLessThan(submitHandlerSegment.indexOf('const refreshedPrototypes = await onRefreshPrototypes?.(startItem.name);'));
     expect(submitHandlerSegment.indexOf('const refreshedPrototypes = await onRefreshPrototypes?.(startItem.name);'))
       .toBeLessThan(submitHandlerSegment.indexOf("setViewMode?.('demo');"));
-    const pageSubmitIndex = submitHandlerSegment.indexOf('await onSubmitCanvasAssistantPrompt?.(submittedRequest);');
-    const pageReturnIndex = submitHandlerSegment.indexOf('return;', pageSubmitIndex);
+    const pageSubmitIndex = submitHandlerSegment.indexOf('return submitCanvasAssistantPrompt(submittedRequest);');
     expect(submitHandlerSegment.indexOf("setViewMode?.('demo');"))
       .toBeLessThan(pageSubmitIndex);
     expect(pageSubmitIndex)
-      .toBeLessThan(pageReturnIndex);
-    expect(pageReturnIndex)
       .toBeLessThan(submitHandlerSegment.indexOf("setViewMode?.('canvas');"));
     expect(source).not.toContain('const [pendingCanvasAiGenerationRequest, setPendingCanvasAiGenerationRequest] = useState<CanvasAiGenerationRequest | null>(null);');
     expect(source).not.toContain('const submitSceneDefinition = getCanvasAiSceneDefinition(request.scene);');
@@ -1136,11 +1168,11 @@ describe('ContentAreaView review zoom source', () => {
     expect(submitHandlerSegment).toContain("if (request.scene === 'page' && startItem?.name)");
     expect(submitHandlerSegment).toContain('await apiService.startPlaceholderPrototypeGeneration(startItem.name, requireProjectScope(activeProjectId));');
     expect(submitHandlerSegment).toContain('const refreshedPrototypes = await onRefreshPrototypes?.(startItem.name);');
-    expect(submitHandlerSegment).toContain('await onSubmitCanvasAssistantPrompt?.(submittedRequest);');
+    expect(submitHandlerSegment).toContain('return submitCanvasAssistantPrompt(submittedRequest);');
     expect(submitHandlerSegment.indexOf('await onCreatePrototypeForDraftStart?.()'))
       .toBeLessThan(submitHandlerSegment.indexOf("if (request.scene === 'page' && startItem?.name)"));
     expect(submitHandlerSegment.indexOf('await apiService.startPlaceholderPrototypeGeneration(startItem.name, requireProjectScope(activeProjectId));'))
-      .toBeLessThan(submitHandlerSegment.indexOf('await onSubmitCanvasAssistantPrompt?.(submittedRequest);'));
+      .toBeLessThan(submitHandlerSegment.indexOf('return submitCanvasAssistantPrompt(submittedRequest);'));
     expect(draftStartBranch).toContain('item={draftPrototypeStartItem}');
     expect(draftStartBranch).toContain('draftActive={prototypeStartDraftActive && !selectedItem}');
   });

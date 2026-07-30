@@ -1,0 +1,283 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/social/reddit/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-reddit-mobile",
+    "slug": "reddit-mobile",
+    "brand": "Reddit",
+    "titleZh": "Reddit 主题",
+    "titleEn": "Reddit",
+    "descriptionZh": "Reddit 的 Design.md 主题展示，围绕移动端、社交与社区组织页面。",
+    "descriptionEn": "Reddit mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "社交与社区"
+    ],
+    "distributionTags": [
+      "移动端",
+      "社交与社区"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/reddit-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/reddit/id1064216828?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/reddit/id1064216828?uo=4",
+          "marketId": "1064216828",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/35/48/b4/3548b4e1-e380-b504-b809-96511057c828/c754066e-6338-43b4-8b15-b995646437f9_Reddit_SS_Brand_Update_Colorful_Set_5.5_4.png/720x1280bb.webp",
+          "collectedAt": "2026-07-27T19:27:38.846Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "ea42706a3128e32bb88e2e2f0f966b41c8ff090b5e822d20cec18ede174e71eb",
+          "byteLength": 41196,
+          "width": 720,
+          "height": 1280
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/reddit/id1064216828?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/reddit/id1064216828?uo=4",
+          "marketId": "1064216828",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/ed/84/a7/ed84a7ec-7d78-c117-7e09-8ec911800018/b58a74df-0fe7-4816-be96-153438344906_Reddit_SS_Brand_Update_Colorful_Set_5.5_2.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:38.846Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "f4df73779cb256bfee65c6014c2d1eaa3f97698e0f1de082325a5b15f7a7f8e7",
+          "byteLength": 38628,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/reddit/id1064216828?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/reddit/id1064216828?uo=4",
+          "marketId": "1064216828",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/7b/92/d7/7b92d7f0-6281-71d9-0891-e5499f4ca57d/aa03a0e1-d00d-42ae-ba45-f419bbc04c70_Reddit_SS_Brand_Update_Colorful_Set_5.5_3.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:38.846Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "822c4ffa7b40c321c267c0479fa7b2a247ab4f0b989c4690427e4016998a557d",
+          "byteLength": 34454,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#FF4500",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Inter",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Inter",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Reddit 主题",
+    "brandAlias": "Reddit",
+    "description": "Reddit 的 Design.md 主题展示，围绕移动端、社交与社区组织页面。",
+    "descriptionEn": "Reddit mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "社交与社区"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#FF4500",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#EDEFF1",
+        "cssValue": "#EDEFF1",
+        "description": "Divider (`#EDEFF1`): Hairline between cards, between comments."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#343536",
+        "cssValue": "#343536",
+        "description": "Surface 2 (Dark) (`#343536`): Hovered / pressed card state, input backgrounds."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#FFFFFF",
+        "cssValue": "#FFFFFF",
+        "description": "Card Surface (`#FFFFFF`): Post cards and comment threads sit on white."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Inter",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use {#FF4500} (Reddit Orange-Red) as the single brand accent — logo, key CTAs。",
+        "建议：Use the semantic vote pair: {#FF8717} upvote orange and {#7193FF} downvote blue-purple。",
+        "建议：Show the vote column on EVERY post and comment — it's the brand。",
+        "建议：Keep cards flat — use corner radius (16pt in card view, 0pt in classic) not shadows。",
+        "建议：Render Markdown inline: bold, italic, quote, code, link。"
+      ],
+      "dont": [
+        "避免：flip the semantic vote colors — upvote MUST be warm (orange) and downvote cool (blue-purple)。",
+        "避免：put the vote column anywhere other than left of post content (or below media in media-first)。",
+        "避免：use drop shadows on post cards — Reddit is flat。",
+        "避免：skip the subreddit {r/name} pill — every post must identify its community。",
+        "避免：use brand red {#FF4500} for the upvote — that's {#FF8717} orange。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "feed",
+      "navigation": [
+        "首页",
+        "发现",
+        "我的"
+      ],
+      "primaryAction": "发布动态"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

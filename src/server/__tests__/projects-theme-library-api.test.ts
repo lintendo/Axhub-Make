@@ -10,7 +10,6 @@ import {
   cleanupProjectApiTestRoots,
   createTempRoot,
   registerProject,
-  scopeProjectApiUrl,
   setActiveProject,
   startTestServer,
   writeProjectMetadata,
@@ -46,7 +45,7 @@ const MIGRATED_GETDESIGN_TEMPLATE_SYSTEMS = [
   'meta',
 ];
 
-function useLocalThemeLibraryFixture(): void {
+function useLocalThemeLibraryFixture(options: { includeMobile?: boolean } = {}): void {
   const workspaceRoot = createTempRoot('axhub-make-theme-library-workspace-');
   const makeTemplateRoot = path.join(workspaceRoot, 'apps', 'make-template');
   const designSystems = MIGRATED_GETDESIGN_TEMPLATE_SYSTEMS.map((slug) => {
@@ -76,6 +75,29 @@ function useLocalThemeLibraryFixture(): void {
       description: `${slug} fixture design system`,
     };
   });
+  if (options.includeMobile) {
+    const slug = 'snapchat-mobile';
+    const sourcePath = `design-systems/${slug}`;
+    const sourceDir = path.join(makeTemplateRoot, sourcePath);
+    fs.mkdirSync(path.join(sourceDir, 'assets'), { recursive: true });
+    fs.writeFileSync(path.join(sourceDir, 'index.tsx'), 'export default function SnapchatMobile() { return null; }\n', 'utf8');
+    fs.writeFileSync(path.join(sourceDir, 'designToken.json'), JSON.stringify({ name: 'Snapchat Mobile' }, null, 2), 'utf8');
+    fs.writeFileSync(path.join(sourceDir, 'globals.css'), ':root { --fixture-color: #fffc00; }\n', 'utf8');
+    fs.writeFileSync(path.join(sourceDir, 'DESIGN.md'), '# Snapchat Mobile\n', 'utf8');
+    fs.writeFileSync(path.join(sourceDir, 'SOURCE.md'), '# Sources\n', 'utf8');
+    fs.writeFileSync(path.join(sourceDir, 'assets', 'cover.svg'), '<svg xmlns="http://www.w3.org/2000/svg" />\n', 'utf8');
+    designSystems.push({
+      id: slug,
+      title: 'Snapchat Mobile',
+      slug,
+      sourcePath,
+      entryPath: `${sourcePath}/index.tsx`,
+      tokenPath: `${sourcePath}/designToken.json`,
+      stylePath: `${sourcePath}/globals.css`,
+      coverPath: `${sourcePath}/assets/cover.svg`,
+      description: 'Mobile design system fixture',
+    });
+  }
   fs.mkdirSync(makeTemplateRoot, { recursive: true });
   fs.writeFileSync(
     path.join(makeTemplateRoot, 'design-systems.json'),
@@ -90,6 +112,16 @@ afterEach(() => {
   vi.restoreAllMocks();
   cleanupProjectApiTestRoots();
 });
+
+function scopeProjectApiUrl(projectRoot: string, rawUrl: string): string {
+  const metadataPath = getProjectMetadataPath(projectRoot);
+  const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+  const projectId = String(metadata?.project?.id || '').trim();
+  if (!projectId) throw new Error(`Missing project id in ${metadataPath}`);
+  const url = new URL(rawUrl);
+  if (!url.searchParams.has('projectId')) url.searchParams.set('projectId', projectId);
+  return url.toString();
+}
 
 function writeThemeImportEnabledProject(projectRoot: string, id = 'theme-library-client'): void {
   writeProjectMetadata(projectRoot, {
@@ -507,6 +539,45 @@ describe('make-server project theme library APIs', () => {
         }),
       ]);
       expect(metadata.orders.themes).toEqual(['hp']);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('imports a mobile local make-template design system into the declared themes target', async () => {
+    const projectRoot = createTempRoot();
+    writeThemeImportEnabledProject(projectRoot, 'theme-mobile-local-import-client');
+    useLocalThemeLibraryFixture({ includeMobile: true });
+    const server = await startThemeLibraryTestServer(projectRoot);
+
+    try {
+      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library`));
+      expect(listed.status).toBe(200);
+      expect(listed.body.designSystems).toHaveLength(MIGRATED_GETDESIGN_TEMPLATE_SYSTEMS.length + 1);
+      expect(listed.body.designSystems).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'snapchat-mobile', slug: 'snapchat-mobile', canDirectImport: true }),
+      ]));
+
+      const imported = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library/import`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ designSystemId: 'snapchat-mobile' }),
+      });
+
+      expect(imported).toMatchObject({
+        status: 200,
+        body: {
+          success: true,
+          projectId: 'theme-mobile-local-import-client',
+          designSystemId: 'snapchat-mobile',
+          folderName: 'snapchat-mobile',
+          path: 'themes/snapchat-mobile',
+          filePath: 'content/themes/snapchat-mobile/index.tsx',
+        },
+      });
+      for (const file of ['index.tsx', 'designToken.json', 'globals.css', 'DESIGN.md', 'SOURCE.md', 'assets/cover.svg']) {
+        expect(fs.existsSync(path.join(projectRoot, 'content/themes/snapchat-mobile', file))).toBe(true);
+      }
     } finally {
       await server.close();
     }

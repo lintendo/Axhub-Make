@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+.dmb-page.doordash-theme {
+  color-scheme: light;
+
+  --dmb-bg: #FFFFFF;
+  --dmb-surface: #FFFFFF;
+  --dmb-accent: #EB1700;
+  --dmb-accent-pressed: #C31500;
+  --dmb-accent-tint: #FFEBE8;
+  --dmb-accent-contrast: #FFFFFF;
+  --dmb-link: #0066E3;
+  --dmb-muted: #F7F7F7;
+  --dmb-ink: #191919;
+  --dmb-ink-muted: #757575;
+  --dmb-ink-subtle: #AFAFAF;
+  --dmb-border: #E5E5E5;
+  --dmb-border-sample-bg: #FFFFFF;
+
+  --dmb-tab-bg: #F7F7F7;
+  --dmb-tab-border: #E5E5E5;
+  --dmb-tab-color: #757575;
+  --dmb-tab-active-bg: #191919;
+  --dmb-tab-active-border: #191919;
+  --dmb-tab-active-color: #FFFFFF;
+
+  --dmb-radius-xs: 4px;
+  --dmb-radius-control: 12px;
+  --dmb-radius-card: 16px;
+  --dmb-radius-preview: 16px;
+  --dmb-radius-pill: 28px;
+
+  --dmb-spacing-2xs: 2px;
+  --dmb-spacing-xs: 4px;
+  --dmb-spacing-sm: 8px;
+  --dmb-spacing-md: 12px;
+  --dmb-spacing-lg: 16px;
+  --dmb-spacing-xl: 20px;
+  --dmb-spacing-2xl: 24px;
+  --dmb-spacing-3xl: 32px;
+  --dmb-spacing-4xl: 40px;
+  --dmb-spacing-5xl: 56px;
+  --dmb-spacing-6xl: 72px;
+
+  --dmb-font-display: "TT Norms Pro", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --dmb-font-body: "TT Norms Pro", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --dmb-font-mono: "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.dmb-page.doordash-theme .dmb-token-grid button,
+.dmb-page.doordash-theme .dmb-component-strip button {
+  border-color: var(--dmb-accent);
+  border-radius: 28px;
+  background: var(--dmb-accent);
+  color: #FFFFFF;
+  font-weight: 700;
+}
+
+.dmb-page.doordash-theme .dmb-token-grid button:hover,
+.dmb-page.doordash-theme .dmb-token-grid button:focus-visible,
+.dmb-page.doordash-theme .dmb-component-strip button:hover,
+.dmb-page.doordash-theme .dmb-component-strip button:focus-visible {
+  border-color: var(--dmb-accent-pressed);
+  background: var(--dmb-accent-pressed);
+}
+
+.dmb-page.doordash-theme .dmb-token-grid .dmb-text-button {
+  border-color: #E5E5E5;
+  background: transparent;
+  color: #191919;
+}
+
+.dmb-page.doordash-theme .dmb-tags span,
+.dmb-page.doordash-theme .dmb-muted,
+.dmb-page.doordash-theme .dmb-token-grid input {
+  border-color: #E5E5E5;
+  background: #F7F7F7;
+}
+
+.dmb-page.doordash-theme .dmb-token-card,
+.dmb-page.doordash-theme .dmb-type-list article,
+.dmb-page.doordash-theme .dmb-component-strip,
+.dmb-page.doordash-theme .dmb-component-grid,
+.dmb-page.doordash-theme .dmb-spacing-scale,
+.dmb-page.doordash-theme .dmb-radius-grid article,
+.dmb-page.doordash-theme .dmb-shadow-grid article,
+.dmb-page.doordash-theme .dmb-border-grid article,
+.dmb-page.doordash-theme .dmb-component-grid article {
+  border-color: #E5E5E5;
+  background: #FFFFFF;
+}
+
+.dmb-page.doordash-theme .dmb-do {
+  border-color: color-mix(in srgb, #008B4A 28%, transparent);
+  background: color-mix(in srgb, #008B4A 8%, #FFFFFF);
+  color: #008B4A;
+}
+
+.dmb-page.doordash-theme .dmb-dont {
+  border-color: color-mix(in srgb, #EB1700 28%, transparent);
+  background: #FFEBE8;
+  color: #C31500;
+}
+
+.dmb-page.doordash-theme .dmb-lightbox > button {
+  border-radius: 28px;
+  background: #EB1700;
+}

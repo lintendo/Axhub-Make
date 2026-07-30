@@ -22,6 +22,13 @@ describe('project setup errors', () => {
     })).toBe('克隆项目失败：Git 克隆失败');
   });
 
+  it('formats an already registered project path', () => {
+    expect(formatMakeClientProjectError({
+      code: 'MAKE_PROJECT_PATH_CONFLICT',
+      error: 'Project path already registered',
+    })).toBe('该项目路径已添加');
+  });
+
   it('builds a novice-friendly prompt from make client startup diagnostics', () => {
     const prompt = buildMakeClientStartupFailurePrompt({
       projectId: 'demo-project',

@@ -735,7 +735,6 @@ export type CommentaryHostToolbarAction =
   | ({ type: 'clear-edits' } & CommentaryClearEditsOptions)
   | { type: 'toggle-property-panel'; open?: boolean }
   | { type: 'set-active-agent'; agent: WebEditorAgentProvider | null }
-  | { type: 'open-ai-settings' }
   | { type: 'get-ai-execution-config'; preferAcpDefaultWorkspace?: boolean }
   | {
       type: 'set-ai-execution-config';
@@ -748,16 +747,11 @@ export type CommentaryHostToolbarAction =
   | { type: 'record-ai-execution-recent-workspace'; path: string }
   | { type: 'remove-ai-execution-recent-workspace'; path: string }
   | { type: 'get-acp-ui-status' }
+  | { type: 'play-notification-sound'; sound: 'reminder' | 'completion' }
   | { type: 'save-html-all' }
   | { type: 'save-html-text' }
   | { type: 'save-html-style' }
   | { type: 'clear-html-style' }
-  | { type: 'get-commentary-skill-settings' }
-  | {
-      type: 'set-commentary-skill-settings';
-      selectedSkillIds?: string[];
-      customSkills?: CommentarySkillOption[];
-    }
   | { type: 'disconnect-agent' }
   | { type: 'copy-skill-install-prompt' }
   | { type: 'copy-global-panel-prompt' }
@@ -859,6 +853,10 @@ export interface CommentaryHostOptions {
   onElementToolAction?: (tool: CommentaryElementTool, element: Element) => void | Promise<void>;
   /** Whether local annotation markdown editing is available for the selected element. */
   canEditAnnotationMarkdown?: (element: Element | null) => boolean;
+  /** Return a host-specific reason that prevents creating an annotation for the selected element. */
+  getCreateAnnotationBlockReason?: (element: Element | null) => string | undefined;
+  /** Select whether the Markdown composer edits annotation metadata or document source. */
+  annotationMarkdownEditorKind?: 'annotation' | 'document-source';
   /** Return an edit URL for the selected annotation document, or an empty value to hide the document edit entry. */
   getAnnotationDocumentEditUrl?: (element: Element | null) => string | null | undefined;
   /** Read the local annotation markdown bound to the selected element. */
@@ -1043,6 +1041,8 @@ export interface CommentaryApi {
    * Triggers deselect and broadcasts null selection.
    */
   clearSelection: () => void;
+  /** Select a connected host proxy target and open the existing comment card. */
+  openCommentTarget: (element: Element) => Promise<boolean>;
   /** Acknowledge that current text edits have been saved externally */
   acknowledgeSavedTextChanges: () => void;
   /** Acknowledge that current style edits have been saved or cleared externally */

@@ -204,6 +204,18 @@ export function applyCanvasGenerationDisplayPrompt({
   return true;
 }
 
+export function shouldSubmitCanvasGenerationDisplayPrompt({
+  key,
+  shiftKey,
+  isComposing,
+}: {
+  key: string;
+  shiftKey: boolean;
+  isComposing: boolean;
+}): boolean {
+  return key === 'Enter' && !shiftKey && !isComposing;
+}
+
 type CanvasGenerationDisplayPromptCardsRenderer = (actions: {
   disabled: boolean;
   selectPrompt: (prompt: string) => void;
@@ -1356,10 +1368,12 @@ function CanvasComposerSendButtonWithCopyMenu({
   canCopy,
   disabled,
   onSubmit,
+  submitting,
 }: {
   canCopy: boolean;
   disabled: boolean;
   onSubmit: () => void;
+  submitting: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const hoverTimerRef = useRef<number | null>(null);
@@ -1402,24 +1416,26 @@ function CanvasComposerSendButtonWithCopyMenu({
             onFocus={scheduleOpen}
             onBlur={closeTooltip}
           >
-            <ComposerPrimitive.Send asChild>
-              <Button
-                type="button"
-                variant="default"
-                size="icon"
-                className={cn(
-                  'aui-composer-send inline-flex size-8 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed',
-                  disabled
-                    ? 'bg-slate-100 text-slate-400 opacity-60'
-                    : 'bg-slate-900 text-white hover:bg-slate-800',
-                )}
-                aria-label="发送"
-                disabled={disabled}
-                onClick={onSubmit}
-              >
+            <Button
+              type="button"
+              variant="default"
+              size="icon"
+              className={cn(
+                'aui-composer-send inline-flex size-8 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed',
+                disabled
+                  ? 'bg-slate-100 text-slate-400 opacity-60'
+                  : 'bg-slate-900 text-white hover:bg-slate-800',
+              )}
+              aria-label={submitting ? '发送中' : '发送'}
+              disabled={disabled}
+              onClick={onSubmit}
+            >
+              {submitting ? (
+                <Loader2 className="aui-composer-send-icon size-4 animate-spin" aria-hidden="true" />
+              ) : (
                 <ArrowUp className="aui-composer-send-icon size-4" />
-              </Button>
-            </ComposerPrimitive.Send>
+              )}
+            </Button>
           </span>
         </TooltipTrigger>
         <TooltipContent side="top" align="end" sideOffset={8} className="z-[1400] w-44 rounded-md p-2">
@@ -1587,9 +1603,10 @@ function CanvasGenerationDisplayComposerContent({
   const [localContextItems, setLocalContextItems] = useState<ContextItem[]>([]);
   const [projectResourceContextItems, setProjectResourceContextItems] = useState<ContextItem[]>([]);
   const [optimizingPrompt, setOptimizingPrompt] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [displayText, setDisplayText] = useState('');
   const visibleContextItems = [...localContextItems, ...projectResourceContextItems];
-  const controlsDisabled = disabled || optimizingPrompt;
+  const controlsDisabled = disabled || optimizingPrompt || submitting;
   const hasDisplayPromptText = displayText.trim().length > 0;
   const initialReferenceImagesKey = useMemo(
     () => JSON.stringify(initialReferenceImages ?? []),
@@ -1616,27 +1633,35 @@ function CanvasGenerationDisplayComposerContent({
     if (controlsDisabled) return;
     const text = inputRef.current?.value.trim() ?? '';
     if (!text) return;
-    const attachmentSelection = await resolveComposerAttachmentSubmitSelection(displayReferenceAttachments);
-    const submitResult = await onSubmitText?.(text, {
-      ...attachmentSelection,
-      localContextRefs: currentLocalContextRefsRef.current,
-    });
-    if (submitResult === false) {
+    setSubmitting(true);
+    try {
+      const attachmentSelection = await resolveComposerAttachmentSubmitSelection(displayReferenceAttachments);
+      const submitResult = await onSubmitText?.(text, {
+        ...attachmentSelection,
+        localContextRefs: currentLocalContextRefsRef.current,
+      });
+      if (submitResult === false) {
+        persistDisplayDraft(text);
+        return;
+      }
+      const storage = getCanvasGenerationComposerDraftStorage();
+      clearCanvasGenerationComposerDraft(storage, draftStorageKey);
+      if (inputRef.current) {
+        inputRef.current.value = '';
+      }
+      setDisplayText('');
+      await aui.composer().clearAttachments();
+      setProjectResourceSelectedKeys(new Set());
+      setProjectResourceContextItems([]);
+      currentLocalContextRefsRef.current = [];
+      currentLocalContextItemsRef.current = [];
+      syncDisplayContextItems([], []);
+    } catch (error) {
       persistDisplayDraft(text);
-      return;
+      toast.error(error instanceof Error ? error.message : '发送失败');
+    } finally {
+      setSubmitting(false);
     }
-    const storage = getCanvasGenerationComposerDraftStorage();
-    clearCanvasGenerationComposerDraft(storage, draftStorageKey);
-    if (inputRef.current) {
-      inputRef.current.value = '';
-    }
-    setDisplayText('');
-    await aui.composer().clearAttachments();
-    setProjectResourceSelectedKeys(new Set());
-    setProjectResourceContextItems([]);
-    currentLocalContextRefsRef.current = [];
-    currentLocalContextItemsRef.current = [];
-    syncDisplayContextItems([], []);
   }, [aui, controlsDisabled, displayReferenceAttachments, draftStorageKey, onSubmitText, persistDisplayDraft, syncDisplayContextItems]);
   useEffect(() => {
     if (!draftStorageKey) return;
@@ -1814,7 +1839,11 @@ function CanvasGenerationDisplayComposerContent({
       }
       return;
     }
-    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+    if (!shouldSubmitCanvasGenerationDisplayPrompt({
+      key: event.key,
+      shiftKey: event.shiftKey,
+      isComposing: event.nativeEvent.isComposing,
+    })) return;
     event.preventDefault();
     void submitDisplayText();
   }, [handleCopyPrompt, submitDisplayText]);
@@ -1901,7 +1930,7 @@ function CanvasGenerationDisplayComposerContent({
               onPaste={handleDisplayPaste}
             />
             <span className="sr-only" aria-live="polite">
-              {optimizingPrompt ? '正在优化提示词' : ''}
+              {submitting ? '正在发送' : optimizingPrompt ? '正在优化提示词' : ''}
             </span>
             <div className={cn(controlsDisabled ? 'pointer-events-none opacity-60' : '')}>
               <ComposerAttachments />
@@ -1973,6 +2002,7 @@ function CanvasGenerationDisplayComposerContent({
                   disabled={controlsDisabled || !hasDisplayPromptText}
                   canCopy={Boolean(onCopyPrompt) && hasDisplayPromptText}
                   onSubmit={() => { void submitDisplayText(); }}
+                  submitting={submitting}
                 />
               </div>
             </div>

@@ -757,7 +757,7 @@ export function handleAssistantPromptIde(
         sendJson(res, {
           success: true,
           mode,
-          message: 'ACP UI 启动命令已触发',
+          message: 'ACP UI 启动或复用检查已完成',
           runtime: createAssistantRuntimeResponse({
             runtime,
             projectId: context.project.id,

@@ -1,0 +1,301 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/fitness/fitbit/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-fitbit-mobile",
+    "slug": "fitbit-mobile",
+    "brand": "Fitbit",
+    "titleZh": "Fitbit 主题",
+    "titleEn": "Fitbit",
+    "descriptionZh": "Fitbit 的 Design.md 主题展示，围绕移动端、健康与运动组织页面。",
+    "descriptionEn": "Fitbit mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "健康与运动"
+    ],
+    "distributionTags": [
+      "移动端",
+      "健康与运动"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/fitbit-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/google-health-fitbit/id462638897",
+          "officialPageUrl": "https://apps.apple.com/us/app/google-health-fitbit/id462638897",
+          "marketId": "462638897",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/be/52/35/be523521-1e31-5c62-b819-35e83e87d217/download__U00289_U0029.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:01.538Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "8293592bd0ec87c29d940d0fe6f4a7ff9b212b5711929a25e760d71b06d2118a",
+          "byteLength": 48102,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/google-health-fitbit/id462638897",
+          "officialPageUrl": "https://apps.apple.com/us/app/google-health-fitbit/id462638897",
+          "marketId": "462638897",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/09/6b/5f/096b5f41-f8f8-ab5b-4f7a-0a899017e68d/download__U002810_U0029.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:01.538Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "9ae9db98cfeb523b36cf29d061a152138d0495736a6948185c00f71eae2df1b8",
+          "byteLength": 38632,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/google-health-fitbit/id462638897",
+          "officialPageUrl": "https://apps.apple.com/us/app/google-health-fitbit/id462638897",
+          "marketId": "462638897",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/21/2a/c8/212ac88a-55a0-d738-6c21-a3148543f875/download__U002811_U0029.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:17:01.538Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "2d5a9be8db91ed6b7e3160056ce55c2c442ecbe217f829c4681e430c1518df2a",
+          "byteLength": 45808,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#001017",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Roboto",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Roboto",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Fitbit 主题",
+    "brandAlias": "Fitbit",
+    "description": "Fitbit 的 Design.md 主题展示，围绕移动端、健康与运动组织页面。",
+    "descriptionEn": "Fitbit mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "健康与运动"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#001017",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#143E50",
+        "cssValue": "#143E50",
+        "description": "Divider (`#143E50`): 1pt hairlines."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#DCE7E9",
+        "cssValue": "#DCE7E9",
+        "description": "Divider Light (`#DCE7E9`): Hairline dividers."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#21D9CE",
+        "cssValue": "#21D9CE",
+        "description": "The brand color is Fitbit Teal (`#00B0B9`) — it is the logo, the steps/activity color, the primary CTA, and the active tab. On dark backgrounds it brightens to a more luminous teal (`#21D9CE`) for text and links so it never muddies. The defining system characteristic is per-metric color coding: every health metric owns one fixed hue and keeps it everywhere it appears (tile icon, ring, chart line, detail screen). Steps/Activity = teal `#00B0B9`, Heart Rate = coral `#FF6B81`, Sleep = purple `#7C5CFF`, Daily Readiness = lime `#B8E986`, Active Zone Minutes = orange `#FF8A3D`, Calories = gold `#FFC233`. This means a user can recognize \"that's my sleep data\" purely by the purple, anywhere in the app — color is a navigational and mnemonic system, not decoration."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#FF6B81",
+        "cssValue": "#FF6B81",
+        "description": "The brand color is Fitbit Teal (`#00B0B9`) — it is the logo, the steps/activity color, the primary CTA, and the active tab. On dark backgrounds it brightens to a more luminous teal (`#21D9CE`) for text and links so it never muddies. The defining system characteristic is per-metric color coding: every health metric owns one fixed hue and keeps it everywhere it appears (tile icon, ring, chart line, detail screen). Steps/Activity = teal `#00B0B9`, Heart Rate = coral `#FF6B81`, Sleep = purple `#7C5CFF`, Daily Readiness = lime `#B8E986`, Active Zone Minutes = orange `#FF8A3D`, Calories = gold `#FFC233`. This means a user can recognize \"that's my sleep data\" purely by the purple, anywhere in the app — color is a navigational and mnemonic system, not decoration."
+      },
+      {
+        "label": "边框 5 - Border 5",
+        "value": "#B8E986",
+        "cssValue": "#B8E986",
+        "description": "The brand color is Fitbit Teal (`#00B0B9`) — it is the logo, the steps/activity color, the primary CTA, and the active tab. On dark backgrounds it brightens to a more luminous teal (`#21D9CE`) for text and links so it never muddies. The defining system characteristic is per-metric color coding: every health metric owns one fixed hue and keeps it everywhere it appears (tile icon, ring, chart line, detail screen). Steps/Activity = teal `#00B0B9`, Heart Rate = coral `#FF6B81`, Sleep = purple `#7C5CFF`, Daily Readiness = lime `#B8E986`, Active Zone Minutes = orange `#FF8A3D`, Calories = gold `#FFC233`. This means a user can recognize \"that's my sleep data\" purely by the purple, anywhere in the app — color is a navigational and mnemonic system, not decoration."
+      },
+      {
+        "label": "边框 6 - Border 6",
+        "value": "#EAF6F9",
+        "cssValue": "#EAF6F9",
+        "description": "Text Primary Dark (`#EAF6F9`): Primary text, hero numbers (near-white with a faint cyan cast)."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Roboto",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use the deep teal-black canvas {#001017}/{#002A3A} — cyan undertone, not neutral gray。",
+        "建议：Make Fitbit Teal {#00B0B9} the brand/steps/CTA; brighten to {#21D9CE} for text/links on dark。",
+        "建议：Give every metric its fixed hue and keep it everywhere (tile, ring, chart, detail) — color is a mnemonic。",
+        "建议：Make the big number the visual hero of every card (40–44pt bold, tight tracking)。",
+        "建议：Use progress rings as the recurring shape language for goals。"
+      ],
+      "dont": [
+        "避免：use a neutral-gray dark theme — the canvas must carry the teal cast。",
+        "避免：let metrics share or swap colors — sleep is always purple, HR always coral。",
+        "避免：make labels/units compete with the hero number — keep them quieter and smaller。",
+        "避免：use clinical phrasing (\"78% goal completion\") — Fitbit speaks like a kind coach。",
+        "避免：use sharp or small radii — cards are 16–24pt, buttons are full pills。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "health",
+      "navigation": [
+        "今日",
+        "趋势",
+        "我的"
+      ],
+      "primaryAction": "记录活动"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

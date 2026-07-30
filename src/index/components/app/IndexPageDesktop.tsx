@@ -1,5 +1,6 @@
 import React from 'react';
 import NewSidebar from '../sidebar/NewSidebar';
+import { ResponsiveSidebarProvider } from '../sidebar/ResponsiveSidebarController';
 import PresentationArea from '../content/PresentationArea';
 import AssistantPanel from './AssistantPanel';
 import type { AssistantIframeRenderEntry } from './AssistantPanel';
@@ -34,31 +35,33 @@ export default function IndexPageDesktop({
     assistantPanel,
 }: IndexPageDesktopProps) {
     return (
-        <div className="pc-layout">
-            <div style={{ display: 'flex', height: '100vh', minHeight: 0 }}>
-                <NewSidebar {...sidebarProps} />
+        <ResponsiveSidebarProvider>
+            <div className="pc-layout">
+                <div style={{ display: 'flex', height: '100vh', minHeight: 0 }}>
+                    <NewSidebar {...sidebarProps} />
 
-                <div style={{ display: 'flex', flex: 1, minWidth: 0 }}>
-                    <PresentationArea {...presentationAreaProps} />
+                    <div style={{ display: 'flex', flex: 1, minWidth: 0 }}>
+                        <PresentationArea {...presentationAreaProps} />
 
-                    {assistantPanel.mounted ? (
-                        <AssistantPanel
-                            mounted={assistantPanel.mounted}
-                            visible={assistantPanel.visible}
-                            width={assistantPanel.width}
-                            minWidth={assistantPanel.minWidth}
-                            maxWidth={assistantPanel.maxWidth}
-                            iframeEntries={assistantPanel.iframeEntries}
-                            activeIframeKey={assistantPanel.activeIframeKey}
-                            onIframeRef={assistantPanel.onIframeRef}
-                            onIframeLoad={assistantPanel.onIframeLoad}
-                            onResize={assistantPanel.onResize}
-                            onAddContextItems={assistantPanel.onAddContextItems}
-                            onToggle={assistantPanel.onToggle}
-                        />
-                    ) : null}
+                        {assistantPanel.mounted ? (
+                            <AssistantPanel
+                                mounted={assistantPanel.mounted}
+                                visible={assistantPanel.visible}
+                                width={assistantPanel.width}
+                                minWidth={assistantPanel.minWidth}
+                                maxWidth={assistantPanel.maxWidth}
+                                iframeEntries={assistantPanel.iframeEntries}
+                                activeIframeKey={assistantPanel.activeIframeKey}
+                                onIframeRef={assistantPanel.onIframeRef}
+                                onIframeLoad={assistantPanel.onIframeLoad}
+                                onResize={assistantPanel.onResize}
+                                onAddContextItems={assistantPanel.onAddContextItems}
+                                onToggle={assistantPanel.onToggle}
+                            />
+                        ) : null}
+                    </div>
                 </div>
             </div>
-        </div>
+        </ResponsiveSidebarProvider>
     );
 }

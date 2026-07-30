@@ -9,6 +9,7 @@ dist/
 !vendor/**/dist/**
 build/
 **/build/
+client/output/
 admin/
 **/admin/
 coverage/
@@ -17,6 +18,16 @@ test-results/
 **/test-results/
 *.tsbuildinfo
 vite.config.*.timestamp-*
+
+# Local-only client projects and prototypes
+client/src/public/
+client/src/prototypes/merchant-dashboard/
+client/src/prototypes/power-distribution-cockpit/
+client/src/prototypes/secondhand-market-home/
+client/src/prototypes/xunhang-logistics-trae-1/
+client/src/resources/crm-admin/
+client/src/resources/kangbaobao/
+client/src/resources/prd/
 
 # Environment
 .env
@@ -49,7 +60,6 @@ vite.config.*.timestamp-*
 # Local tools and caches
 .local/
 **/.local/
-docs/superpowers/
 .logs/
 **/.logs/
 .trae/

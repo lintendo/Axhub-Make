@@ -516,20 +516,20 @@ describe('SettingsDialog source', () => {
     expect(source).toContain('AssistantRuntimeResponse');
     expect(source).toContain('localAcpRuntime');
     expect(source).toContain('const localAcpConnected = localAcpRuntime?.health.status === \'ready\';');
-    expect(source).toContain('const localAcpNeedsCorsRestart = isLocalAcpCorsFailure(localAcpRuntime, localAcpFailureContext?.message);');
-    expect(source).toContain("const localAcpActionLabel = localAcpConnected ? '重启' : localAcpNeedsCorsRestart ? '重启修复' : '链接';");
+    expect(source).toContain('const localAcpHasCorsFailure = isLocalAcpCorsFailure(localAcpRuntime, localAcpFailureContext?.message);');
+    expect(source).toContain("const localAcpActionLabel = localAcpConnected || localAcpHasCorsFailure ? '重新检测' : '链接';");
     expect(source).toContain('formatLocalAcpCheckedAt');
     expect(source).toContain('handleLocalAcpRuntimeCheck');
     expect(source).toContain('handleLocalAcpRuntimeConnect');
-    expect(source).toContain('handleLocalAcpRuntimeRestart');
+    expect(source).toContain('handleLocalAcpRuntimeRefresh');
     expect(source).toContain('apiService.getAssistantRuntime({ autoStart: false');
     expect(source).toContain('apiService.getAssistantRuntime({ autoStart: true');
-    expect(source).toContain("apiService.bootstrapAssistant({ mode: 'restart_existing', projectId: activeProjectId || projectId })");
+    expect(source).not.toContain("apiService.bootstrapAssistant({ mode: 'restart_existing', projectId: activeProjectId || projectId })");
     expect(aiTabSource).toContain('本地 ACP 服务');
     expect(aiTabSource).toContain('已链接');
     expect(aiTabSource).toContain('未链接');
     expect(aiTabSource).toContain('上次检测');
-    expect(aiTabSource).toContain('onClick={localAcpNeedsCorsRestart || localAcpConnected ? handleLocalAcpRuntimeRestart : handleLocalAcpRuntimeConnect}');
+    expect(aiTabSource).toContain('onClick={localAcpHasCorsFailure || localAcpConnected ? handleLocalAcpRuntimeRefresh : handleLocalAcpRuntimeConnect}');
     expect(aiTabSource).toContain('{localAcpActionLabel}');
     expect(aiTabSource).not.toContain('onClick={() => handleLocalAcpRuntimeCheck()}');
     expect(aiTabSource).not.toContain('{localAcpChecking ? <Loader2');
@@ -539,14 +539,14 @@ describe('SettingsDialog source', () => {
     expect(aiTabSource).not.toContain('本地 ACP 服务未链接');
   });
 
-  it('keeps the settings dialog open while local ACP link and restart actions resolve', () => {
+  it('keeps the settings dialog open while local ACP link and refresh actions resolve', () => {
     const source = readSource();
     const connectSource = source.slice(
       source.indexOf('const handleLocalAcpRuntimeConnect = async () => {'),
-      source.indexOf('const handleLocalAcpRuntimeRestart = async () => {'),
+      source.indexOf('const handleLocalAcpRuntimeRefresh = async () => {'),
     );
-    const restartSource = source.slice(
-      source.indexOf('const handleLocalAcpRuntimeRestart = async () => {'),
+    const refreshSource = source.slice(
+      source.indexOf('const handleLocalAcpRuntimeRefresh = async () => {'),
       source.indexOf('const loadMakeClientUpdateStatus = async'),
     );
 
@@ -559,9 +559,9 @@ describe('SettingsDialog source', () => {
     expect(source).toContain('if (localAcpAutoCloseBlockedRef.current) {');
     expect(source).toContain('<Sheet open={open} onOpenChange={handleSettingsDialogOpenChange}>');
     expect(connectSource).toContain('return preserveSettingsDialogDuringLocalAcpAction(async () => {');
-    expect(restartSource).toContain('return preserveSettingsDialogDuringLocalAcpAction(async () => {');
+    expect(refreshSource).toContain('return preserveSettingsDialogDuringLocalAcpAction(async () => {');
     expect(connectSource).not.toContain('onClose();');
-    expect(restartSource).not.toContain('onClose();');
+    expect(refreshSource).not.toContain('onClose();');
   });
 
   it('accepts external ACP failure context and keeps it visible until the user manually checks again', () => {
@@ -587,7 +587,7 @@ describe('SettingsDialog source', () => {
 
     expect(source).toContain('function resolveLocalAcpRepairCommand(runtime: AssistantRuntimeResponse | null): string');
     expect(source).toContain('function resolveLocalAcpRepairMessage(params: {');
-    expect(source).toContain("return '本地 ACP 已响应，但未允许当前 Make 地址跨域访问。点击“重启修复”可自动重启并带上当前 Make 地址；下方命令仅作为手动备用。';");
+    expect(source).toContain("return '本地 ACP 已响应，但未允许当前 Make 地址跨域访问。为避免覆盖共享服务的跨域配置，Make 不会自动重启；请在 ACP 配置中追加该地址后重新检测。';");
     expect(source).toContain("return '本地 ACP 未就绪。请使用下方命令启动，或点击“链接”自动处理。';");
     expect(source).toContain("runtime?.health.status === 'missing_cli'");
     expect(source).toContain('runtime?.health.hints.installGlobal');
@@ -766,8 +766,8 @@ describe('SettingsDialog source', () => {
 
     expect(source).toContain("from '@lobehub/icons'");
     expect(source).toContain('Cursor');
-    expect(source).toContain('Qoder');
-    expect(source).toContain('CodeBuddy');
+    expect(source).toContain("import qoderIconUrl from '../assets/brand-icons/qoder.svg?url';");
+    expect(source).toContain("import codeBuddyIconUrl from '../assets/brand-icons/codebuddy.svg?url';");
     expect(source).toContain('DeepSeek');
     expect(source).toContain('Grok');
     expect(source).toContain("if (provider === 'codex') return <Codex.Color size={16} />;");
@@ -776,8 +776,10 @@ describe('SettingsDialog source', () => {
     expect(source).toContain("if (provider === 'claude') return <ClaudeCode.Color size={16} />;");
     expect(source).toContain("if (provider === 'opencode') return <OpenCode size={16} />;");
     expect(source).toContain("if (provider === 'cursor') return <Cursor size={16} />;");
-    expect(source).toContain("if (provider === 'qoder') return <Qoder.Color size={16} />;");
-    expect(source).toContain("if (provider === 'codebuddy') return <CodeBuddy.Color size={16} />;");
+    expect(source).toContain("if (provider === 'qoder') return <img src={qoderIconUrl} alt=\"\" aria-hidden width={16} height={16} />;");
+    expect(source).toContain("if (provider === 'codebuddy') return <img src={codeBuddyIconUrl} alt=\"\" aria-hidden width={16} height={16} />;");
+    expect(source).not.toContain('<Qoder.Color');
+    expect(source).not.toContain('<CodeBuddy.Color');
     expect(source).toContain("if (provider === 'reasonix') return <DeepSeek.Color size={16} />;");
     expect(source).toContain("if (provider === 'grok-build') return <Grok size={16} />;");
     expect(source).toContain('getAgentProviderIcon(option.provider)');
@@ -951,5 +953,26 @@ describe('SettingsDialog source', () => {
     expect(source).toContain("value={formState.defaultTheme || NO_PROTOTYPE_THEME_VALUE}");
     expect(source).toContain("updateField('defaultTheme', themeName === NO_PROTOTYPE_THEME_VALUE ? '' : themeName)");
     expect(source).not.toContain('默认主题');
+  });
+
+  it('keeps notification sound controls browser-local to the AI tab', () => {
+    const source = readSource();
+    const aiTabSource = source.slice(
+      source.indexOf('<TabsContent value="ai"'),
+      source.indexOf('<TabsContent value="network"'),
+    );
+    const handleSaveSource = source.slice(
+      source.indexOf('const handleSave = async () => {'),
+      source.indexOf('\n    return (', source.indexOf('const handleSave = async () => {')),
+    );
+
+    expect(aiTabSource).toContain('声音通知');
+    expect(aiTabSource).toContain('完成音');
+    expect(aiTabSource).toContain('提醒音');
+    expect(source).toContain('readNotificationSettings');
+    expect(source).toContain('writeNotificationSettings');
+    expect(source).toContain("notificationPlayer.play('completion')");
+    expect(source).toContain("notificationPlayer.play('reminder')");
+    expect(handleSaveSource).not.toContain('notificationSettings');
   });
 });

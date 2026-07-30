@@ -84,6 +84,7 @@ describe('ACP runtime events API', () => {
 
       expect(response.status).toBe(200);
       expect(response.headers.get('content-type')).toContain('text/event-stream');
+      expect(response.headers.get('access-control-allow-origin')).toBe('*');
       expect(await response.text()).toBe('event: snapshot\ndata: {"statuses":[]}\n\n');
       expect(upstream.requests).toHaveLength(1);
       expect(upstream.requests[0]?.pathname).toBe('/api/conversations/runtime/events');
@@ -143,6 +144,7 @@ describe('ACP runtime events API', () => {
       );
 
       expect(response.status).toBe(200);
+      expect(response.headers.get('access-control-allow-origin')).toBe('*');
       expect(await response.json()).toMatchObject({
         threadId: 'thread-1',
         metadata: { runState: 'completed' },

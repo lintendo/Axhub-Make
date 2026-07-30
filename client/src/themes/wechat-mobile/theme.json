@@ -1,0 +1,420 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/messaging/wechat/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-wechat-mobile",
+    "slug": "wechat-mobile",
+    "brand": "Wechat",
+    "titleZh": "Wechat 主题",
+    "titleEn": "Wechat",
+    "descriptionZh": "Wechat 的 Design.md 主题展示，围绕移动端、通讯与协作组织页面。",
+    "descriptionEn": "Wechat mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "通讯与协作"
+    ],
+    "distributionTags": [
+      "移动端",
+      "通讯与协作"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/wechat-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/wechat/id414478124?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/wechat/id414478124?uo=4",
+          "marketId": "414478124",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/09/a8/ba/09a8bacf-82b8-714f-64ba-4f88aaa09f3e/1_U6d88_U606f_U5217_U8868_ios_1242_U00d72208.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "3721124774555946fb0288587e28c86b8f2c9198523e259d06f1abad2b4555b6",
+          "byteLength": 17322,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/wechat/id414478124?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/wechat/id414478124?uo=4",
+          "marketId": "414478124",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/55/28/63/55286332-4c62-61cd-56bf-584cbaa18989/2_U7fa4_U804a_ios_1242_U00d72208.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "6780af8926f02bf7dab41159ff5311c0cd8e757421c7987f4a3b043de7cd4977",
+          "byteLength": 15600,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/wechat/id414478124?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/wechat/id414478124?uo=4",
+          "marketId": "414478124",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/ef/01/f4/ef01f4f9-22e9-8be7-e40c-92a8a5231ab1/3_U89c6_U9891_U901a_U8bdd_ios_1242_U00d72208.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "963df3eabc8b2c3fa2d7fb08212c80134100fd0ac930c0aee63e395d79cd7ed8",
+          "byteLength": 24188,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "appearance": {
+      "defaultMode": "light",
+      "source": "design-md"
+    },
+    "palette": [
+      "#07C160",
+      "#06A050",
+      "#95EC69",
+      "#EDEDED",
+      "#FFFFFF",
+      "#F7F7F7",
+      "#D9D9D9",
+      "#181818",
+      "#888888",
+      "#B2B2B2",
+      "#FA5151",
+      "#576B95",
+      "#FBE3B3"
+    ],
+    "typography": {
+      "display": "PingFang SC",
+      "body": "PingFang SC",
+      "primary": "PingFang SC",
+      "mono": "ui-monospace",
+      "fallback": [
+        "-apple-system",
+        "PingFang SC",
+        "Noto Sans",
+        "BlinkMacSystemFont",
+        "SF Pro Text",
+        "Hiragino Sans",
+        "sans-serif"
+      ],
+      "hints": [
+        "PingFang SC",
+        "PingFang SC",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "6px",
+      "card": "8px",
+      "preview": "8px",
+      "pill": "8px",
+      "circle": "50%",
+      "scale": [
+        "4px",
+        "6px",
+        "8px",
+        "50%"
+      ],
+      "source": "design-md"
+    },
+    "spacing": {
+      "base": "4px",
+      "scale": [
+        "4px",
+        "8px",
+        "12px",
+        "16px",
+        "20px",
+        "24px",
+        "28px",
+        "44px",
+        "56px"
+      ],
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "WeChat 主题",
+    "brandAlias": "WeChat",
+    "description": "WeChat 的轻量超级应用主题，以灰色分组列表、绿色行动、方形头像和紧凑消息气泡承载高密度日常服务。",
+    "descriptionEn": "WeChat light super-app theme with grouped gray lists, restrained green actions, rounded-square avatars, and compact message bubbles.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "通讯与协作"
+    ],
+    "fontStylesheets": [],
+    "palette": [
+      {
+        "color": "#07C160",
+        "labelZh": "品牌行动绿",
+        "labelEn": "WeChat Green",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#06A050",
+        "labelZh": "按下态",
+        "labelEn": "Green Pressed",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#95EC69",
+        "labelZh": "发出气泡",
+        "labelEn": "Outgoing Bubble",
+        "textColor": "#181818"
+      },
+      {
+        "color": "#EDEDED",
+        "labelZh": "聊天底色",
+        "labelEn": "Chat Backdrop",
+        "textColor": "#181818"
+      },
+      {
+        "color": "#FFFFFF",
+        "labelZh": "卡片与列表",
+        "labelEn": "Canvas White",
+        "textColor": "#181818"
+      },
+      {
+        "color": "#F7F7F7",
+        "labelZh": "次级表面",
+        "labelEn": "Surface Gray",
+        "textColor": "#181818"
+      },
+      {
+        "color": "#D9D9D9",
+        "labelZh": "分隔线",
+        "labelEn": "Divider",
+        "textColor": "#181818"
+      },
+      {
+        "color": "#181818",
+        "labelZh": "主要文字",
+        "labelEn": "Primary Text",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#888888",
+        "labelZh": "次要文字",
+        "labelEn": "Secondary Text",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#B2B2B2",
+        "labelZh": "占位文字",
+        "labelEn": "Tertiary Text",
+        "textColor": "#181818"
+      },
+      {
+        "color": "#FA5151",
+        "labelZh": "提醒红点",
+        "labelEn": "Attention Red",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#576B95",
+        "labelZh": "消息链接",
+        "labelEn": "Link Blue",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#FBE3B3",
+        "labelZh": "红包金",
+        "labelEn": "Packet Gold",
+        "textColor": "#181818"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "栏分隔 - Bar Hairline",
+        "value": "rgba(0,0,0,0.05) 0 0.5px 0",
+        "cssValue": "rgba(0,0,0,0.05) 0 0.5px 0",
+        "description": "顶部栏与底部标签栏的极轻分隔。"
+      },
+      {
+        "label": "红包卡片 - Red Packet",
+        "value": "rgba(0,0,0,0.12) 0 2px 8px",
+        "cssValue": "rgba(0,0,0,0.12) 0 2px 8px",
+        "description": "只为红包卡片提供轻微物理感。"
+      },
+      {
+        "label": "底部浮层 - Sheet",
+        "value": "rgba(0,0,0,0.16) 0 -8px 28px",
+        "cssValue": "rgba(0,0,0,0.16) 0 -8px 28px",
+        "description": "附件面板与操作浮层使用的克制抬升。"
+      }
+    ],
+    "borders": [
+      {
+        "label": "列表分隔线 - Divider",
+        "value": "#D9D9D9",
+        "cssValue": "#D9D9D9",
+        "description": "列表行和分组区块之间的细分隔线。"
+      },
+      {
+        "label": "输入焦点 - Focus",
+        "value": "#07C160",
+        "cssValue": "#07C160",
+        "description": "搜索和输入光标使用克制的品牌绿色。"
+      }
+    ],
+    "typography": [
+      "PingFang SC",
+      "PingFang SC",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "Super App",
+        "title": "分组列表承载生态",
+        "body": "Discover 以白色行、灰色间隔和小型彩色图标组织超级应用入口。"
+      },
+      {
+        "eyebrow": "Action",
+        "title": "绿色只表达“继续”",
+        "body": "#07C160 留给发送、支付、确认和活动标签；聊天气泡使用浅绿 #95EC69。"
+      },
+      {
+        "eyebrow": "Shape",
+        "title": "方正轮廓保持克制",
+        "body": "6px 气泡和按钮、8px 方形头像构成与西方聊天产品不同的紧凑剪影。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "把 Discover 设计为功能入口的分组列表。",
+        "使用 #EDEDED 背景、白色行和 #181818 主要文字。",
+        "发出气泡使用 #95EC69，收到气泡使用白色。",
+        "只把 #07C160 用于发送、支付、确认与活动标签。",
+        "所有头像使用约 8px 圆角的方形轮廓。"
+      ],
+      "dont": [
+        "不要把 Discover 做成彩色仪表盘。",
+        "不要使用圆形头像。",
+        "不要把饱和品牌绿用作发出气泡。",
+        "不要把聊天气泡做成大圆角胶囊。",
+        "不要引入第二套强调色或装饰渐变。"
+      ]
+    },
+    "radius": {
+      "control": "6px",
+      "card": "8px",
+      "preview": "8px",
+      "pill": "8px",
+      "circle": "50%",
+      "scale": [
+        "4px",
+        "6px",
+        "8px",
+        "50%"
+      ],
+      "source": "design-md"
+    },
+    "spacing": {
+      "base": "4px",
+      "scale": [
+        "4px",
+        "8px",
+        "12px",
+        "16px",
+        "20px",
+        "24px",
+        "28px",
+        "44px",
+        "56px"
+      ],
+      "source": "design-md"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

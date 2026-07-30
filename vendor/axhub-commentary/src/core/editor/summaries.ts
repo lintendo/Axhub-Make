@@ -933,41 +933,6 @@ export function createEditorSummariesService(options: {
     lines.push('约束: 元素描述仅用于定位，只改动明确指出的内容，其余保持不动。');
   }
 
-  function resolveCommentaryCommentsFilePath(): string {
-    try {
-      const scopeFilePath = normalizePathValue(options.getPersistenceScope?.()?.filePath);
-      return /^\.axhub\/chrome\/pages\/[^/]+\/comments\.json$/u.test(scopeFilePath)
-        ? scopeFilePath
-        : '';
-    } catch {
-      return '';
-    }
-  }
-
-  function appendCommentaryCompletionInstructions(
-    lines: string[],
-    elementKeys: readonly string[],
-  ): void {
-    const filePath = resolveCommentaryCommentsFilePath();
-    const normalizedElementKeys = dedupeStrings(elementKeys);
-    if (!filePath || normalizedElementKeys.length === 0) return;
-
-    lines.push('');
-    lines.push('批注状态收尾（必须最后执行）:');
-    lines.push(`- 完成并验证上述代码修改后，再读取并更新批注文件: ${filePath}`);
-    lines.push(
-      `- 仅处理 comments 中 elementKey 为 ${normalizedElementKeys
-        .map((elementKey) => JSON.stringify(elementKey))
-        .join(', ')} 对应的当前 pageScope 批注；将对应批注的 state 设为 completed，并更新批注与顶层 updatedAt。无法唯一匹配时不要猜测或改写其他批注。`,
-    );
-    lines.push(
-      '- 保留 comments 和 assets 的全部记录，不设置 deletedAt，不删除数组项或本地文件。',
-    );
-    lines.push(
-      '- 上述批注文件必须是本次任务最后一次文件写入；写完后不要再修改任何文件。回复中说明任务已完成，是否清除留给用户后续确认。',
-    );
-  }
-
   function resolveAnnotationPromptContext(locator: ElementLocator): AnnotationPromptContext | null {
     const nodeId =
       resolveAnnotationNodeIdFromLocator(locator) ||
@@ -1481,7 +1446,6 @@ export function createEditorSummariesService(options: {
     summaries: ReturnType<typeof aggregateTransactionsByElement>;
     commentOnlyMetas: SaveRunCommentMeta[];
     moveSummaries: readonly MoveSummary[];
-    completionElementKeys: readonly string[];
   }): string {
     const { summaries, commentOnlyMetas, moveSummaries } = params;
     const mode = params.mode ?? 'initial';
@@ -1575,8 +1539,6 @@ export function createEditorSummariesService(options: {
       }
     }
 
-    appendCommentaryCompletionInstructions(lines, params.completionElementKeys);
-
     return lines.join('\n');
   }
 
@@ -1595,11 +1557,6 @@ export function createEditorSummariesService(options: {
       summaries,
       commentOnlyMetas,
       moveSummaries,
-      completionElementKeys: [
-        ...summaries.map((summary) => String(summary.elementKey)),
-        ...commentOnlyMetas.map((meta) => meta.elementKey),
-        ...moveSummariesWithKeys.map((summary) => summary.elementKey),
-      ],
     });
   }
 
@@ -1618,11 +1575,6 @@ export function createEditorSummariesService(options: {
       summaries,
       commentOnlyMetas,
       moveSummaries,
-      completionElementKeys: [
-        ...summaries.map((summary) => String(summary.elementKey)),
-        ...commentOnlyMetas.map((meta) => meta.elementKey),
-        ...moveSummariesWithKeys.map((summary) => summary.elementKey),
-      ],
     });
   }
 
@@ -1650,7 +1602,6 @@ export function createEditorSummariesService(options: {
       summaries,
       commentOnlyMetas,
       moveSummaries,
-      completionElementKeys: [normalizedElementKey],
     });
   }
 
@@ -1673,7 +1624,6 @@ export function createEditorSummariesService(options: {
       summaries,
       commentOnlyMetas,
       moveSummaries,
-      completionElementKeys: [elementKey],
     });
   }
 

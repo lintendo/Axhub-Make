@@ -261,7 +261,7 @@ export const WEB_EDITOR_POPUP_ROOT_STYLES = `
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-popover,
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-popconfirm,
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-color-picker-dropdown {
-    z-index: ${POPUP_LAYER_Z_INDEX + 20};
+    z-index: ${POPUP_LAYER_Z_INDEX + 20} !important;
   }
 
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-select-dropdown,
@@ -474,6 +474,23 @@ export const WEB_EDITOR_POPUP_ROOT_STYLES = `
     gap: 6px;
     color: ${EDITOR_CHROME.textSecondary};
     font-size: 13px;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__workspace-value {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__workspace-value-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__workspace-value > .anticon {
+    flex: 0 0 auto;
   }
 
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-dark-mode-button .anticon {

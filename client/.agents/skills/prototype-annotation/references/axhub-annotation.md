@@ -58,6 +58,9 @@ const options = useMemo<AnnotationViewerOptions>(() => ({
 {
   "documentVersion": 1,
   "format": "axhub-annotation-source",
+  "presentation": {
+    "layerSelectors": [".modal-layer[data-open=\"true\"]"]
+  },
   "data": {
     "version": 2,
     "prototypeName": "prototype-id",
@@ -72,6 +75,8 @@ const options = useMemo<AnnotationViewerOptions>(() => ({
   }
 }
 ```
+
+`layerSelectors` 应按实际 DOM 匹配当前活动且包含弹窗内容的层根，不要只选择遮罩节点。
 
 ## 目录
 

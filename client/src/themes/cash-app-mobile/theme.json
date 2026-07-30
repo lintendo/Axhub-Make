@@ -1,0 +1,295 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/finance/cash-app/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-cash-app-mobile",
+    "slug": "cash-app-mobile",
+    "brand": "Cash App",
+    "titleZh": "Cash App 主题",
+    "titleEn": "Cash App",
+    "descriptionZh": "Cash App 的 Design.md 主题展示，围绕移动端、金融与支付组织页面。",
+    "descriptionEn": "Cash App mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "金融与支付"
+    ],
+    "distributionTags": [
+      "移动端",
+      "金融与支付"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/cash-app-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/cash-app/id711923939",
+          "officialPageUrl": "https://apps.apple.com/us/app/cash-app/id711923939",
+          "marketId": "711923939",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/62/ba/44/62ba44b6-6c21-a8aa-c511-6b6f828a7d6c/US_MoneyMove_iPhone6.5__01.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:16:47.646Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "8924d620f1dc4be3a5758aa21124eee7c39b5feb3ff84ce80e91bf060434f1bf",
+          "byteLength": 41750,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/cash-app/id711923939",
+          "officialPageUrl": "https://apps.apple.com/us/app/cash-app/id711923939",
+          "marketId": "711923939",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/5e/14/30/5e1430d6-4446-2347-6422-57f15f86f9b3/US_P2P_iPhone6.5__03.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:16:47.646Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "c49f2078f2b99037a5e8ef2adb4ae266cc1caee81eb549d737cdc5b0b7627a8c",
+          "byteLength": 19924,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/cash-app/id711923939",
+          "officialPageUrl": "https://apps.apple.com/us/app/cash-app/id711923939",
+          "marketId": "711923939",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/f0/dc/8d/f0dc8d07-b3c8-cd32-33fe-d144062e8231/US_Teen_APY_iPhone6.5__black__3.25_.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:16:47.646Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "a8fec2ea7a9cb884efe1358f1dfd099f3ace7786a67d73d9375706a4220ff5d2",
+          "byteLength": 52054,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#00D632",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Roboto",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Roboto",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Cash App 主题",
+    "brandAlias": "Cash App",
+    "description": "Cash App 的 Design.md 主题展示，围绕移动端、金融与支付组织页面。",
+    "descriptionEn": "Cash App mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "金融与支付"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#00D632",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#1A1A1A",
+        "cssValue": "#1A1A1A",
+        "description": "Pure-black surfaces with hairline `#1A1A1A` dividers — no shadows, no blur, only contrast"
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#1F1F1F",
+        "cssValue": "#1F1F1F",
+        "description": "Divider (`#1F1F1F`): Hairline dividers between Activity rows and list items — barely visible by design."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#2A2A2A",
+        "cssValue": "#2A2A2A",
+        "description": "Hairline (`#2A2A2A`): More visible divider used sparingly on sheets."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#000000",
+        "cssValue": "#000000",
+        "description": "Near-black canvas (`#000000`) with `#0F0F0F` for slightly elevated surfaces — true black, not warm gray"
+      },
+      {
+        "label": "边框 5 - Border 5",
+        "value": "#00D632",
+        "cssValue": "#00D632",
+        "description": "The accent is Cash Green (`#00D632`) — a near-traffic-light green that's deliberately too-bright on near-black canvas, the way a neon sign is too-bright in a dark bar. It's the only color that touches money: the Pay button, the $-amount display when valid, the boost glyphs on the Cash Card, and the Bitcoin and Stocks indicators when up. Every other accent is muted by comparison — the Cash Card itself is matte black with a custom Cashtag etched in a single color, the Card tab uses the user's chosen card art as the hero, and the Activity feed alternates between green (received) and gray (sent) with no other chromatic noise."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Roboto",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use {#000000} pure black as the canvas — not warm gray, not {#111}。",
+        "建议：Use Cash Green {#00D632} as the ONLY accent — Pay button, success states, active tab glyph。",
+        "建议：Set the $-amount in Cash Sans Mono at 96pt+ on the Pay screen — this is the signature。",
+        "建议：Use Cash Sans Black (weight 900) for screen titles like \"Money\", \"Card\", \"Activity\"。",
+        "建议：Render every $-amount and every $Cashtag in Cash Sans Mono with tabular numerals。"
+      ],
+      "dont": [
+        "避免：use blue or navy anywhere — Cash App is anti-bank-app blue。",
+        "避免：add shadows — Cash App is flat; depth is fill-color contrast only。",
+        "避免：use {#111} or warm dark grays as canvas — pure {#000000} is core。",
+        "避免：dim inactive tab icons — Cash App keeps them at full white opacity。",
+        "避免：add tab bar labels — this is a hard rule。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "finance",
+      "navigation": [
+        "资产",
+        "交易",
+        "我的"
+      ],
+      "primaryAction": "转账"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

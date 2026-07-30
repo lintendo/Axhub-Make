@@ -38,6 +38,25 @@ describe('prototype spec request gate', () => {
     expect(gate.shouldOpen(true, 'project:orders')).toBe(true);
   });
 
+  it('closes only a failed latest annotation attempt for the current spec item', async () => {
+    const controllerModule = await import('./usePrototypeSpecController');
+    const shouldClose = (controllerModule as Record<string, unknown>)
+      .shouldClosePrototypeSpecAfterAnnotationAttempt as (params: {
+        enabled: boolean;
+        attemptedItem: object | null;
+        currentItem: object | null;
+        attemptId: number;
+        latestAttemptId: number;
+      }) => boolean;
+    const currentItem = { name: 'spec.html' };
+
+    expect(typeof shouldClose).toBe('function');
+    expect(shouldClose({ enabled: false, attemptedItem: currentItem, currentItem, attemptId: 2, latestAttemptId: 2 })).toBe(true);
+    expect(shouldClose({ enabled: true, attemptedItem: currentItem, currentItem, attemptId: 2, latestAttemptId: 2 })).toBe(false);
+    expect(shouldClose({ enabled: false, attemptedItem: currentItem, currentItem: { name: 'other.html' }, attemptId: 2, latestAttemptId: 2 })).toBe(false);
+    expect(shouldClose({ enabled: false, attemptedItem: currentItem, currentItem, attemptId: 1, latestAttemptId: 2 })).toBe(false);
+  });
+
   it('builds the complete review URL for the AI prompt and supports auto-open', () => {
     const source = readFileSync(resolve(__dirname, './usePrototypeSpecController.ts'), 'utf8');
 

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="960" viewBox="0 0 1440 960" role="img" aria-label="Netflix dark-only cinematic theme token preview">
+  <defs>
+    <linearGradient id="hero" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3A3A3A"/><stop offset="1" stop-color="#141414"/></linearGradient>
+  </defs>
+  <rect width="1440" height="960" fill="#141414"/>
+  <rect width="16" height="960" fill="#E50914"/>
+  <g font-family="Netflix Sans, -apple-system, BlinkMacSystemFont, Graphik, Helvetica Neue, Arial, sans-serif">
+    <text x="88" y="102" fill="#AAAAAA" font-size="18" font-weight="700" letter-spacing="2">DARK-ONLY CINEMA</text>
+    <text x="88" y="226" fill="#E50914" font-size="92" font-weight="700" letter-spacing="-2">NETFLIX</text>
+    <text x="88" y="282" fill="#AAAAAA" font-size="25">Warm charcoal. Poster art. One sacred red.</text>
+    <rect x="88" y="354" width="180" height="126" rx="4" fill="#E50914"/><text x="106" y="385" fill="#FFFFFF" font-size="14" font-weight="700">PLAY / BRAND</text><text x="106" y="453" fill="#FFFFFF" font-size="29" font-weight="700">#E50914</text>
+    <rect x="284" y="354" width="180" height="126" rx="4" fill="#141414" stroke="#2B2B2B"/><text x="302" y="385" fill="#AAAAAA" font-size="14" font-weight="700">CANVAS</text><text x="302" y="453" fill="#FFFFFF" font-size="29" font-weight="700">#141414</text>
+    <rect x="480" y="354" width="180" height="126" rx="4" fill="#1F1F1F" stroke="#2B2B2B"/><text x="498" y="385" fill="#AAAAAA" font-size="14" font-weight="700">SURFACE</text><text x="498" y="453" fill="#FFFFFF" font-size="29" font-weight="700">#1F1F1F</text>
+    <text x="88" y="566" fill="#FFFFFF" font-size="42" font-weight="700">Netflix Sans</text><text x="88" y="608" fill="#AAAAAA" font-size="17">400 / 500 / 700 · art is the headline</text>
+    <rect x="88" y="648" width="250" height="52" rx="4" fill="#E50914"/><text x="213" y="681" fill="#FFFFFF" text-anchor="middle" font-size="17" font-weight="700">▶ Play</text>
+    <g transform="translate(794 64)">
+      <rect width="528" height="832" rx="48" fill="#000000"/><rect x="16" y="16" width="496" height="800" rx="36" fill="#141414"/>
+      <rect x="16" y="16" width="496" height="390" rx="36" fill="url(#hero)"/><text x="50" y="68" fill="#E50914" font-size="23" font-weight="700">NETFLIX</text>
+      <text x="264" y="258" fill="#FFFFFF" text-anchor="middle" font-size="44" font-weight="700">MIDNIGHT SIGNAL</text><text x="264" y="296" fill="#AAAAAA" text-anchor="middle" font-size="14">Gripping • Thriller • Drama</text>
+      <rect x="170" y="324" width="188" height="48" rx="4" fill="#E50914"/><text x="264" y="355" fill="#FFFFFF" text-anchor="middle" font-size="17" font-weight="700">▶ Play</text>
+      <text x="42" y="442" fill="#FFFFFF" font-size="18" font-weight="700">Trending Now</text>
+      <rect x="42" y="466" width="126" height="190" rx="4" fill="#2A2A2A"/><rect x="180" y="466" width="126" height="190" rx="4" fill="#3A3A3A"/><rect x="318" y="466" width="126" height="190" rx="4" fill="#1F1F1F"/>
+      <rect x="42" y="648" width="126" height="4" fill="#E50914"/><text x="42" y="708" fill="#FFFFFF" font-size="18" font-weight="700">Continue Watching</text>
+      <rect x="16" y="748" width="496" height="68" fill="#141414"/><line x1="16" y1="748" x2="512" y2="748" stroke="#2B2B2B"/>
+      <text x="78" y="785" fill="#FFFFFF" text-anchor="middle" font-size="12">Home</text><text x="202" y="785" fill="#777777" text-anchor="middle" font-size="12">New &amp; Hot</text><text x="326" y="785" fill="#777777" text-anchor="middle" font-size="12">My Netflix</text><text x="450" y="785" fill="#777777" text-anchor="middle" font-size="12">Downloads</text>
+    </g>
+  </g>
+</svg>

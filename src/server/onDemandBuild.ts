@@ -424,7 +424,7 @@ export const __onDemandBuildTestUtils = {
   getPackageExport,
   getDefaultExport,
   isAnnotationRuntimeModule,
+  replaceEmbeddedImageAssets,
   hasRelativeStyleImport,
   resolvePackageFromProject,
-  replaceEmbeddedImageAssets,
 };

@@ -34,6 +34,19 @@ export function createPrototypeSpecAutoOpenGate() {
     };
 }
 
+export function shouldClosePrototypeSpecAfterAnnotationAttempt(params: {
+    enabled: boolean;
+    attemptedItem: ItemData | null;
+    currentItem: ItemData | null;
+    attemptId: number;
+    latestAttemptId: number;
+}): boolean {
+    return !params.enabled
+        && params.attemptedItem !== null
+        && params.attemptedItem === params.currentItem
+        && params.attemptId === params.latestAttemptId;
+}
+
 export function usePrototypeSpecController(params: {
     activeProjectId: string | null;
     selectedItem: ItemData | null;

@@ -11,8 +11,6 @@ const ANTD_PACKAGES = new Set([
 ]);
 
 const SPEC_TEMPLATE_PACKAGES = new Set([
-  '@ant-design/x',
-  '@ant-design/x-markdown',
   'domelementtype',
   'domhandler',
   'domutils',

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import * as helpers from './previewActions.helpers';
+import { createDefaultPreviewConfig } from '../../domains/device/preview-layout';
 import {
   buildCombinedPrototypePrompt,
   buildMainPreviewIframeUrl,
@@ -8,18 +9,102 @@ import {
   buildProjectPrototypeScreenshotIframeUrl,
   createDefaultHostToolbarState,
   getClientUrlOrigin,
+  isQuickEditRuntimeReadyForIframe,
   resolveActiveAnnotationDirectRunToolbarState,
   resolvePrototypeAnnotationTargetPath,
   resolveCurrentPublishResourcePath,
   resolveCurrentPreviewScreenshotSize,
   resolveExportScreenshotViewportSize,
   resolveHostToolbarStateForDisplay,
+  resolveAnnotationActionEditingTargets,
   waitForHostToolbarActionState,
 } from './previewActions.helpers';
 
 describe('previewActions.helpers', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('binds quick-edit runtime readiness to the current iframe identity', () => {
+    const readyIframe = {} as HTMLIFrameElement;
+    const replacementIframe = {} as HTMLIFrameElement;
+
+    expect(isQuickEditRuntimeReadyForIframe('ready', readyIframe, readyIframe)).toBe(true);
+    expect(isQuickEditRuntimeReadyForIframe('ready', readyIframe, replacementIframe)).toBe(false);
+    expect(isQuickEditRuntimeReadyForIframe('pending', readyIframe, readyIframe)).toBe(false);
+    expect(isQuickEditRuntimeReadyForIframe('ready', readyIframe, null)).toBe(false);
+  });
+
+  it('uses mobile annotation interaction only for phone-sized prototype previews', () => {
+    const resolveMobileMode = (helpers as Record<string, unknown>)
+      .resolvePrototypeEditorMobileMode as undefined | ((
+        resourceType: 'prototype' | 'theme',
+        pane: 'primary' | 'secondary',
+        previewConfig: ReturnType<typeof createDefaultPreviewConfig>,
+      ) => boolean);
+    const defaultConfig = createDefaultPreviewConfig();
+
+    expect(typeof resolveMobileMode).toBe('function');
+    expect(resolveMobileMode?.('prototype', 'primary', {
+      ...defaultConfig,
+      singlePreset: 'mobile',
+    })).toBe(true);
+    expect(resolveMobileMode?.('prototype', 'primary', {
+      ...defaultConfig,
+      singlePreset: 'tablet',
+    })).toBe(false);
+    expect(resolveMobileMode?.('prototype', 'primary', {
+      ...defaultConfig,
+      singlePreset: 'custom',
+      customWidth: 640,
+    })).toBe(true);
+    expect(resolveMobileMode?.('prototype', 'primary', {
+      ...defaultConfig,
+      singlePreset: 'custom',
+      customWidth: 1024,
+    })).toBe(false);
+    expect(resolveMobileMode?.('prototype', 'secondary', defaultConfig)).toBe(true);
+    expect(resolveMobileMode?.('theme', 'secondary', defaultConfig)).toBe(false);
+  });
+
+  it('maps cross-origin modified elements to top-level AI execution targets', () => {
+    const locatorA = { selectors: ['[data-card="a"]'], fingerprint: 'card-a', path: [0] };
+    const locatorB = { selectors: ['[data-card="b"]'], fingerprint: 'card-b', path: [1] };
+
+    expect(resolveAnnotationActionEditingTargets(
+      { type: 'send-to-agent' },
+      [
+        { elementKey: 'card-a', locator: locatorA, label: 'Card A', note: 'A', imageCount: 0, changeKinds: [] },
+        { elementKey: 'card-b', locator: locatorB, label: 'Card B', note: 'B', imageCount: 0, changeKinds: [] },
+      ],
+    )).toEqual([
+      { elementKey: 'card-a', targetRef: { locator: locatorA, label: 'Card A' } },
+      { elementKey: 'card-b', targetRef: { locator: locatorB, label: 'Card B' } },
+    ]);
+  });
+
+  it('keeps an explicit element action scoped to that element', () => {
+    const locatorA = { selectors: ['[data-card="a"]'], fingerprint: 'card-a', path: [0] };
+    const locatorB = { selectors: ['[data-card="b"]'], fingerprint: 'card-b', path: [1] };
+
+    expect(resolveAnnotationActionEditingTargets({
+      type: 'send-to-agent',
+      elementKey: 'card-a',
+      locator: locatorA,
+      label: 'Card A',
+    }, [{ elementKey: 'card-b', locator: locatorB, label: 'Card B', note: 'B', imageCount: 0, changeKinds: [] }]))
+      .toEqual([{ elementKey: 'card-a', targetRef: { locator: locatorA, label: 'Card A' } }]);
+  });
+
+  it('ignores blank modified element keys and keeps the first duplicate target', () => {
+    const firstLocator = { selectors: ['[data-card="first"]'], fingerprint: 'first', path: [0] };
+    const duplicateLocator = { selectors: ['[data-card="duplicate"]'], fingerprint: 'duplicate', path: [1] };
+
+    expect(resolveAnnotationActionEditingTargets(null, [
+      { elementKey: ' ', locator: null, label: '', note: '', imageCount: 0, changeKinds: [] },
+      { elementKey: 'card-a', locator: firstLocator, label: 'First', note: '', imageCount: 0, changeKinds: [] },
+      { elementKey: 'card-a', locator: duplicateLocator, label: 'Duplicate', note: '', imageCount: 0, changeKinds: [] },
+    ])).toEqual([{ elementKey: 'card-a', targetRef: { locator: firstLocator, label: 'First' } }]);
   });
 
   it('resolves relative client URLs against the runtime origin instead of the admin origin', () => {

@@ -5,7 +5,37 @@
     "originalDetailUrl": "https://styles.refero.design/style/81bd6ad6-b02b-4fb3-a600-91ecf8324171",
     "fallbackRawUrl": "",
     "mirrorSource": "",
-    "websiteUrl": "https://www.augusthealth.com/"
+    "websiteUrl": "https://www.augusthealth.com/",
+    "localPaths": [
+      "DESIGN.md",
+      "theme.json",
+      "assets/tokens.json",
+      "index.tsx",
+      "style.css",
+      "tw.css",
+      "assets/official-homepage.webp"
+    ],
+    "pinnedCommit": {
+      "status": "not-applicable",
+      "reason": "Retained Refero URL/image evidence is not a Git repository and has no applicable upstream commit."
+    },
+    "license": {
+      "status": "unresolved",
+      "evidence": "No local license evidence is stored for the retained screenshot, brand imagery, or named proprietary fonts.",
+      "scope": "Internal design reference only; keep the retained client theme and exclude unresolved assets from redistribution claims."
+    },
+    "conversionNotes": "Curated retained URL/image metadata and local preview evidence into one responsive React/Web specification without claiming an official upstream design system.",
+    "evidence": {
+      "observed": [
+        "The retained Refero detail URL, theme-local preview image, palette metadata, CSS, and React entry were inspected."
+      ],
+      "inferred": [
+        "Component dimensions, interaction states, token roles, and responsive behavior beyond the retained still evidence are explicitly treated as implementation inference."
+      ],
+      "knownGaps": [
+        "Official source DESIGN.md, applicable Git commit, asset/font licenses, complete interaction states, and full responsive behavior remain unresolved."
+      ]
+    }
   },
   "identity": {
     "id": "P0-22",
@@ -57,7 +87,7 @@
   "assets": {
     "designMd": {
       "path": "DESIGN.md",
-      "method": "derived_from_metadata"
+      "method": "curated_from_local_source_evidence"
     },
     "tailwind": {
       "path": "tw.css",
@@ -98,13 +128,39 @@
       "#114e0b"
     ],
     "typography": {
-      "display": "Reckless Neue",
-      "body": "Reckless Neue",
-      "mono": "ui-monospace",
-      "hints": [
-        "Reckless Neue",
-        "ui-monospace"
-      ]
+      "fontFamily": {
+        "display": "Reckless Neue",
+        "body": "Saans",
+        "mono": "ui-monospace"
+      },
+      "fontSize": {
+        "hero": "52px",
+        "section": "32px",
+        "card": "19px",
+        "body": "15px",
+        "label": "12px"
+      },
+      "lineHeight": {
+        "hero": "1.05",
+        "section": "1.15",
+        "card": "1.25",
+        "body": "1.55",
+        "label": "1.35"
+      },
+      "letterSpacing": {
+        "default": "0em"
+      }
+    },
+    "spacing": {
+      "controlInset": "16px",
+      "mobileGutter": "20px",
+      "outerGutter": "32px",
+      "section": "64px"
+    },
+    "radius": {
+      "control": "8px",
+      "card": "16px",
+      "preview": "16px"
     }
   },
   "previewImages": [
@@ -230,10 +286,23 @@
         "title": "面向真实界面片段",
         "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
       }
-    ]
+    ],
+    "spacing": {
+      "controlInset": "16px",
+      "mobileGutter": "20px",
+      "outerGutter": "32px",
+      "section": "64px"
+    },
+    "radius": {
+      "control": "8px",
+      "card": "16px",
+      "preview": "16px"
+    }
   },
   "status": {
     "displayPage": "todo",
-    "collectionErrors": []
+    "collectionErrors": [
+      "Blocking license gap: retained external visual/font assets have no local license evidence; keep this client theme and exclude unresolved assets from redistribution claims."
+    ]
   }
 }

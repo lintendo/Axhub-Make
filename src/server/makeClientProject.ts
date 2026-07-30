@@ -26,6 +26,12 @@ import {
 } from './projectCore/index.ts';
 
 import { buildLocalCommandEnv, runLocalCommand } from './localCommand.ts';
+import {
+  MakeClientPackageJsonError,
+  mergeMakeClientPackageJson,
+  parseMakeClientPackageJson,
+  type MakeClientPackageJsonSource,
+} from './makeClientPackageJson.ts';
 import type { DiagnosticLog } from './diagnosticLog.ts';
 import { extractZipBufferToDirectory } from './zipArchive.ts';
 import {
@@ -41,6 +47,7 @@ export type MakeClientPhase =
   | 'template'
   | 'clone'
   | 'download-template'
+  | 'merge-package'
   | 'backup'
   | 'overwrite'
   | 'install'
@@ -194,6 +201,7 @@ export const MAKE_CLIENT_ERROR_STATUS: Record<string, number> = {
   MAKE_PROJECT_ID_CONFLICT: 409,
   MAKE_CLIENT_SOURCE_UNAVAILABLE: 502,
   MAKE_CLIENT_TEMPLATE_UNAVAILABLE: 500,
+  MAKE_CLIENT_PACKAGE_INVALID: 409,
   MAKE_CLIENT_INSTALL_FAILED: 500,
   MAKE_CLIENT_METADATA_SYNC_FAILED: 500,
   MAKE_CLIENT_UPDATE_NOT_AVAILABLE: 409,
@@ -1560,6 +1568,44 @@ function shouldSkipMakeClientUpdateEntry(relativePath: string, entryName: string
   return false;
 }
 
+function readMakeClientPackageJsonForUpdate(
+  filePath: string,
+  source: MakeClientPackageJsonSource,
+): { content: string; packageJson: Record<string, unknown> } {
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, 'utf8');
+  } catch {
+    if (source === 'template') {
+      throw new MakeClientProjectError(
+        'MAKE_CLIENT_TEMPLATE_UNAVAILABLE',
+        'Make client template package.json is missing',
+        { status: 500, phase: 'merge-package', details: { source, filePath } },
+      );
+    }
+    throw new MakeClientProjectError(
+      'MAKE_CLIENT_PACKAGE_INVALID',
+      'Make client project package.json is missing or unreadable',
+      { status: 409, phase: 'merge-package', details: { source, filePath } },
+    );
+  }
+
+  try {
+    return { content, packageJson: parseMakeClientPackageJson(source, content) };
+  } catch (error) {
+    if (!(error instanceof MakeClientPackageJsonError)) throw error;
+    throw new MakeClientProjectError(
+      'MAKE_CLIENT_PACKAGE_INVALID',
+      error.message,
+      {
+        status: source === 'project' ? 409 : 500,
+        phase: 'merge-package',
+        details: { source, filePath },
+      },
+    );
+  }
+}
+
 function collectMakeClientUpdateTemplateFiles(templateRoot: string): string[] {
   const files: string[] = [];
   const walk = (sourceDir: string, relativeDir = '') => {
@@ -1689,10 +1735,24 @@ function readLatestMakeClientUpdateBackupRecord(projectRoot: string): MakeClient
   return records[0] || null;
 }
 
+function writeUtf8FileAtomically(targetPath: string, content: string): void {
+  const tempPath = path.join(
+    path.dirname(targetPath),
+    `.${path.basename(targetPath)}.${process.pid}.${crypto.randomUUID()}.tmp`,
+  );
+  try {
+    fs.writeFileSync(tempPath, content, 'utf8');
+    fs.renameSync(tempPath, targetPath);
+  } finally {
+    fs.rmSync(tempPath, { force: true });
+  }
+}
+
 function writeMakeClientUpdateTemplateFiles(params: {
   projectRoot: string;
   templateRoot: string;
   plannedFiles: string[];
+  packageJsonContent: string;
   marker: MakeClientMarker;
   source: MakeClientTemplateSource;
   targetVersion: string;
@@ -1728,7 +1788,11 @@ function writeMakeClientUpdateTemplateFiles(params: {
       continue;
     }
     fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    fs.copyFileSync(sourcePath, targetPath);
+    if (relativePath === 'package.json') {
+      writeUtf8FileAtomically(targetPath, params.packageJsonContent);
+    } else {
+      fs.copyFileSync(sourcePath, targetPath);
+    }
     writtenFiles.push(relativePath);
   }
   return writtenFiles;
@@ -1941,6 +2005,9 @@ export async function applyMakeClientUpdate(
 ): Promise<MakeClientUpdateApplyResult> {
   const root = path.resolve(projectRoot);
   const runner = options.commandRunner || defaultCommandRunner();
+  const packageRelativePath = 'package.json';
+  const projectPackagePath = path.join(root, packageRelativePath);
+  const projectPackage = readMakeClientPackageJsonForUpdate(projectPackagePath, 'project');
   const marker = validateExistingMakeClientProject(root);
   const status = await getMakeClientUpdateStatus(projectId, root, { commandRunner: runner });
   assertMakeClientUpdateCanApply(status);
@@ -1972,11 +2039,10 @@ export async function applyMakeClientUpdate(
     extractedTemplate = await extractMakeClientUpdateTemplate(status.targetVersion, status.template.sources);
     templateUrl = extractedTemplate.source.url;
     plannedFiles = collectMakeClientUpdateTemplateFiles(extractedTemplate.templateRoot);
-    const packageRelativePath = 'package.json';
     const templatePackagePath = path.join(extractedTemplate.templateRoot, packageRelativePath);
-    const projectPackagePath = path.join(root, packageRelativePath);
-    const packageChanged = fs.existsSync(templatePackagePath)
-      && fs.readFileSync(templatePackagePath, 'utf8') !== (fs.existsSync(projectPackagePath) ? fs.readFileSync(projectPackagePath, 'utf8') : '');
+    const templatePackage = readMakeClientPackageJsonForUpdate(templatePackagePath, 'template');
+    const packageJsonContent = mergeMakeClientPackageJson(projectPackage.packageJson, templatePackage.packageJson);
+    const packageChanged = packageJsonContent !== projectPackage.content;
 
     backupRoot = createMakeClientUpdateBackupRoot(root);
     backupExistingMakeClientUpdateFiles(root, backupRoot, plannedFiles);
@@ -1996,6 +2062,7 @@ export async function applyMakeClientUpdate(
       projectRoot: root,
       templateRoot: extractedTemplate.templateRoot,
       plannedFiles,
+      packageJsonContent,
       marker,
       source: extractedTemplate.source,
       targetVersion: status.targetVersion,

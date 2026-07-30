@@ -22,6 +22,10 @@ import {
   syncProjectIdentitySource,
   updateProjectIdentityName,
 } from './projectIdentity.ts';
+import {
+  allocateRegisteredProjectId,
+  findRegisteredProjectByRoot,
+} from './projectRegistration.ts';
 
 import {
   getRequestUrl,
@@ -272,25 +276,22 @@ function addOrUpdateRegistryProjectByRoot(
   },
 ): RegisteredProject {
   const root = path.resolve(params.root);
-  const { identity } = syncProjectIdentitySource(root, {
-    metadataPath: params.metadataPath,
-    fallback: params,
-  });
-  const existingByRoot = registry.listProjects().find((project) => path.resolve(project.root) === root) || null;
-  const existingById = registry.getProject(identity.id);
-  if (existingById && path.resolve(existingById.root) !== root && existingByRoot?.id !== existingById.id) {
-    const error = new Error(`Project already exists with id ${identity.id}`) as Error & { code?: string; status?: number };
-    error.code = 'MAKE_PROJECT_ID_CONFLICT';
+  const existingByRoot = findRegisteredProjectByRoot(registry.listProjects(), root);
+  if (existingByRoot) {
+    const error = new Error(`Project path already registered: ${root}`) as Error & { code?: string; status?: number };
+    error.code = 'MAKE_PROJECT_PATH_CONFLICT';
     error.status = 409;
     throw error;
   }
-  if (existingByRoot) {
-    return registry.updateProject(existingByRoot.id, {
-      name: identity.name,
-      root,
-      metadataPath: params.metadataPath,
-    });
-  }
+  const projectId = allocateRegisteredProjectId(
+    params.id,
+    (candidate) => Boolean(registry.getProject(candidate)),
+  );
+  const { identity } = syncProjectIdentitySource(root, {
+    metadataPath: params.metadataPath,
+    fallback: params,
+    projectId,
+  });
   return registry.addProject({
     id: identity.id,
     name: identity.name,

@@ -18,6 +18,8 @@ Axhub 画布节点本质上是标准 Excalidraw 元素，Axhub 扩展信息存�
 | `customData.annotation` | 元素批注文本 |
 | `customData.annotationUpdatedAt` | 批注更新时间，ISO 8601 格式 |
 
+`customData.previewUrl`、`customData.openUrl` 和元素 `link` 是画布运行时字段，可以使用相对路由或 API 路径。把预览入口发给用户验收时，不要直接复用相对字段值；先按项目“预览链接口径”补齐当前 runtime 或管理端 origin。
+
 ## 嵌入资源节点
 
 嵌入资源使用 `type: "embeddable"`。

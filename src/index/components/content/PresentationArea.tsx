@@ -1,4 +1,5 @@
 import PresentationToolbar from './PresentationToolbar';
+import ResponsiveSidebarTriggerButton from '../sidebar/ResponsiveSidebarTriggerButton';
 import ContentAreaView from './ContentAreaView';
 import UiReviewPanel from './UiReviewPanel';
 import type {
@@ -119,7 +120,16 @@ export default function PresentationArea(rawProps: PresentationAreaProps) {
                     onReviewPanelToggle={props.handleReviewPanelToggle}
                     onOpenAISettings={props.onOpenAISettings}
                 />
-            ) : null}
+            ) : (
+                <div className="ax-sidebar-compact-fallback-trigger">
+                    <ResponsiveSidebarTriggerButton
+                        compactOnly
+                        collapsed={props.collapsed}
+                        setCollapsed={props.setCollapsed}
+                        className="bg-background/90 shadow-sm"
+                    />
+                </div>
+            )}
             <div className="flex flex-1 min-h-0">
                 <div className="flex-1 min-h-0 relative">
                     <ContentAreaView

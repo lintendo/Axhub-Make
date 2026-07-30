@@ -5,7 +5,37 @@
     "originalDetailUrl": "https://styles.refero.design/style/95b472c5-fc07-46a8-a11f-c5432e290fcd",
     "fallbackRawUrl": "",
     "mirrorSource": "",
-    "websiteUrl": ""
+    "websiteUrl": "",
+    "localPaths": [
+      "DESIGN.md",
+      "theme.json",
+      "assets/tokens.json",
+      "index.tsx",
+      "style.css",
+      "tw.css",
+      "assets/source-preview.jpg"
+    ],
+    "pinnedCommit": {
+      "status": "not-applicable",
+      "reason": "Retained Refero URL/image evidence is not a Git repository and has no applicable upstream commit."
+    },
+    "license": {
+      "status": "unresolved",
+      "evidence": "No local license evidence is stored for the retained screenshot, brand imagery, or named proprietary fonts.",
+      "scope": "Internal design reference only; keep the retained client theme and exclude unresolved assets from redistribution claims."
+    },
+    "conversionNotes": "Curated retained URL/image metadata and local preview evidence into one responsive React/Web specification without claiming an official upstream design system.",
+    "evidence": {
+      "observed": [
+        "The retained Refero detail URL, theme-local preview image, palette metadata, CSS, and React entry were inspected."
+      ],
+      "inferred": [
+        "Component dimensions, interaction states, token roles, and responsive behavior beyond the retained still evidence are explicitly treated as implementation inference."
+      ],
+      "knownGaps": [
+        "Official source DESIGN.md, applicable Git commit, asset/font licenses, complete interaction states, and full responsive behavior remain unresolved."
+      ]
+    }
   },
   "identity": {
     "id": "P1R-029",
@@ -66,7 +96,7 @@
   "assets": {
     "designMd": {
       "path": "DESIGN.md",
-      "method": "derived_from_metadata"
+      "method": "curated_from_local_source_evidence"
     },
     "tailwind": {
       "path": "tw.css",
@@ -107,13 +137,41 @@
       "#a5ed6e"
     ],
     "typography": {
-      "display": "Inter",
-      "body": "Inter",
-      "mono": "ui-monospace",
-      "hints": [
-        "Inter",
-        "ui-monospace"
-      ]
+      "fontFamily": {
+        "display": "Inter",
+        "body": "Inter",
+        "mono": "ui-monospace"
+      },
+      "fontSize": {
+        "hero": "32px",
+        "section": "24px",
+        "control": "14px",
+        "body": "16px",
+        "caption": "12px"
+      },
+      "lineHeight": {
+        "hero": "1.2",
+        "section": "1.25",
+        "control": "1.2",
+        "body": "1.5",
+        "caption": "1.35"
+      },
+      "letterSpacing": {
+        "default": "0em",
+        "control": "0.04em"
+      }
+    },
+    "spacing": {
+      "xs": "8px",
+      "sm": "16px",
+      "md": "24px",
+      "lg": "40px",
+      "section": "64px"
+    },
+    "radius": {
+      "control": "12px",
+      "card": "12px",
+      "preview": "12px"
     }
   },
   "previewImages": [
@@ -256,10 +314,24 @@
         "避免：不要把 Duolingo 套用到与 教育服务、消费品牌、公共服务 明显无关的产品语境。",
         "避免：不要用通用行业模板覆盖 Duolingo 的采集图风格；需要保留原图里的版式密度、留白和视觉重心。"
       ]
+    },
+    "spacing": {
+      "xs": "8px",
+      "sm": "16px",
+      "md": "24px",
+      "lg": "40px",
+      "section": "64px"
+    },
+    "radius": {
+      "control": "12px",
+      "card": "12px",
+      "preview": "12px"
     }
   },
   "status": {
     "displayPage": "done",
-    "collectionErrors": []
+    "collectionErrors": [
+      "Blocking license gap: retained external visual/font assets have no local license evidence; keep this client theme and exclude unresolved assets from redistribution claims."
+    ]
   }
 }

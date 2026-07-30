@@ -1,0 +1,299 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/messaging/slack/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-slack-mobile",
+    "slug": "slack-mobile",
+    "brand": "Slack",
+    "titleZh": "Slack 主题",
+    "titleEn": "Slack",
+    "descriptionZh": "Slack 的 Design.md 主题展示，围绕移动端、通讯与协作组织页面。",
+    "descriptionEn": "Slack mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "通讯与协作"
+    ],
+    "distributionTags": [
+      "移动端",
+      "通讯与协作"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/slack-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/slack/id618783545?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/slack/id618783545?uo=4",
+          "marketId": "618783545",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/e9/15/e3/e915e3f6-7cda-51f0-1f66-eb204dc7f0de/card4_-_coordinate.png/720x1561bb.webp",
+          "collectedAt": "2026-07-27T19:27:40.274Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "c7c8911404692a63010bbc66df575394d7922062dcdc45773c49cebb99706c42",
+          "byteLength": 41058,
+          "width": 720,
+          "height": 1561
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/slack/id618783545?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/slack/id618783545?uo=4",
+          "marketId": "618783545",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/5d/ca/6b/5dca6b63-1062-1f70-b072-84cf8cd5fd8d/9776126f-a44a-4ecb-aa3e-ac35f8128ba0_iOS-iPhone5.5-Screenshot02.en-GB@3x.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:40.274Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "4f53b810efbb79dfb1a1212350bb10c508e2135afa5b8bb8a066b3e6ebaa2850",
+          "byteLength": 19218,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/slack/id618783545?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/slack/id618783545?uo=4",
+          "marketId": "618783545",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/8a/08/e1/8a08e19d-4d6b-cd4e-05b3-d4b45bd9f075/b56b1f8b-323c-44c7-a6ce-f1b8c497af8c_iOS-iPhone5.5-Screenshot03.en-GB@3x.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:40.274Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "9291061e11b98aecec6a32313691b8431306647385918165a708645a6f13d77a",
+          "byteLength": 20286,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#4A154B",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Helvetica Neue",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Helvetica Neue",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Slack 主题",
+    "brandAlias": "Slack",
+    "description": "Slack 的 Design.md 主题展示，围绕移动端、通讯与协作组织页面。",
+    "descriptionEn": "Slack mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "通讯与协作"
+    ],
+    "fontStylesheets": [],
+    "palette": [
+      {
+        "color": "#4A154B",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#DDDDDD",
+        "cssValue": "#DDDDDD",
+        "description": "Divider Light (`#DDDDDD`): Hairline separators."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#35373B",
+        "cssValue": "#35373B",
+        "description": "Dark Divider (`#35373B`): Hairline separators on dark."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#1D1C1D",
+        "cssValue": "#1D1C1D",
+        "description": "Text Primary Light (`#1D1C1D`): Primary message body, user names."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#1264A3",
+        "cssValue": "#1264A3",
+        "description": "Huddles banner — blue (`#1264A3`) top strip when an audio huddle is active"
+      },
+      {
+        "label": "边框 5 - Border 5",
+        "value": "#E3F2FC",
+        "cssValue": "#E3F2FC",
+        "description": "Reaction Chip (you reacted) outline `#1264A3` with `#E3F2FC` background light."
+      },
+      {
+        "label": "边框 6 - Border 6",
+        "value": "#FFFFFF",
+        "cssValue": "#FFFFFF",
+        "description": "The content surfaces outside the sidebar are clean white (`#FFFFFF`) in light mode or a near-black canvas (`#1A1D21`) in dark mode, giving Slack a two-zone visual structure: the saturated workspace sidebar on one side, the neutral conversation canvas on the other. Channel names (`#design`, `#general`) appear in the sidebar in a muted lavender-white (`#CFC3CF`) with full-white on the active channel. Unread channels get the bold treatment — channel name shifts to `#FFFFFF` bold, and a small count badge (for direct mentions) appears in bright red (`#E01E5A`, another Slack signature hue)."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Helvetica Neue",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use Slack Aubergine ({#4A154B}) as the default sidebar color — it's the signature brand anchor。",
+        "建议：Make sidebar color workspace-customizable (admin setting) — allow any hex。",
+        "建议：Use rounded-square (4pt corner) avatars — NOT circles — Slack's distinct choice。",
+        "建议：Surface reactions below every message as inline pill chips with emoji + count。",
+        "建议：Show threads as first-class: \"5 replies, last reply 3h ago\" link + slide-in pane on tap。"
+      ],
+      "dont": [
+        "避免：use circle avatars — rounded-square (4pt) is Slack's signature。",
+        "避免：hardcode the sidebar color — it's workspace-customizable。",
+        "避免：use Slack aubergine anywhere except the sidebar (and login screens) — it's the sidebar's color。",
+        "避免：put mentions without the colored pill background — the pill IS the mention。",
+        "避免：ignore threads — they need a sliding pane, not a tap-through replacement of the main view。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "chat",
+      "navigation": [
+        "消息",
+        "联系人",
+        "我的"
+      ],
+      "primaryAction": "发起对话"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

@@ -24,6 +24,35 @@ describe('OpenInDropdown source', () => {
     expect(source).not.toContain('const currentConfig = await configRes.json();');
   });
 
+  it('distinguishes an unavailable Web Agent action from a missing AI Agent preference', () => {
+    const source = readFileSync(resolve(__dirname, './OpenInDropdown.tsx'), 'utf8');
+    const guideSource = source.slice(
+      source.indexOf('const handleGuideToAISettings = useCallback'),
+      source.indexOf('const handleUnavailableWebAgent'),
+    );
+    const unavailableSource = source.slice(
+      source.indexOf('const handleUnavailableWebAgent'),
+      source.indexOf('const handleOpenWithWebAgent'),
+    );
+    const webHandlerSource = source.slice(
+      source.indexOf('const handleOpenWithWebAgent'),
+      source.indexOf('const handleOpenWithImageAi'),
+    );
+    const defaultWebBranch = source.slice(
+      source.indexOf("if (openMethod.type === 'web')"),
+      source.indexOf("if (openMethod.type === 'cli')"),
+    );
+
+    expect(guideSource).toContain('onOpenAISettings?.();');
+    expect(guideSource).toContain("toast.warning('请先在 AI 设置中选择本地 AI Agent');");
+    expect(unavailableSource).toContain("toast.warning('当前页面请直接使用页面中的 AI 输入框');");
+    expect(unavailableSource).not.toContain('onOpenAISettings?.();');
+    expect(webHandlerSource).toContain('handleUnavailableWebAgent();');
+    expect(webHandlerSource).not.toContain('handleGuideToAISettings();');
+    expect(defaultWebBranch).toContain('handleGuideToAISettings();');
+    expect(defaultWebBranch).not.toContain("toast.warning('打开 Web Agent 失败');");
+  });
+
   it('renders chat and image AI actions plus AI settings and nests CLI agents under the local app group', () => {
     const source = readFileSync(resolve(__dirname, './OpenInDropdown.tsx'), 'utf8');
     const onlineOptionsSource = source.slice(

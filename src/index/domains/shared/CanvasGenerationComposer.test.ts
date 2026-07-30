@@ -95,10 +95,36 @@ async function loadMessageExtraction() {
     removeCanvasLocalContextRefItem: mod.removeCanvasLocalContextRefItem,
     resolveCanvasAcpRuntimeProviderOptions: mod.resolveCanvasAcpRuntimeProviderOptions,
     resolveCanvasAcpSelectorDefaults: mod.resolveCanvasAcpSelectorDefaults,
+    shouldSubmitCanvasGenerationDisplayPrompt: mod.shouldSubmitCanvasGenerationDisplayPrompt,
   };
 }
 
 describe('CanvasGenerationComposer message extraction', () => {
+  it('submits display prompts on Enter but not while adding a line break or composing text', async () => {
+    const { shouldSubmitCanvasGenerationDisplayPrompt } = await loadMessageExtraction();
+
+    expect(shouldSubmitCanvasGenerationDisplayPrompt({
+      key: 'Enter',
+      shiftKey: false,
+      isComposing: false,
+    })).toBe(true);
+    expect(shouldSubmitCanvasGenerationDisplayPrompt({
+      key: 'Enter',
+      shiftKey: true,
+      isComposing: false,
+    })).toBe(false);
+    expect(shouldSubmitCanvasGenerationDisplayPrompt({
+      key: 'Enter',
+      shiftKey: false,
+      isComposing: true,
+    })).toBe(false);
+    expect(shouldSubmitCanvasGenerationDisplayPrompt({
+      key: 'a',
+      shiftKey: false,
+      isComposing: false,
+    })).toBe(false);
+  });
+
   it('applies, persists, and focuses an editable display prompt', async () => {
     const { applyCanvasGenerationDisplayPrompt } = await loadMessageExtraction();
     const persist = vi.fn();

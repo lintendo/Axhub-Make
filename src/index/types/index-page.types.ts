@@ -341,7 +341,7 @@ export interface PresentationAreaState {
     containerRef: RefObject<HTMLDivElement>;
     previewIframeRef: MutableRefObject<HTMLIFrameElement | null>;
     secondaryPreviewIframeRef: MutableRefObject<HTMLIFrameElement | null>;
-    handlePreviewIframeLoad?: () => void;
+    handlePreviewIframeLoad?: (iframe?: HTMLIFrameElement | null) => void;
     currentDevice: { id: string; [key: string]: any };
     displaySize: { width: number; height: number };
     scale: number;

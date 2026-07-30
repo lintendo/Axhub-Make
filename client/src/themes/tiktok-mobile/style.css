@@ -1,0 +1,201 @@
+@import "tailwindcss";
+
+.dmb-page.tiktok-theme {
+  color-scheme: dark;
+
+  --dmb-bg: #010101;
+  --dmb-surface: #161823;
+  --dmb-accent: #FE2C55;
+  --dmb-secondary-accent: #25F4EE;
+  --dmb-accent-contrast: #FFFFFF;
+  --dmb-link: #25F4EE;
+  --dmb-muted: #2F2F2F;
+  --dmb-ink: #FFFFFF;
+  --dmb-ink-muted: #E5E5E5;
+  --dmb-ink-subtle: rgba(255, 255, 255, 0.6);
+  --dmb-border: rgba(255, 255, 255, 0.12);
+  --dmb-border-sample-bg: #161823;
+
+  --dmb-tab-bg: #161823;
+  --dmb-tab-border: rgba(255, 255, 255, 0.12);
+  --dmb-tab-color: rgba(255, 255, 255, 0.6);
+  --dmb-tab-active-bg: #2F2F2F;
+  --dmb-tab-active-border: rgba(255, 255, 255, 0.2);
+  --dmb-tab-active-color: #FFFFFF;
+
+  --dmb-radius-xs: 0;
+  --dmb-radius-control: 4px;
+  --dmb-radius-card: 8px;
+  --dmb-radius-preview: 12px;
+  --dmb-radius-pill: 500px;
+
+  --dmb-spacing-xs: 4px;
+  --dmb-spacing-sm: 8px;
+  --dmb-spacing-md: 12px;
+  --dmb-spacing-lg: 16px;
+  --dmb-spacing-xl: 20px;
+  --dmb-spacing-2xl: 24px;
+  --dmb-spacing-3xl: 32px;
+  --dmb-spacing-4xl: 48px;
+  --dmb-spacing-5xl: 64px;
+  --dmb-spacing-6xl: 96px;
+
+  --dmb-font-display: "Proxima Nova", -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --dmb-font-body: "Proxima Nova", -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --dmb-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.dmb-page.tiktok-theme .dmb-sheet-head,
+.dmb-page.tiktok-theme .dmb-overview-meta {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dmb-page.tiktok-theme .dmb-sheet-links a:hover,
+.dmb-page.tiktok-theme .dmb-sheet-links a:focus-visible {
+  color: var(--dmb-secondary-accent);
+}
+
+.dmb-page.tiktok-theme .dmb-tags span,
+.dmb-page.tiktok-theme .dmb-muted {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: var(--dmb-ink-muted);
+}
+
+.dmb-page.tiktok-theme .dmb-token-card {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #161823;
+}
+
+.dmb-page.tiktok-theme .dmb-token-grid > div {
+  background: #22232D;
+  color: var(--dmb-ink);
+}
+
+.dmb-page.tiktok-theme .dmb-token-grid small {
+  color: var(--dmb-ink-subtle);
+}
+
+.dmb-page.tiktok-theme .dmb-token-grid button,
+.dmb-page.tiktok-theme .dmb-component-strip button {
+  border-color: var(--dmb-accent);
+  background: var(--dmb-accent);
+  color: #FFFFFF;
+}
+
+.dmb-page.tiktok-theme .dmb-token-grid .dmb-text-button {
+  border-color: var(--dmb-secondary-accent);
+  background: transparent;
+  color: var(--dmb-secondary-accent);
+}
+
+.dmb-page.tiktok-theme .dmb-outline-button {
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  background: transparent !important;
+  color: #FFFFFF !important;
+}
+
+.dmb-page.tiktok-theme .dmb-token-grid input {
+  border-color: transparent;
+  background: #2F2F2F;
+  color: #FFFFFF;
+  caret-color: var(--dmb-accent);
+}
+
+.dmb-page.tiktok-theme .dmb-token-grid input::placeholder {
+  color: var(--dmb-ink-subtle);
+}
+
+.dmb-page.tiktok-theme .dmb-lines span {
+  background: var(--dmb-accent);
+}
+
+.dmb-page.tiktok-theme .dmb-lines span:nth-child(even) {
+  background: var(--dmb-secondary-accent);
+}
+
+.dmb-page.tiktok-theme .dmb-type-list article,
+.dmb-page.tiktok-theme .dmb-component-strip,
+.dmb-page.tiktok-theme .dmb-component-grid,
+.dmb-page.tiktok-theme .dmb-spacing-scale {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #161823;
+}
+
+.dmb-page.tiktok-theme .dmb-type-list strong,
+.dmb-page.tiktok-theme .dmb-type-list p {
+  color: var(--dmb-ink);
+}
+
+.dmb-page.tiktok-theme .dmb-type-list span,
+.dmb-page.tiktok-theme .dmb-spacing-scale div {
+  color: var(--dmb-ink-subtle);
+}
+
+.dmb-page.tiktok-theme .dmb-type-list .dmb-type-sample-en {
+  color: var(--dmb-ink-muted);
+}
+
+.dmb-page.tiktok-theme .dmb-spacing-scale i {
+  border-color: var(--dmb-secondary-accent);
+}
+
+.dmb-page.tiktok-theme .dmb-radius-grid article,
+.dmb-page.tiktok-theme .dmb-shadow-grid article,
+.dmb-page.tiktok-theme .dmb-border-grid article,
+.dmb-page.tiktok-theme .dmb-component-grid article {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #161823;
+}
+
+.dmb-page.tiktok-theme .dmb-radius-grid strong,
+.dmb-page.tiktok-theme .dmb-shadow-grid strong,
+.dmb-page.tiktok-theme .dmb-border-grid strong,
+.dmb-page.tiktok-theme .dmb-component-grid h3 {
+  color: var(--dmb-ink);
+}
+
+.dmb-page.tiktok-theme .dmb-radius-grid p,
+.dmb-page.tiktok-theme .dmb-shadow-grid p,
+.dmb-page.tiktok-theme .dmb-border-grid p,
+.dmb-page.tiktok-theme .dmb-component-grid p {
+  color: var(--dmb-ink-subtle);
+}
+
+.dmb-page.tiktok-theme .dmb-radius-grid code,
+.dmb-page.tiktok-theme .dmb-shadow-grid code,
+.dmb-page.tiktok-theme .dmb-border-grid code,
+.dmb-page.tiktok-theme .dmb-component-grid small {
+  color: var(--dmb-secondary-accent);
+}
+
+.dmb-page.tiktok-theme .dmb-radius-sample {
+  background: #2F2F2F;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.dmb-page.tiktok-theme .dmb-border-sample {
+  background: #010101;
+}
+
+.dmb-page.tiktok-theme .dmb-do {
+  border-color: color-mix(in srgb, var(--dmb-secondary-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--dmb-secondary-accent) 10%, #161823);
+  color: var(--dmb-secondary-accent);
+}
+
+.dmb-page.tiktok-theme .dmb-dont {
+  border-color: color-mix(in srgb, var(--dmb-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--dmb-accent) 10%, #161823);
+  color: #FF8CA3;
+}
+
+.dmb-page.tiktok-theme .dmb-mobile-screenshot {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #161823;
+}
+
+.dmb-page.tiktok-theme .dmb-lightbox > button {
+  border-radius: 4px;
+  background: #FE2C55;
+}

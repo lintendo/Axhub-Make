@@ -105,6 +105,9 @@ describe('spec-template quick editing regression boundary', () => {
     const viewerSource = readSpecTemplateSource('MarkdownViewer.tsx');
 
     expect(viewerSource).toContain("import { XMarkdown } from '@ant-design/x-markdown';");
+    expect(viewerSource.indexOf("import { XMarkdown } from '@ant-design/x-markdown';")).toBeLessThan(
+      viewerSource.indexOf("import '@ant-design/x-markdown/themes/light.css';"),
+    );
     expect(viewerSource).toContain('<XMarkdown');
     expect(viewerSource).toContain('className="x-markdown-light"');
     expect(viewerSource).not.toMatch(/\.markdown-content\s*>\s*div\s*\{[\s\S]*background:\s*#fff/);
@@ -119,6 +122,17 @@ describe('spec-template quick editing regression boundary', () => {
     expect(viewerSource).toContain('onChange={scrollActiveAnchorIntoView}');
     expect(viewerSource).toContain("link.getAttribute('href') === activeHref");
     expect(viewerSource).not.toContain('targetElement.scrollIntoView');
+  });
+
+  it('keeps the document formatting toolbar sticky to the page viewport', () => {
+    const viewerSource = readSpecTemplateSource('MarkdownViewer.tsx');
+
+    expect(viewerSource).toMatch(
+      /\.spec-editor-shell \.simple-editor-wrapper\s*\{[^}]*overflow:\s*visible;/,
+    );
+    expect(viewerSource).toMatch(
+      /\.spec-editor-shell \.tiptap-toolbar\s*\{[^}]*top:\s*0;[^}]*position:\s*sticky;/,
+    );
   });
 
   it('initializes text comment editing for Markdown documents', () => {

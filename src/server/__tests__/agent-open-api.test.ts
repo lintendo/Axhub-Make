@@ -805,7 +805,6 @@ describe('make-server agent open API', () => {
   });
 
   it('builds Codex app commands and non-Windows OpenCode deeplinks without losing path encoding', () => {
-    const linuxDirectory = path.posix.join('/', 'home', 'demo', 'Axhub Runtime');
     const codex = buildLocalAppOpenCommandForPlatform({
       agent: 'codex',
       directory: '/workspace/axhub-runtime',
@@ -818,7 +817,7 @@ describe('make-server agent open API', () => {
     });
     const linuxOpenCode = buildLocalAppOpenCommandForPlatform({
       agent: 'opencode',
-      directory: linuxDirectory,
+      directory: '/workspace/Axhub Runtime',
       platform: 'linux',
     });
 
@@ -833,7 +832,7 @@ describe('make-server agent open API', () => {
     });
     expect(linuxOpenCode).toMatchObject({
       command: 'xdg-open',
-      args: [`opencode://open-project?directory=${encodeURI(linuxDirectory)}`],
+      args: ['opencode://open-project?directory=/workspace/Axhub%20Runtime'],
     });
   });
 

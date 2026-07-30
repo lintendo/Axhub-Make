@@ -988,4 +988,20 @@ describe('useAssistantPanelController source', () => {
     expect(ensureReadySource).toContain('messageApi.warning(\'已打开 AI 设置，请检查本地 ACP 服务\');');
     expect(ensureReadySource).toContain("openAISettingsForAssistantRuntime(runtime, error?.message || '检测 AI 助手状态失败');");
   });
+
+  it('adapts only validated compatible ACP events into host notifications', () => {
+    const source = readFileSync(resolve(__dirname, './useAssistantPanelController.tsx'), 'utf8');
+
+    expect(source).toContain("import { createAssistantNotificationTracker } from '../../notifications/assistantNotificationEvents';");
+    expect(source).toContain("import { notificationDiagnostics } from '../../notifications/notificationDiagnostics';");
+    expect(source).toContain("import type { NotificationIntent } from '../../notifications/notificationCoordinator';");
+    expect(source).toContain('onAiNotification?: (intent: NotificationIntent) => void;');
+    expect(source).toContain('const assistantNotificationTrackerRef = useRef(createAssistantNotificationTracker(notificationDiagnostics));');
+    expect(source).toContain("notificationDiagnostics.record('assistant.event.received'");
+    expect(source).toContain("reason: 'unmatched-source'");
+    expect(source).toContain("reason: 'origin-mismatch'");
+    expect(source).toContain("reason: 'accepted'");
+    expect(source).toContain('const notificationIntent = assistantNotificationTrackerRef.current.consume(event.data);');
+    expect(source).toContain('onAiNotification?.(notificationIntent);');
+  });
 });

@@ -1,8 +1,85 @@
+import React from 'react';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { apiService } from '../../services/index.api';
+import { useIndexPagePreferences } from './useIndexPagePreferences';
+
+vi.mock('../../services/index.api', () => ({
+  apiService: {
+    getBootstrapConfig: vi.fn(),
+    getConfig: vi.fn(),
+  },
+}));
+
+vi.mock('@/common/promptExecution', () => ({
+  normalizePromptClientPreference: (value: unknown) => value || null,
+}));
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
 
 describe('useIndexPagePreferences source', () => {
+  it('waits for a project before loading preferences, then loads the selected project', async () => {
+    const getBootstrapConfig = vi.mocked(apiService.getBootstrapConfig);
+    getBootstrapConfig.mockResolvedValue({} as any);
+    const setDefaultThemeName = vi.fn();
+
+    function Harness({ projectId }: { projectId: string | null }) {
+      useIndexPagePreferences({
+        activeProjectId: projectId,
+        enabled: true,
+        setDefaultThemeName,
+      });
+      return null;
+    }
+
+    let renderer: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(React.createElement(Harness, { projectId: null }));
+    });
+
+    expect(getBootstrapConfig).not.toHaveBeenCalled();
+
+    await act(async () => {
+      renderer.update(React.createElement(Harness, { projectId: '   ' }));
+    });
+
+    expect(getBootstrapConfig).not.toHaveBeenCalled();
+
+    await act(async () => {
+      renderer.update(React.createElement(Harness, { projectId: 'project-a' }));
+    });
+
+    expect(getBootstrapConfig).toHaveBeenCalledOnce();
+    expect(getBootstrapConfig).toHaveBeenCalledWith({ projectId: 'project-a' });
+  });
+
+  it('ignores settings refresh while no project is selected', async () => {
+    const getConfig = vi.mocked(apiService.getConfig);
+    let handleSettingsSaved: (() => void) | null = null;
+
+    function Harness() {
+      handleSettingsSaved = useIndexPagePreferences({
+        activeProjectId: null,
+        enabled: true,
+        setDefaultThemeName: vi.fn(),
+      }).handleSettingsSaved;
+      return null;
+    }
+
+    await act(async () => {
+      create(React.createElement(Harness));
+    });
+
+    expect(handleSettingsSaved).not.toBeNull();
+    expect(() => handleSettingsSaved?.()).not.toThrow();
+    expect(getConfig).not.toHaveBeenCalled();
+  });
+
   it('uses lightweight bootstrap config initially without probing local IDE or agent availability', () => {
     const source = readFileSync(resolve(__dirname, './useIndexPagePreferences.ts'), 'utf8');
     const initialEffectStart = source.indexOf('useEffect(() => {');

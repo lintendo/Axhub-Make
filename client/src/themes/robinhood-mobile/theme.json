@@ -1,0 +1,294 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/finance/robinhood/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-robinhood-mobile",
+    "slug": "robinhood-mobile",
+    "brand": "Robinhood",
+    "titleZh": "Robinhood 主题",
+    "titleEn": "Robinhood",
+    "descriptionZh": "Robinhood 的 Design.md 主题展示，围绕移动端、金融与支付组织页面。",
+    "descriptionEn": "Robinhood mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "金融与支付"
+    ],
+    "distributionTags": [
+      "移动端",
+      "金融与支付"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/robinhood-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/robinhood-trading-investing/id938003185?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/robinhood-trading-investing/id938003185?uo=4",
+          "marketId": "938003185",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/21/8d/5f/218d5f50-8c94-a422-211d-b77dfb9b2c00/ios-1242x2208__U00283_U0029.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:27:39.857Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "82030a56ebb21039aca41f8d5881d92ae5a7ea82035e79e41942230add17f0eb",
+          "byteLength": 17224,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/robinhood-trading-investing/id938003185?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/robinhood-trading-investing/id938003185?uo=4",
+          "marketId": "938003185",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/84/c3/7e/84c37eeb-0f75-a7b1-f06c-799f34c229f3/ios-1260x2736-1.jpg/720x1563bb.webp",
+          "collectedAt": "2026-07-27T19:27:39.857Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "7d2dd2ea126205fba363de30990a1306676a0f57eb4ac0b56741a25bb953c27a",
+          "byteLength": 46054,
+          "width": 720,
+          "height": 1563
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/robinhood-trading-investing/id938003185?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/robinhood-trading-investing/id938003185?uo=4",
+          "marketId": "938003185",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/20/c4/70/20c4705c-3db7-26ad-5502-f9229d8167ac/ios-1242x2208__U00287_U0029.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:27:39.857Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "7d5d62d882ead85163e139ffa632ca2bf534e72cf535e481ca977253849eae17",
+          "byteLength": 17064,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#00C805",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "Apercu",
+      "body": "Helvetica Neue",
+      "mono": "ui-monospace",
+      "hints": [
+        "Apercu",
+        "Helvetica Neue",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Robinhood 主题",
+    "brandAlias": "Robinhood",
+    "description": "Robinhood 的 Design.md 主题展示，围绕移动端、金融与支付组织页面。",
+    "descriptionEn": "Robinhood mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "金融与支付"
+    ],
+    "fontStylesheets": [],
+    "palette": [
+      {
+        "color": "#00C805",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "阴影 1 - Shadow 1",
+        "value": "rgba(0,0,0,0.04)",
+        "cssValue": "rgba(0,0,0,0.04)",
+        "description": "Shadow Black (`rgba(0,0,0,0.04)`): Very subtle shadows only — Robinhood is essentially flat."
+      }
+    ],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#E6E6E6",
+        "cssValue": "#E6E6E6",
+        "description": "Divider (`#E6E6E6`): Hairline row dividers in lists."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#2D3138",
+        "cssValue": "#2D3138",
+        "description": "Dark Divider (`#2D3138`): Hairlines."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#00C805",
+        "cssValue": "#00C805",
+        "description": "The accent is Robinhood Green (`#00C805`) — a vivid, slightly-yellow lime green pulled from the original 2014 brand identity. It carries the upward portfolio movement, the chart line when the day is green, the \"Trading\" badge on profitable positions, and the buy-button gradient. Its counter is Robinhood Red (`#FF5000`) — actually orange, not pure red, deliberately differentiated from the legacy financial-software red because Robinhood wanted to feel friendlier even on the downside. Together green/orange render every chart, every position card, every notification: portfolio is up (green) or portfolio is down (orange)."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#FFFFFF",
+        "cssValue": "#FFFFFF",
+        "description": "White canvas (`#FFFFFF`) with `#F7F7F7` for subtle section fills — clean tech-product aesthetic"
+      }
+    ],
+    "typography": [
+      "Apercu",
+      "Helvetica Neue",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use {#00C805} (Robinhood Green) for all upward portfolio movement, buy CTAs, profitable positions。",
+        "建议：Use {#FF5000} (Robinhood Red — orange) for downward movement and loss states — note this is orange, NOT red。",
+        "建议：Use a true red {#E62232} only for hard error states (order failed, system error) — keep it distinct from the loss orange。",
+        "建议：Render every $-amount and every percentage in Capsule Sans Text with tabular numerals。",
+        "建议：Use Capsule Sans Display (40pt+ Bold) for the hero portfolio value at the top of the Investing tab。"
+      ],
+      "dont": [
+        "避免：use green for a down number or orange for an up number — color is bound to direction。",
+        "避免：use legacy red {#FF0000} for losses — Robinhood Red is specifically orange ({#FF5000})。",
+        "避免：add gradients to the chart line area — modern Robinhood is just the line, no fill。",
+        "避免：render numbers in proportional figures — always tabular numerals。",
+        "避免：crowd position rows below 56pt — the data density is already at its limit。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "finance",
+      "navigation": [
+        "资产",
+        "交易",
+        "我的"
+      ],
+      "primaryAction": "转账"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

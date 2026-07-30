@@ -1,0 +1,392 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/social/tiktok/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-tiktok-mobile",
+    "slug": "tiktok-mobile",
+    "brand": "TikTok",
+    "titleZh": "TikTok 主题",
+    "titleEn": "TikTok",
+    "descriptionZh": "TikTok 的深色移动主题，以全屏视频、玫红动作色与青红错位品牌效果为核心。",
+    "descriptionEn": "TikTok dark mobile theme with full-bleed video, rose actions, and chromatic accents."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "社交与社区"
+    ],
+    "distributionTags": [
+      "移动端",
+      "社交与社区"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/tiktok-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/tiktok-videos-shop-live/id835599320?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/tiktok-videos-shop-live/id835599320?uo=4",
+          "marketId": "835599320",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/99/2e/c2/992ec242-7589-7262-cfd6-11a6115674d0/426a0b06-acb2-4cec-b9a0-b0e69a124d7e_Winter_AI_iOS_2208.png/720x1280bb.webp",
+          "collectedAt": "2026-07-27T19:27:41.614Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "a913f3e008806a1a2fb20ed2e441b43970c96af215b38227a08e828f49040604",
+          "byteLength": 45374,
+          "width": 720,
+          "height": 1280
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/tiktok-videos-shop-live/id835599320?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/tiktok-videos-shop-live/id835599320?uo=4",
+          "marketId": "835599320",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/27/ce/2f/27ce2fc4-a338-95ab-3bbe-1b9062cf537d/e6733d76-8afb-4efa-b9a1-9937cdd227f7_STEM_iOS_2208.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:41.614Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "0029ad121973705c506416c8b37a8a431c9088b20b30b22a03359eea195c8526",
+          "byteLength": 23910,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/tiktok-videos-shop-live/id835599320?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/tiktok-videos-shop-live/id835599320?uo=4",
+          "marketId": "835599320",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/b2/b8/d5/b2b8d5ce-7852-5c2c-1bce-4c812c04cb65/329e308a-8a6a-40d8-a1a1-ada1c34e45e8_Mother_iOS_2208.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:41.614Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "e5ed4426d0cd765b49cee8e1a72831a29b29ee6910a2c6f8992d675e11aa4ce6",
+          "byteLength": 23120,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "appearance": {
+      "defaultMode": "dark",
+      "source": "design-md"
+    },
+    "palette": [
+      "#010101",
+      "#FE2C55",
+      "#25F4EE",
+      "#FFFFFF",
+      "#161823",
+      "#2F2F2F",
+      "#E5E5E5"
+    ],
+    "typography": {
+      "display": "Proxima Nova",
+      "body": "Proxima Nova",
+      "primary": "Proxima Nova",
+      "mono": "ui-monospace",
+      "fallback": [
+        "-apple-system",
+        "BlinkMacSystemFont",
+        "SF Pro Text",
+        "Inter",
+        "Segoe UI",
+        "Roboto",
+        "Helvetica",
+        "Arial",
+        "sans-serif"
+      ],
+      "hints": [
+        "Proxima Nova",
+        "Proxima Nova",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "4px",
+      "card": "8px",
+      "preview": "12px",
+      "pill": "500px",
+      "circle": "50%",
+      "scale": [
+        "0px",
+        "4px",
+        "8px",
+        "12px",
+        "500px",
+        "50%"
+      ],
+      "source": "design-md"
+    },
+    "spacing": {
+      "base": "4px",
+      "scale": [
+        "4px",
+        "8px",
+        "12px",
+        "16px",
+        "20px",
+        "24px",
+        "32px",
+        "48px",
+        "64px",
+        "96px"
+      ],
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "TikTok 主题",
+    "brandAlias": "TikTok",
+    "description": "TikTok 的深色移动主题，以全屏视频画布、玫红动作色、青色品牌点缀与紧凑覆盖层排版为核心。",
+    "descriptionEn": "TikTok dark mobile theme with full-bleed video, rose actions, cyan accents, and compact overlay typography.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "社交与社区"
+    ],
+    "fontStylesheets": [],
+    "palette": [
+      {
+        "color": "#FE2C55",
+        "labelZh": "主操作色",
+        "labelEn": "Primary Action",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#25F4EE",
+        "labelZh": "品牌强调色",
+        "labelEn": "Accent",
+        "textColor": "#010101"
+      },
+      {
+        "color": "#010101",
+        "labelZh": "画布黑",
+        "labelEn": "Canvas",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#FFFFFF",
+        "labelZh": "主要文字",
+        "labelEn": "Text Primary",
+        "textColor": "#010101"
+      },
+      {
+        "color": "#161823",
+        "labelZh": "抬升表面",
+        "labelEn": "Elevated Surface",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#2F2F2F",
+        "labelZh": "输入表面",
+        "labelEn": "Input Surface",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#E5E5E5",
+        "labelZh": "次要文字",
+        "labelEn": "Text Secondary",
+        "textColor": "#010101"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "视频文字阴影 - Text Shadow",
+        "value": "rgba(0,0,0,0.4) 0 1px 4px",
+        "cssValue": "rgba(0,0,0,0.4) 0 1px 4px",
+        "description": "所有视频覆盖文字都使用轻量黑色阴影，在明暗画面上保持可读。"
+      },
+      {
+        "label": "视频图标阴影 - Icon Shadow",
+        "value": "rgba(0,0,0,0.25) 0 1px 3px",
+        "cssValue": "rgba(0,0,0,0.25) 0 1px 3px",
+        "description": "右侧操作轨和顶部标签使用更紧凑的图标阴影。"
+      },
+      {
+        "label": "底部浮层 - Bottom Sheet",
+        "value": "rgba(0,0,0,0.5) 0 -12px 40px",
+        "cssValue": "rgba(0,0,0,0.5) 0 -12px 40px",
+        "description": "评论和分享浮层仅用向上的阴影表达抬升。"
+      }
+    ],
+    "borders": [
+      {
+        "label": "底栏分隔线 - Tab Divider",
+        "value": "rgba(255,255,255,0.08)",
+        "cssValue": "rgba(255,255,255,0.08)",
+        "description": "非视频页底部导航使用的 0.5pt 轻分隔线。"
+      },
+      {
+        "label": "头像描边 - Avatar Ring",
+        "value": "#FFFFFF",
+        "cssValue": "#FFFFFF",
+        "description": "视频操作轨中的头像使用 2pt 白色描边。"
+      },
+      {
+        "label": "话题标签边框 - Hashtag Border",
+        "value": "rgba(255,255,255,0.2)",
+        "cssValue": "rgba(255,255,255,0.2)",
+        "description": "透明话题标签使用 1pt 半透明白色边框。"
+      }
+    ],
+    "typography": [
+      "Proxima Nova",
+      "Proxima Nova",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "Feed",
+        "title": "全屏视频画布",
+        "body": "视频从边到边填满视口，文字与操作控件直接叠加在内容之上。"
+      },
+      {
+        "eyebrow": "Action",
+        "title": "玫红表达动作",
+        "body": "点赞、关注和进度条使用 #FE2C55；非动作状态不滥用品牌色。"
+      },
+      {
+        "eyebrow": "Brand",
+        "title": "青红错位强调",
+        "body": "#25F4EE 与 #FE2C55 只在标志、创建按钮和加载状态形成色差效果。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "使用 #010101 作为全局画布，让视频边缘融入背景。",
+        "只在点赞、关注、进度等主要动作上使用 #FE2C55。",
+        "谨慎使用 #25F4EE，只用于创建按钮与青红错位效果。",
+        "所有视频覆盖文字使用 rgba(0,0,0,0.4) 的可读性阴影。",
+        "按钮和输入框使用 4px 的近直角圆角。"
+      ],
+      "dont": [
+        "不要用 #000000 替代来源明确指定的 #010101。",
+        "不要引入玫红和青色之外的第二套强调色。",
+        "不要为主题生成浅色模式或米白色画布。",
+        "不要把普通按钮做成全胶囊形状。",
+        "不要让标题和图标在视频上失去阴影保护。"
+      ]
+    },
+    "radius": {
+      "control": "4px",
+      "card": "8px",
+      "preview": "12px",
+      "pill": "500px",
+      "circle": "50%",
+      "scale": [
+        "0px",
+        "4px",
+        "8px",
+        "12px",
+        "500px",
+        "50%"
+      ],
+      "source": "design-md"
+    },
+    "spacing": {
+      "base": "4px",
+      "scale": [
+        "4px",
+        "8px",
+        "12px",
+        "16px",
+        "20px",
+        "24px",
+        "32px",
+        "48px",
+        "64px",
+        "96px"
+      ],
+      "source": "design-md"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

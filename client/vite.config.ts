@@ -59,7 +59,10 @@ export default defineConfig(({ command }) => {
 
   const config: any = {
     plugins: [
-      tailwindcss(),
+      // Vitest 4 currently runs on Vite 7, while @tailwindcss/vite resolves
+      // against this package's Vite 5. Skip the production-only CSS plugin
+      // during test collection so CSS mocks can load without that mismatch.
+      process.env.VITEST ? null : tailwindcss(),
       isServe ? canvasHotUpdateFilterPlugin() : null,
       isServe ? annotationRuntimeOptimizeDepsPlugin(projectRoot) : null,
       injectStablePageIds(),

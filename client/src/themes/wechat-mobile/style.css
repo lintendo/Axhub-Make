@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+.dmb-page.wechat-theme {
+  color-scheme: light;
+
+  --dmb-bg: #EDEDED;
+  --dmb-surface: #FFFFFF;
+  --dmb-accent: #07C160;
+  --dmb-accent-pressed: #06A050;
+  --dmb-accent-contrast: #FFFFFF;
+  --dmb-link: #576B95;
+  --dmb-muted: #F7F7F7;
+  --dmb-ink: #181818;
+  --dmb-ink-muted: #888888;
+  --dmb-ink-subtle: #B2B2B2;
+  --dmb-border: #D9D9D9;
+  --dmb-border-sample-bg: #FFFFFF;
+
+  --dmb-tab-bg: #F7F7F7;
+  --dmb-tab-border: #D9D9D9;
+  --dmb-tab-color: #888888;
+  --dmb-tab-active-bg: #FFFFFF;
+  --dmb-tab-active-border: #07C160;
+  --dmb-tab-active-color: #07C160;
+
+  --dmb-radius-xs: 4px;
+  --dmb-radius-control: 6px;
+  --dmb-radius-card: 8px;
+  --dmb-radius-preview: 8px;
+  --dmb-radius-pill: 8px;
+
+  --dmb-spacing-xs: 4px;
+  --dmb-spacing-sm: 8px;
+  --dmb-spacing-md: 12px;
+  --dmb-spacing-lg: 16px;
+  --dmb-spacing-xl: 20px;
+  --dmb-spacing-2xl: 24px;
+  --dmb-spacing-3xl: 28px;
+  --dmb-spacing-4xl: 44px;
+  --dmb-spacing-5xl: 56px;
+
+  --dmb-font-display: "PingFang SC", "Noto Sans", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Hiragino Sans", sans-serif;
+  --dmb-font-body: "PingFang SC", "Noto Sans", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Hiragino Sans", sans-serif;
+  --dmb-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.dmb-page.wechat-theme .dmb-sheet {
+  background: #FFFFFF;
+}
+
+.dmb-page.wechat-theme .dmb-token-grid button,
+.dmb-page.wechat-theme .dmb-component-strip button {
+  border-color: #07C160;
+  border-radius: 6px;
+  background: #07C160;
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.dmb-page.wechat-theme .dmb-token-grid button:hover,
+.dmb-page.wechat-theme .dmb-token-grid button:focus-visible,
+.dmb-page.wechat-theme .dmb-component-strip button:hover,
+.dmb-page.wechat-theme .dmb-component-strip button:focus-visible {
+  border-color: #06A050;
+  background: #06A050;
+}
+
+.dmb-page.wechat-theme .dmb-token-grid .dmb-text-button {
+  border-color: #D9D9D9;
+  background: #FFFFFF;
+  color: #181818;
+}
+
+.dmb-page.wechat-theme .dmb-outline-button {
+  border-color: #D9D9D9 !important;
+  background: #FFFFFF !important;
+  color: #181818 !important;
+}
+
+.dmb-page.wechat-theme .dmb-token-grid input {
+  border-color: #D9D9D9;
+  border-radius: 6px;
+  background: #FFFFFF;
+  color: #181818;
+  caret-color: #07C160;
+}
+
+.dmb-page.wechat-theme .dmb-token-card,
+.dmb-page.wechat-theme .dmb-type-list article,
+.dmb-page.wechat-theme .dmb-component-strip,
+.dmb-page.wechat-theme .dmb-component-grid,
+.dmb-page.wechat-theme .dmb-spacing-scale,
+.dmb-page.wechat-theme .dmb-radius-grid article,
+.dmb-page.wechat-theme .dmb-shadow-grid article,
+.dmb-page.wechat-theme .dmb-border-grid article,
+.dmb-page.wechat-theme .dmb-component-grid article,
+.dmb-page.wechat-theme .dmb-mobile-screenshot {
+  border-color: #D9D9D9;
+  background: #FFFFFF;
+}
+
+.dmb-page.wechat-theme .dmb-tags span,
+.dmb-page.wechat-theme .dmb-muted {
+  border-color: #D9D9D9;
+  background: #F7F7F7;
+  color: #888888;
+}
+
+.dmb-page.wechat-theme .dmb-do {
+  border-color: color-mix(in srgb, #07C160 35%, transparent);
+  background: color-mix(in srgb, #07C160 8%, #FFFFFF);
+  color: #06A050;
+}
+
+.dmb-page.wechat-theme .dmb-dont {
+  border-color: color-mix(in srgb, #FA5151 35%, transparent);
+  background: color-mix(in srgb, #FA5151 8%, #FFFFFF);
+  color: #FA5151;
+}
+
+.dmb-page.wechat-theme .dmb-lightbox > button {
+  border-radius: 6px;
+  background: #07C160;
+}
+
+.dmb-page.wechat-theme .dmb-lines span:nth-child(even) {
+  background: #95EC69;
+}
+
+.dmb-page.wechat-theme .dmb-radius-sample {
+  background: #F7F7F7;
+  border-color: #D9D9D9;
+}

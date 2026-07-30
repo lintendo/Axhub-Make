@@ -1,0 +1,420 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/misc/chatgpt/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-chatgpt-mobile",
+    "slug": "chatgpt-mobile",
+    "brand": "Chatgpt",
+    "titleZh": "Chatgpt 主题",
+    "titleEn": "Chatgpt",
+    "descriptionZh": "Chatgpt 的 Design.md 主题展示，围绕移动端、AI 与开发工具组织页面。",
+    "descriptionEn": "Chatgpt mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "AI 与开发工具"
+    ],
+    "distributionTags": [
+      "移动端",
+      "AI 与开发工具"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/chatgpt-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/chatgpt/id6448311069",
+          "officialPageUrl": "https://apps.apple.com/us/app/chatgpt/id6448311069",
+          "marketId": "6448311069",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/05/d5/4a/05d54ae7-3d1f-70ab-a95c-e0c440d02255/1_iPhone.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:16:51.219Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "b609777e21c54c9257262d091c9878d2067ad63c61972a260bc67949d8c9638e",
+          "byteLength": 46744,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/chatgpt/id6448311069",
+          "officialPageUrl": "https://apps.apple.com/us/app/chatgpt/id6448311069",
+          "marketId": "6448311069",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/bb/7d/a5/bb7da595-db66-80c5-efc2-0f9126b3ee96/2_iPhone.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:16:51.219Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "ff6f944560c8d8ac57d940477616d252827ccf005906788d861d4da26321fa5e",
+          "byteLength": 61712,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/chatgpt/id6448311069",
+          "officialPageUrl": "https://apps.apple.com/us/app/chatgpt/id6448311069",
+          "marketId": "6448311069",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/5e/fb/ad/5efbadef-3a01-9715-4de4-13aeb5ecf502/3_iPhone.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:16:51.219Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "7498ffe9b3480c1bed67ad95892d7126e1971441bf5aa84b72e04b71978c0648",
+          "byteLength": 50610,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "appearance": {
+      "defaultMode": "light",
+      "source": "design-md"
+    },
+    "palette": [
+      "#0D0D0D",
+      "#FFFFFF",
+      "#212121",
+      "#ECECEC",
+      "#F7F7F8",
+      "#2F2F2F",
+      "#E5E5E5",
+      "#676767",
+      "#8E8E8E",
+      "#2A7FFF",
+      "#CCCCCC",
+      "#4D4D4D",
+      "#3B82F6",
+      "#60A5FA",
+      "#93C5FD"
+    ],
+    "typography": {
+      "display": "Söhne",
+      "body": "Söhne",
+      "primary": "Söhne",
+      "mono": "Menlo",
+      "fallback": [
+        "-apple-system",
+        "BlinkMacSystemFont",
+        "Inter",
+        "Segoe UI",
+        "Helvetica",
+        "Arial",
+        "sans-serif"
+      ],
+      "hints": [
+        "Söhne",
+        "Söhne",
+        "Menlo"
+      ]
+    },
+    "radius": {
+      "control": "8px",
+      "card": "18px",
+      "preview": "24px",
+      "pill": "500px",
+      "circle": "50%",
+      "scale": [
+        "0px",
+        "4px",
+        "8px",
+        "12px",
+        "18px",
+        "24px",
+        "500px",
+        "50%"
+      ],
+      "source": "design-md"
+    },
+    "spacing": {
+      "base": "4px",
+      "scale": [
+        "4px",
+        "8px",
+        "12px",
+        "16px",
+        "20px",
+        "24px",
+        "32px",
+        "40px",
+        "56px",
+        "72px"
+      ],
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "ChatGPT 主题",
+    "brandAlias": "ChatGPT",
+    "description": "ChatGPT 的后 2024 单色主题，以白色文档画布、黑色圆形发送按钮、轻灰用户气泡和克制的蓝色链接为核心。",
+    "descriptionEn": "Post-2024 ChatGPT monochrome theme with a white document canvas, black circular send action, soft user bubbles, and restrained blue links.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "AI 与开发工具"
+    ],
+    "fontStylesheets": [],
+    "palette": [
+      {
+        "color": "#0D0D0D",
+        "labelZh": "发送与主要文字",
+        "labelEn": "Black / Send",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#FFFFFF",
+        "labelZh": "浅色画布",
+        "labelEn": "Light Canvas",
+        "textColor": "#0D0D0D"
+      },
+      {
+        "color": "#212121",
+        "labelZh": "深色画布",
+        "labelEn": "Dark Canvas",
+        "textColor": "#ECECEC"
+      },
+      {
+        "color": "#ECECEC",
+        "labelZh": "深色主要文字",
+        "labelEn": "Dark Text",
+        "textColor": "#212121"
+      },
+      {
+        "color": "#F7F7F8",
+        "labelZh": "用户气泡",
+        "labelEn": "User Bubble",
+        "textColor": "#0D0D0D"
+      },
+      {
+        "color": "#2F2F2F",
+        "labelZh": "深色用户气泡",
+        "labelEn": "Dark Bubble",
+        "textColor": "#ECECEC"
+      },
+      {
+        "color": "#E5E5E5",
+        "labelZh": "分隔线",
+        "labelEn": "Divider",
+        "textColor": "#0D0D0D"
+      },
+      {
+        "color": "#676767",
+        "labelZh": "次要文字",
+        "labelEn": "Secondary Text",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#2A7FFF",
+        "labelZh": "消息链接",
+        "labelEn": "Link Blue",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#CCCCCC",
+        "labelZh": "发送禁用",
+        "labelEn": "Send Disabled",
+        "textColor": "#0D0D0D"
+      },
+      {
+        "color": "#3B82F6",
+        "labelZh": "语音球蓝",
+        "labelEn": "Voice Blue",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#93C5FD",
+        "labelZh": "语音球高光",
+        "labelEn": "Voice Highlight",
+        "textColor": "#0D0D0D"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "浮层 - Floating",
+        "value": "rgba(0,0,0,0.08) 0 4px 12px",
+        "cssValue": "rgba(0,0,0,0.08) 0 4px 12px",
+        "description": "模型选择、分享和附件浮层的功能性阴影。"
+      },
+      {
+        "label": "底部浮层 - Sheet",
+        "value": "rgba(0,0,0,0.16) 0 -4px 24px",
+        "cssValue": "rgba(0,0,0,0.16) 0 -4px 24px",
+        "description": "设置和模型选择底部浮层使用的向上阴影。"
+      }
+    ],
+    "borders": [
+      {
+        "label": "浅色分隔线 - Divider",
+        "value": "#E5E5E5",
+        "cssValue": "#E5E5E5",
+        "description": "代码块、表格和浅色控件的 1px 边框。"
+      },
+      {
+        "label": "深色分隔线 - Dark Divider",
+        "value": "#424242",
+        "cssValue": "#424242",
+        "description": "深色模式控件和代码表面的 1px 边框。"
+      }
+    ],
+    "typography": [
+      "Söhne",
+      "Söhne",
+      "Menlo"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "Document",
+        "title": "文本就是界面",
+        "body": "助手响应不使用气泡，以 Markdown 文档流承载标题、代码、表格和公式。"
+      },
+      {
+        "eyebrow": "Action",
+        "title": "黑白反相发送按钮",
+        "body": "浅色模式为黑底白箭头，深色模式反相；旧 ChatGPT Green 不再承担主色。"
+      },
+      {
+        "eyebrow": "Voice",
+        "title": "蓝色只在语音模式绽放",
+        "body": "#3B82F6 → #93C5FD 的球形渐变是单色聊天之外唯一戏剧化时刻。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "浅色画布使用 #FFFFFF，深色画布使用 #212121。",
+        "发送按钮保持 32px 圆形并使用黑白反相箭头。",
+        "聊天界面保持单色，#2A7FFF 只用于链接。",
+        "用户消息使用 #F7F7F8 轻灰气泡，助手消息不使用气泡。",
+        "完整渲染助手响应中的 Markdown、代码、表格和公式。"
+      ],
+      "dont": [
+        "不要给助手响应添加聊天气泡。",
+        "不要把旧 #10A37F 设为主题主色。",
+        "不要把发送按钮改成方形或矩形。",
+        "不要给聊天内容添加重阴影。",
+        "不要忽略代码高亮和复制操作。"
+      ]
+    },
+    "radius": {
+      "control": "8px",
+      "card": "18px",
+      "preview": "24px",
+      "pill": "500px",
+      "circle": "50%",
+      "scale": [
+        "0px",
+        "4px",
+        "8px",
+        "12px",
+        "18px",
+        "24px",
+        "500px",
+        "50%"
+      ],
+      "source": "design-md"
+    },
+    "spacing": {
+      "base": "4px",
+      "scale": [
+        "4px",
+        "8px",
+        "12px",
+        "16px",
+        "20px",
+        "24px",
+        "32px",
+        "40px",
+        "56px",
+        "72px"
+      ],
+      "source": "design-md"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

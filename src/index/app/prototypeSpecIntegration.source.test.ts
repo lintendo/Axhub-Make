@@ -39,6 +39,11 @@ describe('prototype spec workspace integration', () => {
     expect(indexSource).toContain('handlePrototypeSpecPreviewReady');
     expect(indexSource).toContain("preview.handleEnableDocEdit('comment', { disableSelectionMode: true, preserveSidebar: true })");
     expect(previewReadyHandler).toContain(".endsWith('.md')) return;");
+    expect(indexSource).toContain('const prototypeSpecAnnotationAttemptIdRef = useRef(0);');
+    expect(indexSource).toContain('currentPrototypeSpecItemRef.current = prototypeSpec.currentItem;');
+    expect(previewReadyHandler).toContain('const annotationEnabled = await preview.handleEnableDocEdit');
+    expect(previewReadyHandler).toContain('shouldClosePrototypeSpecAfterAnnotationAttempt({');
+    expect(previewReadyHandler).toContain('prototypeSpec.close();');
     expect(previewReadyHandler).not.toContain('prototypeSpecAnnotationActiveRef.current = true;');
     expect(indexSource).toContain('onPrototypeSpecExit: prototypeSpec.close');
     expect(indexSource).not.toContain('prototypeSpecAnnotationActiveRef');
@@ -80,8 +85,12 @@ describe('prototype spec workspace integration', () => {
   it('guards automatic split-spec navigation with current-page commentary state', () => {
     const indexSource = readSource('./IndexPage.tsx');
     const controllerSource = readSource('./hooks/usePrototypeSpecController.ts');
+    const documentNavigationSource = readSource('./hooks/useDocumentResourceNavigation.ts');
     const guardSource = readSource('./hooks/usePrototypeSpecNavigationGuard.ts');
 
+    expect(indexSource).toContain('useDocumentResourceNavigation({');
+    expect(documentNavigationSource).toContain("event.data?.type !== 'axhub-document-resource:navigate'");
+    expect(documentNavigationSource).toContain('event.source !== sourceWindow');
     expect(indexSource).toContain('usePrototypeSpecNavigationGuard({');
     expect(indexSource).toContain('modifiedCount: preview.hostToolbarState?.modifiedCount ?? 0');
     expect(indexSource).toContain("type: 'clear-edits'");

@@ -16,13 +16,25 @@
       "tsconfig.base.json",
       "tsconfig.json",
       "tsconfig.typecheck.json",
-      "vite.config.ts"
+      "vite.config.ts",
+      "scripts/build-all.js",
+      "scripts/canvas-fig-sync.mjs",
+      "scripts/capture-theme-homepage.mjs",
+      "scripts/capture-theme-source.mjs",
+      "scripts/check-app-ready.mjs",
+      "scripts/chrome-export-converter.mjs",
+      "scripts/scan-entries.js",
+      "scripts/sync-project-metadata.d.ts",
+      "scripts/sync-project-metadata.mjs",
+      "scripts/sync-project-metadata.mjs.d.ts",
+      "scripts/sync-vendor-if-present.mjs"
     ],
     "directories": [
       ".agents/skills",
       ".claude/skills",
       "rules",
-      "scripts",
+      "scripts/templates",
+      "scripts/utils",
       "src/common",
       "src/preview-templates",
       "vite-plugins"
@@ -30,13 +42,13 @@
     "fileRules": [
       {
         "action": "exclude",
-        "pattern": "^scripts/subset-beginner-guide-fonts\\.mjs$",
-        "description": "发布包只保留已裁剪字体，不携带字体裁剪开发工具。"
+        "pattern": "^\\.(?:agents|claude)/skills/prototype-comments(?:/|$)",
+        "description": "旧版 prototype-comments 已由 handle-comments 替代，不进入发布模板。"
       },
       {
         "action": "exclude",
-        "pattern": "^\\.(?:agents|claude)/skills/prototype-comments(?:/|$)",
-        "description": "旧版 prototype-comments 已由 handle-comments 替代，不进入发布模板。"
+        "pattern": "^\\.(?:agents|claude)/skills/triple-ampersand-operator(?:/|$)",
+        "description": "测试用 triple-ampersand-operator 不进入发布模板。"
       }
     ]
   },

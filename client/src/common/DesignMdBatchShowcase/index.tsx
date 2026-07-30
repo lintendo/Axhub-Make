@@ -6,6 +6,24 @@ import { getHeaderLinks, type BatchShowcaseSourceLinks } from './headerLinks';
 
 type TypographyFontRole = 'display' | 'body' | 'mono';
 
+export type MobilePreviewPattern =
+  | 'feed'
+  | 'chat'
+  | 'finance'
+  | 'map'
+  | 'workspace'
+  | 'health'
+  | 'commerce'
+  | 'media'
+  | 'dating'
+  | 'assistant';
+
+export type BatchMobilePreview = {
+  pattern: MobilePreviewPattern;
+  navigation: [string, string, string];
+  primaryAction: string;
+};
+
 export type BatchPreviewImage = {
   type: string;
   url: string;
@@ -31,7 +49,8 @@ export type BatchShowcaseConfig = {
   description: string;
   descriptionEn?: string;
   source?: BatchShowcaseSourceLinks;
-  variant: 'saas-devtool' | 'dashboard' | 'consumer-commerce' | 'editorial-agency' | 'dark-experimental';
+  variant: 'saas-devtool' | 'dashboard' | 'consumer-commerce' | 'editorial-agency' | 'dark-experimental' | 'mobile-product';
+  mobilePreview?: BatchMobilePreview;
   distributionTags: string[];
   fontStylesheets?: string[];
   palette: Array<string | BatchPaletteSwatch>;
@@ -76,6 +95,7 @@ const variantLabels: Record<BatchShowcaseConfig['variant'], string> = {
   'consumer-commerce': '消费与商业 - Consumer / Commerce',
   'editorial-agency': '编辑与机构 - Editorial / Agency',
   'dark-experimental': '暗色实验 - Dark / Experimental',
+  'mobile-product': '移动产品 - Mobile Product',
 };
 
 const NON_SELECTION_TAGS = new Set([
@@ -365,6 +385,29 @@ function PreviewFigure({ config, onOpen }: { config: BatchShowcaseConfig; onOpen
       </span>
       <span className="dmb-preview-label">{primaryImage.type}</span>
     </button>
+  );
+}
+
+function MobileScreenshotGallery({ config, onOpen }: { config: BatchShowcaseConfig; onOpen: (url: string) => void }) {
+  if (config.variant !== 'mobile-product') return null;
+
+  const screenshots = config.previewImages.filter(image => image.type === 'product-screenshot').slice(0, 3);
+  const imageLabel = config.brandAlias || config.brand;
+
+  return (
+    <section className="dmb-mobile-screenshot-gallery" aria-label={`${imageLabel} product screenshots`}>
+      {screenshots.map((image, index) => (
+        <button
+          className="dmb-mobile-screenshot"
+          key={`${image.url}-${index}`}
+          type="button"
+          onClick={() => onOpen(image.url)}
+          aria-label={`Open ${imageLabel} product screenshot ${index + 1}`}
+        >
+          <img src={image.url} alt={`${imageLabel} product screenshot ${index + 1}`} loading={index === 0 ? 'eager' : 'lazy'} />
+        </button>
+      ))}
+    </section>
   );
 }
 
@@ -733,7 +776,8 @@ export function DesignMdBatchShowcase({ config, tabs = [], className = '' }: Des
 
   const overviewContent = (
     <>
-      <PreviewFigure config={config} onOpen={setZoomImage} />
+      <MobileScreenshotGallery config={config} onOpen={setZoomImage} />
+      {config.variant === 'mobile-product' ? null : <PreviewFigure config={config} onOpen={setZoomImage} />}
 
       <div className="dmb-overview-meta">
         <div className="dmb-description">

@@ -1932,6 +1932,7 @@ function resolveWebEditorOptions(options = {}) {
       aiExecutionRunConcurrency: 5,
       aiExecutionProviderOptions: [],
       htmlFileSaveEnabled: false,
+      pageEditingSettingsAvailable: true,
       getAcpUiConnected: void 0,
       getAssistantPanelOpen: () => false,
       onHostToolbarAction: async () => false,
@@ -1939,13 +1940,14 @@ function resolveWebEditorOptions(options = {}) {
       getAnnotationEnabled: () => false,
       getAnnotationEnableAvailable: () => false,
       getAnnotationEnableLoading: () => false,
+      markdownSourceEditorAvailable: false,
+      getMarkdownSourceEditorOpen: () => false,
+      onMarkdownSourceEditorOpenChange: async () => false,
       externalEditingStatusDescription: "",
       skillInstallSource: "",
       commentarySkillOptions: [],
       commentarySelectedSkillIds: [],
       commentarySkillSettingsConfigured: false,
-      onCommentarySkillSelectionLoad: async () => [],
-      onCommentarySkillSelectionChange: async () => void 0,
       onRequestFullExit: async () => void 0,
       ...options.ui ?? {}
     },
@@ -1960,6 +1962,8 @@ function resolveWebEditorOptions(options = {}) {
       conversationTaskTransport: options.host?.conversationTaskTransport ?? void 0,
       commentPersistenceMode: options.host?.commentPersistenceMode ?? "local",
       canEditAnnotationMarkdown: options.host?.canEditAnnotationMarkdown ?? void 0,
+      getCreateAnnotationBlockReason: options.host?.getCreateAnnotationBlockReason ?? void 0,
+      annotationMarkdownEditorKind: options.host?.annotationMarkdownEditorKind ?? "annotation",
       getAnnotationDocumentEditUrl: options.host?.getAnnotationDocumentEditUrl ?? void 0,
       getAnnotationMarkdown: options.host?.getAnnotationMarkdown ?? void 0,
       onAnnotationMarkdownChange: options.host?.onAnnotationMarkdownChange ?? void 0,
@@ -9138,6 +9142,7 @@ function mountShadowHost(_options = {}) {
   }
   const host = document.createElement("div");
   host.id = WEB_EDITOR_V2_HOST_ID;
+  host.classList.add("data-fullscreen-prevent-event-capture");
   host.setAttribute("data-mcp-web-editor", "v2");
   setImportantStyle(host, "position", "fixed");
   setImportantStyle(host, "inset", "0");
@@ -9969,270 +9974,6 @@ var PROPERTY_PANEL_LOCAL_STYLES = `
     color: ${EDITOR_CHROME.accent};
   }
 
-  .we-runtime-ai-settings-modal .ant-modal-content {
-    overflow: hidden;
-    border: 1px solid ${EDITOR_CHROME.border};
-    border-radius: 18px;
-    background: ${EDITOR_CHROME.surfaceElevated};
-    box-shadow: ${EDITOR_CHROME.shadow};
-  }
-
-  .we-runtime-ai-settings-modal .ant-modal-header {
-    margin-bottom: 18px;
-    background: transparent;
-  }
-
-  .we-runtime-ai-settings-modal .ant-modal-footer {
-    margin-top: 20px;
-    padding-top: 14px;
-    border-top: 1px solid ${EDITOR_CHROME.divider};
-  }
-
-  .we-runtime-ai-settings-dialog {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .we-runtime-ai-settings-dialog__row {
-    display: grid;
-    grid-template-columns: 104px minmax(0, 1fr);
-    align-items: center;
-    gap: 16px;
-    min-height: 36px;
-  }
-
-  .we-runtime-ai-settings-dialog__label {
-    color: ${EDITOR_CHROME.textPrimary};
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 20px;
-  }
-
-  .we-runtime-ai-settings-dialog__control {
-    min-width: 0;
-  }
-
-  .we-runtime-ai-settings-dialog__control .ant-select,
-  .we-runtime-ai-settings-dialog__control .ant-input-number,
-  .we-runtime-ai-settings-dialog__control .ant-input-affix-wrapper {
-    width: 100%;
-  }
-
-  .we-runtime-ai-settings-dialog__workspace-input input {
-    text-overflow: ellipsis;
-  }
-
-  .we-runtime-ai-settings-dialog__workspace-input .ant-input-suffix .ant-btn {
-    width: 28px;
-    min-width: 28px;
-    height: 28px;
-    padding: 0;
-    color: ${EDITOR_CHROME.textSecondary};
-  }
-
-  .we-runtime-commentary-skill-modal .ant-modal-content {
-    overflow: hidden;
-    border: 1px solid ${EDITOR_CHROME.border};
-    border-radius: 18px;
-    background: ${EDITOR_CHROME.surfaceElevated};
-    box-shadow: ${EDITOR_CHROME.shadow};
-  }
-
-  .we-runtime-commentary-skill-modal .ant-modal-header {
-    margin-bottom: 16px;
-    background: transparent;
-  }
-
-  .we-runtime-commentary-skill-modal .ant-modal-footer {
-    margin-top: 18px;
-    padding-top: 14px;
-    border-top: 1px solid ${EDITOR_CHROME.divider};
-  }
-
-  .we-runtime-commentary-skill-dialog__title {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    color: ${EDITOR_CHROME.textPrimary};
-    line-height: 1.25;
-  }
-
-  .we-runtime-commentary-skill-dialog__subtitle {
-    color: ${EDITOR_CHROME.textMuted};
-    font-size: 12px;
-    font-weight: 400;
-  }
-
-  .we-runtime-commentary-skill-dialog {
-    display: flex;
-    min-height: 0;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .we-runtime-commentary-skill-dialog__list {
-    display: flex;
-    max-height: min(55vh, 460px);
-    flex-direction: column;
-    gap: 8px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 1px;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  .we-runtime-commentary-skill-dialog__list::-webkit-scrollbar {
-    display: none;
-  }
-
-  .we-runtime-commentary-skill-dialog__section-title {
-    display: flex;
-    min-height: 26px;
-    align-items: center;
-    justify-content: space-between;
-    padding: 5px 2px 1px;
-    color: ${EDITOR_CHROME.textSecondary};
-    font-size: 12px;
-    font-weight: 650;
-  }
-
-  .we-runtime-commentary-skill-dialog__section-title--custom {
-    margin-top: 6px;
-    padding-top: 4px;
-  }
-
-  .we-runtime-commentary-skill-dialog__section-title .ant-btn-link {
-    height: 26px;
-    padding: 0 2px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-
-  .we-runtime-commentary-skill-dialog__item {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: 14px;
-    padding: 12px 14px;
-    border: 1px solid ${EDITOR_CHROME.border};
-    border-radius: 12px;
-    background: ${EDITOR_CHROME.surface};
-    box-shadow: 0 1px 2px ${EDITOR_CHROME.hoverGhost};
-    color: ${EDITOR_CHROME.textPrimary};
-    cursor: pointer;
-    outline: none;
-    transition:
-      border-color 160ms ease,
-      background-color 160ms ease,
-      box-shadow 160ms ease,
-      transform 160ms ease;
-  }
-
-  .we-runtime-commentary-skill-dialog__item:hover:not(.we-runtime-commentary-skill-dialog__item--disabled) {
-    border-color: ${EDITOR_CHROME.borderStrong};
-    background: ${EDITOR_CHROME.surfaceMuted};
-  }
-
-  .we-runtime-commentary-skill-dialog__item:focus-visible {
-    border-color: color-mix(in srgb, ${EDITOR_CHROME.accent} 46%, ${EDITOR_CHROME.border});
-    box-shadow: 0 0 0 3px ${EDITOR_CHROME.accentRing};
-  }
-
-  .we-runtime-commentary-skill-dialog__item--disabled {
-    cursor: not-allowed;
-    opacity: 0.62;
-  }
-
-  .we-runtime-commentary-skill-dialog__copy {
-    display: flex;
-    min-width: 0;
-    flex: 1 1 auto;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .we-runtime-commentary-skill-dialog__name {
-    overflow: hidden;
-    color: ${EDITOR_CHROME.textPrimary};
-    font-size: 13px;
-    font-weight: 650;
-    line-height: 1.35;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .we-runtime-commentary-skill-dialog__description {
-    overflow: hidden;
-    color: ${EDITOR_CHROME.textMuted};
-    font-size: 12px;
-    line-height: 1.45;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .we-runtime-commentary-skill-dialog__item > .ant-checkbox-wrapper {
-    flex: 0 0 auto;
-    margin: 0;
-  }
-
-  .we-runtime-commentary-skill-dialog__edit.ant-btn.ant-btn-text {
-    flex: 0 0 auto;
-    color: ${EDITOR_CHROME.textMuted};
-  }
-
-  .we-runtime-commentary-skill-dialog__edit.ant-btn.ant-btn-text:hover {
-    color: ${EDITOR_CHROME.textSecondary};
-    background: ${EDITOR_CHROME.hoverSubtle};
-  }
-
-  .we-runtime-commentary-skill-dialog__empty {
-    padding: 14px;
-    border: 1px dashed ${EDITOR_CHROME.border};
-    border-radius: 12px;
-    color: ${EDITOR_CHROME.textMuted};
-    font-size: 12px;
-    text-align: center;
-  }
-
-  .we-runtime-commentary-skill-editor {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .we-runtime-commentary-skill-editor__field {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    color: ${EDITOR_CHROME.textSecondary};
-    font-size: 12px;
-    font-weight: 600;
-  }
-
-  .we-runtime-commentary-skill-editor__error {
-    color: ${EDITOR_CHROME.textDanger};
-    font-size: 12px;
-    line-height: 1.4;
-  }
-
-  @media (max-width: 640px) {
-    .we-runtime-ai-settings-modal .ant-modal-content,
-    .we-runtime-commentary-skill-modal .ant-modal-content {
-      padding: 18px 16px 14px;
-    }
-
-    .we-runtime-ai-settings-dialog__row {
-      grid-template-columns: 1fr;
-      gap: 6px;
-    }
-
-    .we-runtime-commentary-skill-dialog__item {
-      padding: 11px 12px;
-    }
-  }
-
   .we-runtime-keyboard-shortcuts-modal,
   .we-runtime-keyboard-shortcuts-modal * {
     outline: none !important;
@@ -10762,8 +10503,60 @@ var PROPERTY_PANEL_LOCAL_STYLES = `
     cursor: grab;
   }
 
-  .we-runtime-prop-panel__drag-handle[data-dragging="true"] {
-    cursor: grabbing !important;
+  .we-runtime-toolbar__drag-grip {
+    position: relative;
+    z-index: 1;
+    width: 0;
+    min-width: 0;
+    margin-right: -4px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(-8px) scale(0.9);
+    transform-origin: left center;
+    transition:
+      width 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      margin-right 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 140ms ease,
+      visibility 0s linear 140ms,
+      transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .we-runtime-prop-panel__drag-handle:hover .we-runtime-toolbar__drag-grip,
+  .we-runtime-toolbar__drag-grip[data-dragging="true"] {
+    width: 12px;
+    margin-right: 0;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(0) scale(1);
+    transition-delay: 0s;
+  }
+
+  .we-runtime-toolbar__drag-grip[data-dragging="true"] {
+    cursor: grabbing;
+  }
+
+  @media (hover: none) {
+    .we-runtime-toolbar__drag-grip {
+      width: 12px;
+      margin-right: 0;
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: translateX(0) scale(1);
+      transition-delay: 0s;
+    }
   }
 
   .we-runtime-prop-panel__resize-handle {
@@ -11093,7 +10886,7 @@ var WEB_EDITOR_POPUP_ROOT_STYLES = `
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-popover,
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-popconfirm,
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-color-picker-dropdown {
-    z-index: ${POPUP_LAYER_Z_INDEX + 20};
+    z-index: ${POPUP_LAYER_Z_INDEX + 20} !important;
   }
 
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-select-dropdown,
@@ -11306,6 +11099,23 @@ var WEB_EDITOR_POPUP_ROOT_STYLES = `
     gap: 6px;
     color: ${EDITOR_CHROME.textSecondary};
     font-size: 13px;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__workspace-value {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__workspace-value-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__workspace-value > .anticon {
+    flex: 0 0 auto;
   }
 
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-dark-mode-button .anticon {
@@ -12471,7 +12281,12 @@ function computePromptCardPosition(options) {
     return { left: Math.round(left2), top: Math.round(top2) };
   }
   const safeRightX = propertyPanelEnabled ? viewportWidth - (propertyPanelWidth + propertyPanelRight + safePaddingPx) : viewportWidth - safePaddingPx;
-  const maxLeft = Math.min(viewportWidth - safePaddingPx - cardWidth, safeRightX - cardWidth);
+  const viewportMaxLeft = Math.max(
+    safePaddingPx,
+    viewportWidth - safePaddingPx - cardWidth
+  );
+  const propertyPanelMaxLeft = safeRightX - cardWidth;
+  const maxLeft = propertyPanelEnabled && propertyPanelMaxLeft >= safePaddingPx ? Math.min(viewportMaxLeft, propertyPanelMaxLeft) : viewportMaxLeft;
   const preferredRightLeft = anchorRect.left + anchorRect.width + anchorGapPx;
   const preferredLeftLeft = anchorRect.left - anchorGapPx - cardWidth;
   const fitsRight = preferredRightLeft >= safePaddingPx && preferredRightLeft <= maxLeft;
@@ -12617,6 +12432,12 @@ async function executePromptCardCurrentElementAction(options) {
   onDispatched?.();
   await sendPromise;
   return true;
+}
+
+// src/ui/runtime/prompt-card-shortcut-label.ts
+function resolvePromptCardCloseActionTitle(platform) {
+  const shortcut = platform?.includes("Mac") ? "\u2318 Enter" : "Ctrl + Enter";
+  return `\u5173\u95ED\u5E76\u4FDD\u5B58\uFF08${shortcut} / Esc\uFF09`;
 }
 
 // src/ui/runtime/action-buttons.tsx
@@ -12796,7 +12617,6 @@ function AgentToolbarShell(props) {
   return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
     "div",
     {
-      ref: dragHandleRef,
       className: "we-runtime-prop-panel__drag-handle",
       style: {
         position: "relative",
@@ -12865,7 +12685,7 @@ function AgentToolbarShell(props) {
           },
           "toolbar-ring"
         ) : null }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
           "div",
           {
             style: {
@@ -12884,7 +12704,41 @@ function AgentToolbarShell(props) {
               boxShadow: shellSurfaceShadow,
               minWidth: fullWidth ? 0 : "unset"
             },
-            children
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                "div",
+                {
+                  ref: dragHandleRef,
+                  className: "we-runtime-toolbar__drag-grip data-fullscreen-prevent-event-capture",
+                  "data-we-toolbar-drag-grip": "true",
+                  "aria-hidden": "true",
+                  title: "\u62D6\u52A8\u5DE5\u5177\u680F",
+                  style: {
+                    color: EDITOR_CHROME.textMuted
+                  },
+                  children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+                    "svg",
+                    {
+                      width: "8",
+                      height: "18",
+                      viewBox: "0 0 8 18",
+                      fill: "currentColor",
+                      focusable: "false",
+                      style: { display: "block", pointerEvents: "none" },
+                      children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "2", cy: "4", r: "1.25" }),
+                        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "6", cy: "4", r: "1.25" }),
+                        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "2", cy: "9", r: "1.25" }),
+                        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "6", cy: "9", r: "1.25" }),
+                        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "2", cy: "14", r: "1.25" }),
+                        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("circle", { cx: "6", cy: "14", r: "1.25" })
+                      ]
+                    }
+                  )
+                }
+              ),
+              children
+            ]
           }
         )
       ]
@@ -15240,11 +15094,7 @@ var tabStripStyle = {
   padding: "0 0 6px"
 };
 var editorShellStyle = {
-  marginTop: 2,
-  padding: "8px 8px 6px",
-  borderRadius: 16,
-  background: `color-mix(in srgb, ${EDITOR_CHROME.surfaceMuted} 72%, ${EDITOR_CHROME.surface} 28%)`,
-  border: `1px solid ${EDITOR_CHROME.border}`
+  padding: "0 8px 6px"
 };
 var contentStyle = {
   maxHeight: 236,
@@ -15355,8 +15205,9 @@ function resolvePromptCardNotePlaceholder() {
 }
 var ANNOTATION_PANEL_NODE_ID_ATTR2 = "data-axhub-annotation-panel-node-id";
 var ANNOTATION_MARKER_NODE_ID_ATTR2 = "data-axhub-annotation-node-id";
-var ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE = "\u5F53\u524D\u5143\u7D20\u65E0\u6CD5\u53EF\u9760\u5B9A\u4F4D\uFF0C\u8BF7\u5728 AI \u8F93\u5165\u6846\u63CF\u8FF0\u6807\u6CE8\u9700\u6C42\uFF0C\u7531 AI \u521B\u5EFA\u6807\u6CE8\u3002";
+var ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE = "\u65E0\u6CD5\u51C6\u786E\u5B9A\u4F4D\u6807\u6CE8\u4F4D\u7F6E\uFF0C\u8BE5\u6807\u6CE8\u9700\u8981\u7531 AI \u751F\u6210";
 var ANNOTATION_MARKDOWN_PLACEHOLDER = "\u8F93\u5165\u9700\u6C42\u6807\u6CE8\uFF0C\u652F\u6301 Markdown \u683C\u5F0F\u3002\u8F93\u5165\u540E\u5373\u53EF\u521B\u5EFA\u6807\u6CE8\u8282\u70B9\u3002\u5EFA\u8BAE\u7531 AI \u521B\u5EFA\u6807\u6CE8\uFF0C\u5B9A\u4F4D\u4F1A\u66F4\u51C6\u786E\u3002";
+var DOCUMENT_SOURCE_MARKDOWN_PLACEHOLDER = "\u7F16\u8F91\u6240\u9009\u5185\u5BB9\u5BF9\u5E94\u7684\u539F\u59CB Markdown\u3002\u4FDD\u5B58\u540E\u4F1A\u76F4\u63A5\u66F4\u65B0\u672C\u5730\u6587\u6863\u3002";
 function isAnnotationPanelTarget(element) {
   if (!element) return false;
   if (element.getAttribute("data-axhub-annotation-panel-target") === "true") {
@@ -15375,21 +15226,26 @@ function readCurrentAnnotationNodeId(element) {
   }
   return "";
 }
-function getAnnotationManualEditLocatorState(element, resolveLocator = locateElement) {
-  if (!element) {
+function getAnnotationManualEditLocatorState(element, resolveLocator = locateElement, getCreateBlockReason, resolveAnnotationTarget) {
+  const annotationTarget = resolveAnnotationTarget ? resolveAnnotationTarget(element) : element;
+  if (!annotationTarget) {
     return { disabled: true, message: ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE };
   }
-  const annotationNodeId = readCurrentAnnotationNodeId(element);
+  const annotationNodeId = readCurrentAnnotationNodeId(annotationTarget);
   if (annotationNodeId) {
     return { disabled: false, message: "" };
   }
-  const isPanelTarget = isAnnotationPanelTarget(element);
+  const createBlockReason = getCreateBlockReason?.(annotationTarget)?.trim();
+  if (createBlockReason) {
+    return { disabled: true, message: createBlockReason };
+  }
+  const isPanelTarget = isAnnotationPanelTarget(annotationTarget);
   if (isPanelTarget) {
     return { disabled: true, message: ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE };
   }
   let locator;
   try {
-    locator = createElementLocator(element);
+    locator = createElementLocator(annotationTarget);
   } catch {
     return { disabled: true, message: ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE };
   }
@@ -15402,7 +15258,7 @@ function getAnnotationManualEditLocatorState(element, resolveLocator = locateEle
   if (!resolvedElement) {
     return { disabled: true, message: ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE };
   }
-  if (resolvedElement !== element) {
+  if (resolvedElement !== annotationTarget) {
     return { disabled: true, message: ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE };
   }
   return { disabled: false, message: "" };
@@ -15535,6 +15391,7 @@ var PromptCardView = import_react10.default.forwardRef(
       onConfirmAnnotationMarkdown,
       onDeleteCurrentAnnotationNode
     } = props;
+    const documentSourceMarkdownEditor = options.annotationMarkdownEditorKind === "document-source";
     const rootRef = import_react10.default.useRef(null);
     const textComposerRef = import_react10.default.useRef(null);
     const noteComposerRef = import_react10.default.useRef(null);
@@ -15544,6 +15401,7 @@ var PromptCardView = import_react10.default.forwardRef(
     const [sendingCurrentElementPrompt, setSendingCurrentElementPrompt] = import_react10.default.useState(false);
     const [refreshKey, setRefreshKey] = import_react10.default.useState(0);
     const [selectedSkills, setSelectedSkills] = import_react10.default.useState([]);
+    const [promptDismissed, setPromptDismissed] = import_react10.default.useState(false);
     const [annotationEditorOpen, setAnnotationEditorOpen] = import_react10.default.useState(false);
     const [runningElementToolId, setRunningElementToolId] = import_react10.default.useState(null);
     const [elementToolError, setElementToolError] = import_react10.default.useState("");
@@ -15576,6 +15434,9 @@ var PromptCardView = import_react10.default.forwardRef(
       setRunningElementToolId(null);
       setElementToolError("");
     }, [enabledSkillIds, savedNoteMeta, currentTarget, skillOptions]);
+    import_react10.default.useEffect(() => {
+      setPromptDismissed(false);
+    }, [currentTarget]);
     const onConfirmNoteWithSelectedSkills = import_react10.default.useCallback(async () => {
       const payload = buildPromptCardSkillSavePayload(draftNote, selectedSkills);
       await onConfirmNote({ skillIds: payload.skillIds });
@@ -15738,7 +15599,7 @@ var PromptCardView = import_react10.default.forwardRef(
       visualViewportKey
     ]);
     const promptVisible = Boolean(
-      currentTarget && promptPosition && promptCardSize && !toolMinimized && uiMode === "bubble-card"
+      currentTarget && promptPosition && promptCardSize && !toolMinimized && uiMode === "bubble-card" && !promptDismissed
     );
     import_react10.default.useEffect(() => {
       if (promptVisible && uiMode === "bubble-card") return;
@@ -15826,26 +15687,43 @@ var PromptCardView = import_react10.default.forwardRef(
       onDismissSelection?.();
     }, [onConfirmNoteWithSelectedSkills, onDismissSelection]);
     const saveAndDismissPromptCard = import_react10.default.useCallback(async () => {
-      await onConfirmText();
-      await onConfirmNoteWithSelectedSkills();
-      if (!getAnnotationManualEditLocatorState(currentTarget).disabled) {
-        await onConfirmAnnotationMarkdown();
-      }
       setSelectedSkills([]);
+      setPromptDismissed(true);
       const activeElement = document.activeElement;
       if (activeElement instanceof HTMLElement && rootRef.current?.contains(activeElement)) {
         activeElement.blur();
       }
-      onDismissSelection?.();
+      try {
+        await onConfirmText();
+        await onConfirmNoteWithSelectedSkills();
+        if (documentSourceMarkdownEditor || !getAnnotationManualEditLocatorState(
+          currentTarget,
+          void 0,
+          options.getCreateAnnotationBlockReason,
+          options.resolveAnnotationTarget
+        ).disabled) {
+          await onConfirmAnnotationMarkdown();
+        }
+      } finally {
+        onDismissSelection?.();
+      }
     }, [
       currentTarget,
+      documentSourceMarkdownEditor,
       onConfirmAnnotationMarkdown,
       onConfirmNoteWithSelectedSkills,
       onConfirmText,
-      onDismissSelection
+      onDismissSelection,
+      options.getCreateAnnotationBlockReason,
+      options.resolveAnnotationTarget
     ]);
     const saveAndCloseAnnotationMarkdownComposer = import_react10.default.useCallback(async () => {
-      if (getAnnotationManualEditLocatorState(currentTarget).disabled) {
+      if (!documentSourceMarkdownEditor && getAnnotationManualEditLocatorState(
+        currentTarget,
+        void 0,
+        options.getCreateAnnotationBlockReason,
+        options.resolveAnnotationTarget
+      ).disabled) {
         return;
       }
       await onConfirmAnnotationMarkdown();
@@ -15854,7 +15732,14 @@ var PromptCardView = import_react10.default.forwardRef(
         activeElement.blur();
       }
       onDismissSelection?.();
-    }, [currentTarget, onConfirmAnnotationMarkdown, onDismissSelection]);
+    }, [
+      currentTarget,
+      documentSourceMarkdownEditor,
+      onConfirmAnnotationMarkdown,
+      onDismissSelection,
+      options.getCreateAnnotationBlockReason,
+      options.resolveAnnotationTarget
+    ]);
     const clearSelectedSkills = import_react10.default.useCallback(() => {
       setSelectedSkills([]);
     }, []);
@@ -15932,11 +15817,7 @@ var PromptCardView = import_react10.default.forwardRef(
         currentTaskTerminal,
         onDismissSelection
       }),
-      [
-        currentTarget,
-        currentTaskTerminal,
-        onDismissSelection
-      ]
+      [currentTarget, currentTaskTerminal, onDismissSelection]
     );
     const currentTaskSessionHref = currentAgentTask?.sessionUrl ?? (currentAgentTask?.sessionId ? `/session/${currentAgentTask.sessionId}` : "");
     const currentTaskDescription = resolveExternalEditingStatusDescription(
@@ -16094,7 +15975,12 @@ var PromptCardView = import_react10.default.forwardRef(
     const showAnnotationMarkdownEditor = Boolean(
       annotationEditorOpen && showAnnotationMarkdownEditorButton && !bubbleStyleEditorOpen
     );
-    const annotationManualEditLocatorState = showAnnotationMarkdownEditor ? getAnnotationManualEditLocatorState(currentTarget) : { disabled: false, message: "" };
+    const annotationManualEditLocatorState = showAnnotationMarkdownEditor ? documentSourceMarkdownEditor ? { disabled: false, message: "" } : getAnnotationManualEditLocatorState(
+      currentTarget,
+      void 0,
+      options.getCreateAnnotationBlockReason,
+      options.resolveAnnotationTarget
+    ) : { disabled: false, message: "" };
     const annotationManualEditDisabled = annotationManualEditLocatorState.disabled;
     const annotationManualEditMessage = annotationManualEditLocatorState.message;
     const showPromptDesignEditor = Boolean(
@@ -16108,7 +15994,9 @@ var PromptCardView = import_react10.default.forwardRef(
     const agentSelectionActionTitle = currentTaskRunning ? "\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD" : `\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD${agentSelectionShortcutHint}`;
     const showContextAppendExecutionControls = !hideExecutionControls;
     const notePlaceholder = resolvePromptCardNotePlaceholder();
-    const promptCardCloseActionTitle = "\u5173\u95ED\u5E76\u4FDD\u5B58 (Cmd/Ctrl + Enter / Esc)";
+    const promptCardCloseActionTitle = resolvePromptCardCloseActionTitle(
+      globalThis.navigator?.platform
+    );
     const promptCardNode = /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
       "div",
       {
@@ -16193,7 +16081,7 @@ var PromptCardView = import_react10.default.forwardRef(
               showAnnotationMarkdownEditorButton ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
                 IconActionButton,
                 {
-                  title: annotationEditorOpen ? "\u5173\u95ED\u6807\u6CE8\u7F16\u8F91" : "\u6807\u6CE8\u7F16\u8F91",
+                  title: documentSourceMarkdownEditor ? annotationEditorOpen ? "\u5173\u95ED Markdown \u6E90\u7801\u7F16\u8F91" : "Markdown \u6E90\u7801\u7F16\u8F91" : annotationEditorOpen ? "\u5173\u95ED\u6807\u6CE8\u7F16\u8F91" : "\u6807\u6CE8\u7F16\u8F91",
                   icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.FileTextOutlined, {}),
                   tone: annotationEditorOpen ? "accent" : "dark",
                   disabled: annotationLoading,
@@ -16268,7 +16156,7 @@ var PromptCardView = import_react10.default.forwardRef(
                 IconActionButton,
                 {
                   title: "\u6E05\u7A7A\u6279\u6CE8",
-                  icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.DeleteOutlined, {}),
+                  icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.ClearOutlined, {}),
                   tone: "dark",
                   disabled: !currentTarget,
                   onClick: () => {
@@ -16298,7 +16186,7 @@ var PromptCardView = import_react10.default.forwardRef(
                     onClick: () => {
                       if (dismissTerminalTaskAndSelection()) return;
                       clearSelectedSkills();
-                      void saveAndDismissPromptCard();
+                      void saveAndDismissPromptCard().catch(() => void 0);
                     }
                   }
                 )
@@ -16616,10 +16504,10 @@ var PromptCardView = import_react10.default.forwardRef(
                               lineHeight: 1.4,
                               color: EDITOR_CHROME.textSecondary
                             },
-                            children: "\u9700\u6C42\u6807\u6CE8"
+                            children: documentSourceMarkdownEditor ? "Markdown \u6E90\u7801" : "\u9700\u6C42\u6807\u6CE8"
                           }
                         ),
-                        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                        !documentSourceMarkdownEditor ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
                           import_antd5.Popconfirm,
                           {
                             title: "\u5220\u9664\u6807\u6CE8",
@@ -16642,7 +16530,7 @@ var PromptCardView = import_react10.default.forwardRef(
                               }
                             ) })
                           }
-                        )
+                        ) : null
                       ] }),
                       /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
                         import_antd5.Input.TextArea,
@@ -16651,7 +16539,7 @@ var PromptCardView = import_react10.default.forwardRef(
                           value: annotationDraftMarkdown,
                           disabled: annotationLoading || annotationManualEditDisabled,
                           autoSize: { minRows: 4, maxRows: 10 },
-                          placeholder: ANNOTATION_MARKDOWN_PLACEHOLDER,
+                          placeholder: documentSourceMarkdownEditor ? DOCUMENT_SOURCE_MARKDOWN_PLACEHOLDER : annotationManualEditDisabled ? annotationManualEditMessage : ANNOTATION_MARKDOWN_PLACEHOLDER,
                           variant: "borderless",
                           styles: {
                             textarea: {
@@ -16686,18 +16574,7 @@ var PromptCardView = import_react10.default.forwardRef(
                             }
                           }
                         }
-                      ),
-                      annotationManualEditMessage ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                        "div",
-                        {
-                          style: {
-                            fontSize: 11,
-                            lineHeight: 1.45,
-                            color: EDITOR_CHROME.textMuted
-                          },
-                          children: annotationManualEditMessage
-                        }
-                      ) : null
+                      )
                     ]
                   }
                 ) : null,
@@ -16812,7 +16689,9 @@ var PromptCardView = import_react10.default.forwardRef(
                                         marginLeft: 1
                                       },
                                       onClick: () => {
-                                        void copyPromptCardTextToClipboard(currentTaskErrorMessage).catch(() => void 0);
+                                        void copyPromptCardTextToClipboard(currentTaskErrorMessage).catch(
+                                          () => void 0
+                                        );
                                       }
                                     }
                                   ) : null
@@ -16856,7 +16735,7 @@ var PromptCardView = import_react10.default.forwardRef(
         promptVisible,
         promptCardTop: promptPosition?.top ?? 0,
         onDismiss: () => {
-          void saveAndDismissPromptCard();
+          void saveAndDismissPromptCard().catch(() => void 0);
         }
       }
     );
@@ -17139,6 +17018,7 @@ function setPageZoomEnabled(enabled, options = {}) {
 }
 
 // src/ui/floating-drag.ts
+var FLOATING_DRAG_POINTER_RELAY_EVENT = "axhub-floating-drag-pointer-relay";
 var WINDOW_CAPTURE = { capture: true, passive: false };
 var SETTLE_DISTANCE_FACTOR = 0.12;
 var DEFAULT_SETTLE_DURATION_MS = 220;
@@ -17207,6 +17087,27 @@ function shouldIgnoreInteractiveTarget(eventTarget, handleEl, enabled) {
   }
   return true;
 }
+function parsePointerRelayDetail(value) {
+  if (!value || typeof value !== "object") return null;
+  const detail = value;
+  if (!["pointerdown", "pointermove", "pointerup", "pointercancel"].includes(detail.type ?? "") || !Number.isInteger(detail.pointerId) || !Number.isFinite(detail.clientX) || !Number.isFinite(detail.clientY)) {
+    return null;
+  }
+  return {
+    type: detail.type,
+    pointerId: detail.pointerId,
+    pointerType: typeof detail.pointerType === "string" ? detail.pointerType : "mouse",
+    isPrimary: detail.isPrimary !== false,
+    button: Number.isFinite(detail.button) ? Number(detail.button) : 0,
+    buttons: Number.isFinite(detail.buttons) ? Number(detail.buttons) : 0,
+    clientX: Number(detail.clientX),
+    clientY: Number(detail.clientY),
+    altKey: detail.altKey === true,
+    ctrlKey: detail.ctrlKey === true,
+    metaKey: detail.metaKey === true,
+    shiftKey: detail.shiftKey === true
+  };
+}
 function installFloatingDrag(options) {
   const { handleEl, targetEl, onPositionChange, clampMargin } = options;
   const moveThresholdPx = Math.max(0, options.moveThresholdPx ?? 3);
@@ -17244,7 +17145,7 @@ function installFloatingDrag(options) {
     bodyEl.style.cursor = cursorSnapshot.bodyCursor;
     cursorSnapshot = null;
   }
-  function teardownWindowListeners() {
+  function removeWindowListeners() {
     window.removeEventListener("pointermove", onWindowPointerMove, WINDOW_CAPTURE);
     window.removeEventListener("pointerup", onWindowPointerUp, WINDOW_CAPTURE);
     window.removeEventListener("pointercancel", onWindowPointerCancel, WINDOW_CAPTURE);
@@ -17284,7 +17185,6 @@ function installFloatingDrag(options) {
   function finishSession(resetMetrics = true) {
     if (!session) return;
     cancelAnimationLoop();
-    teardownWindowListeners();
     cleanupCapture(session.pointerId);
     handleEl.dataset.dragging = "false";
     setGlobalDraggingCursor(false);
@@ -17346,10 +17246,6 @@ function installFloatingDrag(options) {
     handleEl.dataset.dragging = "true";
     emitDragState(true);
     setGlobalDraggingCursor(true);
-    try {
-      handleEl.setPointerCapture(pointerId);
-    } catch {
-    }
     ensureAnimationLoop();
   }
   function onAnimationFrame(timestamp) {
@@ -17379,7 +17275,9 @@ function installFloatingDrag(options) {
   }
   function onWindowPointerMove(event) {
     const currentSession = session;
-    if (!currentSession || event.pointerId !== currentSession.pointerId) return;
+    if (!currentSession || currentSession.phase === "settling" || event.pointerId !== currentSession.pointerId) {
+      return;
+    }
     if (!currentSession.activated) {
       const dx = event.clientX - currentSession.startClientX;
       const dy = event.clientY - currentSession.startClientY;
@@ -17405,14 +17303,15 @@ function installFloatingDrag(options) {
   }
   function onWindowPointerUp(event) {
     const currentSession = session;
-    if (!currentSession || event.pointerId !== currentSession.pointerId) return;
+    if (!currentSession || currentSession.phase === "settling" || event.pointerId !== currentSession.pointerId) {
+      return;
+    }
     if (!currentSession.activated) {
       finishSession();
       return;
     }
     blockEvent(event);
     suppressClickOnce();
-    teardownWindowListeners();
     cleanupCapture(event.pointerId);
     handleEl.dataset.dragging = "false";
     setGlobalDraggingCursor(false);
@@ -17421,7 +17320,9 @@ function installFloatingDrag(options) {
   }
   function onWindowPointerCancel(event) {
     const currentSession = session;
-    if (!currentSession || event.pointerId !== currentSession.pointerId) return;
+    if (!currentSession || currentSession.phase === "settling" || event.pointerId !== currentSession.pointerId) {
+      return;
+    }
     if (currentSession.activated) {
       blockEvent(event);
       cancelDrag();
@@ -17430,7 +17331,7 @@ function installFloatingDrag(options) {
     }
   }
   function onWindowKeyDown(event) {
-    if (event.key !== "Escape" || !session) return;
+    if (event.key !== "Escape" || !session || session.phase === "settling") return;
     if (session.activated) {
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -17441,7 +17342,7 @@ function installFloatingDrag(options) {
     }
   }
   function onWindowBlur() {
-    if (!session) return;
+    if (!session || session.phase === "settling") return;
     if (session.activated) {
       cancelDrag();
     } else {
@@ -17449,7 +17350,7 @@ function installFloatingDrag(options) {
     }
   }
   function onVisibilityChange() {
-    if (!session || document.visibilityState !== "hidden") return;
+    if (!session || session.phase === "settling" || document.visibilityState !== "hidden") return;
     if (session.activated) {
       cancelDrag();
     } else {
@@ -17457,10 +17358,10 @@ function installFloatingDrag(options) {
     }
   }
   function onHandlePointerDown(event) {
-    if (disposed || !targetEl.isConnected || session) return;
-    if (event.button !== 0 || !event.isPrimary) return;
+    if (disposed || !targetEl.isConnected || session) return false;
+    if (event.button !== 0 || !event.isPrimary) return false;
     if (shouldIgnoreInteractiveTarget(event.target, handleEl, Boolean(options.ignoreInteractiveChildren))) {
-      return;
+      return false;
     }
     const rect = targetEl.getBoundingClientRect();
     const startPosition = roundPosition({ left: rect.left, top: rect.top });
@@ -17490,22 +17391,56 @@ function installFloatingDrag(options) {
     };
     emitDragMetrics({ velocityX: 0, velocityY: 0 });
     handleEl.dataset.dragging = "false";
+    try {
+      handleEl.setPointerCapture(event.pointerId);
+    } catch {
+    }
     if (moveThresholdSq === 0) {
       activateDrag(event.pointerId);
     }
-    window.addEventListener("pointermove", onWindowPointerMove, WINDOW_CAPTURE);
-    window.addEventListener("pointerup", onWindowPointerUp, WINDOW_CAPTURE);
-    window.addEventListener("pointercancel", onWindowPointerCancel, WINDOW_CAPTURE);
-    window.addEventListener("keydown", onWindowKeyDown, WINDOW_CAPTURE);
-    window.addEventListener("blur", onWindowBlur, WINDOW_CAPTURE);
-    document.addEventListener("visibilitychange", onVisibilityChange);
+    return true;
+  }
+  function onRelayedPointerEvent(event) {
+    if (!(event instanceof CustomEvent)) return;
+    const detail = parsePointerRelayDetail(event.detail);
+    if (!detail) return;
+    const pointerEvent = {
+      ...detail,
+      target: handleEl,
+      cancelable: event.cancelable,
+      preventDefault: () => event.preventDefault(),
+      stopImmediatePropagation: () => event.stopImmediatePropagation(),
+      stopPropagation: () => event.stopPropagation()
+    };
+    if (detail.type === "pointerdown") {
+      if (!onHandlePointerDown(pointerEvent)) return;
+      event.preventDefault();
+      return;
+    }
+    const currentSession = session;
+    if (!currentSession || currentSession.phase === "settling" || currentSession.pointerId !== detail.pointerId) {
+      return;
+    }
+    event.preventDefault();
+    if (detail.type === "pointermove") onWindowPointerMove(pointerEvent);
+    else if (detail.type === "pointerup") onWindowPointerUp(pointerEvent);
+    else onWindowPointerCancel(pointerEvent);
   }
   handleEl.dataset.dragging = "false";
   handleEl.addEventListener("pointerdown", onHandlePointerDown, HANDLE_POINTER_DOWN_CAPTURE);
+  handleEl.addEventListener(FLOATING_DRAG_POINTER_RELAY_EVENT, onRelayedPointerEvent);
+  window.addEventListener("pointermove", onWindowPointerMove, WINDOW_CAPTURE);
+  window.addEventListener("pointerup", onWindowPointerUp, WINDOW_CAPTURE);
+  window.addEventListener("pointercancel", onWindowPointerCancel, WINDOW_CAPTURE);
+  window.addEventListener("keydown", onWindowKeyDown, WINDOW_CAPTURE);
+  window.addEventListener("blur", onWindowBlur, WINDOW_CAPTURE);
+  document.addEventListener("visibilitychange", onVisibilityChange);
   return () => {
     disposed = true;
     handleEl.removeEventListener("pointerdown", onHandlePointerDown, HANDLE_POINTER_DOWN_CAPTURE);
+    handleEl.removeEventListener(FLOATING_DRAG_POINTER_RELAY_EVENT, onRelayedPointerEvent);
     finishSession();
+    removeWindowListeners();
   };
 }
 
@@ -18419,72 +18354,11 @@ var AGENT_MENU_OPTIONS = [
   { value: "codex", label: "Codex" },
   { value: "opencode", label: "OpenCode" }
 ];
-var DEFAULT_AI_EXECUTION_PROVIDER = "codex";
-var DEFAULT_AI_EXECUTION_RUN_CONCURRENCY = 5;
-var MIN_AI_EXECUTION_RUN_CONCURRENCY = 1;
-var MAX_AI_EXECUTION_RUN_CONCURRENCY = 10;
-var AI_EXECUTION_PROVIDER_OPTIONS = [
-  { value: "codex", label: "Codex" },
-  { value: "claude", label: "Claude" },
-  { value: "opencode", label: "OpenCode" },
-  { value: "cursor", label: "Cursor" },
-  { value: "qoder", label: "Qoder" },
-  { value: "codebuddy", label: "CodeBuddy" },
-  { value: "reasonix", label: "Reasonix" }
-];
-var AGENT_DEFAULT_MENU_KEY = "agent-provider:default";
 var PROPERTY_PANEL_HELP_TOOLTIP = "\u53EF\u4EE5\u76F4\u63A5\u628A\u9700\u6C42\u53D1\u7ED9\u4F60\u6B63\u5728\u7528\u7684 IDE \u6216\u672C\u5730 agent\uFF0C\u4E5F\u53EF\u4EE5\u5148\u5728\u9875\u9762\u4E0A\u6279\u6CE8\uFF0C\u8BA9\u5B83\u5E2E\u4F60\u751F\u6210\u6216\u6574\u7406\u8BBE\u8BA1\u51B3\u7B56\u3002";
 var SELECTION_MODE_TOGGLE_SHORTCUT_LABEL = "Ctrl / Cmd + S";
 var PARENT_SELECT_SHORTCUT_LABEL = "\u2191";
 var PARENT_RETURN_SHORTCUT_LABEL = "\u2193";
 var PARENT_SELECT_INPUT_TOUCHED_ATTR2 = "data-we-parent-select-input-touched";
-function mergeCommentarySkillOptions(options) {
-  const merged = /* @__PURE__ */ new Map();
-  for (const item of [...PROMPT_CARD_SKILL_OPTIONS, ...options]) {
-    const id = item.id.trim();
-    const label = item.label.trim();
-    if (!id || !label) continue;
-    merged.set(id, {
-      id,
-      label,
-      description: item.description?.trim() || void 0,
-      sourceUrl: "sourceUrl" in item ? item.sourceUrl?.trim() || void 0 : void 0,
-      prompt: "prompt" in item ? item.prompt?.trim() || void 0 : void 0,
-      custom: "custom" in item ? item.custom === true : false
-    });
-  }
-  return [...merged.values()];
-}
-function createCommentaryCustomSkillId() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return `custom-${crypto.randomUUID()}`;
-  }
-  return `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-function summarizeCommentaryCustomSkillPrompt(prompt) {
-  return prompt.replace(/\s+/gu, " ").trim().slice(0, 80);
-}
-function normalizeCommentarySkillIds(value, options) {
-  const allowedIds = new Set(options.map((item) => item.id));
-  const rawValues = Array.isArray(value) ? value : [];
-  const result = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const item of rawValues) {
-    const id = typeof item === "string" ? item.trim() : "";
-    if (!id || seen.has(id) || !allowedIds.has(id)) {
-      continue;
-    }
-    seen.add(id);
-    result.push(id);
-  }
-  return result;
-}
-function resolveCommentarySkillIds(value, options, configured) {
-  if (!configured || !Array.isArray(value)) {
-    return options.map((item) => item.id);
-  }
-  return normalizeCommentarySkillIds(value, options);
-}
 function buildCommentarySkillGuidancePrompt(skillInstallSource) {
   const resolvedSkillInstallSource = typeof skillInstallSource === "string" && skillInstallSource.trim() ? skillInstallSource.trim() : "";
   return [
@@ -18607,52 +18481,11 @@ var lockPageScrollForRuntimeModal = () => {
     });
   };
 };
-var normalizeAiExecutionProvider = (value) => typeof value === "string" && value.trim() ? value.trim() : DEFAULT_AI_EXECUTION_PROVIDER;
 var normalizeAiExecutionWorkspacePath = (value) => typeof value === "string" ? value.trim() : "";
-var normalizeAiExecutionRunConcurrency = (value) => {
-  const numeric = typeof value === "string" ? Number(value.trim()) : Number(value);
-  if (!Number.isFinite(numeric)) {
-    return DEFAULT_AI_EXECUTION_RUN_CONCURRENCY;
-  }
-  return Math.min(
-    MAX_AI_EXECUTION_RUN_CONCURRENCY,
-    Math.max(MIN_AI_EXECUTION_RUN_CONCURRENCY, Math.trunc(numeric))
-  );
-};
 var getPathDisplayName = (value) => {
   const normalized = normalizeAiExecutionWorkspacePath(value).replace(/[\\/]+$/u, "");
   if (!normalized) return "";
   return normalized.split(/[\\/]/u).filter(Boolean).pop() || normalized;
-};
-var readAiExecutionConfigResult = (value) => {
-  if (!value || typeof value !== "object") return {};
-  const record = value;
-  const provider = normalizeAiExecutionProvider(record.provider);
-  const workspacePath = normalizeAiExecutionWorkspacePath(record.workspacePath);
-  const hasRunConcurrency = Object.prototype.hasOwnProperty.call(record, "runConcurrency");
-  const runConcurrency = normalizeAiExecutionRunConcurrency(record.runConcurrency);
-  const defaultWorkspacePath = normalizeAiExecutionWorkspacePath(record.defaultWorkspacePath);
-  const providerOptions = Array.isArray(record.providerOptions) ? record.providerOptions.map((item) => {
-    if (!item || typeof item !== "object") return null;
-    const itemRecord = item;
-    const optionValue = normalizeAiExecutionWorkspacePath(itemRecord.value);
-    if (!optionValue) return null;
-    const label = normalizeAiExecutionWorkspacePath(itemRecord.label) || optionValue;
-    return {
-      value: optionValue,
-      label,
-      disabled: itemRecord.disabled === true
-    };
-  }).filter(
-    (item) => Boolean(item)
-  ) : void 0;
-  return {
-    ...provider ? { provider } : {},
-    ...workspacePath ? { workspacePath } : {},
-    ...hasRunConcurrency ? { runConcurrency } : {},
-    ...defaultWorkspacePath ? { defaultWorkspacePath } : {},
-    ...providerOptions && providerOptions.length > 0 ? { providerOptions } : {}
-  };
 };
 var readLocalDirectoryBrowserResult = (value) => {
   if (!value || typeof value !== "object") return null;
@@ -18693,7 +18526,6 @@ var PropertyPanelView = import_react14.default.forwardRef(
       onPropertyPanelOpenChange,
       onAgentVisualStateChange,
       onUiSettingsChange,
-      onRefreshAgentProviderAvailabilities,
       onHoverSelectionSuppressedChange,
       onSelectionInteractionLockChange,
       onUiModeChange,
@@ -18723,6 +18555,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
     const toolbarMode = props.toolbarMode ?? options.toolbarMode ?? "inline";
     const isHostToolbarMode = toolbarMode === "host";
     const hideExecutionControls = Boolean(options.hideExecutionControls);
+    const selectionModeAvailable = interactionProfile !== "text-comment";
     const rootRef = import_react14.default.useRef(null);
     const pagePanelRef = import_react14.default.useRef(null);
     const pagePanelBodyRef = import_react14.default.useRef(null);
@@ -18751,6 +18584,9 @@ var PropertyPanelView = import_react14.default.forwardRef(
       Math.max(0, options.getModifiedElementCount?.() ?? 0)
     );
     const [actionBusy, setActionBusy] = import_react14.default.useState(false);
+    const [markdownSourceEditorOpen, setMarkdownSourceEditorOpen] = import_react14.default.useState(
+      () => options.getMarkdownSourceEditorOpen?.() === true
+    );
     const [agentPromptSending, setAgentPromptSending] = import_react14.default.useState(false);
     const [agentPromptInterrupting, setAgentPromptInterrupting] = import_react14.default.useState(false);
     const [agentWakeChecking, setAgentWakeChecking] = import_react14.default.useState(false);
@@ -18779,42 +18615,15 @@ var PropertyPanelView = import_react14.default.forwardRef(
     const [settingsPopoverOpen, setSettingsPopoverOpen] = import_react14.default.useState(false);
     const [skillInstallPromptCopied, setSkillInstallPromptCopied] = import_react14.default.useState(false);
     const skillInstallFeedbackTimerRef = import_react14.default.useRef(null);
-    const [aiSettingsDialogOpen, setAiSettingsDialogOpen] = import_react14.default.useState(false);
-    const [commentarySkillDialogOpen, setCommentarySkillDialogOpen] = import_react14.default.useState(false);
-    const [commentarySkillDraftIds, setCommentarySkillDraftIds] = import_react14.default.useState(
-      () => resolveCommentarySkillIds(
-        options.commentarySelectedSkillIds,
-        mergeCommentarySkillOptions(options.commentarySkillOptions ?? []),
-        options.commentarySkillSettingsConfigured === true
-      )
-    );
-    const [commentarySkillDraftOptions, setCommentarySkillDraftOptions] = import_react14.default.useState(() => mergeCommentarySkillOptions(options.commentarySkillOptions ?? []));
-    const [commentarySkillEditorDraft, setCommentarySkillEditorDraft] = import_react14.default.useState(null);
-    const [commentarySkillEditorError, setCommentarySkillEditorError] = import_react14.default.useState("");
-    const [commentarySkillSaving, setCommentarySkillSaving] = import_react14.default.useState(false);
     const [keyboardShortcutsDialogOpen, setKeyboardShortcutsDialogOpen] = import_react14.default.useState(false);
     const [annotationToolbarTick, setAnnotationToolbarTick] = import_react14.default.useState(0);
-    const [agentProviderRefreshPending, setAgentProviderRefreshPending] = import_react14.default.useState(false);
     const uiSettings = import_react14.default.useMemo(
       () => options.getUiSettings?.() ?? propUiSettings,
       [options, panelRefreshKey, propUiSettings]
     );
-    const commentarySkillOptions = import_react14.default.useMemo(
-      () => mergeCommentarySkillOptions(options.commentarySkillOptions ?? []),
-      [options.commentarySkillOptions]
-    );
-    const showCommentarySkillSettings = commentarySkillOptions.length > 0 && (Boolean(options.onHostToolbarAction) || (options.commentarySkillOptions?.length ?? 0) > 0);
-    const [aiExecutionProvider, setAiExecutionProvider] = import_react14.default.useState(
-      () => normalizeAiExecutionProvider(options.aiExecutionProvider)
-    );
     const [aiExecutionWorkspacePath, setAiExecutionWorkspacePath] = import_react14.default.useState(
       () => normalizeAiExecutionWorkspacePath(options.aiExecutionWorkspacePath)
     );
-    const [aiExecutionRunConcurrency, setAiExecutionRunConcurrency] = import_react14.default.useState(
-      () => normalizeAiExecutionRunConcurrency(options.aiExecutionRunConcurrency)
-    );
-    const [aiExecutionProviderOptionsState, setAiExecutionProviderOptionsState] = import_react14.default.useState(() => [...AI_EXECUTION_PROVIDER_OPTIONS]);
-    const [aiExecutionConfigBusy, setAiExecutionConfigBusy] = import_react14.default.useState(false);
     const [directoryPickerOpen, setDirectoryPickerOpen] = import_react14.default.useState(false);
     const [directoryPickerBusy, setDirectoryPickerBusy] = import_react14.default.useState(false);
     const [directoryPickerError, setDirectoryPickerError] = import_react14.default.useState("");
@@ -18832,18 +18641,10 @@ var PropertyPanelView = import_react14.default.forwardRef(
       [agentProviderAvailabilities]
     );
     import_react14.default.useEffect(() => {
-      setAiExecutionProvider(normalizeAiExecutionProvider(options.aiExecutionProvider));
-    }, [options.aiExecutionProvider]);
-    import_react14.default.useEffect(() => {
       setAiExecutionWorkspacePath(
         normalizeAiExecutionWorkspacePath(options.aiExecutionWorkspacePath)
       );
     }, [options.aiExecutionWorkspacePath]);
-    import_react14.default.useEffect(() => {
-      setAiExecutionRunConcurrency(
-        normalizeAiExecutionRunConcurrency(options.aiExecutionRunConcurrency)
-      );
-    }, [options.aiExecutionRunConcurrency]);
     import_react14.default.useEffect(
       () => () => {
         if (skillInstallFeedbackTimerRef.current !== null) {
@@ -18852,23 +18653,6 @@ var PropertyPanelView = import_react14.default.forwardRef(
       },
       []
     );
-    import_react14.default.useEffect(() => {
-      if (!Array.isArray(options.aiExecutionProviderOptions)) return;
-      const nextOptions = options.aiExecutionProviderOptions.map((item) => {
-        const value = normalizeAiExecutionWorkspacePath(item?.value);
-        if (!value) return null;
-        return {
-          value,
-          label: normalizeAiExecutionWorkspacePath(item?.label) || value,
-          disabled: item?.disabled === true
-        };
-      }).filter(
-        (item) => Boolean(item)
-      );
-      if (nextOptions.length > 0) {
-        setAiExecutionProviderOptionsState(nextOptions);
-      }
-    }, [options.aiExecutionProviderOptions]);
     import_react14.default.useEffect(() => {
       inlineTextEditingRef.current = inlineTextEditing;
     }, [inlineTextEditing]);
@@ -18891,7 +18675,8 @@ var PropertyPanelView = import_react14.default.forwardRef(
     );
     const hasPageTweakEntries = pageTweakEntries.length > 0;
     const showPropertyPanelToolbarButton = propertyPanelVisible && hasPageTweakEntries;
-    const showPropertyPanelSettingsItem = propertyPanelVisible && !showPropertyPanelToolbarButton;
+    const pageEditingSettingsAvailable = options.pageEditingSettingsAvailable !== false;
+    const showPropertyPanelSettingsItem = pageEditingSettingsAvailable && propertyPanelVisible && !showPropertyPanelToolbarButton;
     const {
       currentTask: currentAgentTask,
       currentTaskRunning,
@@ -19082,27 +18867,26 @@ var PropertyPanelView = import_react14.default.forwardRef(
       },
       [syncPanelMetaState]
     );
-    const handleHtmlFileSaveAction = import_react14.default.useCallback(
-      async () => {
-        if (actionBusy || !options.htmlFileSaveEnabled || !options.onHostToolbarAction) return;
-        try {
-          let result = false;
-          await runAction(async () => {
-            result = await options.onHostToolbarAction?.({ type: "save-html-all" });
-            if (result === false) throw new Error("\u5F53\u524D\u5BBF\u4E3B\u65E0\u6CD5\u4FDD\u5B58 HTML \u6587\u4EF6");
+    const handleHtmlFileSaveAction = import_react14.default.useCallback(async () => {
+      if (actionBusy || !options.htmlFileSaveEnabled || !options.onHostToolbarAction) return;
+      try {
+        let result = false;
+        await runAction(async () => {
+          result = await options.onHostToolbarAction?.({
+            type: "save-html-all"
           });
-          const record = result && typeof result === "object" ? result : {};
-          const message3 = typeof record.message === "string" && record.message.trim() ? record.message.trim() : "HTML \u6587\u672C\u548C\u6837\u5F0F\u5DF2\u4FDD\u5B58";
-          notifyRuntimeMessage(record.changed === false ? "info" : "success", message3);
-        } catch (error) {
-          notifyRuntimeMessage(
-            "error",
-            error instanceof Error ? error.message : "HTML \u6587\u4EF6\u4FDD\u5B58\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5"
-          );
-        }
-      },
-      [actionBusy, options.htmlFileSaveEnabled, options.onHostToolbarAction, runAction]
-    );
+          if (result === false) throw new Error("\u5F53\u524D\u5BBF\u4E3B\u65E0\u6CD5\u4FDD\u5B58 HTML \u6587\u4EF6");
+        });
+        const record = result && typeof result === "object" ? result : {};
+        const message3 = typeof record.message === "string" && record.message.trim() ? record.message.trim() : "HTML \u6587\u672C\u548C\u6837\u5F0F\u5DF2\u4FDD\u5B58";
+        notifyRuntimeMessage(record.changed === false ? "info" : "success", message3);
+      } catch (error) {
+        notifyRuntimeMessage(
+          "error",
+          error instanceof Error ? error.message : "HTML \u6587\u4EF6\u4FDD\u5B58\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5"
+        );
+      }
+    }, [actionBusy, options.htmlFileSaveEnabled, options.onHostToolbarAction, runAction]);
     const agentAwake = effectiveVisualState === "awake";
     const wakeAgentForAction = import_react14.default.useCallback(async () => {
       if (agentWakeChecking) {
@@ -19331,7 +19115,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
         options.onCommentShortcutDialogOpenChange?.(false);
       };
     }, [options]);
-    const blockingLayerOpen = settingsPopoverOpen || aiSettingsDialogOpen || commentarySkillDialogOpen || shortcutDialogOpen || keyboardShortcutsDialogOpen || directoryPickerOpen;
+    const blockingLayerOpen = settingsPopoverOpen || shortcutDialogOpen || keyboardShortcutsDialogOpen || directoryPickerOpen;
     import_react14.default.useEffect(() => {
       onBlockingLayerOpenChange?.(blockingLayerOpen);
       return () => {
@@ -19408,7 +19192,6 @@ var PropertyPanelView = import_react14.default.forwardRef(
       if (!toolMinimized) return;
       setSessionActivityCardOpen(false);
       setSettingsPopoverOpen(false);
-      setCommentarySkillDialogOpen(false);
       setDirectoryPickerOpen(false);
     }, [toolMinimized]);
     import_react14.default.useEffect(() => {
@@ -20006,187 +19789,22 @@ var PropertyPanelView = import_react14.default.forwardRef(
         notifyRuntimeMessage("error", "\u590D\u5236\u5931\u8D25");
       }
     }, []);
-    const handleRefreshAgentProviders = import_react14.default.useCallback(async () => {
-      if (!onRefreshAgentProviderAvailabilities) return;
-      setAgentProviderRefreshPending(true);
-      try {
-        await onRefreshAgentProviderAvailabilities(AGENT_MENU_OPTIONS.map((item) => item.value));
-      } finally {
-        setAgentProviderRefreshPending(false);
-      }
-    }, [onRefreshAgentProviderAvailabilities]);
-    const agentProviderSettingsMenuItems = AGENT_MENU_OPTIONS.map(
-      (item) => {
-        const availability = agentProviderAvailabilityMap.get(item.value) ?? null;
-        const agentInstalled = availability?.installed !== false;
-        return {
-          key: `agent-provider:${item.value}`,
-          label: `${item.label}${agentInstalled ? "" : "\uFF08\u672A\u5B89\u88C5\uFF09"}`,
-          disabled: !agentInstalled
-        };
-      }
-    );
-    const selectedAgentMenuKey = uiSettings.agentProvider ? `agent-provider:${uiSettings.agentProvider}` : AGENT_DEFAULT_MENU_KEY;
-    const agentProviderDropdownItems = hideExecutionControls ? [] : [
-      {
-        key: AGENT_DEFAULT_MENU_KEY,
-        label: "\u9ED8\u8BA4"
-      },
-      ...agentProviderSettingsMenuItems
-    ];
-    const handleAgentProviderMenuClick = import_react14.default.useCallback(
-      ({ key }) => {
-        if (key === AGENT_DEFAULT_MENU_KEY) {
-          onUiSettingsChange({ ...uiSettings, agentProvider: null });
-          return;
-        }
-        if (String(key).startsWith("agent-provider:")) {
-          const nextAgent = String(key).replace("agent-provider:", "").trim();
-          if (nextAgent && nextAgent !== uiSettings.agentProvider) {
-            onUiSettingsChange({
-              ...uiSettings,
-              agentProvider: nextAgent
-            });
-          }
-          return;
-        }
-      },
-      [onUiSettingsChange, uiSettings]
-    );
-    const selectedAgentMenuLabel = uiSettings.agentProvider ? AGENT_MENU_OPTIONS.find((item) => item.value === uiSettings.agentProvider)?.label ?? uiSettings.agentProvider : "\u9ED8\u8BA4";
-    const aiExecutionProviderOptions = import_react14.default.useMemo(() => {
-      const merged = /* @__PURE__ */ new Map();
-      for (const item of AI_EXECUTION_PROVIDER_OPTIONS) {
-        merged.set(item.value, item);
-      }
-      for (const item of aiExecutionProviderOptionsState) {
-        const value = normalizeAiExecutionWorkspacePath(item.value);
-        if (!value) continue;
-        merged.set(value, {
-          value,
-          label: normalizeAiExecutionWorkspacePath(item.label) || value,
-          disabled: item.disabled === true
-        });
-      }
-      if (aiExecutionProvider && !merged.has(aiExecutionProvider)) {
-        merged.set(aiExecutionProvider, {
-          value: aiExecutionProvider,
-          label: aiExecutionProvider
-        });
-      }
-      return [...merged.values()];
-    }, [aiExecutionProvider, aiExecutionProviderOptionsState]);
-    const applyAiExecutionConfigResult = import_react14.default.useCallback((result) => {
-      const resultRecord = result && typeof result === "object" ? result : null;
-      const resolved = readAiExecutionConfigResult(result);
-      if (resultRecord && Object.prototype.hasOwnProperty.call(resultRecord, "provider")) {
-        setAiExecutionProvider(normalizeAiExecutionProvider(resultRecord.provider));
-      } else if (resolved.provider) {
-        setAiExecutionProvider(resolved.provider);
-      }
-      if (resultRecord && Object.prototype.hasOwnProperty.call(resultRecord, "workspacePath")) {
-        setAiExecutionWorkspacePath(normalizeAiExecutionWorkspacePath(resultRecord.workspacePath));
-      } else if (resolved.workspacePath) {
-        setAiExecutionWorkspacePath(resolved.workspacePath);
-      }
-      if (resultRecord && Object.prototype.hasOwnProperty.call(resultRecord, "runConcurrency")) {
-        setAiExecutionRunConcurrency(
-          normalizeAiExecutionRunConcurrency(resultRecord.runConcurrency)
-        );
-      } else if (resolved.runConcurrency) {
-        setAiExecutionRunConcurrency(resolved.runConcurrency);
-      }
-      if (resolved.providerOptions?.length) {
-        setAiExecutionProviderOptionsState(resolved.providerOptions);
-      }
-      return resolved;
-    }, []);
-    const commitAiExecutionConfig = import_react14.default.useCallback(
-      async (nextProvider, nextWorkspacePath, nextRunConcurrency) => {
-        const result = await options.onHostToolbarAction?.({
-          type: "set-ai-execution-config",
-          provider: normalizeAiExecutionProvider(nextProvider),
-          workspacePath: normalizeAiExecutionWorkspacePath(nextWorkspacePath),
-          runConcurrency: normalizeAiExecutionRunConcurrency(nextRunConcurrency)
-        });
-        applyAiExecutionConfigResult(result);
-        return result;
-      },
-      [applyAiExecutionConfigResult, options]
-    );
-    const handleRefreshAiExecutionConfig = import_react14.default.useCallback(async () => {
+    const handleRefreshAiExecutionWorkspace = import_react14.default.useCallback(async () => {
       if (!options.onHostToolbarAction) return;
-      setAiExecutionConfigBusy(true);
       try {
         const result = await options.onHostToolbarAction({
           type: "get-ai-execution-config"
         });
-        applyAiExecutionConfigResult(result);
+        const resultRecord = result && typeof result === "object" ? result : null;
+        if (resultRecord && Object.prototype.hasOwnProperty.call(resultRecord, "workspacePath")) {
+          setAiExecutionWorkspacePath(
+            normalizeAiExecutionWorkspacePath(resultRecord.workspacePath)
+          );
+        }
       } catch (error) {
         notifyRuntimeMessage("warning", error instanceof Error ? error.message : String(error));
-      } finally {
-        setAiExecutionConfigBusy(false);
       }
-    }, [applyAiExecutionConfigResult, options]);
-    const handleOpenAiSettingsDialog = import_react14.default.useCallback(() => {
-      setSettingsPopoverOpen(false);
-      setAiSettingsDialogOpen(true);
-    }, []);
-    const handleAiExecutionProviderChange = import_react14.default.useCallback(
-      (nextProvider) => {
-        const normalizedProvider = normalizeAiExecutionProvider(nextProvider);
-        setAiExecutionProvider(normalizedProvider);
-        setAiExecutionConfigBusy(true);
-        void commitAiExecutionConfig(
-          normalizedProvider,
-          aiExecutionWorkspacePath,
-          aiExecutionRunConcurrency
-        ).catch((error) => {
-          notifyRuntimeMessage("error", error instanceof Error ? error.message : String(error));
-        }).finally(() => {
-          setAiExecutionConfigBusy(false);
-        });
-      },
-      [aiExecutionRunConcurrency, aiExecutionWorkspacePath, commitAiExecutionConfig]
-    );
-    const handleAiExecutionWorkspacePathCommit = import_react14.default.useCallback(() => {
-      const normalizedWorkspacePath = normalizeAiExecutionWorkspacePath(aiExecutionWorkspacePath);
-      setAiExecutionWorkspacePath(normalizedWorkspacePath);
-      setAiExecutionConfigBusy(true);
-      void commitAiExecutionConfig(
-        aiExecutionProvider,
-        normalizedWorkspacePath,
-        aiExecutionRunConcurrency
-      ).catch((error) => {
-        notifyRuntimeMessage("error", error instanceof Error ? error.message : String(error));
-      }).finally(() => {
-        setAiExecutionConfigBusy(false);
-      });
-    }, [
-      aiExecutionProvider,
-      aiExecutionRunConcurrency,
-      aiExecutionWorkspacePath,
-      commitAiExecutionConfig
-    ]);
-    const handleAiExecutionRunConcurrencyCommit = import_react14.default.useCallback(() => {
-      const normalizedRunConcurrency = normalizeAiExecutionRunConcurrency(aiExecutionRunConcurrency);
-      setAiExecutionRunConcurrency(normalizedRunConcurrency);
-      setAiExecutionConfigBusy(true);
-      void commitAiExecutionConfig(
-        aiExecutionProvider,
-        aiExecutionWorkspacePath,
-        normalizedRunConcurrency
-      ).catch((error) => {
-        notifyRuntimeMessage("error", error instanceof Error ? error.message : String(error));
-      }).finally(() => {
-        setAiExecutionConfigBusy(false);
-      });
-    }, [
-      aiExecutionProvider,
-      aiExecutionRunConcurrency,
-      aiExecutionWorkspacePath,
-      commitAiExecutionConfig
-    ]);
+    }, [options]);
     const browseAiExecutionDirectories = import_react14.default.useCallback(
       async (path) => {
         if (!options.onHostToolbarAction) return;
@@ -20368,7 +19986,16 @@ var PropertyPanelView = import_react14.default.forwardRef(
       setDirectoryPickerBusy(true);
       try {
         setAiExecutionWorkspacePath(selectedPath);
-        await commitAiExecutionConfig(aiExecutionProvider, selectedPath, aiExecutionRunConcurrency);
+        const result = await options.onHostToolbarAction?.({
+          type: "set-ai-execution-config",
+          workspacePath: selectedPath
+        });
+        const resultRecord = result && typeof result === "object" ? result : null;
+        if (resultRecord && Object.prototype.hasOwnProperty.call(resultRecord, "workspacePath")) {
+          setAiExecutionWorkspacePath(
+            normalizeAiExecutionWorkspacePath(resultRecord.workspacePath)
+          );
+        }
         const optimisticRecentWorkspaces = recordAiExecutionRecentWorkspace(
           directoryPickerRecentWorkspaces,
           selectedPath
@@ -20379,8 +20006,8 @@ var PropertyPanelView = import_react14.default.forwardRef(
           path: selectedPath
         });
         if (recentWorkspaceRequest) {
-          void Promise.resolve(recentWorkspaceRequest).then((result) => {
-            setDirectoryPickerRecentWorkspaces(normalizeAiExecutionRecentWorkspaces(result));
+          void Promise.resolve(recentWorkspaceRequest).then((result2) => {
+            setDirectoryPickerRecentWorkspaces(normalizeAiExecutionRecentWorkspaces(result2));
           }).catch(() => void 0);
         }
         setDirectoryPickerOpen(false);
@@ -20393,17 +20020,11 @@ var PropertyPanelView = import_react14.default.forwardRef(
         setDirectoryPickerBusy(false);
       }
     }, [
-      aiExecutionProvider,
-      aiExecutionRunConcurrency,
-      commitAiExecutionConfig,
       directoryPickerRecentWorkspaces,
       directoryPickerState?.path,
       options
     ]);
-    const aiExecutionProviderLabel = aiExecutionProviderOptions.find((item) => item.value === aiExecutionProvider)?.label ?? aiExecutionProvider ?? DEFAULT_AI_EXECUTION_PROVIDER;
     const aiExecutionWorkspaceDisplayName = getPathDisplayName(aiExecutionWorkspacePath);
-    const aiExecutionConfigSummary = aiExecutionWorkspaceDisplayName ? `${aiExecutionProviderLabel} / ${aiExecutionWorkspaceDisplayName}` : `${aiExecutionProviderLabel} / \u672A\u914D\u7F6E AI \u5DE5\u4F5C\u76EE\u5F55`;
-    const aiExecutionConfigConfigured = Boolean(aiExecutionWorkspacePath) || options.aiExecutionConfigConfigured === true;
     const toggleSelectionMode = import_react14.default.useCallback(() => {
       const nextSelectionModeActive = !selectionModeActive;
       if (!nextSelectionModeActive) {
@@ -20425,200 +20046,6 @@ var PropertyPanelView = import_react14.default.forwardRef(
       onTargetChange,
       selectionModeActive
     ]);
-    const handleOpenCommentarySkillDialog = import_react14.default.useCallback(async () => {
-      setSettingsPopoverOpen(false);
-      setCommentarySkillEditorDraft(null);
-      setCommentarySkillEditorError("");
-      setCommentarySkillDraftOptions(commentarySkillOptions);
-      setCommentarySkillDraftIds(
-        resolveCommentarySkillIds(
-          options.commentarySelectedSkillIds,
-          commentarySkillOptions,
-          options.commentarySkillSettingsConfigured === true
-        )
-      );
-      setCommentarySkillDialogOpen(true);
-      try {
-        const settings = await options.onCommentarySkillSettingsLoad?.();
-        if (settings) {
-          const nextSkillOptions = mergeCommentarySkillOptions(settings.skillOptions);
-          setCommentarySkillDraftOptions(nextSkillOptions);
-          setCommentarySkillDraftIds(
-            normalizeCommentarySkillIds(settings.selectedSkillIds, nextSkillOptions)
-          );
-          return;
-        }
-        const selectedSkillIds = await options.onCommentarySkillSelectionLoad?.();
-        if (selectedSkillIds) {
-          setCommentarySkillDraftIds(
-            normalizeCommentarySkillIds(selectedSkillIds, commentarySkillOptions)
-          );
-        }
-      } catch {
-        notifyRuntimeMessage("error", "\u8BFB\u53D6\u6280\u80FD\u914D\u7F6E\u5931\u8D25");
-      }
-    }, [commentarySkillOptions, options]);
-    const handleSaveCommentarySkillSelection = import_react14.default.useCallback(async () => {
-      const nextSkillIds = normalizeCommentarySkillIds(
-        commentarySkillDraftIds,
-        commentarySkillDraftOptions
-      );
-      setCommentarySkillSaving(true);
-      try {
-        const saved = options.onCommentarySkillSettingsChange ? await options.onCommentarySkillSettingsChange({
-          selectedSkillIds: nextSkillIds,
-          skillOptions: commentarySkillDraftOptions
-        }) : void 0;
-        if (!options.onCommentarySkillSettingsChange) {
-          await options.onCommentarySkillSelectionChange?.(nextSkillIds);
-        }
-        const savedSkillOptions = mergeCommentarySkillOptions(
-          saved?.skillOptions ?? commentarySkillDraftOptions
-        );
-        setCommentarySkillDraftOptions(savedSkillOptions);
-        setCommentarySkillDraftIds(
-          normalizeCommentarySkillIds(saved?.selectedSkillIds ?? nextSkillIds, savedSkillOptions)
-        );
-        setCommentarySkillDialogOpen(false);
-        notifyRuntimeMessage("success", "\u6280\u80FD\u914D\u7F6E\u5DF2\u4FDD\u5B58");
-      } catch {
-        notifyRuntimeMessage("error", "\u4FDD\u5B58\u6280\u80FD\u914D\u7F6E\u5931\u8D25");
-      } finally {
-        setCommentarySkillSaving(false);
-      }
-    }, [commentarySkillDraftIds, commentarySkillDraftOptions, options]);
-    const handleSaveCommentaryCustomSkillDraft = import_react14.default.useCallback(() => {
-      if (!commentarySkillEditorDraft) return;
-      const label = commentarySkillEditorDraft.label.trim();
-      const prompt = commentarySkillEditorDraft.prompt.trim();
-      if (!label) {
-        setCommentarySkillEditorError("\u8BF7\u8F93\u5165\u6280\u80FD\u540D\u79F0");
-        return;
-      }
-      if (label.length > 30) {
-        setCommentarySkillEditorError("\u6280\u80FD\u540D\u79F0\u4E0D\u80FD\u8D85\u8FC7 30 \u4E2A\u5B57");
-        return;
-      }
-      if (!prompt) {
-        setCommentarySkillEditorError("\u8BF7\u8F93\u5165\u63D0\u793A\u8BCD");
-        return;
-      }
-      if (prompt.length > 4e3) {
-        setCommentarySkillEditorError("\u63D0\u793A\u8BCD\u4E0D\u80FD\u8D85\u8FC7 4000 \u4E2A\u5B57");
-        return;
-      }
-      const nextSkill = {
-        id: commentarySkillEditorDraft.id,
-        label,
-        prompt,
-        description: summarizeCommentaryCustomSkillPrompt(prompt),
-        custom: true
-      };
-      setCommentarySkillDraftOptions(
-        (current) => mergeCommentarySkillOptions([
-          ...current.filter((skill) => skill.id !== nextSkill.id),
-          nextSkill
-        ])
-      );
-      setCommentarySkillDraftIds(
-        (current) => current.includes(nextSkill.id) ? current : [...current, nextSkill.id]
-      );
-      setCommentarySkillEditorDraft(null);
-      setCommentarySkillEditorError("");
-    }, [commentarySkillEditorDraft]);
-    const commentarySystemSkillDraftOptions = commentarySkillDraftOptions.filter(
-      (skill) => skill.custom !== true
-    );
-    const commentaryCustomSkillDraftOptions = commentarySkillDraftOptions.filter(
-      (skill) => skill.custom === true
-    );
-    const commentarySkillEditorIsExisting = Boolean(
-      commentarySkillEditorDraft && commentaryCustomSkillDraftOptions.some(
-        (skill) => skill.id === commentarySkillEditorDraft.id
-      )
-    );
-    const renderCommentarySkillOption = (skill) => {
-      const checked = commentarySkillDraftIds.includes(skill.id);
-      const toggleSkill = () => {
-        if (commentarySkillSaving) return;
-        setCommentarySkillDraftIds((prev) => {
-          const current = new Set(prev);
-          if (current.has(skill.id)) {
-            current.delete(skill.id);
-          } else {
-            current.add(skill.id);
-          }
-          return normalizeCommentarySkillIds([...current], commentarySkillDraftOptions);
-        });
-      };
-      return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
-        "div",
-        {
-          role: "checkbox",
-          "aria-checked": checked,
-          "aria-label": `${skill.label}\uFF1A${checked ? "\u5DF2\u542F\u7528" : "\u672A\u542F\u7528"}`,
-          tabIndex: commentarySkillSaving ? -1 : 0,
-          className: `we-runtime-commentary-skill-dialog__item${commentarySkillSaving ? " we-runtime-commentary-skill-dialog__item--disabled" : ""}`,
-          onClick: toggleSkill,
-          onKeyDown: (event) => {
-            if (commentarySkillSaving) return;
-            if (event.key !== "Enter" && event.key !== " ") return;
-            event.preventDefault();
-            toggleSkill();
-          },
-          children: [
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "we-runtime-commentary-skill-dialog__copy", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "we-runtime-commentary-skill-dialog__name", children: skill.label }),
-              skill.description ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "we-runtime-commentary-skill-dialog__description", children: skill.description }) : null
-            ] }),
-            skill.custom === true ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-              import_antd9.Button,
-              {
-                type: "text",
-                size: "small",
-                className: "we-runtime-commentary-skill-dialog__edit",
-                "aria-label": `\u7F16\u8F91${skill.label}`,
-                icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.EditOutlined, {}),
-                disabled: commentarySkillSaving,
-                onClick: (event) => {
-                  event.stopPropagation();
-                  setCommentarySkillEditorDraft({
-                    id: skill.id,
-                    label: skill.label,
-                    prompt: skill.prompt ?? ""
-                  });
-                  setCommentarySkillEditorError("");
-                }
-              }
-            ) : null,
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-              import_antd9.Checkbox,
-              {
-                checked,
-                disabled: commentarySkillSaving,
-                "aria-label": `${checked ? "\u505C\u7528" : "\u542F\u7528"}${skill.label}`,
-                onClick: (event) => {
-                  event.stopPropagation();
-                },
-                onChange: (event) => {
-                  const nextChecked = event.target.checked;
-                  setCommentarySkillDraftIds((prev) => {
-                    const current = new Set(prev);
-                    if (nextChecked) {
-                      current.add(skill.id);
-                    } else {
-                      current.delete(skill.id);
-                    }
-                    return normalizeCommentarySkillIds([...current], commentarySkillDraftOptions);
-                  });
-                }
-              }
-            )
-          ]
-        },
-        skill.id
-      );
-    };
     const commentarySkillInstallSettingsItem = {
       key: "commentary-skill-install",
       compactControl: true,
@@ -20648,52 +20075,21 @@ var PropertyPanelView = import_react14.default.forwardRef(
         }
       )
     };
-    const agentProviderSettingsItem = hideExecutionControls || options.onHostToolbarAction ? null : {
-      key: "agent-provider",
-      label: "\u6267\u884C AI",
-      control: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-        import_antd9.Dropdown,
+    const aiWorkspaceSettingsItem = hideExecutionControls || !options.onHostToolbarAction ? null : {
+      key: "ai-workspace",
+      label: "AI \u5DE5\u4F5C\u76EE\u5F55",
+      action: handleOpenDirectoryPicker,
+      control: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+        "span",
         {
-          trigger: ["click"],
-          placement: "bottomRight",
-          getPopupContainer: resolveRuntimePopupContainer,
-          overlayClassName: "we-runtime-agent-menu-dropdown",
-          menu: {
-            items: agentProviderDropdownItems,
-            onClick: handleAgentProviderMenuClick,
-            selectedKeys: [selectedAgentMenuKey]
-          },
-          onOpenChange: (open) => {
-            if (open) {
-              void handleRefreshAgentProviders();
-            }
-          },
-          children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-            import_antd9.Button,
-            {
-              type: "text",
-              size: "small",
-              loading: agentProviderRefreshPending,
-              disabled: agentProviderRefreshPending,
-              style: {
-                color: EDITOR_CHROME.textSecondary,
-                paddingInline: 4,
-                height: 24
-              },
-              children: selectedAgentMenuLabel
-            }
-          )
+          className: "we-runtime-settings-card__value we-runtime-settings-card__workspace-value",
+          title: aiExecutionWorkspacePath || void 0,
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "we-runtime-settings-card__workspace-value-text", children: aiExecutionWorkspaceDisplayName || "\u672A\u914D\u7F6E" }),
+            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.RightOutlined, { style: { fontSize: 10 } })
+          ]
         }
       )
-    };
-    const aiSettingsItem = hideExecutionControls || !options.onHostToolbarAction ? null : {
-      key: "ai-settings",
-      label: "AI \u8BBE\u7F6E",
-      action: handleOpenAiSettingsDialog,
-      control: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: "we-runtime-settings-card__value", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { children: "3 \u9879" }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.RightOutlined, { style: { fontSize: 10 } })
-      ] })
     };
     const propertyPanelSettingsItem = showPropertyPanelSettingsItem ? {
       key: "property-panel",
@@ -20708,89 +20104,46 @@ var PropertyPanelView = import_react14.default.forwardRef(
         }
       )
     } : null;
-    const agentRunConcurrencySettingsItem = hideExecutionControls || options.onHostToolbarAction ? null : {
-      key: "agent-run-concurrency",
-      label: "AI \u5E76\u53D1\u6570",
-      control: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-        import_antd9.InputNumber,
-        {
-          min: MIN_AI_EXECUTION_RUN_CONCURRENCY,
-          max: MAX_AI_EXECUTION_RUN_CONCURRENCY,
-          precision: 0,
-          size: "small",
-          value: uiSettings.agentRunConcurrency,
-          onChange: (value) => {
-            onUiSettingsChange({
-              ...uiSettings,
-              agentRunConcurrency: typeof value === "number" ? value : uiSettings.agentRunConcurrency
-            });
-          },
-          style: { width: 64 }
-        }
-      )
-    };
-    const commentarySkillSettingsItem = showCommentarySkillSettings ? {
-      key: "commentary-skills",
-      label: "\u6280\u80FD\u7BA1\u7406",
-      action: handleOpenCommentarySkillDialog,
-      control: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
-        "span",
-        {
-          style: {
-            color: EDITOR_CHROME.textSecondary,
-            fontSize: 13,
-            display: "flex",
-            alignItems: "center",
-            gap: 6
-          },
-          children: [
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { children: commentarySkillDraftIds.length > 0 ? `${commentarySkillDraftIds.length} \u9879` : "\u672A\u9009\u62E9" }),
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.RightOutlined, { style: { fontSize: 10 } })
-          ]
-        }
-      )
-    } : null;
     const settingsItems = [
       commentarySkillInstallSettingsItem,
-      ...aiSettingsItem ? [aiSettingsItem] : [],
-      ...agentProviderSettingsItem ? [agentProviderSettingsItem] : [],
-      ...commentarySkillSettingsItem ? [commentarySkillSettingsItem] : [],
+      ...aiWorkspaceSettingsItem ? [aiWorkspaceSettingsItem] : [],
       ...propertyPanelSettingsItem ? [propertyPanelSettingsItem] : [],
-      ...agentRunConcurrencySettingsItem ? [agentRunConcurrencySettingsItem] : [],
-      {
-        key: "disable-page-animations",
-        label: "\u5173\u95ED\u9875\u9762\u52A8\u753B",
-        control: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-          import_antd9.Switch,
-          {
-            checked: uiSettings.disablePageAnimations,
-            onChange: (checked) => {
-              onUiSettingsChange({
-                ...uiSettings,
-                disablePageAnimations: checked
-              });
-            }
-          }
-        )
-      },
-      ...options.documentCommentModeAvailable === false ? [] : [
+      ...pageEditingSettingsAvailable ? [
         {
-          key: "document-comment-mode",
-          label: "\u6587\u6863\u6279\u6CE8\u6A21\u5F0F",
+          key: "disable-page-animations",
+          label: "\u5173\u95ED\u9875\u9762\u52A8\u753B",
           control: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
             import_antd9.Switch,
             {
-              checked: uiSettings.documentCommentMode,
+              checked: uiSettings.disablePageAnimations,
               onChange: (checked) => {
                 onUiSettingsChange({
                   ...uiSettings,
-                  documentCommentMode: checked
+                  disablePageAnimations: checked
                 });
               }
             }
           )
-        }
-      ],
+        },
+        ...options.documentCommentModeAvailable === false ? [] : [
+          {
+            key: "document-comment-mode",
+            label: "\u6587\u6863\u6279\u6CE8\u6A21\u5F0F",
+            control: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+              import_antd9.Switch,
+              {
+                checked: uiSettings.documentCommentMode,
+                onChange: (checked) => {
+                  onUiSettingsChange({
+                    ...uiSettings,
+                    documentCommentMode: checked
+                  });
+                }
+              }
+            )
+          }
+        ]
+      ] : [],
       {
         key: "keyboard-shortcuts",
         label: "\u5FEB\u6377\u952E",
@@ -20894,7 +20247,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
           if (actionBusy && nextOpen) return;
           setSettingsPopoverOpen(nextOpen);
           if (nextOpen) {
-            void handleRefreshAiExecutionConfig();
+            void handleRefreshAiExecutionWorkspace();
           }
         },
         content: settingsCardContent,
@@ -20911,7 +20264,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
       }
     );
     const selectionModeToolbarTitle = `${selectionModeActive ? "\u5173\u95ED\u9009\u62E9\u5143\u7D20" : "\u5F00\u542F\u9009\u62E9\u5143\u7D20"}\uFF08${SELECTION_MODE_TOGGLE_SHORTCUT_LABEL}\uFF09`;
-    const selectionModeToolbarButton = /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+    const selectionModeToolbarButton = selectionModeAvailable ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
       AgentToolbarIconButton,
       {
         title: selectionModeToolbarTitle,
@@ -20922,7 +20275,40 @@ var PropertyPanelView = import_react14.default.forwardRef(
         disabled: actionBusy,
         onClick: toggleSelectionMode
       }
-    );
+    ) : null;
+    const markdownSourceEditorToolbarButton = options.markdownSourceEditorAvailable ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+      AgentToolbarIconButton,
+      {
+        title: markdownSourceEditorOpen ? "\u9690\u85CF Markdown \u539F\u6587" : "\u663E\u793A Markdown \u539F\u6587",
+        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.FileTextOutlined, {}),
+        ariaLabel: markdownSourceEditorOpen ? "\u9690\u85CF Markdown \u539F\u6587" : "\u663E\u793A Markdown \u539F\u6587",
+        awake: agentShellAwake,
+        active: markdownSourceEditorOpen,
+        disabled: actionBusy || !options.onMarkdownSourceEditorOpenChange,
+        onClick: () => {
+          if (actionBusy || !options.onMarkdownSourceEditorOpenChange) return;
+          const requestedOpen = !markdownSourceEditorOpen;
+          void (async () => {
+            try {
+              const result = await runAction(
+                () => options.onMarkdownSourceEditorOpenChange?.(requestedOpen)
+              );
+              const actualOpen = typeof result === "boolean" ? result : options.getMarkdownSourceEditorOpen?.() === true;
+              setMarkdownSourceEditorOpen(actualOpen);
+              if (!requestedOpen && actualOpen) {
+                notifyRuntimeMessage("warning", "Markdown \u5C1A\u672A\u4FDD\u5B58\uFF0C\u5DF2\u4FDD\u7559\u539F\u6587\u7F16\u8F91\u533A");
+              }
+            } catch (error) {
+              setMarkdownSourceEditorOpen(options.getMarkdownSourceEditorOpen?.() === true);
+              notifyRuntimeMessage(
+                "error",
+                error instanceof Error ? error.message : "Markdown \u7F16\u8F91\u89C6\u56FE\u5207\u6362\u5931\u8D25"
+              );
+            }
+          })();
+        }
+      }
+    ) : null;
     const closeToolbarButton = /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
       AgentToolbarIconButton,
       {
@@ -20962,7 +20348,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
               children: "\u6682\u65F6\u6CA1\u6709\u9700\u8981\u5904\u7406\u7684\u8BBE\u8BA1\u51B3\u7B56\u3002\u53EF\u4EE5\u5148\u751F\u6210\u591A\u4E2A\u8BBE\u8BA1\u65B9\u6848\uFF0C\u518D\u8FDB\u884C\u5BF9\u6BD4\u548C\u51B3\u7B56\u3002"
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          showCopyPromptAction ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
             import_antd9.Button,
             {
               type: "default",
@@ -20974,7 +20360,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
               style: { alignSelf: "flex-start" },
               children: "\u590D\u5236\u63D0\u793A\u8BCD"
             }
-          )
+          ) : null
         ]
       }
     );
@@ -21041,17 +20427,17 @@ var PropertyPanelView = import_react14.default.forwardRef(
         terminalTaskCount: visibleTerminalTaskCount,
         selectedAgent: hideExecutionControls ? null : uiSettings.agentProvider,
         agentOptions: hideExecutionControls ? [] : agentOptions,
-        aiExecutionConfigSummary,
-        aiExecutionConfigConfigured,
-        aiExecutionProvider,
+        aiExecutionConfigSummary: options.aiExecutionConfigSummary ?? "",
+        aiExecutionConfigConfigured: Boolean(aiExecutionWorkspacePath) || options.aiExecutionConfigConfigured === true,
+        aiExecutionProvider: options.aiExecutionProvider?.trim() || "codex",
         aiExecutionWorkspacePath,
-        aiExecutionRunConcurrency,
-        aiExecutionProviderOptions,
+        aiExecutionRunConcurrency: options.aiExecutionRunConcurrency ?? 5,
+        aiExecutionProviderOptions: options.aiExecutionProviderOptions ?? [],
         darkMode: uiSettings.darkMode,
         disablePageAnimations: uiSettings.disablePageAnimations,
         pageZoomEnabled: uiSettings.pageZoomEnabled,
-        copySkillInstallPromptDisabled: actionBusy || agentProviderRefreshPending,
-        selectionModeActive,
+        copySkillInstallPromptDisabled: actionBusy,
+        selectionModeActive: selectionModeAvailable && selectionModeActive,
         fullExitAvailable: Boolean(options.onRequestFullExit),
         annotationEnabled,
         annotationEnableAvailable,
@@ -21072,13 +20458,9 @@ var PropertyPanelView = import_react14.default.forwardRef(
       copyReason,
       agentPromptToolbarAction,
       agentProviderAvailabilityMap,
-      agentProviderRefreshPending,
       hideExecutionControls,
       hostSendVisible,
       isHostToolbarMode,
-      aiExecutionProvider,
-      aiExecutionProviderOptions,
-      aiExecutionRunConcurrency,
       aiExecutionWorkspacePath,
       modifiedCount,
       options.getAnnotationEnabled,
@@ -21086,8 +20468,11 @@ var PropertyPanelView = import_react14.default.forwardRef(
       options.getAnnotationEnableLoading,
       options.onEnableAnnotation,
       options.onRequestFullExit,
-      aiExecutionConfigConfigured,
-      aiExecutionConfigSummary,
+      options.aiExecutionConfigConfigured,
+      options.aiExecutionConfigSummary,
+      options.aiExecutionProvider,
+      options.aiExecutionProviderOptions,
+      options.aiExecutionRunConcurrency,
       propertyPanelOpen,
       showPropertyPanelToolbarButton,
       selectionModeActive,
@@ -21155,8 +20540,6 @@ var PropertyPanelView = import_react14.default.forwardRef(
             onUiSettingsChange({ ...uiSettings, agentProvider: nextAgent });
             return true;
           }
-          case "open-ai-settings":
-            return Boolean(await options.onHostToolbarAction?.(action));
           case "get-acp-ui-status":
             return Boolean(await options.onHostToolbarAction?.(action));
           case "save-html-all":
@@ -21201,6 +20584,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
             handleTogglePageZoom();
             return true;
           case "toggle-selection-mode": {
+            if (!selectionModeAvailable) return false;
             const nextSelectionModeActive = action.active ?? !selectionModeActive;
             if (!nextSelectionModeActive) {
               onDismissSelection?.();
@@ -21258,6 +20642,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
         options,
         propertyPanelOpen,
         runAction,
+        selectionModeAvailable,
         selectionModeActive,
         uiSettings,
         wakeAgentForAction
@@ -21409,6 +20794,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
             },
             children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(import_antd9.Space, { size: 4, style: { minWidth: 0, flex: "0 0 auto" }, children: [
               selectionModeToolbarButton,
+              markdownSourceEditorToolbarButton,
               agentExecutionToolbarButton,
               copyToolbarButton,
               propertyPanelToggleButton,
@@ -21618,260 +21004,6 @@ var PropertyPanelView = import_react14.default.forwardRef(
           children: [
             /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("style", { children: PROPERTY_PANEL_LOCAL_STYLES }),
             isHostToolbarMode ? null : toolMinimized ? minimizedToolbar : expandedToolbar,
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-              import_antd9.Modal,
-              {
-                title: "AI \u8BBE\u7F6E",
-                open: aiSettingsDialogOpen,
-                centered: true,
-                width: 500,
-                className: "we-runtime-ai-settings-modal",
-                getContainer: false,
-                onCancel: () => setAiSettingsDialogOpen(false),
-                footer: [
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                    import_antd9.Button,
-                    {
-                      type: "primary",
-                      onClick: () => setAiSettingsDialogOpen(false),
-                      children: "\u5B8C\u6210"
-                    },
-                    "done"
-                  )
-                ],
-                children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "we-runtime-ai-settings-dialog", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "we-runtime-ai-settings-dialog__row", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("label", { className: "we-runtime-ai-settings-dialog__label", htmlFor: "we-ai-provider", children: "\u6267\u884C AI" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "we-runtime-ai-settings-dialog__control", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                      import_antd9.Select,
-                      {
-                        id: "we-ai-provider",
-                        value: aiExecutionProvider,
-                        options: aiExecutionProviderOptions,
-                        disabled: aiExecutionConfigBusy,
-                        onChange: handleAiExecutionProviderChange,
-                        getPopupContainer: resolveRuntimePopupContainer,
-                        popupClassName: "we-runtime-ai-execution-provider-dropdown",
-                        placement: "bottomRight",
-                        style: { width: "100%" }
-                      }
-                    ) })
-                  ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "we-runtime-ai-settings-dialog__row", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                      "label",
-                      {
-                        className: "we-runtime-ai-settings-dialog__label",
-                        htmlFor: "we-ai-run-concurrency",
-                        children: "AI \u5E76\u53D1\u6570"
-                      }
-                    ),
-                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "we-runtime-ai-settings-dialog__control", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                      import_antd9.InputNumber,
-                      {
-                        id: "we-ai-run-concurrency",
-                        min: MIN_AI_EXECUTION_RUN_CONCURRENCY,
-                        max: MAX_AI_EXECUTION_RUN_CONCURRENCY,
-                        precision: 0,
-                        value: aiExecutionRunConcurrency,
-                        disabled: aiExecutionConfigBusy,
-                        onChange: (value) => {
-                          setAiExecutionRunConcurrency(normalizeAiExecutionRunConcurrency(value));
-                        },
-                        onBlur: handleAiExecutionRunConcurrencyCommit,
-                        style: { width: "100%" }
-                      }
-                    ) })
-                  ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "we-runtime-ai-settings-dialog__row", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                      "label",
-                      {
-                        className: "we-runtime-ai-settings-dialog__label",
-                        htmlFor: "we-ai-workspace-path",
-                        children: "AI \u5DE5\u4F5C\u76EE\u5F55"
-                      }
-                    ),
-                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "we-runtime-ai-settings-dialog__control", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                      import_antd9.Input,
-                      {
-                        id: "we-ai-workspace-path",
-                        className: "we-runtime-ai-settings-dialog__workspace-input",
-                        value: aiExecutionWorkspacePath,
-                        placeholder: "\u5DE5\u4F5C\u76EE\u5F55",
-                        title: aiExecutionWorkspacePath || void 0,
-                        disabled: aiExecutionConfigBusy,
-                        onChange: (event) => {
-                          setAiExecutionWorkspacePath(event.target.value);
-                        },
-                        onBlur: handleAiExecutionWorkspacePathCommit,
-                        onPressEnter: (event) => {
-                          event.currentTarget.blur();
-                        },
-                        suffix: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                          import_antd9.Tooltip,
-                          {
-                            title: "\u9009\u62E9 AI \u5DE5\u4F5C\u76EE\u5F55",
-                            placement: "bottomRight",
-                            getPopupContainer: resolveRuntimePopupContainer,
-                            children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                              import_antd9.Button,
-                              {
-                                type: "text",
-                                "aria-label": "\u9009\u62E9 AI \u5DE5\u4F5C\u76EE\u5F55",
-                                icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.FolderOpenOutlined, {}),
-                                loading: directoryPickerBusy,
-                                disabled: aiExecutionConfigBusy || directoryPickerBusy,
-                                onMouseDown: (event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                },
-                                onClick: (event) => {
-                                  event.stopPropagation();
-                                  void handleOpenDirectoryPicker();
-                                }
-                              }
-                            )
-                          }
-                        )
-                      }
-                    ) })
-                  ] })
-                ] })
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-              import_antd9.Modal,
-              {
-                title: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "we-runtime-commentary-skill-dialog__title", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { children: commentarySkillEditorDraft ? commentarySkillEditorIsExisting ? "\u7F16\u8F91\u81EA\u5B9A\u4E49\u6280\u80FD" : "\u65B0\u5EFA\u81EA\u5B9A\u4E49\u6280\u80FD" : "\u6280\u80FD\u7BA1\u7406" }),
-                  !commentarySkillEditorDraft ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "we-runtime-commentary-skill-dialog__subtitle", children: "\u7BA1\u7406\u6279\u6CE8\u4E2D\u53EF\u4F7F\u7528\u7684\u6280\u80FD" }) : null
-                ] }),
-                open: commentarySkillDialogOpen,
-                centered: true,
-                width: 560,
-                className: "we-runtime-commentary-skill-modal",
-                getContainer: false,
-                maskClosable: !commentarySkillSaving,
-                onCancel: () => {
-                  if (commentarySkillSaving) return;
-                  if (commentarySkillEditorDraft) {
-                    setCommentarySkillEditorDraft(null);
-                    setCommentarySkillEditorError("");
-                    return;
-                  }
-                  setCommentarySkillDialogOpen(false);
-                },
-                footer: commentarySkillEditorDraft ? [
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                    import_antd9.Button,
-                    {
-                      onClick: () => {
-                        setCommentarySkillEditorDraft(null);
-                        setCommentarySkillEditorError("");
-                      },
-                      children: "\u53D6\u6D88"
-                    },
-                    "cancel-editor"
-                  ),
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                    import_antd9.Button,
-                    {
-                      type: "primary",
-                      onClick: handleSaveCommentaryCustomSkillDraft,
-                      children: "\u4FDD\u5B58"
-                    },
-                    "save-editor"
-                  )
-                ] : [
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                    import_antd9.Button,
-                    {
-                      disabled: commentarySkillSaving,
-                      onClick: () => setCommentarySkillDialogOpen(false),
-                      children: "\u53D6\u6D88"
-                    },
-                    "cancel"
-                  ),
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                    import_antd9.Button,
-                    {
-                      type: "primary",
-                      loading: commentarySkillSaving,
-                      onClick: () => {
-                        void handleSaveCommentarySkillSelection();
-                      },
-                      children: "\u4FDD\u5B58"
-                    },
-                    "save"
-                  )
-                ],
-                children: commentarySkillEditorDraft ? /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "we-runtime-commentary-skill-editor", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("label", { className: "we-runtime-commentary-skill-editor__field", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { children: "\u540D\u79F0" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                      import_antd9.Input,
-                      {
-                        value: commentarySkillEditorDraft.label,
-                        maxLength: 30,
-                        autoFocus: true,
-                        placeholder: "\u4F8B\u5982\uFF1A\u7ADE\u54C1\u6587\u6848\u5BA1\u67E5",
-                        onChange: (event) => {
-                          setCommentarySkillEditorDraft(
-                            (current) => current ? { ...current, label: event.target.value } : current
-                          );
-                          setCommentarySkillEditorError("");
-                        }
-                      }
-                    )
-                  ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("label", { className: "we-runtime-commentary-skill-editor__field", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { children: "\u63D0\u793A\u8BCD" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                      import_antd9.Input.TextArea,
-                      {
-                        value: commentarySkillEditorDraft.prompt,
-                        maxLength: 4e3,
-                        autoSize: { minRows: 7, maxRows: 12 },
-                        placeholder: "\u8F93\u5165\u5E0C\u671B AI \u6267\u884C\u7684\u63D0\u793A\u8BCD",
-                        onChange: (event) => {
-                          setCommentarySkillEditorDraft(
-                            (current) => current ? { ...current, prompt: event.target.value } : current
-                          );
-                          setCommentarySkillEditorError("");
-                        }
-                      }
-                    )
-                  ] }),
-                  commentarySkillEditorError ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "we-runtime-commentary-skill-editor__error", children: commentarySkillEditorError }) : null
-                ] }) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "we-runtime-commentary-skill-dialog", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "we-runtime-commentary-skill-dialog__list", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "we-runtime-commentary-skill-dialog__section-title", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { children: "\u7CFB\u7EDF\u6280\u80FD" }) }),
-                  commentarySystemSkillDraftOptions.map(renderCommentarySkillOption),
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "we-runtime-commentary-skill-dialog__section-title we-runtime-commentary-skill-dialog__section-title--custom", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { children: "\u6211\u7684\u6280\u80FD" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                      import_antd9.Button,
-                      {
-                        type: "link",
-                        size: "small",
-                        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.PlusOutlined, {}),
-                        disabled: commentarySkillSaving,
-                        onClick: () => {
-                          setCommentarySkillEditorDraft({
-                            id: createCommentaryCustomSkillId(),
-                            label: "",
-                            prompt: ""
-                          });
-                          setCommentarySkillEditorError("");
-                        },
-                        children: "\u81EA\u5B9A\u4E49"
-                      }
-                    )
-                  ] }),
-                  commentaryCustomSkillDraftOptions.length > 0 ? commentaryCustomSkillDraftOptions.map(renderCommentarySkillOption) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "we-runtime-commentary-skill-dialog__empty", children: "\u6682\u65E0\u81EA\u5B9A\u4E49\u6280\u80FD" })
-                ] }) })
-              }
-            ),
             /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
               import_antd9.Modal,
               {
@@ -22385,11 +21517,13 @@ var PropertyPanelView = import_react14.default.forwardRef(
                     label: "\u7C98\u8D34\u56FE\u7247\u6216\u6587\u6848",
                     desc: "AI \u5F00\u542F\u65F6\uFF0C\u5728\u6C14\u6CE1\u5361\u7247\u6216\u5F85\u9009\u6846\u4E2D\u53EF\u76F4\u63A5\u7C98\u8D34\u56FE\u7247\u548C\u6587\u6848"
                   },
-                  {
-                    keys: [SELECTION_MODE_TOGGLE_SHORTCUT_LABEL],
-                    label: "\u5F00\u542F / \u5173\u95ED\u9009\u62E9\u5143\u7D20",
-                    desc: "\u5173\u95ED\u540E\u9875\u9762\u70B9\u51FB\u6062\u590D\u539F\u751F\u4EA4\u4E92\uFF0C\u518D\u6309\u4E00\u6B21\u91CD\u65B0\u5F00\u542F\u5143\u7D20\u9009\u62E9"
-                  },
+                  ...selectionModeAvailable ? [
+                    {
+                      keys: [SELECTION_MODE_TOGGLE_SHORTCUT_LABEL],
+                      label: "\u5F00\u542F / \u5173\u95ED\u9009\u62E9\u5143\u7D20",
+                      desc: "\u5173\u95ED\u540E\u9875\u9762\u70B9\u51FB\u6062\u590D\u539F\u751F\u4EA4\u4E92\uFF0C\u518D\u6309\u4E00\u6B21\u91CD\u65B0\u5F00\u542F\u5143\u7D20\u9009\u62E9"
+                    }
+                  ] : [],
                   {
                     keys: [PARENT_SELECT_SHORTCUT_LABEL, PARENT_RETURN_SHORTCUT_LABEL],
                     label: "\u9009\u62E9\u4E0A / \u4E0B\u7EA7\u5143\u7D20",
@@ -23776,9 +22910,6 @@ function WebEditorUiApp(props) {
   const [blockingLayerOpen, setBlockingLayerOpen] = import_react20.default.useState(false);
   const [commentarySkillOptions, setCommentarySkillOptions] = import_react20.default.useState(() => normalizeRuntimeSkillOptions(propertyPanelOptions?.commentarySkillOptions));
   const commentarySkillSelectionManaged = commentarySkillOptions.length > 0;
-  const [commentarySkillSettingsConfigured, setCommentarySkillSettingsConfigured] = import_react20.default.useState(
-    () => propertyPanelOptions?.commentarySkillSettingsConfigured === true
-  );
   const [enabledCommentarySkillIds, setEnabledCommentarySkillIds] = import_react20.default.useState(
     () => resolveRuntimeSkillIds(
       propertyPanelOptions?.commentarySelectedSkillIds,
@@ -23858,7 +22989,6 @@ function WebEditorUiApp(props) {
       propertyPanelOptions?.commentarySkillOptions
     );
     setCommentarySkillOptions(nextSkillOptions);
-    setCommentarySkillSettingsConfigured(configured);
     setEnabledCommentarySkillIds(
       resolveRuntimeSkillIds(
         propertyPanelOptions?.commentarySelectedSkillIds,
@@ -23871,64 +23001,6 @@ function WebEditorUiApp(props) {
     propertyPanelOptions?.commentarySkillOptions,
     propertyPanelOptions?.commentarySelectedSkillIds,
     propertyPanelOptions?.commentarySkillSettingsConfigured
-  ]);
-  const effectivePropertyPanelOptions = import_react20.default.useMemo(() => {
-    if (!propertyPanelOptions || !commentarySkillSelectionManaged) {
-      return propertyPanelOptions;
-    }
-    return {
-      ...propertyPanelOptions,
-      commentarySkillOptions,
-      commentarySelectedSkillIds: enabledCommentarySkillIds,
-      commentarySkillSettingsConfigured,
-      onCommentarySkillSelectionLoad: async () => {
-        const loadedSkillIds = await propertyPanelOptions.onCommentarySkillSelectionLoad?.();
-        const nextSkillIds = Array.isArray(loadedSkillIds) ? normalizeRuntimeSkillIds(loadedSkillIds) : normalizeRuntimeSkillIds(propertyPanelOptions.commentarySelectedSkillIds);
-        setEnabledCommentarySkillIds(nextSkillIds);
-        return nextSkillIds;
-      },
-      onCommentarySkillSelectionChange: async (skillIds) => {
-        const nextSkillIds = normalizeRuntimeSkillIds(skillIds);
-        await propertyPanelOptions.onCommentarySkillSelectionChange?.(nextSkillIds);
-        setCommentarySkillSettingsConfigured(true);
-        setEnabledCommentarySkillIds(nextSkillIds);
-      },
-      onCommentarySkillSettingsLoad: propertyPanelOptions.onCommentarySkillSettingsLoad ? async () => {
-        const loaded = await propertyPanelOptions.onCommentarySkillSettingsLoad?.();
-        const nextSkillOptions = normalizeRuntimeSkillOptions(loaded?.skillOptions);
-        const nextSkillIds = normalizeRuntimeSkillIds(loaded?.selectedSkillIds);
-        setCommentarySkillOptions(nextSkillOptions);
-        setCommentarySkillSettingsConfigured(true);
-        setEnabledCommentarySkillIds(nextSkillIds);
-        return {
-          selectedSkillIds: nextSkillIds,
-          skillOptions: nextSkillOptions
-        };
-      } : void 0,
-      onCommentarySkillSettingsChange: propertyPanelOptions.onCommentarySkillSettingsChange ? async (settings) => {
-        const normalizedSettings = {
-          selectedSkillIds: normalizeRuntimeSkillIds(settings.selectedSkillIds),
-          skillOptions: normalizeRuntimeSkillOptions(settings.skillOptions)
-        };
-        const saved = await propertyPanelOptions.onCommentarySkillSettingsChange?.(normalizedSettings);
-        const nextSettings = saved ?? normalizedSettings;
-        const nextSkillOptions = normalizeRuntimeSkillOptions(nextSettings.skillOptions);
-        const nextSkillIds = normalizeRuntimeSkillIds(nextSettings.selectedSkillIds);
-        setCommentarySkillOptions(nextSkillOptions);
-        setCommentarySkillSettingsConfigured(true);
-        setEnabledCommentarySkillIds(nextSkillIds);
-        return {
-          selectedSkillIds: nextSkillIds,
-          skillOptions: nextSkillOptions
-        };
-      } : void 0
-    };
-  }, [
-    commentarySkillSettingsConfigured,
-    commentarySkillSelectionManaged,
-    commentarySkillOptions,
-    enabledCommentarySkillIds,
-    propertyPanelOptions
   ]);
   import_react20.default.useEffect(() => {
     const nextUiMode = normalizeRuntimeUiMode(propertyPanelOptions?.getUiMode?.());
@@ -24159,7 +23231,12 @@ function WebEditorUiApp(props) {
       const element = elementOverride ?? currentTargetRef.current;
       if (!element || !propertyPanelOptions?.onAnnotationMarkdownChange) return false;
       if (!(propertyPanelOptions?.canEditAnnotationMarkdown?.(element) ?? false)) return false;
-      if (getAnnotationManualEditLocatorState(element).disabled) return false;
+      if (propertyPanelOptions.annotationMarkdownEditorKind !== "document-source" && getAnnotationManualEditLocatorState(
+        element,
+        void 0,
+        propertyPanelOptions.getCreateAnnotationBlockReason,
+        propertyPanelOptions.resolveAnnotationTarget
+      ).disabled) return false;
       const nextValue = typeof markdownOverride === "string" ? markdownOverride : annotationStateRef.current.annotationDraftMarkdown;
       if (!options2.force && nextValue === annotationStateRef.current.savedAnnotationMarkdown)
         return false;
@@ -24824,11 +23901,11 @@ function WebEditorUiApp(props) {
         onDeleteCurrentAnnotationNode: handleDeleteCurrentAnnotationNode
       }
     ) : null,
-    effectivePropertyPanelOptions && propertyPanelVisible ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+    propertyPanelOptions && propertyPanelVisible ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
       PropertyPanelView,
       {
         ref: propertyPanelRef,
-        options: effectivePropertyPanelOptions,
+        options: propertyPanelOptions,
         currentTarget,
         uiMode,
         toolMinimized,
@@ -27617,6 +26694,7 @@ function createSelectionEngine(options) {
 var CONTEXT_CHARS = 50;
 var TEXT_COMMENT_HIGHLIGHT_NAME = "axhub-web-editor-text-comment";
 var TEXT_COMMENT_HIGHLIGHT_STYLE_ID = "axhub-web-editor-text-comment-style";
+var TEXT_COMMENT_DISABLED_SELECTOR = '[data-we-text-comment-disabled="true"]';
 function fnv1aHash(input) {
   let hash = 2166136261;
   for (let i = 0; i < input.length; i++) {
@@ -27672,16 +26750,12 @@ function collectSegments(range) {
     appendSegmentFromTextNode(range.commonAncestorContainer);
     return segments;
   }
-  const walker = document.createTreeWalker(
-    range.commonAncestorContainer,
-    NodeFilter.SHOW_TEXT,
-    {
-      acceptNode(node) {
-        if (!range.intersectsNode(node)) return NodeFilter.FILTER_REJECT;
-        return NodeFilter.FILTER_ACCEPT;
-      }
+  const walker = document.createTreeWalker(range.commonAncestorContainer, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!range.intersectsNode(node)) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
     }
-  );
+  });
   let current = walker.nextNode();
   while (current) {
     appendSegmentFromTextNode(current);
@@ -27726,6 +26800,10 @@ function resolveSelectionSourceElement(range) {
   if (commonAncestor instanceof Element) return commonAncestor;
   return commonAncestor.parentElement;
 }
+function isTextCommentDisabledNode(node) {
+  const element = node instanceof Element ? node : node.parentElement;
+  return Boolean(element?.closest(TEXT_COMMENT_DISABLED_SELECTOR));
+}
 function supportsCssHighlights() {
   return typeof CSS !== "undefined" && "highlights" in CSS && typeof globalThis.Highlight === "function";
 }
@@ -27761,6 +26839,9 @@ function createTextCommentManager(options) {
     const text = selection.toString().trim();
     if (!text) return null;
     if (isOverlayElement(range.startContainer) || isOverlayElement(range.endContainer)) {
+      return null;
+    }
+    if (isTextCommentDisabledNode(range.startContainer) || isTextCommentDisabledNode(range.endContainer)) {
       return null;
     }
     const segments = collectSegments(range);
@@ -30546,6 +29627,22 @@ function createLifecycleService(deps) {
   function resolveActiveInteractionProfile() {
     return options.interactionProfile === "text-comment" || state2.uiSettings.documentCommentMode ? "text-comment" : "design";
   }
+  function resolveAnnotationHostTarget(element) {
+    if (element?.getAttribute?.(TEXT_COMMENT_TARGET_ATTR) !== "true") return element;
+    return resolveTextCommentElementMeta(state2, element)?.sourceElement ?? element;
+  }
+  const canEditAnnotationMarkdown = options.host.canEditAnnotationMarkdown ? (element) => {
+    const target = resolveAnnotationHostTarget(element);
+    return Boolean(target && options.host.canEditAnnotationMarkdown?.(target));
+  } : void 0;
+  const getCreateAnnotationBlockReason = options.host.getCreateAnnotationBlockReason ? (element) => options.host.getCreateAnnotationBlockReason?.(resolveAnnotationHostTarget(element)) : void 0;
+  const getAnnotationDocumentEditUrl = options.host.getAnnotationDocumentEditUrl ? (element) => options.host.getAnnotationDocumentEditUrl?.(resolveAnnotationHostTarget(element)) : void 0;
+  const getAnnotationMarkdown = options.host.getAnnotationMarkdown ? (element) => options.host.getAnnotationMarkdown?.(resolveAnnotationHostTarget(element)) ?? "" : void 0;
+  const onAnnotationMarkdownChange = options.host.onAnnotationMarkdownChange ? async (element, markdown) => {
+    const target = resolveAnnotationHostTarget(element);
+    if (!target) throw new Error("The selected document source is no longer available.");
+    await options.host.onAnnotationMarkdownChange?.(target, markdown);
+  } : void 0;
   function handleUiSettingsChange(settings) {
     const documentCommentModeChanged = settings.documentCommentMode !== state2.uiSettings.documentCommentMode;
     state2.uiSettings = settings;
@@ -30755,11 +29852,13 @@ function createLifecycleService(deps) {
     sendCommentContextSync(element, mode);
   }
   async function handleDeleteCurrentAnnotationNode(element) {
+    const hostTarget = resolveAnnotationHostTarget(element);
+    if (!hostTarget) return;
     if (options.host.onDeleteAnnotationNode) {
-      await options.host.onDeleteAnnotationNode(element);
-    } else if (options.host.onAnnotationMarkdownChange) {
-      if (options.host.canEditAnnotationMarkdown?.(element) === false) return;
-      await options.host.onAnnotationMarkdownChange(element, "");
+      await options.host.onDeleteAnnotationNode(hostTarget);
+    } else if (onAnnotationMarkdownChange) {
+      if (canEditAnnotationMarkdown?.(hostTarget) === false) return;
+      await onAnnotationMarkdownChange(hostTarget, "");
     } else {
       return;
     }
@@ -30883,9 +29982,7 @@ function createLifecycleService(deps) {
   }
   function hasPrototypeComments() {
     const document2 = services.persistence.getPersistedPrototypeCommentsDocument?.() ?? null;
-    return Boolean(
-      document2 && (document2.comments.length > 0 || document2.images.length > 0)
-    );
+    return Boolean(document2 && (document2.comments.length > 0 || document2.images.length > 0));
   }
   function getTweakProtocol() {
     return getGlobalCommentaryTweakProtocol();
@@ -31411,6 +30508,7 @@ function createLifecycleService(deps) {
       installPerfHotkey();
       const interactionProfile = resolveActiveInteractionProfile();
       const isTextComment = interactionProfile === "text-comment";
+      const initialSelectionModeActive = !isTextComment && options.ui.initialSelectionModeActive;
       if (isTextComment) {
         const textCommentTarget = document.createElement("div");
         textCommentTarget.setAttribute(TEXT_COMMENT_TARGET_ATTR, "true");
@@ -31517,7 +30615,7 @@ function createLifecycleService(deps) {
         getSelectedElement: () => state2.selectedElement,
         isElementInteractionLocked: (element) => services.agentBridge.isElementInteractionLocked(element)
       });
-      if (!options.ui.initialSelectionModeActive) {
+      if (!initialSelectionModeActive) {
         state2.eventController.setMode("interaction", {
           allowPageInteraction: true
         });
@@ -31613,6 +30711,7 @@ function createLifecycleService(deps) {
           getUiSettings: () => state2.uiSettings,
           interactionProfile,
           documentCommentModeAvailable: options.interactionProfile !== "text-comment",
+          pageEditingSettingsAvailable: options.ui.pageEditingSettingsAvailable,
           onUiSettingsChange: handleUiSettingsChange,
           onLocateElement: (element) => {
             const target = services.agentBridge.resolveSelectableElement(element) ?? element;
@@ -31632,6 +30731,9 @@ function createLifecycleService(deps) {
           getAnnotationEnabled: options.ui.getAnnotationEnabled,
           getAnnotationEnableAvailable: options.ui.getAnnotationEnableAvailable,
           getAnnotationEnableLoading: options.ui.getAnnotationEnableLoading,
+          markdownSourceEditorAvailable: options.ui.markdownSourceEditorAvailable,
+          getMarkdownSourceEditorOpen: options.ui.getMarkdownSourceEditorOpen,
+          onMarkdownSourceEditorOpenChange: options.ui.onMarkdownSourceEditorOpenChange,
           onWakeAgent: shouldDelegateAiActionToHost() ? () => runHostAiAction({ type: "wake-agent" }) : options.agentBridge.allowWake !== false ? async () => {
             try {
               return await services.agentBridge.requestWake();
@@ -31762,29 +30864,6 @@ function createLifecycleService(deps) {
           commentarySkillOptions: options.ui.commentarySkillOptions,
           commentarySelectedSkillIds: options.ui.commentarySelectedSkillIds,
           commentarySkillSettingsConfigured: options.ui.commentarySkillSettingsConfigured,
-          onCommentarySkillSelectionLoad: options.ui.onCommentarySkillSelectionLoad,
-          onCommentarySkillSelectionChange: options.ui.onCommentarySkillSelectionChange,
-          onCommentarySkillSettingsLoad: options.ui.onCommentarySkillSettingsLoad ? async () => {
-            const settings = await options.ui.onCommentarySkillSettingsLoad?.();
-            if (!settings) {
-              return {
-                selectedSkillIds: options.ui.commentarySelectedSkillIds,
-                skillOptions: options.ui.commentarySkillOptions
-              };
-            }
-            options.ui.commentarySelectedSkillIds = settings.selectedSkillIds;
-            options.ui.commentarySkillOptions = settings.skillOptions;
-            options.ui.commentarySkillSettingsConfigured = true;
-            return settings;
-          } : void 0,
-          onCommentarySkillSettingsChange: options.ui.onCommentarySkillSettingsChange ? async (settings) => {
-            const saved = await options.ui.onCommentarySkillSettingsChange?.(settings);
-            const nextSettings = saved ?? settings;
-            options.ui.commentarySelectedSkillIds = nextSettings.selectedSkillIds;
-            options.ui.commentarySkillOptions = nextSettings.skillOptions;
-            options.ui.commentarySkillSettingsConfigured = true;
-            return nextSettings;
-          } : void 0,
           getAgentBridgeAvailable: () => services.agentBridge.isAvailable(),
           getAgentBridgeConnected: () => services.agentBridge.isConnected(),
           getCanAbortAgentPrompt: (element) => {
@@ -31896,10 +30975,13 @@ function createLifecycleService(deps) {
             services.changes.setImagesForElement(element, images);
             state2.positionTracker?.forceUpdate(true);
           },
-          canEditAnnotationMarkdown: options.host.canEditAnnotationMarkdown,
-          getAnnotationDocumentEditUrl: options.host.getAnnotationDocumentEditUrl,
-          getAnnotationMarkdown: options.host.getAnnotationMarkdown,
-          onAnnotationMarkdownChange: options.host.onAnnotationMarkdownChange,
+          canEditAnnotationMarkdown,
+          resolveAnnotationTarget: resolveAnnotationHostTarget,
+          getCreateAnnotationBlockReason,
+          annotationMarkdownEditorKind: options.host.annotationMarkdownEditorKind,
+          getAnnotationDocumentEditUrl,
+          getAnnotationMarkdown,
+          onAnnotationMarkdownChange,
           onDismissSelection: services.interaction.clearSelection,
           getChangeMarkersVisible: () => state2.changeMarkersVisible,
           onChangeMarkersVisible: services.changes.setChangeMarkersVisible,
@@ -31925,11 +31007,17 @@ function createLifecycleService(deps) {
             onStatusChange?.();
           },
           onToggleSelectionMode: (enabled, toggleOptions) => {
-            const selectedElement = state2.selectedElement;
-            const hasSelection = !!selectedElement && selectedElement.isConnected;
             if (!state2.eventController) {
               return;
             }
+            if (isTextComment) {
+              state2.eventController.setMode("interaction", {
+                allowPageInteraction: true
+              });
+              return;
+            }
+            const selectedElement = state2.selectedElement;
+            const hasSelection = !!selectedElement && selectedElement.isConnected;
             if (enabled) {
               state2.eventController.setMode(hasSelection ? "selecting" : "hover");
               return;
@@ -31943,7 +31031,7 @@ function createLifecycleService(deps) {
           container: elements.uiRoot,
           shadowRoot: elements.shadowRoot,
           propertyPanelVisible: options.ui.propertyPanel,
-          initialSelectionModeActive: options.ui.initialSelectionModeActive,
+          initialSelectionModeActive,
           toolbarMode: options.ui.toolbarMode,
           breadcrumbsOptions: options.ui.breadcrumbs ? {
             container: elements.uiRoot,
@@ -31964,10 +31052,13 @@ function createLifecycleService(deps) {
             getElementStyleSummaryLines: (element) => services.changes.getMetaForElement(element)?.styleSummaryLines ?? [],
             getElementTools: options.host.getElementTools,
             onElementToolAction: options.host.onElementToolAction,
-            canEditAnnotationMarkdown: options.host.canEditAnnotationMarkdown,
-            getAnnotationDocumentEditUrl: options.host.getAnnotationDocumentEditUrl,
-            getAnnotationMarkdown: options.host.getAnnotationMarkdown,
-            onAnnotationMarkdownChange: options.host.onAnnotationMarkdownChange,
+            canEditAnnotationMarkdown,
+            resolveAnnotationTarget: resolveAnnotationHostTarget,
+            getCreateAnnotationBlockReason,
+            annotationMarkdownEditorKind: options.host.annotationMarkdownEditorKind,
+            getAnnotationDocumentEditUrl,
+            getAnnotationMarkdown,
+            onAnnotationMarkdownChange,
             onDeleteCurrentAnnotationNode: options.host.onDeleteAnnotationNode || options.host.onAnnotationMarkdownChange ? handleDeleteCurrentAnnotationNode : void 0,
             onSelectParent: (element) => {
               const parent = state2.selectionEngine?.getParentCandidate(element) ?? null;
@@ -31993,7 +31084,9 @@ function createLifecycleService(deps) {
       }
       services.changes.renderChangeMarkers();
       installParentSelectHotkey();
-      installSelectionModeHotkey();
+      if (!isTextComment) {
+        installSelectionModeHotkey();
+      }
       installUiResizeClamp();
       installRouteChangeRefresh();
       state2.active = true;
@@ -32117,6 +31210,7 @@ function createLifecycleService(deps) {
         darkMode: options.ui.initialDarkMode
       };
       const interactionProfile = resolveActiveInteractionProfile();
+      const initialSelectionModeActive = interactionProfile !== "text-comment" && options.ui.initialSelectionModeActive;
       if (options.ui.propertyPanel) {
         state2.tokensService = createDesignTokensService();
         const propertyPanelOptions = {
@@ -32140,6 +31234,7 @@ function createLifecycleService(deps) {
           getUiSettings: () => state2.uiSettings,
           interactionProfile,
           documentCommentModeAvailable: options.interactionProfile !== "text-comment",
+          pageEditingSettingsAvailable: options.ui.pageEditingSettingsAvailable,
           onUiSettingsChange: handleUiSettingsChange,
           onLocateElement: () => {
           },
@@ -32155,6 +31250,9 @@ function createLifecycleService(deps) {
           getAnnotationEnabled: options.ui.getAnnotationEnabled,
           getAnnotationEnableAvailable: options.ui.getAnnotationEnableAvailable,
           getAnnotationEnableLoading: options.ui.getAnnotationEnableLoading,
+          markdownSourceEditorAvailable: options.ui.markdownSourceEditorAvailable,
+          getMarkdownSourceEditorOpen: options.ui.getMarkdownSourceEditorOpen,
+          onMarkdownSourceEditorOpenChange: options.ui.onMarkdownSourceEditorOpenChange,
           onWakeAgent: void 0,
           onSendPromptToAgent: async () => {
           },
@@ -32186,10 +31284,6 @@ function createLifecycleService(deps) {
           commentarySkillOptions: options.ui.commentarySkillOptions,
           commentarySelectedSkillIds: options.ui.commentarySelectedSkillIds,
           commentarySkillSettingsConfigured: options.ui.commentarySkillSettingsConfigured,
-          onCommentarySkillSelectionLoad: options.ui.onCommentarySkillSelectionLoad,
-          onCommentarySkillSelectionChange: options.ui.onCommentarySkillSelectionChange,
-          onCommentarySkillSettingsLoad: options.ui.onCommentarySkillSettingsLoad,
-          onCommentarySkillSettingsChange: options.ui.onCommentarySkillSettingsChange,
           getAgentBridgeAvailable: () => false,
           getAgentBridgeConnected: () => false,
           getCanAbortAgentPrompt: () => false,
@@ -32239,10 +31333,13 @@ function createLifecycleService(deps) {
           },
           onAiNoteImagesChange: () => {
           },
-          canEditAnnotationMarkdown: options.host.canEditAnnotationMarkdown,
-          getAnnotationDocumentEditUrl: options.host.getAnnotationDocumentEditUrl,
-          getAnnotationMarkdown: options.host.getAnnotationMarkdown,
-          onAnnotationMarkdownChange: options.host.onAnnotationMarkdownChange,
+          canEditAnnotationMarkdown,
+          resolveAnnotationTarget: resolveAnnotationHostTarget,
+          getCreateAnnotationBlockReason,
+          annotationMarkdownEditorKind: options.host.annotationMarkdownEditorKind,
+          getAnnotationDocumentEditUrl,
+          getAnnotationMarkdown,
+          onAnnotationMarkdownChange,
           onDeleteCurrentAnnotationNode: options.host.onDeleteAnnotationNode || options.host.onAnnotationMarkdownChange ? handleDeleteCurrentAnnotationNode : void 0,
           onDismissSelection: () => {
           },
@@ -32262,7 +31359,7 @@ function createLifecycleService(deps) {
           shadowRoot: elements.shadowRoot,
           propertyPanelVisible: true,
           initialPropertyPanelOpen: true,
-          initialSelectionModeActive: options.ui.initialSelectionModeActive,
+          initialSelectionModeActive,
           toolbarMode: options.ui.toolbarMode,
           breadcrumbsOptions: null,
           propertyPanelOptions
@@ -33932,6 +33029,8 @@ function createConversationTaskMonitor(options) {
   const activeByCommentId = /* @__PURE__ */ new Map();
   const transport = options.transport ?? null;
   const logger = options.logger ?? console;
+  let pageCycleActive = false;
+  let pageCycleHadError = false;
   function isCurrent(entry) {
     return activeByCommentId.get(entry.task.commentId) === entry;
   }
@@ -33965,12 +33064,25 @@ function createConversationTaskMonitor(options) {
       const applied = await options.persistence.transitionConversationTaskTerminal(entry.terminal);
       if (!isCurrent(entry)) return;
       if (applied) {
+        pageCycleHadError || (pageCycleHadError = entry.terminal.state === "error");
         try {
-          options.onTerminalPersisted?.();
+          options.onTerminalPersisted?.(entry.terminal);
         } catch (error) {
           logger.warn("[Commentary] Failed to refresh persisted ACP terminal state:", error);
         }
         discard(entry);
+        if (pageCycleActive && activeByCommentId.size === 0 && options.persistence.listEditingConversationTasks().length === 0) {
+          const settlement = { hasError: pageCycleHadError };
+          pageCycleActive = false;
+          pageCycleHadError = false;
+          try {
+            void Promise.resolve(options.onPageSettled?.(settlement)).catch((error) => {
+              logger.warn("[Commentary] Failed to notify ACP page settlement:", error);
+            });
+          } catch (error) {
+            logger.warn("[Commentary] Failed to notify ACP page settlement:", error);
+          }
+        }
         return;
       }
       discard(entry);
@@ -34029,9 +33141,9 @@ function createConversationTaskMonitor(options) {
   }
   function reconcile() {
     if (!transport) return;
-    const nextByCommentId = new Map(
-      options.persistence.listEditingConversationTasks().map((task) => [task.commentId, task])
-    );
+    const editingTasks = options.persistence.listEditingConversationTasks();
+    if (editingTasks.length > 0) pageCycleActive = true;
+    const nextByCommentId = new Map(editingTasks.map((task) => [task.commentId, task]));
     for (const entry of activeByCommentId.values()) {
       const next = nextByCommentId.get(entry.task.commentId);
       if (entry.terminal && !next) continue;
@@ -34599,31 +33711,6 @@ ${lines.join("\n")}
   function appendGlobalConstraints(lines) {
     lines.push("\u7EA6\u675F: \u5143\u7D20\u63CF\u8FF0\u4EC5\u7528\u4E8E\u5B9A\u4F4D\uFF0C\u53EA\u6539\u52A8\u660E\u786E\u6307\u51FA\u7684\u5185\u5BB9\uFF0C\u5176\u4F59\u4FDD\u6301\u4E0D\u52A8\u3002");
   }
-  function resolveCommentaryCommentsFilePath() {
-    try {
-      const scopeFilePath = normalizePathValue2(options.getPersistenceScope?.()?.filePath);
-      return /^\.axhub\/chrome\/pages\/[^/]+\/comments\.json$/u.test(scopeFilePath) ? scopeFilePath : "";
-    } catch {
-      return "";
-    }
-  }
-  function appendCommentaryCompletionInstructions(lines, elementKeys) {
-    const filePath = resolveCommentaryCommentsFilePath();
-    const normalizedElementKeys = dedupeStrings(elementKeys);
-    if (!filePath || normalizedElementKeys.length === 0) return;
-    lines.push("");
-    lines.push("\u6279\u6CE8\u72B6\u6001\u6536\u5C3E\uFF08\u5FC5\u987B\u6700\u540E\u6267\u884C\uFF09:");
-    lines.push(`- \u5B8C\u6210\u5E76\u9A8C\u8BC1\u4E0A\u8FF0\u4EE3\u7801\u4FEE\u6539\u540E\uFF0C\u518D\u8BFB\u53D6\u5E76\u66F4\u65B0\u6279\u6CE8\u6587\u4EF6: ${filePath}`);
-    lines.push(
-      `- \u4EC5\u5904\u7406 comments \u4E2D elementKey \u4E3A ${normalizedElementKeys.map((elementKey) => JSON.stringify(elementKey)).join(", ")} \u5BF9\u5E94\u7684\u5F53\u524D pageScope \u6279\u6CE8\uFF1B\u5C06\u5BF9\u5E94\u6279\u6CE8\u7684 state \u8BBE\u4E3A completed\uFF0C\u5E76\u66F4\u65B0\u6279\u6CE8\u4E0E\u9876\u5C42 updatedAt\u3002\u65E0\u6CD5\u552F\u4E00\u5339\u914D\u65F6\u4E0D\u8981\u731C\u6D4B\u6216\u6539\u5199\u5176\u4ED6\u6279\u6CE8\u3002`
-    );
-    lines.push(
-      "- \u4FDD\u7559 comments \u548C assets \u7684\u5168\u90E8\u8BB0\u5F55\uFF0C\u4E0D\u8BBE\u7F6E deletedAt\uFF0C\u4E0D\u5220\u9664\u6570\u7EC4\u9879\u6216\u672C\u5730\u6587\u4EF6\u3002"
-    );
-    lines.push(
-      "- \u4E0A\u8FF0\u6279\u6CE8\u6587\u4EF6\u5FC5\u987B\u662F\u672C\u6B21\u4EFB\u52A1\u6700\u540E\u4E00\u6B21\u6587\u4EF6\u5199\u5165\uFF1B\u5199\u5B8C\u540E\u4E0D\u8981\u518D\u4FEE\u6539\u4EFB\u4F55\u6587\u4EF6\u3002\u56DE\u590D\u4E2D\u8BF4\u660E\u4EFB\u52A1\u5DF2\u5B8C\u6210\uFF0C\u662F\u5426\u6E05\u9664\u7559\u7ED9\u7528\u6237\u540E\u7EED\u786E\u8BA4\u3002"
-    );
-  }
   function resolveAnnotationPromptContext(locator) {
     const nodeId = resolveAnnotationNodeIdFromLocator(locator) || (() => {
       const element = tryLocateElement(locator);
@@ -35078,7 +34165,6 @@ ${lines.join("\n")}
         itemIndex += 1;
       }
     }
-    appendCommentaryCompletionInstructions(lines, params.completionElementKeys);
     return lines.join("\n");
   }
   function buildSaveRunPrompt() {
@@ -35095,12 +34181,7 @@ ${lines.join("\n")}
       mode: "initial",
       summaries,
       commentOnlyMetas,
-      moveSummaries,
-      completionElementKeys: [
-        ...summaries.map((summary) => String(summary.elementKey)),
-        ...commentOnlyMetas.map((meta) => meta.elementKey),
-        ...moveSummariesWithKeys.map((summary) => summary.elementKey)
-      ]
+      moveSummaries
     });
   }
   function buildAppendSaveRunPrompt() {
@@ -35117,12 +34198,7 @@ ${lines.join("\n")}
       mode: "append",
       summaries,
       commentOnlyMetas,
-      moveSummaries,
-      completionElementKeys: [
-        ...summaries.map((summary) => String(summary.elementKey)),
-        ...commentOnlyMetas.map((meta) => meta.elementKey),
-        ...moveSummariesWithKeys.map((summary) => summary.elementKey)
-      ]
+      moveSummaries
     });
   }
   function buildSaveRunPromptForElement(element) {
@@ -35144,8 +34220,7 @@ ${lines.join("\n")}
       mode: "initial",
       summaries,
       commentOnlyMetas,
-      moveSummaries,
-      completionElementKeys: [normalizedElementKey]
+      moveSummaries
     });
   }
   function buildAppendSaveRunPromptForElement(element) {
@@ -35163,8 +34238,7 @@ ${lines.join("\n")}
       mode: "append",
       summaries,
       commentOnlyMetas,
-      moveSummaries,
-      completionElementKeys: [elementKey]
+      moveSummaries
     });
   }
   function getCopyPromptBlockReason() {
@@ -35992,9 +35066,36 @@ function createCommentary(options = {}) {
   conversationTaskMonitor = createConversationTaskMonitor({
     persistence,
     transport: resolvedOptions.host.conversationTaskTransport,
-    onTerminalPersisted: () => {
+    onTerminalPersisted: (transition) => {
+      const taskRef = {
+        provider: transition.provider,
+        sessionId: transition.sessionId,
+        requestId: transition.requestId
+      };
+      const elementKeys = /* @__PURE__ */ new Set();
+      const meta = Array.from(state2.editMetaByKey.values()).find(
+        (candidate) => candidate.commentId === transition.commentId
+      );
+      if (meta) {
+        elementKeys.add(meta.elementKey);
+      }
+      for (const task of agentBridge?.getVisibleTaskStates?.() ?? []) {
+        if (task.origin === "external-editing" && task.requestId === transition.requestId) {
+          elementKeys.add(task.elementKey);
+        }
+      }
+      for (const elementKey of elementKeys) {
+        agentBridge?.clearExternalEditingStateByElementKey?.(elementKey, taskRef);
+      }
+      changes.renderChangeMarkers();
       state2.propertyPanel?.refresh();
       notifyStatusChange();
+    },
+    onPageSettled: async ({ hasError }) => {
+      await resolvedOptions.ui.onHostToolbarAction?.({
+        type: "play-notification-sound",
+        sound: hasError ? "reminder" : "completion"
+      });
     }
   });
   let flushPendingCommentContextSync = null;
@@ -36123,6 +35224,13 @@ function createCommentary(options = {}) {
     interaction?.clearSelection();
     notifyStatusChange();
   }
+  async function openCommentTarget(element) {
+    if (destroyed || !interaction || !element?.isConnected) return false;
+    await interaction.handleSelect(element, DEFAULT_MODIFIERS);
+    interaction.enterCommentInput("bubble-card");
+    notifyStatusChange();
+    return true;
+  }
   function acknowledgeSavedTextChanges() {
     if (destroyed) return;
     persistence?.clearCachedChanges("text");
@@ -36226,6 +35334,7 @@ function createCommentary(options = {}) {
     getHistoryCounts,
     revertElement,
     clearSelection,
+    openCommentTarget,
     acknowledgeSavedTextChanges,
     acknowledgeSavedStyleChanges,
     clearElementEdits,

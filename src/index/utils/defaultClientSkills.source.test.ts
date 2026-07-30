@@ -185,21 +185,19 @@ describe('default client skills', () => {
     }
   });
 
-  it('bundles the PRD planning workflow with traceable sources and explicit confirmation', () => {
+  it('keeps option exploration aligned across the current client skill roots', () => {
     const skillRoots = [
-      '.agents/skills/plan-prds',
-      '.claude/skills/plan-prds',
+      '.agents/skills/explore-options',
+      '.claude/skills/explore-options',
     ];
 
     for (const root of skillRoots) {
       const skillSource = readClientFile(`${root}/SKILL.md`);
 
-      expect(skillSource).toContain('src/resources/prd/');
-      expect(skillSource).toContain('SOURCES.md');
-      expect(skillSource).toContain('PLAN.md');
-      expect(skillSource).toContain('确认前不执行 `write-prd`');
-      expect(skillSource).toContain('现状反推');
-      expect(skillSource).toContain('新增或创作需求');
+      expect(skillSource).toContain('先围绕当前问题发散出真实不同的设计方向');
+      expect(skillSource).toContain('没有指定数量时默认给 3 个方案');
+      expect(skillSource).toContain('React 原型优先使用 `@axhub/commentary-react`');
+      expect(skillSource).not.toContain('requirements-exploration');
     }
   });
 

@@ -34,7 +34,6 @@ import type {
   CommentaryClearEditsOptions,
   CommentaryClearEditsTarget,
   CommentarySkillOption,
-  CommentarySkillSettingsSnapshot,
   CommentaryHostToolbarAction,
   CommentaryHostToolbarActionResult,
   CommentaryHostToolbarState,
@@ -86,11 +85,7 @@ export interface PropertyPanelOptions {
   /** Clear current edits + cache */
   onClearEdits?: (
     options?: CommentaryClearEditsOptions,
-  ) =>
-    | CommentaryClearEditsTarget
-    | null
-    | void
-    | Promise<CommentaryClearEditsTarget | null | void>;
+  ) => CommentaryClearEditsTarget | null | void | Promise<CommentaryClearEditsTarget | null | void>;
   /** Whether the current prototype has persisted comments in any page scope. */
   hasPrototypeComments?: () => boolean;
   /** Clear the current element's related edits, note, and local modifications */
@@ -140,6 +135,12 @@ export interface PropertyPanelOptions {
   getAnnotationEnableAvailable?: () => boolean;
   /** Whether the local annotation injection action is busy. */
   getAnnotationEnableLoading?: () => boolean;
+  /** Whether the floating toolbar may show the Markdown full-source editor switch. */
+  markdownSourceEditorAvailable?: boolean;
+  /** Read whether the Markdown source pane is currently visible. */
+  getMarkdownSourceEditorOpen?: () => boolean;
+  /** Show or hide the Markdown source pane, returning the resulting state. */
+  onMarkdownSourceEditorOpenChange?: (open: boolean) => boolean | Promise<boolean>;
   /** Optional extension-specific single-line hint for running external editing tasks */
   externalEditingStatusDescription?: string;
   /** Optional skill document source used when copying the Agent skill install prompt */
@@ -150,18 +151,6 @@ export interface PropertyPanelOptions {
   commentarySelectedSkillIds?: string[];
   /** Whether the host has persisted a skill selection, including an empty one. */
   commentarySkillSettingsConfigured?: boolean;
-  /** Load selected Chrome commentary skill IDs from the host. */
-  onCommentarySkillSelectionLoad?: () => readonly string[] | Promise<readonly string[]>;
-  /** Persist selected Chrome commentary skill IDs through the host. */
-  onCommentarySkillSelectionChange?: (skillIds: string[]) => void | Promise<void>;
-  /** Load the complete skill list and enabled IDs from the host. */
-  onCommentarySkillSettingsLoad?: () =>
-    | CommentarySkillSettingsSnapshot
-    | Promise<CommentarySkillSettingsSnapshot>;
-  /** Persist the complete custom skill list and enabled IDs through the host. */
-  onCommentarySkillSettingsChange?: (
-    settings: CommentarySkillSettingsSnapshot,
-  ) => CommentarySkillSettingsSnapshot | void | Promise<CommentarySkillSettingsSnapshot | void>;
   /** Whether the Agent bridge is currently online */
   getAgentBridgeAvailable?: () => boolean;
   /** Whether the Agent bridge websocket is connected and ready */
@@ -277,6 +266,15 @@ export interface PropertyPanelOptions {
   /** Whether local annotation markdown editing is available for the selected element */
   canEditAnnotationMarkdown?: (element: Element | null) => boolean;
 
+  /** Resolve synthetic editor targets to the host element used by annotation checks */
+  resolveAnnotationTarget?: (element: Element | null) => Element | null;
+
+  /** Return a host-specific reason that prevents creating an annotation for the selected element */
+  getCreateAnnotationBlockReason?: (element: Element | null) => string | undefined;
+
+  /** Select whether the Markdown composer edits annotation metadata or document source */
+  annotationMarkdownEditorKind?: 'annotation' | 'document-source';
+
   /** Return an edit URL for the selected annotation document, or an empty value to hide the document edit entry */
   getAnnotationDocumentEditUrl?: (element: Element | null) => string | null | undefined;
 
@@ -338,6 +336,9 @@ export interface PropertyPanelOptions {
 
   /** Whether the settings menu may switch between design and document comment interactions. */
   documentCommentModeAvailable?: boolean;
+
+  /** Whether page-editing settings are relevant to the current host surface. */
+  pageEditingSettingsAvailable?: boolean;
 
   /** Persist runtime UI settings */
   onUiSettingsChange?: (settings: WebEditorUiSettings) => void;

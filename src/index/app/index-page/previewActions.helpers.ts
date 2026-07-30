@@ -4,6 +4,7 @@ import type {
     CommentaryDebugState,
     CommentaryHostToolbarAction,
     CommentaryHostToolbarState,
+    CommentaryModifiedElementSummary,
 } from '@/common/web-editor-types';
 import type { AxureCopyOptions, ImageConfig } from '../../types';
 import type { ExportIndexBundle } from '../../services/api';
@@ -24,6 +25,41 @@ export type PrototypePanePrompt = {
     promptText: string | null | undefined;
 };
 export type QuickEditRuntimeStatus = 'idle' | 'pending' | 'ready' | 'missing' | 'error';
+
+const MOBILE_ANNOTATION_MAX_WIDTH = 768;
+
+export function resolvePrototypeEditorMobileMode(
+    resourceType: 'prototype' | 'theme',
+    pane: PreviewPane,
+    previewConfig: PreviewConfig,
+): boolean {
+    if (resourceType !== 'prototype') {
+        return false;
+    }
+    if (pane === 'secondary') {
+        return true;
+    }
+    if (previewConfig.previewMode !== 'single') {
+        return false;
+    }
+    if (previewConfig.singlePreset === 'mobile') {
+        return true;
+    }
+    return previewConfig.singlePreset === 'custom'
+        && Number.isFinite(previewConfig.customWidth)
+        && (previewConfig.customWidth as number) <= MOBILE_ANNOTATION_MAX_WIDTH;
+}
+
+export function isQuickEditRuntimeReadyForIframe(
+    status: QuickEditRuntimeStatus,
+    readyIframe: HTMLIFrameElement | null | undefined,
+    currentIframe: HTMLIFrameElement | null | undefined,
+): boolean {
+    return status === 'ready'
+        && Boolean(currentIframe)
+        && readyIframe === currentIframe;
+}
+
 export type QuickEditMessageType =
     | 'axhub.quickEdit.runtimeReady'
     | 'axhub.quickEdit.patch'
@@ -308,18 +344,51 @@ export type PrototypeEditorBridgeStateMessage = {
     hostToolbarState?: CommentaryHostToolbarState | null;
     debugState?: CommentaryDebugState | null;
     promptText?: string;
+    modifiedElements?: CommentaryModifiedElementSummary[];
     decisionDataCount?: number;
 };
+
+export function resolveAnnotationActionEditingTargets(
+    action: CommentaryHostToolbarAction | null | undefined,
+    modifiedElements: readonly CommentaryModifiedElementSummary[] = [],
+): Array<{
+    elementKey: string;
+    targetRef: { locator: ElementLocator | null; label: string };
+}> {
+    if (action?.type === 'send-to-agent') {
+        const elementKey = String(action.elementKey || '').trim();
+        if (elementKey) {
+            return [{
+                elementKey,
+                targetRef: {
+                    locator: action.locator ?? null,
+                    label: String(action.label || '').trim() || elementKey,
+                },
+            }];
+        }
+    }
+
+    const targets = new Map<string, {
+        elementKey: string;
+        targetRef: { locator: ElementLocator | null; label: string };
+    }>();
+    for (const item of modifiedElements) {
+        const elementKey = String(item?.elementKey || '').trim();
+        if (!elementKey || targets.has(elementKey)) continue;
+        targets.set(elementKey, {
+            elementKey,
+            targetRef: {
+                locator: item?.locator ?? null,
+                label: String(item?.label || '').trim() || elementKey,
+            },
+        });
+    }
+    return Array.from(targets.values());
+}
 
 export type PrototypeEditorSaveActionMessage = {
     type: 'AXHUB_PROTOTYPE_EDITOR_SAVE_ACTION';
     action: QuickEditSaveAction;
-};
-
-export type PrototypeEditorBridgePendingRequest = {
-    iframe: HTMLIFrameElement;
-    resolve: (message: PrototypeEditorBridgeStateMessage | null) => void;
-    timeoutId: number;
 };
 
 const HOST_TOOLBAR_STATE_SETTLE_TIMEOUT_MS = 1500;

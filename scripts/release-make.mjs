@@ -41,7 +41,6 @@ const makeClientTemplateLatestManifestName = 'axhub-make-client-template.latest.
 const makeClientTemplateLatestManifestGiteeTagName = 'make-client-template-latest';
 const makeClientTemplatePackageManager = 'pnpm@10.20.0';
 const makeClientTemplateRequiredExactDependencies = new Set([
-  '@axhub/annotation',
   'lucide-react',
 ]);
 const makeClientTemplateExactDevDependencies = new Map([
@@ -1719,14 +1718,27 @@ function getCurrentTargetId() {
   return null;
 }
 
-function npmBinPath(tempInstallDir) {
-  const binName = process.platform === 'win32' ? 'axhub-make.cmd' : 'axhub-make';
-  return path.join(tempInstallDir, 'node_modules/.bin', binName);
-}
-
 function installedBinPath(tempInstallDir, binName) {
   const commandName = process.platform === 'win32' ? `${binName}.cmd` : binName;
   return path.join(tempInstallDir, 'node_modules/.bin', commandName);
+}
+
+export function createInstalledNpmBinCommand(tempInstallDir, binName, options = {}) {
+  const platform = options.platform || process.platform;
+  if (platform === 'win32') {
+    const binTarget = requiredNpmBin[binName];
+    if (!binTarget) {
+      throw new Error(`Unknown npm bin: ${binName}`);
+    }
+    return {
+      command: options.nodeExecutable || process.execPath,
+      args: [path.join(tempInstallDir, 'node_modules', '@axhub', 'make', binTarget)],
+    };
+  }
+  return {
+    command: installedBinPath(tempInstallDir, binName),
+    args: [],
+  };
 }
 
 export function createNpmExecSmokeArgs(tarballPath) {
@@ -1771,6 +1783,24 @@ async function waitForHttpOk(url, child, label) {
     await sleep(250);
   }
   throw new Error(`${label} did not become ready: ${lastError?.message || 'timeout'}`);
+}
+
+export function createServerProbeLaunchOptions(params) {
+  return {
+    args: [
+      '--host',
+      '127.0.0.1',
+      '--port',
+      String(params.port),
+      '--admin-root',
+      params.adminRoot,
+    ],
+    env: {
+      AXHUB_MAKE_CANVAS_FIG_SYNC: params.canvasFigSyncPath,
+      ...(params.env || {}),
+      AXHUB_MAKE_HOME_DIR: params.makeHomeDir,
+    },
+  };
 }
 
 async function exerciseCommentAssetLifecycle(origin, projectRoot) {
@@ -1870,26 +1900,20 @@ async function exerciseCommentAssetLifecycle(origin, projectRoot) {
 
 async function startAndProbeServer(params) {
   const port = await findFreePort();
-  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-make-release-project-'));
-  const homeDir = params.exerciseCommentAssets
-    ? fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-make-release-home-'))
+  const makeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-make-release-home-'));
+  const projectRoot = params.exerciseCommentAssets
+    ? fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-make-release-project-'))
     : null;
-  const args = [
-    projectRoot,
-    '--host',
-    '127.0.0.1',
-    '--port',
-    String(port),
-    '--admin-root',
-    params.adminRoot,
-  ];
-  const child = spawn(params.command, args, {
+  const launch = createServerProbeLaunchOptions({
+    ...params,
+    port,
+    makeHomeDir,
+  });
+  const child = spawn(params.command, [...(params.commandArgs || []), ...launch.args], {
     cwd: params.cwd || repoRoot,
     env: {
       ...process.env,
-      AXHUB_MAKE_CANVAS_FIG_SYNC: params.canvasFigSyncPath,
-      ...(homeDir ? { AXHUB_MAKE_HOME_DIR: homeDir } : {}),
-      ...(params.env || {}),
+      ...launch.env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -1916,6 +1940,7 @@ async function startAndProbeServer(params) {
       }
     }
     if (params.exerciseCommentAssets) {
+      if (!projectRoot) throw new Error('Comment asset smoke project root is unavailable');
       await exerciseCommentAssetLifecycle(`http://127.0.0.1:${port}`, projectRoot);
     }
   } finally {
@@ -1924,8 +1949,8 @@ async function startAndProbeServer(params) {
       child.once('exit', resolve);
       setTimeout(resolve, 1000);
     });
-    fs.rmSync(projectRoot, { recursive: true, force: true });
-    if (homeDir) fs.rmSync(homeDir, { recursive: true, force: true });
+    fs.rmSync(makeHomeDir, { recursive: true, force: true });
+    if (projectRoot) fs.rmSync(projectRoot, { recursive: true, force: true });
   }
 
   if (output.trim()) {
@@ -1943,14 +1968,16 @@ async function testPreparedArtifacts() {
     run('npm', ['init', '-y'], { cwd: tempInstallDir, capture: true });
     run('npm', ['install', manifest.npmTarballPath, '--ignore-scripts'], { cwd: tempInstallDir });
 
-    const installedBin = npmBinPath(tempInstallDir);
     for (const binName of Object.keys(requiredNpmBin)) {
-      run(installedBinPath(tempInstallDir, binName), ['--help'], { cwd: tempInstallDir, capture: true });
+      const installedBin = createInstalledNpmBinCommand(tempInstallDir, binName, { platform: process.platform });
+      run(installedBin.command, [...installedBin.args, '--help'], { cwd: tempInstallDir, capture: true });
     }
     run('npm', createNpmExecSmokeArgs(manifest.npmTarballPath), { cwd: tempInstallDir, capture: true });
+    const installedBin = createInstalledNpmBinCommand(tempInstallDir, 'axhub-make', { platform: process.platform });
     await startAndProbeServer({
       label: 'installed npm CLI',
-      command: installedBin,
+      command: installedBin.command,
+      commandArgs: installedBin.args,
       cwd: tempInstallDir,
       adminRoot: manifest.adminDir,
       canvasFigSyncPath: path.join(npmPackageScriptsDir, 'canvas-fig-sync.mjs'),

@@ -75,6 +75,9 @@ function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+const ANNOTATION_PAGE_CONTEXT_MISMATCH_MESSAGE =
+  '无法准确定位标注位置，该标注需要由 AI 生成';
+
 function buildAcpRuntimeEventsProxyUrl(projectId: string, targetPath: string): string {
   const params = new URLSearchParams();
   const normalizedProjectId = normalizeString(projectId);
@@ -101,17 +104,30 @@ function buildAcpRuntimeStatusProxyUrl(
   return `/api/acp/conversations/runtime/status${query ? `?${query}` : ''}`;
 }
 
+function resolveAcpRuntimeProxyUrl(apiBaseUrl: string, path: string): string {
+  const normalizedApiBaseUrl = normalizeString(apiBaseUrl).replace(/\/+$/, '');
+  return normalizedApiBaseUrl ? `${normalizedApiBaseUrl}${path}` : path;
+}
+
 function createMakeConversationTaskTransport(
+  getApiBaseUrl: () => string,
   getProjectId: () => string,
   getTargetPath: () => string,
 ): CommentaryConversationTaskTransport {
   return {
     watch(query, observer) {
+      const apiBaseUrl = getApiBaseUrl();
       const projectId = getProjectId();
       const targetPath = getTargetPath();
       const subscription = subscribeAcpRuntimeStatuses({
-        eventsUrl: buildAcpRuntimeEventsProxyUrl(projectId, targetPath),
-        runtimeUrl: buildAcpRuntimeStatusProxyUrl(projectId, targetPath, query.threadId),
+        eventsUrl: resolveAcpRuntimeProxyUrl(
+          apiBaseUrl,
+          buildAcpRuntimeEventsProxyUrl(projectId, targetPath),
+        ),
+        runtimeUrl: resolveAcpRuntimeProxyUrl(
+          apiBaseUrl,
+          buildAcpRuntimeStatusProxyUrl(projectId, targetPath, query.threadId),
+        ),
         threadId: query.threadId,
         provider: query.provider,
       }, observer.next);
@@ -558,6 +574,41 @@ function hasMountedAnnotationRuntime(): boolean {
   return Boolean(runtime && typeof runtime === 'object');
 }
 
+function readMountedAnnotationRuntimeCurrentPageId(): string {
+  if (typeof window === 'undefined') return '';
+  type AnnotationRuntimeMetadataRef = {
+    getMetadata?: () => { currentPageId?: unknown } | null | undefined;
+  };
+  const runtimeWindow = window as Window & {
+    __AXHUB_MAKE_ANNOTATION_RUNTIME__?: AnnotationRuntimeMetadataRef;
+    __AXHUB_ANNOTATION_RUNTIME__?: AnnotationRuntimeMetadataRef;
+  };
+  const runtime = runtimeWindow.__AXHUB_ANNOTATION_RUNTIME__
+    ?? runtimeWindow.__AXHUB_MAKE_ANNOTATION_RUNTIME__;
+  try {
+    return normalizeString(runtime?.getMetadata?.()?.currentPageId);
+  } catch {
+    return '';
+  }
+}
+
+function getLocalAnnotationCreateBlockReason(annotationPageId: unknown): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  let locationPageId = '';
+  try {
+    locationPageId = readInternalPrototypePageIdFromLocationUrl(
+      new URL(window.location.href, 'http://localhost'),
+    );
+  } catch {
+    return undefined;
+  }
+  const configuredPageId = normalizeString(annotationPageId);
+  if (!locationPageId || !configuredPageId || locationPageId === configuredPageId) {
+    return undefined;
+  }
+  return ANNOTATION_PAGE_CONTEXT_MISMATCH_MESSAGE;
+}
+
 function hasMountedAnnotationRuntimeSource(): boolean {
   if (!hasMountedAnnotationRuntime()) return false;
   const sourceDocument = (window as Window & {
@@ -616,6 +667,7 @@ function createPrototypeAnnotationClient() {
   let cachedApiOrigin = '';
   let cachedTargetPath = '';
   let cachedSource: AnnotationSourceDocument | null = null;
+  let cachedApiSourcePageId = '';
   let cachedEnabled = false;
   let enableLoading = false;
   let configuredApiOrigin = '';
@@ -655,22 +707,32 @@ function createPrototypeAnnotationClient() {
     if (!targetPath) {
       cachedEnabled = false;
       cachedSource = null;
+      cachedApiSourcePageId = '';
       return { enabled: false, source: null };
     }
     const url = await resolveRequestUrl(buildPrototypeAnnotationUrl(targetPath, configuredProjectId));
-    const response = await fetch(url, { method: 'GET' });
-    if (!response.ok) {
+    try {
+      const response = await fetch(url, { method: 'GET' });
+      if (!response.ok) {
+        cachedEnabled = false;
+        cachedSource = null;
+        cachedApiSourcePageId = '';
+        return { enabled: false, source: null };
+      }
+      const payload = await response.json().catch(() => null) as {
+        enabled?: boolean;
+        source?: AnnotationSourceDocument | null;
+      } | null;
+      cachedEnabled = payload?.enabled === true || hasMountedAnnotationRuntime();
+      cachedApiSourcePageId = normalizeString(payload?.source?.data?.pageId);
+      cachedSource = payload?.source ?? readMountedAnnotationSourceDocument() ?? null;
+      return { enabled: cachedEnabled, source: cachedSource };
+    } catch (error) {
       cachedEnabled = false;
       cachedSource = null;
-      return { enabled: false, source: null };
+      cachedApiSourcePageId = '';
+      throw error;
     }
-    const payload = await response.json().catch(() => null) as {
-      enabled?: boolean;
-      source?: AnnotationSourceDocument | null;
-    } | null;
-    cachedEnabled = payload?.enabled === true || hasMountedAnnotationRuntime();
-    cachedSource = payload?.source ?? readMountedAnnotationSourceDocument() ?? null;
-    return { enabled: cachedEnabled, source: cachedSource };
   };
 
   const refreshSource = async (): Promise<AnnotationSourceDocument | null> => {
@@ -683,6 +745,12 @@ function createPrototypeAnnotationClient() {
 
   const getDirectoryMarkdownProjectRelativePaths = (): string[] => (
     collectDirectoryMarkdownProjectRelativePaths(cachedSource, cachedTargetPath || resolveTargetPath())
+  );
+
+  const getCurrentPageId = (): string => (
+    readMountedAnnotationRuntimeCurrentPageId()
+    || cachedApiSourcePageId
+    || normalizeString(readMountedAnnotationSourceDocument()?.data?.pageId)
   );
 
   const getDocumentEditUrl = (element: Element | null): string => {
@@ -724,6 +792,9 @@ function createPrototypeAnnotationClient() {
         throw new Error(payload?.error || '开启需求标注失败');
       }
       cachedSource = payload.source ?? cachedSource;
+      if (payload.source) {
+        cachedApiSourcePageId = normalizeString(payload.source.data?.pageId);
+      }
       const runtimeMounted = hasMountedAnnotationRuntime();
       if (runtimeMounted && payload.source) {
         replaceRuntimeAnnotationSource(payload.source);
@@ -783,6 +854,7 @@ function createPrototypeAnnotationClient() {
     }
     cachedEnabled = true;
     cachedSource = payload.source;
+    cachedApiSourcePageId = normalizeString(payload.source.data?.pageId);
     await replaceRuntimeAnnotationSource(payload.source);
   };
 
@@ -804,6 +876,7 @@ function createPrototypeAnnotationClient() {
       if (changed) {
         cachedTargetPath = '';
         cachedSource = null;
+        cachedApiSourcePageId = '';
         cachedEnabled = hasMountedAnnotationRuntimeSource();
       }
     },
@@ -812,6 +885,7 @@ function createPrototypeAnnotationClient() {
     enable,
     getDocumentEditUrl,
     getDirectoryMarkdownProjectRelativePaths,
+    getCurrentPageId,
     getMarkdown,
     writeMarkdown,
     isEnabled: () => cachedEnabled || hasMountedAnnotationRuntime(),
@@ -913,7 +987,7 @@ type PreviewDialogRequest = {
 };
 
 type PreviewDialogResponse = {
-  type: 'WEB_EDITOR_DIALOG_RESPONSE';
+  type: 'WEB_EDITOR_DIALOG_RESPONSE' | 'WEB_EDITOR_DIALOG_ACK';
   requestId: string;
   confirmed?: boolean;
 };
@@ -1050,6 +1124,7 @@ async function requestParentDialog(request: Omit<PreviewDialogRequest, 'type' | 
 
   return new Promise<boolean | null>((resolve) => {
     let settled = false;
+    let parentAcknowledged = false;
 
     const cleanup = () => {
       if (typeof window === 'undefined') return;
@@ -1066,13 +1141,20 @@ async function requestParentDialog(request: Omit<PreviewDialogRequest, 'type' | 
 
     const handleMessage = (event: MessageEvent) => {
       const data = event.data as PreviewDialogResponse | undefined;
-      if (!data || data.type !== 'WEB_EDITOR_DIALOG_RESPONSE') return;
+      if (!data) return;
       if (String(data.requestId || '') !== requestId) return;
+      if (data.type === 'WEB_EDITOR_DIALOG_ACK') {
+        parentAcknowledged = true;
+        window.clearTimeout(timeoutId);
+        return;
+      }
+      if (data.type !== 'WEB_EDITOR_DIALOG_RESPONSE') return;
       finish(data.confirmed ?? true);
     };
 
     const timeoutId = window.setTimeout(() => {
-      finish(null);
+      if (parentAcknowledged) return;
+      finish(false);
     }, 60_000);
 
     window.addEventListener('message', handleMessage);
@@ -1745,6 +1827,7 @@ export const createWebEditorV2Controller = (
           conversationTaskTransport:
             options.host?.conversationTaskTransport
             ?? createMakeConversationTaskTransport(
+              () => runtimeAnnotationApiBaseUrl,
               () => runtimeAnnotationProjectId,
               () => {
                 const resource = options.host?.getResourceContext?.()
@@ -1761,6 +1844,9 @@ export const createWebEditorV2Controller = (
           canEditAnnotationMarkdown: (element) => Boolean(
             annotationClient.isEnabled()
             && canEditLocalAnnotationMarkdown(element),
+          ),
+          getCreateAnnotationBlockReason: () => getLocalAnnotationCreateBlockReason(
+            annotationClient.getCurrentPageId(),
           ),
           getAnnotationDocumentEditUrl: (element) => annotationClient.getDocumentEditUrl(element),
           getAnnotationMarkdown: (element) => annotationClient.getMarkdown(element),

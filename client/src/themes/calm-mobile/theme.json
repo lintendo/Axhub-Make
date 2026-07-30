@@ -1,0 +1,290 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/fitness/calm/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-calm-mobile",
+    "slug": "calm-mobile",
+    "brand": "Calm",
+    "titleZh": "Calm 主题",
+    "titleEn": "Calm",
+    "descriptionZh": "Calm 的 Design.md 主题展示，围绕移动端、健康与运动组织页面。",
+    "descriptionEn": "Calm mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "健康与运动"
+    ],
+    "distributionTags": [
+      "移动端",
+      "健康与运动"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/calm-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/calm/id571800810?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/calm/id571800810?uo=4",
+          "marketId": "571800810",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/ff/6a/bc/ff6abc49-7702-1818-9260-12ab3fe3cea6/dac9e900-7943-4ff4-8449-003ac65c4f94_Screen_04_a.png/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:34.557Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "0ef45b6a619a4799936dbc856b07a5a14240e3f31f629da09bd831d0746a00aa",
+          "byteLength": 58514,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/calm/id571800810?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/calm/id571800810?uo=4",
+          "marketId": "571800810",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/c4/d7/a0/c4d7a09f-9670-503d-548b-dac1f19012a2/92a594c0-f5b1-4739-bffd-88930991b524_iPhone_5.5_Inch_02.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:34.557Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "c0f067622202dbe5810de945e75c1dff976381aa38de57e50ae9ffc36b87f8ed",
+          "byteLength": 30330,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/calm/id571800810?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/calm/id571800810?uo=4",
+          "marketId": "571800810",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/c2/b9/78/c2b978bb-3fe0-c2ab-6777-917fc5a89bc0/6f697906-3d56-49aa-9a43-9450f30baa69_iPhone_5.5_Inch_03.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:27:34.557Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "1058c00529bf247186c725ad48fe502eb62893f44cad86b736c4a8789da0b18c",
+          "byteLength": 27192,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#2A6FD6",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Roboto",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Roboto",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Calm 主题",
+    "brandAlias": "Calm",
+    "description": "Calm 的 Design.md 主题展示，围绕移动端、健康与运动组织页面。",
+    "descriptionEn": "Calm mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "健康与运动"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#2A6FD6",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "阴影 1 - Shadow 1",
+        "value": "rgba(255,255,255,0.12)",
+        "cssValue": "rgba(255,255,255,0.12)",
+        "description": "Glass Surface Raised (`rgba(255,255,255,0.12)`): Higher-elevation cards, the Daily Calm hero, pressed list rows."
+      }
+    ],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "rgba(255,255,255,0.12)",
+        "cssValue": "rgba(255,255,255,0.12)",
+        "description": "Glass Surface Raised (`rgba(255,255,255,0.12)`): Higher-elevation cards, the Daily Calm hero, pressed list rows."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "rgba(255,255,255,0.16)",
+        "cssValue": "rgba(255,255,255,0.16)",
+        "description": "Glass Hover (`rgba(255,255,255,0.16)`): Pressed state on glass surfaces."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "rgba(255,255,255,0.20)",
+        "cssValue": "rgba(255,255,255,0.20)",
+        "description": "Focus: border `rgba(255,255,255,0.20)`, no color shift"
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Roboto",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use the night-sky gradient ({#2A6FD6} → {#0B1E3F}) as the canvas — dusk, not pure black。",
+        "建议：Make cards glass — {rgba(255,255,255,0.08)} with backdrop blur so the sky shows through。",
+        "建议：Reserve Calm Blue ({#2A6FD6}) for primary actions, the active tab, and progress。",
+        "建议：Set headlines in Lora (serif) and body/UI in Inter (sans) — never swap the roles。",
+        "建议：Give the layout generous air — 20pt margins, 1.55 body leading, 32pt sections。"
+      ],
+      "dont": [
+        "避免：use pure black {#000000} as the canvas — Calm is a twilight gradient, not a void。",
+        "避免：add saturated accent colors beyond Calm Blue (gold streak is the only rare warm)。",
+        "避免：set headlines in a sans — the Lora serif is the brand's voice。",
+        "避免：use hard drop shadows — depth is translucency and blur, not cast shadow。",
+        "避免：crowd the layout — busyness is the opposite of calm。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "health",
+      "navigation": [
+        "今日",
+        "趋势",
+        "我的"
+      ],
+      "primaryAction": "记录活动"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

@@ -7,11 +7,11 @@ import {
     Microsoft,
     OpenAI,
     OpenCode,
-    Qoder,
     Trae,
     Windsurf,
 } from '@lobehub/icons';
 import { Check, ChevronDown, ChevronRight, CircleHelp, ImageIcon, Loader2, MoreHorizontal, Settings, Sparkles, SquareTerminal } from 'lucide-react';
+import qoderIconUrl from '../../assets/brand-icons/qoder.svg?url';
 import {
     getVisibleIDEOptions,
     IDEAvailabilityMap,
@@ -182,7 +182,7 @@ export default function OpenInDropdown({
         if (ide === 'windsurf') return <Windsurf size={14} />;
         if (ide === 'vscode') return <Microsoft.Color size={14} />;
         if (ide === 'antigravity') return <Antigravity.Color size={14} />;
-        if (ide === 'qoder') return <Qoder.Color size={14} />;
+        if (ide === 'qoder') return <img src={qoderIconUrl} alt="" aria-hidden width={14} height={14} />;
         return <SquareTerminal className="h-3.5 w-3.5" />;
     };
 
@@ -278,6 +278,15 @@ export default function OpenInDropdown({
         }
     };
 
+    const handleGuideToAISettings = useCallback(() => {
+        onOpenAISettings?.();
+        toast.warning('请先在 AI 设置中选择本地 AI Agent');
+    }, [onOpenAISettings]);
+
+    const handleUnavailableWebAgent = useCallback(() => {
+        toast.warning('当前页面请直接使用页面中的 AI 输入框');
+    }, []);
+
     const handleOpenWithWebAgent = async (agent: WebAgent, provider?: AcpProvider) => {
         if (openLoading) return;
 
@@ -292,7 +301,7 @@ export default function OpenInDropdown({
             return;
         }
 
-        toast.warning('打开 Web Agent 失败');
+        handleUnavailableWebAgent();
     };
 
     const handleOpenWithImageAi = useCallback(async () => {
@@ -326,7 +335,7 @@ export default function OpenInDropdown({
 
         if (openMethod.type === 'web') {
             if (!storedWebOpenMethod) {
-                toast.warning('打开 Web Agent 失败');
+                handleGuideToAISettings();
                 return;
             }
             void handleOpenWithWebAgent(storedWebOpenMethod.agent, storedWebOpenMethod.provider);

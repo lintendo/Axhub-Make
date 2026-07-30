@@ -1,0 +1,328 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/food/starbucks/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-starbucks-mobile",
+    "slug": "starbucks-mobile",
+    "brand": "Starbucks",
+    "titleZh": "Starbucks 主题",
+    "titleEn": "Starbucks",
+    "descriptionZh": "Starbucks 的 Design.md 主题展示，围绕移动端、本地生活与餐饮组织页面。",
+    "descriptionEn": "Starbucks mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "本地生活与餐饮"
+    ],
+    "distributionTags": [
+      "移动端",
+      "本地生活与餐饮"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/starbucks-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/starbucks/id331177714",
+          "officialPageUrl": "https://apps.apple.com/us/app/starbucks/id331177714",
+          "marketId": "331177714",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/26/19/15/261915d9-5fed-c6f5-3971-116a5f450d9f/_Card5.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:40.721Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "395c79d184469783253339c25358fb1086e200605feb664547eedbf72e4e419a",
+          "byteLength": 35854,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/starbucks/id331177714",
+          "officialPageUrl": "https://apps.apple.com/us/app/starbucks/id331177714",
+          "marketId": "331177714",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/99/d1/68/99d16802-b98d-9aa4-529c-9477a4ee2ca0/_Card2.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:40.721Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "72cbe194dfc714bce2f2874fbe0043b0d54bc3712ff38395056cf9a9675ef417",
+          "byteLength": 36658,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/starbucks/id331177714",
+          "officialPageUrl": "https://apps.apple.com/us/app/starbucks/id331177714",
+          "marketId": "331177714",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/9e/a6/94/9ea6943f-9270-25a9-aa18-72b8db486640/_Card3.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:27:40.721Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "b2f4e95226b40f4fd55ee43ad06ed9587010c95109d71fbaa61b05eaab911007",
+          "byteLength": 50358,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#00704A",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Helvetica Neue",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Helvetica Neue",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "8px",
+      "card": "8px",
+      "preview": "8px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "spacing": {
+      "xxs": "2px",
+      "xs": "8px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Starbucks 主题",
+    "brandAlias": "Starbucks",
+    "description": "Starbucks 的 Design.md 主题展示，围绕移动端、本地生活与餐饮组织页面。",
+    "descriptionEn": "Starbucks mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "本地生活与餐饮"
+    ],
+    "fontStylesheets": [],
+    "palette": [
+      {
+        "color": "#00704A",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "阴影 1 - Shadow 1",
+        "value": "rgba(0,0,0,0.08) 0 2px 8px",
+        "cssValue": "rgba(0,0,0,0.08) 0 2px 8px",
+        "description": "Shadow: `rgba(0,0,0,0.08) 0 2px 8px`"
+      },
+      {
+        "label": "阴影 2 - Shadow 2",
+        "value": "rgba(0,112,74,0.2) 0 4px 12px",
+        "cssValue": "rgba(0,112,74,0.2) 0 4px 12px",
+        "description": "| Primary Button (Level 3) | `rgba(0,112,74,0.2) 0 4px 12px` | Siren Green CTAs (branded green shadow) |"
+      },
+      {
+        "label": "阴影 3 - Shadow 3",
+        "value": "rgba(0,0,0,0.0) → rgba(0,0,0,0.5)",
+        "cssValue": "rgba(0,0,0,0.0) → rgba(0,0,0,0.5)",
+        "description": "\"Create a category card for the Order grid: 2:3 aspect, 16pt corner radius, full-bleed photo of a steaming cappuccino as background. Apply a bottom 40% vertical gradient `rgba(0,0,0,0.0) → rgba(0,0,0,0.5)` for label legibility. Label 'Hot Coffees' in SoDo Sans 16pt w700 white, bottom-left corner with 16pt padding. Shadow `rgba(0,0,0,0.08) 0 2px 8px`. Tap: scale 0.98 spring + visible feedback state.\""
+      }
+    ],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#E8E8E8",
+        "cssValue": "#E8E8E8",
+        "description": "Divider (`#E8E8E8`): Hairline dividers."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#3A4F48",
+        "cssValue": "#3A4F48",
+        "description": "Dark Divider (`#3A4F48`)."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#00704A",
+        "cssValue": "#00704A",
+        "description": "Starbucks' iOS app is a thoughtful, warm retail experience wrapped around a single, rewards-heavy hero: your Stars dashboard. Open the app and the first thing you see is a big Gold-gradient progress ring at the top, counting your Stars toward the next reward — a tiny daily dopamine loop that's been tuned over years to reinforce the visit. The color palette is all house: the famous Siren Green (`#00704A`) for primary CTAs, a darker \"House Green\" (`#1E3932`) that shows up as the warm dark canvas (and crucially is NOT black — it's a very dark forest green tied to Starbucks' store interiors), a soft mint (`#D4E9E2`) that tints reward moments, and cream-gold (`#CBA258`) for the Gold tier status and Stars themselves. The UI evokes the same hospitality as a store: warm, quiet, a little bit premium, and organized around the ritual of ordering the same drink."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#000000",
+        "cssValue": "#000000",
+        "description": "Text Primary (`#000000`): Primary body text — Starbucks uses true black for body on warm white."
+      },
+      {
+        "label": "边框 5 - Border 5",
+        "value": "#CBA258",
+        "cssValue": "#CBA258",
+        "description": "Starbucks' iOS app is a thoughtful, warm retail experience wrapped around a single, rewards-heavy hero: your Stars dashboard. Open the app and the first thing you see is a big Gold-gradient progress ring at the top, counting your Stars toward the next reward — a tiny daily dopamine loop that's been tuned over years to reinforce the visit. The color palette is all house: the famous Siren Green (`#00704A`) for primary CTAs, a darker \"House Green\" (`#1E3932`) that shows up as the warm dark canvas (and crucially is NOT black — it's a very dark forest green tied to Starbucks' store interiors), a soft mint (`#D4E9E2`) that tints reward moments, and cream-gold (`#CBA258`) for the Gold tier status and Stars themselves. The UI evokes the same hospitality as a store: warm, quiet, a little bit premium, and organized around the ritual of ordering the same drink."
+      },
+      {
+        "label": "边框 6 - Border 6",
+        "value": "#FFFFFF",
+        "cssValue": "#FFFFFF",
+        "description": "Canvas White (`#FFFFFF`): Card surfaces, cleaner inner containers."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Helvetica Neue",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use Siren Green ({#00704A}) on every primary CTA — Add to Order, Pay, Order button。",
+        "建议：Use House Green ({#1E3932}) as the dark canvas — very dark forest green, NOT black。",
+        "建议：Place the Stars dashboard ring at the top of the Home tab — it's the daily habit hook。",
+        "建议：Render the Stars count in SoDo Sans 48pt w800 gold {#CBA258} centered in the ring。",
+        "建议：Use the 5-pill size selector for drinks (Short / Tall / Grande / Venti / Trenta)。"
+      ],
+      "dont": [
+        "避免：use pure black for the dark canvas — {#1E3932} House Green is load-bearing。",
+        "避免：use a banking-style blue for links — Info Blue is sparingly used。",
+        "避免：use display type larger than 48pt — Stars count is the only display moment。",
+        "避免：skip the size selector — it's the mental model of ordering at Starbucks。",
+        "避免：collapse category cards — photography IS the content。"
+      ]
+    },
+    "radius": {
+      "control": "8px",
+      "card": "8px",
+      "preview": "8px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "spacing": {
+      "xxs": "2px",
+      "xs": "8px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "commerce",
+      "navigation": [
+        "首页",
+        "订单",
+        "我的"
+      ],
+      "primaryAction": "立即购买"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

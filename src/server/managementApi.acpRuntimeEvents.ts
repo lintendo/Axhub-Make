@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
 
-import { getRequestUrl, sendJson } from './http.ts';
+import { getRequestUrl, LOCAL_API_CORS_HEADERS, sendJson } from './http.ts';
 import { normalizePrototypeCommentTargetPath } from './documentCommentsStorage.ts';
 import type { ManagementApiOptions } from './managementApi.ts';
 
@@ -151,6 +151,9 @@ export function handleAcpRuntimeEventsApi(
   ) => { getConfig(params: { activeProjectRoot: string }): any },
 ): boolean {
   if (pathname !== ACP_RUNTIME_EVENTS_PATH && pathname !== ACP_RUNTIME_STATUS_PATH) return false;
+  for (const [key, value] of Object.entries(LOCAL_API_CORS_HEADERS)) {
+    res.setHeader(key, value);
+  }
   if (req.method !== 'GET') {
     sendJson(res, { error: 'Method not allowed' }, { status: 405 });
     return true;

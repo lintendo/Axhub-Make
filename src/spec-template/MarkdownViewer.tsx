@@ -7,6 +7,7 @@ import React, {
     useState,
 } from 'react';
 import { XMarkdown } from '@ant-design/x-markdown';
+import '@ant-design/x-markdown/themes/light.css';
 import type { ComponentProps } from '@ant-design/x-markdown';
 import { Mermaid, XProvider } from '@ant-design/x';
 import zhCN_X from '@ant-design/x/locale/zh_CN';
@@ -34,8 +35,8 @@ import {
     type DocumentCommentContext,
 } from '../common/documentCommentsPersistence';
 import {
+    resolveMarkdownDocumentLinkTarget,
     resolvePrototypeSpecAssetUrl,
-    resolvePrototypeSpecDocumentLink,
     resolvePrototypeSpecResourceUrl,
     stripMarkdownPreviewFrontmatter,
 } from './previewMarkdownContent';
@@ -376,6 +377,7 @@ const markdownStyles = `
     width: 100%;
     min-height: calc(100vh - 230px);
     height: auto;
+    overflow: visible;
   }
   .spec-editor-shell .simple-editor-content {
     max-width: 100%;
@@ -1537,11 +1539,11 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
                         content={previewContent}
                         components={{
                             a: ((props: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
-                                const targetPath = resolvePrototypeSpecDocumentLink(
+                                const navigationTarget = resolveMarkdownDocumentLinkTarget(
                                     String(props.href || ''),
                                     String(currentDoc?.url || ''),
                                 );
-                                const resourceUrl = targetPath
+                                const resourceUrl = navigationTarget
                                     ? null
                                     : resolvePrototypeSpecResourceUrl(
                                         String(props.href || ''),
@@ -1553,9 +1555,20 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
                                         href={resourceUrl || props.href}
                                         onClick={(event) => {
                                             props.onClick?.(event);
-                                            if (event.defaultPrevented || !targetPath) return;
+                                            if (event.defaultPrevented || !navigationTarget) return;
                                             event.preventDefault();
-                                            postToParent({ type: 'axhub-prototype-spec:navigate', path: targetPath });
+                                            if (navigationTarget.kind === 'prototype-spec') {
+                                                postToParent({
+                                                    type: 'axhub-prototype-spec:navigate',
+                                                    path: navigationTarget.resourceId,
+                                                });
+                                                return;
+                                            }
+                                            postToParent({
+                                                type: 'axhub-document-resource:navigate',
+                                                resourceType: navigationTarget.kind,
+                                                resourceId: navigationTarget.resourceId,
+                                            });
                                         }}
                                     />
                                 );

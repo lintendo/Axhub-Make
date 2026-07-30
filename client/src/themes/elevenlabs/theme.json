@@ -5,7 +5,37 @@
     "originalDetailUrl": "https://styles.refero.design/style/031056ff-7af1-46db-8daa-115f731c5d26",
     "fallbackRawUrl": "",
     "mirrorSource": "",
-    "websiteUrl": "https://elevenlabs.io/"
+    "websiteUrl": "https://elevenlabs.io/",
+    "localPaths": [
+      "DESIGN.md",
+      "theme.json",
+      "assets/tokens.json",
+      "index.tsx",
+      "style.css",
+      "tw.css",
+      "assets/source-preview.jpg"
+    ],
+    "pinnedCommit": {
+      "status": "not-applicable",
+      "reason": "Retained Refero URL/image evidence is not a Git repository and has no applicable upstream commit."
+    },
+    "license": {
+      "status": "unresolved",
+      "evidence": "No local license evidence is stored for the retained screenshot, brand imagery, or named proprietary fonts.",
+      "scope": "Internal design reference only; keep the retained client theme and exclude unresolved assets from redistribution claims."
+    },
+    "conversionNotes": "Curated retained URL/image metadata and local preview evidence into one responsive React/Web specification without claiming an official upstream design system.",
+    "evidence": {
+      "observed": [
+        "The retained Refero detail URL, theme-local preview image, palette metadata, CSS, and React entry were inspected."
+      ],
+      "inferred": [
+        "Component dimensions, interaction states, token roles, and responsive behavior beyond the retained still evidence are explicitly treated as implementation inference."
+      ],
+      "knownGaps": [
+        "Official source DESIGN.md, applicable Git commit, asset/font licenses, complete interaction states, and full responsive behavior remain unresolved."
+      ]
+    }
   },
   "identity": {
     "id": "P1R-001",
@@ -55,7 +85,7 @@
   "assets": {
     "designMd": {
       "path": "DESIGN.md",
-      "method": "derived_from_metadata"
+      "method": "curated_from_local_source_evidence"
     },
     "tailwind": {
       "path": "tw.css",
@@ -96,13 +126,39 @@
       "#d76d77"
     ],
     "typography": {
-      "display": "Inter",
-      "body": "Inter",
-      "mono": "ui-monospace",
-      "hints": [
-        "Inter",
-        "ui-monospace"
-      ]
+      "fontFamily": {
+        "display": "Inter",
+        "body": "Inter",
+        "mono": "ui-monospace"
+      },
+      "fontSize": {
+        "hero": "50px",
+        "section": "30px",
+        "card": "18px",
+        "body": "15px",
+        "caption": "12px"
+      },
+      "lineHeight": {
+        "hero": "1.02",
+        "section": "1.15",
+        "card": "1.3",
+        "body": "1.55",
+        "caption": "1.35"
+      },
+      "letterSpacing": {
+        "default": "0em"
+      }
+    },
+    "spacing": {
+      "controlInset": "16px",
+      "mobileGutter": "16px",
+      "outerGutter": "32px",
+      "section": "64px"
+    },
+    "radius": {
+      "control": "12px",
+      "card": "16px",
+      "preview": "24px"
     }
   },
   "previewImages": [
@@ -241,10 +297,23 @@
         "避免：不要把 ElevenLabs 套用到与 AI、浅色界面、SaaS 产品 明显无关的产品语境。",
         "避免：不要用通用行业模板覆盖 ElevenLabs 的采集图风格；需要保留原图里的版式密度、留白和视觉重心。"
       ]
+    },
+    "spacing": {
+      "controlInset": "16px",
+      "mobileGutter": "16px",
+      "outerGutter": "32px",
+      "section": "64px"
+    },
+    "radius": {
+      "control": "12px",
+      "card": "16px",
+      "preview": "24px"
     }
   },
   "status": {
     "displayPage": "done",
-    "collectionErrors": []
+    "collectionErrors": [
+      "Blocking license gap: retained external visual/font assets have no local license evidence; keep this client theme and exclude unresolved assets from redistribution claims."
+    ]
   }
 }

@@ -1,0 +1,290 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/music/spotify/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-spotify-mobile",
+    "slug": "spotify-mobile",
+    "brand": "Spotify",
+    "titleZh": "Spotify 主题",
+    "titleEn": "Spotify",
+    "descriptionZh": "Spotify 的 Design.md 主题展示，围绕移动端、媒体、音乐、视频与阅读组织页面。",
+    "descriptionEn": "Spotify mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "媒体、音乐、视频与阅读"
+    ],
+    "distributionTags": [
+      "移动端",
+      "媒体、音乐、视频与阅读"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/spotify-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/spotify-music-and-podcasts/id324684580?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/spotify-music-and-podcasts/id324684580?uo=4",
+          "marketId": "324684580",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/f3/ce/05/f3ce0547-690a-b355-b1dd-6b6e91808279/IOS_-_5.5_-_S01_-_EN_-_CA_U005bEnglish__U0028Canada_U0029_U005d.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "97208ce904957fdcbc14005ceb0b3b511236297db76b82fef35c60bb6635a454",
+          "byteLength": 29358,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/spotify-music-and-podcasts/id324684580?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/spotify-music-and-podcasts/id324684580?uo=4",
+          "marketId": "324684580",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/78/81/ca/7881ca10-b441-1a6c-e030-92e08dd76144/IOS_-_5.5_-_S02_-_EN_-_CA_U005bEnglish__U0028Canada_U0029_U005d.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "de386f0253df81f9e21f8da01e583d77216652e3dbe957a3e4da9b7300516602",
+          "byteLength": 20762,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/spotify-music-and-podcasts/id324684580?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/spotify-music-and-podcasts/id324684580?uo=4",
+          "marketId": "324684580",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/5b/e7/6a/5be76ae0-8bc6-59fc-58ef-92aa931b6dba/IOS_-_5.5_-_S03_-_EN_-_CA_U005bEnglish__U0028Canada_U0029_U005d.png/392x696bb.png",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "e6639ab7388653146c1086942288d0c0454572fc68fef9f3a285ee8ca6eeec0c",
+          "byteLength": 25710,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#1DB954",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Roboto",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Roboto",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Spotify 主题",
+    "brandAlias": "Spotify",
+    "description": "Spotify 的 Design.md 主题展示，围绕移动端、媒体、音乐、视频与阅读组织页面。",
+    "descriptionEn": "Spotify mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "媒体、音乐、视频与阅读"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#1DB954",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "阴影 1 - Shadow 1",
+        "value": "rgba(0,0,0,0.5) 0 12px 32px",
+        "cssValue": "rgba(0,0,0,0.5) 0 12px 32px",
+        "description": "Centered large playlist image (200pt × 200pt) with shadow `rgba(0,0,0,0.5) 0 12px 32px`"
+      }
+    ],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#2A2A2A",
+        "cssValue": "#2A2A2A",
+        "description": "Divider (`#2A2A2A`): Hairline dividers between list rows."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#B3B3B3",
+        "cssValue": "#B3B3B3",
+        "description": "Text Secondary (`#B3B3B3`): Artist names, play counts, metadata, section subtitles."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#FFFFFF",
+        "cssValue": "#FFFFFF",
+        "description": "Text Primary (`#FFFFFF`): Track titles, screen headlines, primary UI text."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Roboto",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use {#121212} as the canvas — NOT true black, NOT {#191414}。",
+        "建议：Reserve Spotify Green ({#1DB954}) for the primary \"play/follow\" action and active toggles — it's the verb。",
+        "建议：Use black text ({#000000}) on green CTA buttons — not white, it's intentional for contrast。",
+        "建议：Render album art with 6pt corner radius — softening without rounding。",
+        "建议：Use Spotify Mix (or Circular as legacy fallback) at weights 400/600/700 only。"
+      ],
+      "dont": [
+        "避免：use pure black {#000000} as the canvas — it kills Now Playing gradient contrast。",
+        "避免：add accent colors beyond green — the app's restraint is what makes the green pop。",
+        "避免：use light weights — Spotify Mix starts at 400。",
+        "避免：use large display-size headlines — content (album art, track titles) is the hero。",
+        "避免：round album art heavily — 6pt max, keep the square integrity。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "media",
+      "navigation": [
+        "推荐",
+        "收藏",
+        "我的"
+      ],
+      "primaryAction": "开始播放"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

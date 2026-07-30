@@ -5,13 +5,16 @@ import { describe, expect, it } from 'vitest';
 describe('IndexPage source', () => {
   it('passes the active markdown resource and content mode into the assistant controller', () => {
     const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
-    const contentModeIndex = source.indexOf('const contentMode: IndexContentMode');
+    const baseContentModeIndex = source.indexOf('const baseContentMode = useMemo');
+    const contentModeIndex = source.indexOf("const contentMode: IndexContentMode = prototypeSpec.isOpen ? 'prototype-spec' : baseContentMode;");
     const markdownResourceIndex = source.indexOf('const currentMarkdownResource = useMemo');
     const assistantControllerIndex = source.indexOf('const assistantController = useAssistantPanelController');
 
+    expect(baseContentModeIndex).toBeGreaterThan(-1);
     expect(contentModeIndex).toBeGreaterThan(-1);
     expect(markdownResourceIndex).toBeGreaterThan(-1);
     expect(assistantControllerIndex).toBeGreaterThan(-1);
+    expect(baseContentModeIndex).toBeLessThan(contentModeIndex);
     expect(contentModeIndex).toBeLessThan(assistantControllerIndex);
     expect(markdownResourceIndex).toBeLessThan(assistantControllerIndex);
     expect(source).toContain('contentMode,');
@@ -451,6 +454,9 @@ describe('IndexPage source', () => {
       source.indexOf('const handleSubmitCanvasAssistantPrompt = useCallback(async (request: CanvasAiGenerationRequest) => {'),
       source.indexOf('const switchProjectWithReturnTarget', source.indexOf('const handleSubmitCanvasAssistantPrompt = useCallback')),
     );
+    const directApiSubmitSource = submitHandlerSource.slice(
+      submitHandlerSource.indexOf('const result = await submitAnnotationPromptViaApi({'),
+    );
 
     expect(source).toContain('buildAcpCanvasMcpServers');
     expect(source).toContain('function isCanvasMcpResourcePath(value: unknown): boolean');
@@ -466,8 +472,8 @@ describe('IndexPage source', () => {
     expect(submitHandlerSource).toContain('onPrepared: request.onPrepared,');
     expect(submitHandlerSource).toContain('onAccepted: request.onAccepted,');
     expect(submitHandlerSource).toContain('signal: request.signal,');
-    expect(submitHandlerSource.indexOf('provider: selectedProvider,')).toBeGreaterThan(
-      submitHandlerSource.indexOf('scene: `canvas-${request.scene}-direct`,'),
+    expect(directApiSubmitSource.indexOf('provider: selectedProvider,')).toBeGreaterThan(
+      directApiSubmitSource.indexOf('scene: `canvas-${request.scene}-direct`,'),
     );
   });
 
@@ -544,20 +550,38 @@ describe('IndexPage source', () => {
     expect(presentationBuilderCall).toContain('onCreatePrototypeForDraftStart: handleCreatePrototypeForDraftStart,');
   });
 
-  it('starts every canvas generation request as a direct API run', () => {
+  it('opens resource and design start requests in fresh visible assistant conversations', () => {
     const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
     const submitSource = source.slice(
       source.indexOf('const handleSubmitCanvasAssistantPrompt = useCallback'),
       source.indexOf('const switchProjectWithReturnTarget', source.indexOf('const handleSubmitCanvasAssistantPrompt = useCallback')),
     );
 
-    expect(submitSource).toContain('buildCanvasAssistantContext(request)');
-    expect(submitSource).toContain('request.prompt');
+    expect(submitSource).toContain("const shouldOpenStartGuideConversation = request.source === 'resource-start'");
+    expect(submitSource).toContain("|| request.source === 'theme-start';");
+    expect(submitSource).toContain('const submitted = await handleSubmitAnnotationAssistantPrompt(');
+    expect(submitSource).toContain('canvasAssistantContext,');
+    expect(submitSource).toContain('forceNewThread: true,');
+    expect(submitSource).toContain("waitUntil: 'started',");
+    expect(submitSource).toContain('provider: selectedProvider,');
+    expect(submitSource).toContain('model: request.model ?? annotationModel,');
+    expect(submitSource).toContain('mode: request.mode,');
+    expect(submitSource).toContain('thought: request.thought,');
+    expect(submitSource).toContain("return { ok: Boolean(submitted && (typeof submitted !== 'object' || submitted.ok !== false)) };");
+  });
+
+  it('keeps non-start-guide canvas requests on the direct API runner', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+    const submitSource = source.slice(
+      source.indexOf('const handleSubmitCanvasAssistantPrompt = useCallback'),
+      source.indexOf('const switchProjectWithReturnTarget', source.indexOf('const handleSubmitCanvasAssistantPrompt = useCallback')),
+    );
+
     expect(submitSource).toContain('submitAnnotationPromptViaApi({');
     expect(submitSource).toContain('scene: `canvas-${request.scene}-direct`,');
     expect(submitSource).toContain('agentRunConcurrency: preferences.agentRunConcurrency,');
-    expect(submitSource).not.toContain('forceNewThread: true,');
-    expect(submitSource).not.toContain('forceNewAssistantThread');
+    expect(submitSource.indexOf('if (shouldOpenStartGuideConversation) {'))
+      .toBeLessThan(submitSource.indexOf('const result = await submitAnnotationPromptViaApi({'));
   });
 
   it('submits annotation prompts with the configured annotation provider and model', () => {
@@ -642,8 +666,9 @@ describe('IndexPage source', () => {
   it('keeps the desktop preview workspace available in narrow desktop browser panes', () => {
     const styles = readFileSync(resolve(__dirname, './styles/index-page.css'), 'utf8');
 
-    expect(styles).toContain('@media (max-width: 640px)');
-    expect(styles).toContain('@media (min-width: 641px)');
+    expect(styles).toContain('@media (max-width: 640px) and (hover: none) and (pointer: coarse)');
+    expect(styles).not.toContain('@media (max-width: 640px) {');
+    expect(styles).not.toContain('@media (min-width: 641px)');
     expect(styles).not.toContain('@media (max-width: 768px)');
     expect(styles).not.toContain('@media (min-width: 769px)');
   });
@@ -1020,7 +1045,7 @@ describe('IndexPage source', () => {
     expect(presentationBuilderCall).not.toContain('getAssistantArtifacts');
   });
 
-  it('blocks the global assistant sidebar while a prototype start page is active', () => {
+  it('keeps the global assistant sidebar available while a start page is active', () => {
     const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
     const startStateSource = source.slice(
       source.indexOf('const prototypePlaceholderActive = contentMode ==='),
@@ -1040,18 +1065,19 @@ describe('IndexPage source', () => {
     );
 
     expect(startStateSource).toContain('const prototypeStartPageActive = prototypeStartDraftActive || prototypePlaceholderActive;');
-    expect(startStateSource).toContain('const startPageActive = prototypeStartPageActive || resourceStartDraftActive || themeStartDraftActive;');
     expect(sidebarBuilderCall).toContain('prototypeStartPageActive,');
-    expect(sidebarBuilderCall).toContain('webAgentPanelOpen: startPageActive ? false : assistantController.assistantVisible,');
-    expect(sidebarBuilderCall).toContain('aiPanelMode: startPageActive ? null : assistantController.aiPanelMode,');
-    expect(sidebarBuilderCall).toContain('handleOpenAcpWebAgent: startPageActive ? undefined : handleOpenAcpWebAgent,');
-    expect(sidebarBuilderCall).toContain('handleOpenImageAiPanel: startPageActive ? undefined : handleOpenImageAiPanel,');
-    expect(presentationBuilderCall).toContain('assistantVisible: startPageActive ? false : assistantController.assistantVisible,');
-    expect(presentationBuilderCall).toContain('webAgentPanelOpen: startPageActive ? false : assistantController.assistantVisible,');
-    expect(presentationBuilderCall).toContain('aiPanelMode: startPageActive ? null : assistantController.aiPanelMode,');
-    expect(presentationBuilderCall).toContain('handleToggleAssistant: startPageActive ? () => undefined : handleToggleAssistantPanel,');
-    expect(assistantPanelPropsSource).toContain('mounted: startPageActive ? false : assistantController.assistantPanelMounted,');
-    expect(assistantPanelPropsSource).toContain('visible: startPageActive ? false : assistantController.assistantVisible,');
+    expect(sidebarBuilderCall).toContain('webAgentPanelOpen: assistantController.assistantVisible,');
+    expect(sidebarBuilderCall).toContain('aiPanelMode: assistantController.aiPanelMode,');
+    expect(sidebarBuilderCall).toContain('handleOpenAcpWebAgent,');
+    expect(sidebarBuilderCall).toContain('handleOpenImageAiPanel,');
+    expect(presentationBuilderCall).toContain('assistantVisible: assistantController.assistantVisible,');
+    expect(presentationBuilderCall).toContain('webAgentPanelOpen: assistantController.assistantVisible,');
+    expect(presentationBuilderCall).toContain('aiPanelMode: assistantController.aiPanelMode,');
+    expect(presentationBuilderCall).toContain('handleToggleAssistant: handleToggleAssistantPanel,');
+    expect(assistantPanelPropsSource).toContain('mounted: assistantController.assistantPanelMounted,');
+    expect(assistantPanelPropsSource).toContain('visible: assistantController.assistantVisible,');
+    expect(source).not.toContain('startPageActive ? false : assistantController');
+    expect(source).not.toContain('startPageActive ? undefined : handleOpen');
   });
 
   it('clears the selected resource folder before opening a folder preview item', () => {
@@ -1072,5 +1098,33 @@ describe('IndexPage source', () => {
     expect(source).toContain("formData.append('projectId', requireProjectScope(workspace.activeProjectId).projectId);");
     expect(source).toContain('activeProjectId: workspace.activeProjectId || \'\',');
     expect(source).toContain('settingsDialogProjectId: workspace.activeProjectId || \'\',');
+  });
+
+  it('creates one host-owned notification coordinator and passes it to preview actions', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+
+    expect(source).toContain('const notificationPlayerRef = useRef<NotificationPlayer | null>(null);');
+    expect(source).toContain('createNotificationCoordinator({');
+    expect(source).toContain('player: notificationPlayerRef.current,');
+    expect(source).toContain('const notificationCoordinatorRef = useRef<NotificationCoordinator | null>(null);');
+    expect(source).toContain('const notifyAiNotification = useCallback((intent: NotificationIntent) => {');
+    expect(source).toContain('onAiNotification: notifyAiNotification,');
+  });
+
+  it('primes host notification audio from the first user gesture', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+
+    expect(source).toContain('const primeNotificationAudio = () => {');
+    expect(source).toContain('notificationPlayerRef.current?.prime?.();');
+    expect(source).toContain("window.addEventListener('pointerdown', primeNotificationAudio, { capture: true, once: true });");
+    expect(source).toContain("window.addEventListener('keydown', primeNotificationAudio, { capture: true, once: true });");
+  });
+
+  it('exposes the host notification diagnostics API only through the development installer', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+
+    expect(source).toContain('installNotificationDebugApi');
+    expect(source).toContain('diagnostics: notificationDiagnostics,');
+    expect(source).toContain('player: notificationPlayerRef.current!,');
   });
 });

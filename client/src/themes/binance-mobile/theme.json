@@ -1,0 +1,301 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/finance/binance/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-binance-mobile",
+    "slug": "binance-mobile",
+    "brand": "Binance",
+    "titleZh": "Binance 主题",
+    "titleEn": "Binance",
+    "descriptionZh": "Binance 的 Design.md 主题展示，围绕移动端、金融与支付组织页面。",
+    "descriptionEn": "Binance mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "金融与支付"
+    ],
+    "distributionTags": [
+      "移动端",
+      "金融与支付"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/binance-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/gb/app/binance-buy-bitcoin-crypto/id1436799971",
+          "officialPageUrl": "https://apps.apple.com/gb/app/binance-buy-bitcoin-crypto/id1436799971",
+          "marketId": "1436799971",
+          "storefront": "gb",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/9d/b3/8b/9db38b12-e92b-a24b-7c0c-8ba9a8f9b295/1242_2688.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:18:05.484Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "a12b85b9c48c580ea485f715e1a32dddcbebee1769f1425136e36ab034231e2e",
+          "byteLength": 26152,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/gb/app/binance-buy-bitcoin-crypto/id1436799971",
+          "officialPageUrl": "https://apps.apple.com/gb/app/binance-buy-bitcoin-crypto/id1436799971",
+          "marketId": "1436799971",
+          "storefront": "gb",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource211/v4/64/39/03/64390320-5ab7-ef35-5732-d438db84c7e4/1242_2688-1.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:18:05.484Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "afab6c8305dc99a9ef688ac935c4694ba261f187976ef52f7eedc88605af579d",
+          "byteLength": 25372,
+          "width": 720,
+          "height": 1558
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/gb/app/binance-buy-bitcoin-crypto/id1436799971",
+          "officialPageUrl": "https://apps.apple.com/gb/app/binance-buy-bitcoin-crypto/id1436799971",
+          "marketId": "1436799971",
+          "storefront": "gb",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/31/ab/c8/31abc8b1-4f77-e3df-1a5e-d836e9bf9f43/1242_2688-4.jpg/720x1558bb.webp",
+          "collectedAt": "2026-07-27T19:18:05.484Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "ac219527307e1b441e466d945d6fa7079db5d3189961e9657ee22b0ae5443ef9",
+          "byteLength": 36102,
+          "width": 720,
+          "height": 1558
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#F0B90B",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "IBM Plex Sans",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "IBM Plex Sans",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Binance 主题",
+    "brandAlias": "Binance",
+    "description": "Binance 的 Design.md 主题展示，围绕移动端、金融与支付组织页面。",
+    "descriptionEn": "Binance mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "金融与支付"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=IBM%20Plex%20Sans:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#F0B90B",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#171717"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#2B3139",
+        "cssValue": "#2B3139",
+        "description": "Binance's iOS app is a dark, dense, data-first trading terminal compressed into a phone. The default and dominant experience is dark mode: a near-black canvas (`#0B0E11`) onto which thousands of live numbers stream — prices, percentages, order books, candlesticks, P&L. The atmosphere is \"professional exchange, not consumer wallet.\" Where Coinbase rounds its corners and pads generously to feel friendly, Binance tightens everything: 12pt row paddings, hairline `#2B3139` dividers, and tabular monospace figures so that a markets list shows ten pairs without scrolling. The screen should feel like a Bloomberg terminal that happens to fit in a hand — information density is a feature, not a flaw."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#EAECEF",
+        "cssValue": "#EAECEF",
+        "description": "Divider Light (`#EAECEF`): Hairline dividers."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#F6465D",
+        "cssValue": "#F6465D",
+        "description": "The single brand accent is Binance Yellow (`#F0B90B`) — a saturated amber-gold that appears on the logo, the primary \"Convert\"/\"Deposit\" CTA, the active tab, selected market-tab underlines, and links. It is used sparingly and deliberately: yellow means \"this is the Binance action.\" Everything else is carried by semantic market color: green (`#0ECB81`) for up / buy / bids, red (`#F6465D`) for down / sell / asks. These two colors are absolute and never invert between themes — green is always up, red is always down, because a trader's muscle memory depends on it. The candlestick chart uses the same green/red for bullish/bearish candles."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#F0B90B",
+        "cssValue": "#F0B90B",
+        "description": "The single brand accent is Binance Yellow (`#F0B90B`) — a saturated amber-gold that appears on the logo, the primary \"Convert\"/\"Deposit\" CTA, the active tab, selected market-tab underlines, and links. It is used sparingly and deliberately: yellow means \"this is the Binance action.\" Everything else is carried by semantic market color: green (`#0ECB81`) for up / buy / bids, red (`#F6465D`) for down / sell / asks. These two colors are absolute and never invert between themes — green is always up, red is always down, because a trader's muscle memory depends on it. The candlestick chart uses the same green/red for bullish/bearish candles."
+      },
+      {
+        "label": "边框 5 - Border 5",
+        "value": "#0B0E11",
+        "cssValue": "#0B0E11",
+        "description": "Binance's iOS app is a dark, dense, data-first trading terminal compressed into a phone. The default and dominant experience is dark mode: a near-black canvas (`#0B0E11`) onto which thousands of live numbers stream — prices, percentages, order books, candlesticks, P&L. The atmosphere is \"professional exchange, not consumer wallet.\" Where Coinbase rounds its corners and pads generously to feel friendly, Binance tightens everything: 12pt row paddings, hairline `#2B3139` dividers, and tabular monospace figures so that a markets list shows ten pairs without scrolling. The screen should feel like a Bloomberg terminal that happens to fit in a hand — information density is a feature, not a flaw."
+      },
+      {
+        "label": "边框 6 - Border 6",
+        "value": "#1E2026",
+        "cssValue": "#1E2026",
+        "description": "Surface 2 (`#1E2026`): Elevated rows, search field, segmented controls, input fields."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "IBM Plex Sans",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use the deep canvas {#0B0E11} as the default — Binance is dark-native。",
+        "建议：Make Binance Yellow {#F0B90B} the *only* brand accent (CTA, active tab, links)。",
+        "建议：Set ALL numbers in monospace with tabular figures so columns align。",
+        "建议：Keep green {#0ECB81} = up/buy and red {#F6465D} = sell/down — absolute, never inverted。",
+        "建议：Use dense 12pt row padding and 1pt {#2B3139} hairline dividers in lists。"
+      ],
+      "dont": [
+        "避免：use white or any color other than {#F0B90B} for the primary CTA。",
+        "避免：render prices/percentages in a proportional sans — alignment breaks。",
+        "避免：invert up/down colors in light mode (green stays up, red stays down)。",
+        "避免：pad rows generously \"to feel friendly\" — density is the Binance identity。",
+        "避免：put white text on the yellow button (fails contrast and is off-brand)。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "finance",
+      "navigation": [
+        "资产",
+        "交易",
+        "我的"
+      ],
+      "primaryAction": "转账"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}

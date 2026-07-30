@@ -28,25 +28,25 @@ export function stripMarkdownPreviewFrontmatter(content: string): string {
 }
 
 const PROTOTYPE_SPEC_CONTENT_PATH_RE = /^\/api\/projects\/[^/]+\/prototypes\/[^/]+\/spec\/content$/u;
+const PROJECT_RESOURCE_DOC_CONTENT_PATH_RE = /^\/api\/projects\/[^/]+\/docs\/(.+)\/content$/u;
+const PROJECT_DOCUMENT_CONTENT_PATH_RE = /^\/api\/projects\/[^/]+\/document-content$/u;
 
-export function resolvePrototypeSpecDocumentLink(href: string, documentUrl: string): string | null {
-  const rawHref = String(href || '').trim();
-  if (!rawHref || rawHref.startsWith('#') || rawHref.startsWith('/') || /^[a-z][a-z0-9+.-]*:/iu.test(rawHref)) {
-    return null;
-  }
-  let currentUrl: URL;
+export type MarkdownDocumentLinkTarget = {
+  kind: 'prototype-spec' | 'doc' | 'project-doc';
+  resourceId: string;
+};
+
+function resolveRelativeDocumentPath(currentPath: string, rawHref: string): string | null {
+  const rawHrefPath = rawHref.split('#', 1)[0].split('?', 1)[0].replace(/\\/gu, '/');
+  let hrefPath = '';
   try {
-    currentUrl = new URL(documentUrl, 'http://axhub.local');
+    hrefPath = decodeURIComponent(rawHrefPath);
   } catch {
     return null;
   }
-  if (!PROTOTYPE_SPEC_CONTENT_PATH_RE.test(currentUrl.pathname)) return null;
-  const currentPath = String(currentUrl.searchParams.get('path') || '').trim().replace(/\\/gu, '/');
-  if (!currentPath) return null;
+  if (!hrefPath) return null;
 
-  const hrefPath = rawHref.split('#', 1)[0].split('?', 1)[0].replace(/\\/gu, '/');
-  if (!/\.(?:html?|md)$/iu.test(hrefPath)) return null;
-  const baseSegments = currentPath.split('/').filter(Boolean).slice(0, -1);
+  const baseSegments = currentPath.replace(/\\/gu, '/').split('/').filter(Boolean).slice(0, -1);
   for (const segment of hrefPath.split('/')) {
     if (!segment || segment === '.') continue;
     if (segment === '..') {
@@ -57,6 +57,56 @@ export function resolvePrototypeSpecDocumentLink(href: string, documentUrl: stri
     baseSegments.push(segment);
   }
   return baseSegments.length > 0 ? baseSegments.join('/') : null;
+}
+
+export function resolveMarkdownDocumentLinkTarget(
+  href: string,
+  documentUrl: string,
+): MarkdownDocumentLinkTarget | null {
+  const rawHref = String(href || '').trim();
+  if (!rawHref || rawHref.startsWith('#') || rawHref.startsWith('/') || /^[a-z][a-z0-9+.-]*:/iu.test(rawHref)) {
+    return null;
+  }
+  let currentUrl: URL;
+  try {
+    currentUrl = new URL(documentUrl, 'http://axhub.local');
+  } catch {
+    return null;
+  }
+
+  const projectDocumentPath = String(currentUrl.searchParams.get('path') || '').trim().replace(/\\/gu, '/');
+  if (PROTOTYPE_SPEC_CONTENT_PATH_RE.test(currentUrl.pathname)) {
+    const resourceId = resolveRelativeDocumentPath(projectDocumentPath, rawHref);
+    return resourceId && /\.(?:html?|md)$/iu.test(resourceId)
+      ? { kind: 'prototype-spec', resourceId }
+      : null;
+  }
+
+  const resourceMatch = currentUrl.pathname.match(PROJECT_RESOURCE_DOC_CONTENT_PATH_RE);
+  if (resourceMatch) {
+    let currentResourceId = '';
+    try {
+      currentResourceId = decodeURIComponent(resourceMatch[1] || '');
+    } catch {
+      return null;
+    }
+    const resourceId = resolveRelativeDocumentPath(currentResourceId, rawHref);
+    return resourceId ? { kind: 'doc', resourceId } : null;
+  }
+
+  if (PROJECT_DOCUMENT_CONTENT_PATH_RE.test(currentUrl.pathname)) {
+    const resourceId = resolveRelativeDocumentPath(projectDocumentPath, rawHref);
+    return resourceId && /\.mdx?$/iu.test(resourceId)
+      ? { kind: 'project-doc', resourceId }
+      : null;
+  }
+
+  return null;
+}
+
+export function resolvePrototypeSpecDocumentLink(href: string, documentUrl: string): string | null {
+  const target = resolveMarkdownDocumentLinkTarget(href, documentUrl);
+  return target?.kind === 'prototype-spec' ? target.resourceId : null;
 }
 
 export function resolvePrototypeSpecResourceUrl(value: string, documentUrl: string): string | null {

@@ -61,10 +61,11 @@ describe('Kami theme resource entry structure', () => {
     expect(styleSource).toContain('font-family');
 
     const designSource = readThemeFile('DESIGN.md');
-    expect(designSource).toContain('src/themes/<theme-key>/components/');
-    expect(designSource).toContain('src/themes/<theme-key>/templates/');
-    expect(designSource).toContain('每个组件一个前端文件');
-    expect(designSource).toContain('每个模板一个前端文件');
+    expect(designSource).toContain('**Observed — local source paths:** `index.tsx`, `style.css`, `components/*.tsx`, `templates/*.tsx`');
+    expect(designSource).toContain('This is one responsive React/Web theme, not a mobile-theme fork.');
+    for (const section of ['## Colors', '## Typography', '## Components', '## Layout', '## Responsive', "## Do's and Don'ts", '## Known Gaps']) {
+      expect(designSource).toContain(section);
+    }
 
     const metadata = buildMakeProjectMetadata(appRoot, {
       clientOrigin: 'http://localhost:51720',

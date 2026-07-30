@@ -7,7 +7,6 @@ import type {
   CommentaryHostToolbarAction,
   CommentaryHostToolbarActionResult,
   CommentarySkillOption,
-  CommentarySkillSettingsSnapshot,
   WebEditorRevertElementResponse,
   CommentaryState,
   CommentaryToolbarMode,
@@ -64,6 +63,8 @@ export interface WebEditorV2UiOptions {
   }>;
   /** Show host-managed direct-save actions for a resolved local HTML file. */
   htmlFileSaveEnabled?: boolean;
+  /** Whether page-editing settings are relevant to the current host surface. */
+  pageEditingSettingsAvailable?: boolean;
   /** Read whether the host's ACP UI service is currently connected. */
   getAcpUiConnected?: () => boolean;
   getAssistantPanelOpen?: () => boolean;
@@ -74,19 +75,17 @@ export interface WebEditorV2UiOptions {
   getAnnotationEnabled?: () => boolean;
   getAnnotationEnableAvailable?: () => boolean;
   getAnnotationEnableLoading?: () => boolean;
+  /** Show a host-managed Markdown source pane beside the document body. */
+  markdownSourceEditorAvailable?: boolean;
+  /** Read whether the Markdown source pane is currently visible. */
+  getMarkdownSourceEditorOpen?: () => boolean;
+  /** Show or hide the Markdown source pane, returning the resulting state. */
+  onMarkdownSourceEditorOpenChange?: (open: boolean) => boolean | Promise<boolean>;
   externalEditingStatusDescription?: string;
   skillInstallSource?: string;
   commentarySkillOptions?: CommentarySkillOption[];
   commentarySelectedSkillIds?: string[];
   commentarySkillSettingsConfigured?: boolean;
-  onCommentarySkillSelectionLoad?: () => readonly string[] | Promise<readonly string[]>;
-  onCommentarySkillSelectionChange?: (skillIds: string[]) => void | Promise<void>;
-  onCommentarySkillSettingsLoad?: () =>
-    | CommentarySkillSettingsSnapshot
-    | Promise<CommentarySkillSettingsSnapshot>;
-  onCommentarySkillSettingsChange?: (
-    settings: CommentarySkillSettingsSnapshot,
-  ) => CommentarySkillSettingsSnapshot | void | Promise<CommentarySkillSettingsSnapshot | void>;
   onRequestFullExit?: () => void | Promise<void>;
 }
 export type CommentaryUiOptions = WebEditorV2UiOptions;
@@ -142,16 +141,8 @@ export interface WebEditorV2InitOptions {
 export type CommentaryInitOptions = WebEditorV2InitOptions;
 
 export interface ResolvedWebEditorOptions {
-  ui: Required<
-    Omit<
-      WebEditorV2UiOptions,
-      'onCommentarySkillSettingsLoad' | 'onCommentarySkillSettingsChange' | 'getAcpUiConnected'
-    >
-  > &
-    Pick<
-      WebEditorV2UiOptions,
-      'onCommentarySkillSettingsLoad' | 'onCommentarySkillSettingsChange' | 'getAcpUiConnected'
-    >;
+  ui: Required<Omit<WebEditorV2UiOptions, 'getAcpUiConnected'>> &
+    Pick<WebEditorV2UiOptions, 'getAcpUiConnected'>;
   host: Required<Pick<CommentaryHostOptions, 'getResourceContext'>> &
     Pick<
       CommentaryHostOptions,
@@ -164,6 +155,8 @@ export interface ResolvedWebEditorOptions {
       | 'conversationTaskTransport'
       | 'commentPersistenceMode'
       | 'canEditAnnotationMarkdown'
+      | 'getCreateAnnotationBlockReason'
+      | 'annotationMarkdownEditorKind'
       | 'getAnnotationDocumentEditUrl'
       | 'getAnnotationMarkdown'
       | 'onAnnotationMarkdownChange'
@@ -410,6 +403,7 @@ export function resolveWebEditorOptions(
       aiExecutionRunConcurrency: 5,
       aiExecutionProviderOptions: [],
       htmlFileSaveEnabled: false,
+      pageEditingSettingsAvailable: true,
       getAcpUiConnected: undefined,
       getAssistantPanelOpen: () => false,
       onHostToolbarAction: async () => false,
@@ -417,13 +411,14 @@ export function resolveWebEditorOptions(
       getAnnotationEnabled: () => false,
       getAnnotationEnableAvailable: () => false,
       getAnnotationEnableLoading: () => false,
+      markdownSourceEditorAvailable: false,
+      getMarkdownSourceEditorOpen: () => false,
+      onMarkdownSourceEditorOpenChange: async () => false,
       externalEditingStatusDescription: '',
       skillInstallSource: '',
       commentarySkillOptions: [],
       commentarySelectedSkillIds: [],
       commentarySkillSettingsConfigured: false,
-      onCommentarySkillSelectionLoad: async () => [],
-      onCommentarySkillSelectionChange: async () => undefined,
       onRequestFullExit: async () => undefined,
       ...(options.ui ?? {}),
     },
@@ -438,6 +433,8 @@ export function resolveWebEditorOptions(
       conversationTaskTransport: options.host?.conversationTaskTransport ?? undefined,
       commentPersistenceMode: options.host?.commentPersistenceMode ?? 'local',
       canEditAnnotationMarkdown: options.host?.canEditAnnotationMarkdown ?? undefined,
+      getCreateAnnotationBlockReason: options.host?.getCreateAnnotationBlockReason ?? undefined,
+      annotationMarkdownEditorKind: options.host?.annotationMarkdownEditorKind ?? 'annotation',
       getAnnotationDocumentEditUrl: options.host?.getAnnotationDocumentEditUrl ?? undefined,
       getAnnotationMarkdown: options.host?.getAnnotationMarkdown ?? undefined,
       onAnnotationMarkdownChange: options.host?.onAnnotationMarkdownChange ?? undefined,

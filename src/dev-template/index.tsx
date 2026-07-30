@@ -21,6 +21,7 @@ import {
   createAppDialogController,
   setImperativeAppDialog,
 } from '../index/components/dialogs/AppDialogProvider';
+import type { CommentaryModifiedElementSummary } from '@/common/web-editor-types';
 
 let editorModeManager: ReturnType<typeof createEditorModeManager> | null = null;
 const devTemplateDialogController = createAppDialogController();
@@ -142,13 +143,16 @@ function ensureEmbedScrollbarHidingStyle() {
   document.head.appendChild(style);
 }
 
-function postPrototypeEditorState(payload: {
+type PrototypeEditorStatePayload = {
   requestId?: unknown;
   success: boolean;
   handled?: boolean;
   error?: string;
   promptText?: string;
-}) {
+  modifiedElements?: CommentaryModifiedElementSummary[];
+};
+
+function postPrototypeEditorState(payload: PrototypeEditorStatePayload) {
   if (typeof window === 'undefined') {
     return;
   }
@@ -164,6 +168,7 @@ function postPrototypeEditorState(payload: {
     ...(typeof payload.handled === 'boolean' ? { handled: payload.handled } : {}),
     ...(payload.error ? { error: payload.error } : {}),
     ...(payload.promptText ? { promptText: payload.promptText } : {}),
+    ...(payload.modifiedElements ? { modifiedElements: payload.modifiedElements } : {}),
   }, '*');
 }
 
@@ -446,19 +451,23 @@ if (typeof window !== 'undefined') {
         // and return the prompt text so the parent window can write to clipboard.
         if (action?.type === 'copy-prompt' && action?.clipboard === 'host') {
           const promptText = editorModeManager?.api.getCopyPromptText?.() ?? '';
+          const modifiedElements = editorModeManager?.api.getEditedSnapshot?.()?.modifiedElements ?? [];
           postPrototypeEditorState({
             requestId: event.data.requestId,
             success: true,
             handled: true,
             promptText: promptText || undefined,
+            modifiedElements,
           });
         } else if (action?.type === 'send-to-agent' && action?.elementKey) {
           const promptText = editorModeManager?.api.getElementPromptText?.(String(action.elementKey || '')) ?? '';
+          const modifiedElements = editorModeManager?.api.getEditedSnapshot?.()?.modifiedElements ?? [];
           postPrototypeEditorState({
             requestId: event.data.requestId,
             success: true,
             handled: Boolean(promptText),
             promptText: promptText || undefined,
+            modifiedElements,
           });
         } else {
           const handled = await Promise.resolve(editorModeManager?.api.runHostToolbarAction(action));

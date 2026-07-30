@@ -25,7 +25,11 @@ import { useIndexPagePresentationPropsBuilder } from './hooks/useIndexPagePresen
 import { useIndexPageSelectionSync } from './hooks/useIndexPageSelectionSync';
 import { useIndexPageSidebarPropsBuilder } from './hooks/useIndexPageSidebarPropsBuilder';
 import { useIndexPageUiBridge } from './hooks/useIndexPageUiBridge';
-import { usePrototypeSpecController } from './hooks/usePrototypeSpecController';
+import {
+    shouldClosePrototypeSpecAfterAnnotationAttempt,
+    usePrototypeSpecController,
+} from './hooks/usePrototypeSpecController';
+import { useDocumentResourceNavigation } from './hooks/useDocumentResourceNavigation';
 import { usePrototypeSpecNavigationGuard } from './hooks/usePrototypeSpecNavigationGuard';
 import { resolveIndexContentMode, type IndexContentMode } from './index-page/contentMode';
 import { buildIndexDeepLinkUrl, parseResourceDeepLink, shouldSyncIndexDeepLinkUrl, type ResourceDeepLinkTarget } from './index-page/resourceDeepLink';
@@ -57,6 +61,17 @@ import {
 } from '../domains/assistant/annotationDirectRun';
 import { buildAcpCanvasMcpServers } from '../domains/assistant/assistantAcpContext';
 import type { AssistantImageAttachmentPayload } from '../domains/assistant/assistantContextPayload';
+import {
+    createNotificationCoordinator,
+    type NotificationCoordinator,
+    type NotificationIntent,
+} from '../domains/notifications/notificationCoordinator';
+import {
+    installNotificationDebugApi,
+    notificationDiagnostics,
+} from '../domains/notifications/notificationDiagnostics';
+import { createNotificationPlayer, type NotificationPlayer } from '../domains/notifications/notificationPlayer';
+import { readNotificationSettings } from '../domains/notifications/notificationSettings';
 import './styles/index-page.css';
 
 interface AppInnerProps {
@@ -221,6 +236,35 @@ export default function IndexPage({
     const { appDialog, messageApi, modal } = useIndexPageUiBridge();
     const workspace = useWorkspaceNavigationController({ messageApi });
     const bridge = useAxhubBridge();
+    const notificationPlayerRef = useRef<NotificationPlayer | null>(null);
+    if (!notificationPlayerRef.current) {
+        notificationPlayerRef.current = createNotificationPlayer();
+    }
+    const notificationCoordinatorRef = useRef<NotificationCoordinator | null>(null);
+    if (!notificationCoordinatorRef.current) {
+        notificationCoordinatorRef.current = createNotificationCoordinator({
+            getSettings: readNotificationSettings,
+            player: notificationPlayerRef.current,
+        });
+    }
+    const notifyAiNotification = useCallback((intent: NotificationIntent) => {
+        void notificationCoordinatorRef.current?.notify(intent);
+    }, []);
+    useEffect(() => installNotificationDebugApi({
+        diagnostics: notificationDiagnostics,
+        player: notificationPlayerRef.current!,
+    }), []);
+    useEffect(() => {
+        const primeNotificationAudio = () => {
+            notificationPlayerRef.current?.prime?.();
+        };
+        window.addEventListener('pointerdown', primeNotificationAudio, { capture: true, once: true });
+        window.addEventListener('keydown', primeNotificationAudio, { capture: true, once: true });
+        return () => {
+            window.removeEventListener('pointerdown', primeNotificationAudio, { capture: true });
+            window.removeEventListener('keydown', primeNotificationAudio, { capture: true });
+        };
+    }, []);
 
     const [collapsed, setCollapsed] = useState(false);
     const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
@@ -555,6 +599,9 @@ export default function IndexPage({
         autoOpen: shouldAutoOpenInitialPrototypeSpec,
         onError: messageApi.error,
     });
+    const prototypeSpecAnnotationAttemptIdRef = useRef(0);
+    const currentPrototypeSpecItemRef = useRef(prototypeSpec.currentItem);
+    currentPrototypeSpecItemRef.current = prototypeSpec.currentItem;
     useEffect(() => {
         if (prototypeSpec.isOpen && sidebarTab !== 'prototype') prototypeSpec.close();
     }, [prototypeSpec.isOpen, prototypeSpec.close, sidebarTab]);
@@ -583,7 +630,6 @@ export default function IndexPage({
     const currentMarkdownLabel = currentMarkdownResource.kind === 'template' ? '模板' : '文档';
     const prototypePlaceholderActive = contentMode === 'preview' && viewMode === 'demo' && selectedItem?.placeholder === true;
     const prototypeStartPageActive = prototypeStartDraftActive || prototypePlaceholderActive;
-    const startPageActive = prototypeStartPageActive || resourceStartDraftActive || themeStartDraftActive;
     const prototypePlaceholderAutoCloseKey = prototypePlaceholderActive && selectedItem
         ? selectedItem.resourceId || selectedItem.name
         : '';
@@ -630,6 +676,7 @@ export default function IndexPage({
             failureSource: '右侧 ACP UI 助手面板',
             failureMessage: message,
         }),
+        onAiNotification: notifyAiNotification,
         activeProjectId: workspace.activeProjectId,
         activeTab,
         viewMode,
@@ -1027,6 +1074,7 @@ export default function IndexPage({
         connectAssistantRuntimeSilently: assistantController.connectAssistantRuntimeSilently,
         syncAssistantCanvasComments: assistantController.syncAssistantCanvasComments,
         clearAssistantSelectedElementsOnExit: assistantController.clearAssistantSelectedElementsOnExit,
+        onAiNotification: notifyAiNotification,
         onPrototypeRouteInfo: (routeInfo: PrototypeRouteInfo) => {
             if (!selectedItem) {
                 return;
@@ -1082,10 +1130,39 @@ export default function IndexPage({
         },
     });
 
+    useDocumentResourceNavigation({
+        enabled: contentMode === 'doc',
+        projectId: workspace.activeProjectId,
+        docs: workspace.docsItems,
+        getSourceWindow: () => preview.previewIframeRef.current?.contentWindow ?? null,
+        navigate: (item, nextViewMode) => {
+            setActiveTab('prototypes');
+            setSidebarTab('document');
+            resources.setSelectedResourceFolder(null);
+            resources.setSelectedDoc(item);
+            setViewMode(nextViewMode);
+        },
+    });
+
     const handlePrototypeSpecPreviewReady = useCallback(() => {
-        if (String(prototypeSpec.currentItem?.name || '').toLowerCase().endsWith('.md')) return;
-        preview.handleEnableDocEdit('comment', { disableSelectionMode: true, preserveSidebar: true });
-    }, [preview.handleEnableDocEdit, prototypeSpec.currentItem?.name]);
+        const attemptedItem = prototypeSpec.currentItem;
+        if (!attemptedItem || String(attemptedItem.name || '').toLowerCase().endsWith('.md')) return;
+        const attemptId = prototypeSpecAnnotationAttemptIdRef.current + 1;
+        prototypeSpecAnnotationAttemptIdRef.current = attemptId;
+        void (async () => {
+            const annotationEnabled = await preview.handleEnableDocEdit('comment', { disableSelectionMode: true, preserveSidebar: true });
+            if (!shouldClosePrototypeSpecAfterAnnotationAttempt({
+                enabled: annotationEnabled,
+                attemptedItem,
+                currentItem: currentPrototypeSpecItemRef.current,
+                attemptId,
+                latestAttemptId: prototypeSpecAnnotationAttemptIdRef.current,
+            })) {
+                return;
+            }
+            prototypeSpec.close();
+        })();
+    }, [preview.handleEnableDocEdit, prototypeSpec.close, prototypeSpec.currentItem]);
 
     const selection = useIndexPageSelectionSync({
         projectId: workspace.activeProjectId,
@@ -1754,6 +1831,23 @@ export default function IndexPage({
         const selectedProvider = resolveAcpPromptClientProvider(request.provider) || annotationProvider;
         const annotationModel = preferences.annotationModel || null;
         const canvasAssistantContext = buildCanvasAssistantContext(request);
+        const shouldOpenStartGuideConversation = request.source === 'resource-start'
+            || request.source === 'theme-start';
+        if (shouldOpenStartGuideConversation) {
+            const submitted = await handleSubmitAnnotationAssistantPrompt(
+                canvasAssistantContext,
+                prompt,
+                {
+                    forceNewThread: true,
+                    waitUntil: 'started',
+                    provider: selectedProvider,
+                    model: request.model ?? annotationModel,
+                    mode: request.mode,
+                    thought: request.thought,
+                },
+            );
+            return { ok: Boolean(submitted && (typeof submitted !== 'object' || submitted.ok !== false)) };
+        }
         const result = await submitAnnotationPromptViaApi({
             context: canvasAssistantContext,
             prompt,
@@ -1790,6 +1884,7 @@ export default function IndexPage({
         assistantController.assistantProjectPath,
         buildCanvasAssistantContext,
         ensureDefaultAiConfigured,
+        handleSubmitAnnotationAssistantPrompt,
         messageApi,
         preferences.annotationModel,
         preferences.annotationPromptClient,
@@ -2022,8 +2117,8 @@ export default function IndexPage({
             isDarkMode,
             sidebarTrees: workspace.sidebarTrees,
             prototypeStartPageActive,
-            webAgentPanelOpen: startPageActive ? false : assistantController.assistantVisible,
-            aiPanelMode: startPageActive ? null : assistantController.aiPanelMode,
+            webAgentPanelOpen: assistantController.assistantVisible,
+            aiPanelMode: assistantController.aiPanelMode,
             selectedDoc: resources.selectedDoc,
             selectedResourceFolder: resources.selectedResourceFolder,
             selectedCanvas: resources.selectedCanvas,
@@ -2060,8 +2155,8 @@ export default function IndexPage({
             handleCreateResourceStartDraft,
             handleCreateThemeStartDraft,
             handleOpenProjectInIDE: ideActions.handleOpenProjectInIDE,
-            handleOpenAcpWebAgent: startPageActive ? undefined : handleOpenAcpWebAgent,
-            handleOpenImageAiPanel: startPageActive ? undefined : handleOpenImageAiPanel,
+            handleOpenAcpWebAgent,
+            handleOpenImageAiPanel,
             handleOpenWebAgentInPanel: assistantController.openRawUrlInAssistantPanel,
             onExecutePrompt: handleExecutePromptAction,
             onCloseAiPanel: handleCloseAiPanel,
@@ -2090,7 +2185,7 @@ export default function IndexPage({
             themeStartDraftActive,
             viewMode,
             activeTab,
-            assistantVisible: startPageActive ? false : assistantController.assistantVisible,
+            assistantVisible: assistantController.assistantVisible,
             isDarkMode,
             contentMode,
             docsItems: workspace.docsItems,
@@ -2121,8 +2216,8 @@ export default function IndexPage({
             excalidrawPropertyPanelPosition,
             bridgeConnected: assistantController.assistantContextAppendAvailable,
             activeProjectId: workspace.activeProjectId,
-            webAgentPanelOpen: startPageActive ? false : assistantController.assistantVisible,
-            aiPanelMode: startPageActive ? null : assistantController.aiPanelMode,
+            webAgentPanelOpen: assistantController.assistantVisible,
+            aiPanelMode: assistantController.aiPanelMode,
             assistantApiBaseUrl: assistantController.assistantApiBaseUrl,
             assistantProjectPath: assistantController.assistantProjectPath,
             prototypes: workspace.data.prototypes,
@@ -2134,7 +2229,7 @@ export default function IndexPage({
             setCollapsed,
             setViewMode,
             handleEnterSelectedPrototypePreview,
-            handleToggleAssistant: startPageActive ? () => undefined : handleToggleAssistantPanel,
+            handleToggleAssistant: handleToggleAssistantPanel,
             handleStartCurrentProjectServer,
             handleCopyStartServerErrorPrompt,
             handleOpenIdeFile: ideActions.handleOpenIdeFile,
@@ -2161,8 +2256,8 @@ export default function IndexPage({
             onOpenCanvasInIDE: handleOpenCanvasInIDE,
             onOpenCanvasAgent: handleOpenCanvasAgent,
             handleOpenProjectInIDE: ideActions.handleOpenProjectInIDE,
-            onOpenAcpWebAgent: startPageActive ? undefined : handleOpenAcpWebAgent,
-            onOpenImageAiPanel: startPageActive ? undefined : handleOpenImageAiPanel,
+            onOpenAcpWebAgent: handleOpenAcpWebAgent,
+            onOpenImageAiPanel: handleOpenImageAiPanel,
             onOpenWebAgentInPanel: assistantController.openRawUrlInAssistantPanel,
             onExecutePrompt: handleExecutePromptAction,
             onCloseAiPanel: handleCloseAiPanel,
@@ -2193,8 +2288,8 @@ export default function IndexPage({
     };
 
     const assistantPanelProps = {
-        mounted: startPageActive ? false : assistantController.assistantPanelMounted,
-        visible: startPageActive ? false : assistantController.assistantVisible,
+        mounted: assistantController.assistantPanelMounted,
+        visible: assistantController.assistantVisible,
         width: assistantController.assistantPanelWidth,
         minWidth: assistantController.assistantPanelMinWidth,
         maxWidth: assistantController.assistantPanelMaxWidth,

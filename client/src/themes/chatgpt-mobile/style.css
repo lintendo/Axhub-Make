@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+.dmb-page.chatgpt-theme {
+  color-scheme: light;
+
+  --dmb-bg: #FFFFFF;
+  --dmb-surface: #FFFFFF;
+  --dmb-accent: #0D0D0D;
+  --dmb-accent-contrast: #FFFFFF;
+  --dmb-link: #2A7FFF;
+  --dmb-muted: #F7F7F8;
+  --dmb-ink: #0D0D0D;
+  --dmb-ink-muted: #676767;
+  --dmb-ink-subtle: #8E8E8E;
+  --dmb-border: #E5E5E5;
+  --dmb-border-sample-bg: #FFFFFF;
+
+  --dmb-tab-bg: #F9F9F9;
+  --dmb-tab-border: #E5E5E5;
+  --dmb-tab-color: #676767;
+  --dmb-tab-active-bg: #0D0D0D;
+  --dmb-tab-active-border: #0D0D0D;
+  --dmb-tab-active-color: #FFFFFF;
+
+  --dmb-radius-xs: 4px;
+  --dmb-radius-control: 8px;
+  --dmb-radius-card: 18px;
+  --dmb-radius-preview: 24px;
+  --dmb-radius-pill: 500px;
+
+  --dmb-spacing-xs: 4px;
+  --dmb-spacing-sm: 8px;
+  --dmb-spacing-md: 12px;
+  --dmb-spacing-lg: 16px;
+  --dmb-spacing-xl: 20px;
+  --dmb-spacing-2xl: 24px;
+  --dmb-spacing-3xl: 32px;
+  --dmb-spacing-4xl: 40px;
+  --dmb-spacing-5xl: 56px;
+  --dmb-spacing-6xl: 72px;
+
+  --dmb-font-display: "Söhne", -apple-system, BlinkMacSystemFont, Inter, "Segoe UI", Helvetica, Arial, sans-serif;
+  --dmb-font-body: "Söhne", -apple-system, BlinkMacSystemFont, Inter, "Segoe UI", Helvetica, Arial, sans-serif;
+  --dmb-font-mono: Menlo, "SF Mono", "IBM Plex Mono", monospace;
+}
+
+.dmb-page.chatgpt-theme .dmb-token-grid button,
+.dmb-page.chatgpt-theme .dmb-component-strip button {
+  border-color: #0D0D0D;
+  background: #0D0D0D;
+  color: #FFFFFF;
+}
+
+.dmb-page.chatgpt-theme .dmb-token-grid .dmb-text-button {
+  border-color: #E5E5E5;
+  background: #F7F7F8;
+  color: #0D0D0D;
+}
+
+.dmb-page.chatgpt-theme .dmb-outline-button {
+  border-color: #E5E5E5 !important;
+  background: transparent !important;
+  color: #0D0D0D !important;
+}
+
+.dmb-page.chatgpt-theme .dmb-token-grid input {
+  border-color: #E5E5E5;
+  border-radius: 24px;
+  background: #FFFFFF;
+  color: #0D0D0D;
+  caret-color: #0D0D0D;
+}
+
+.dmb-page.chatgpt-theme .dmb-token-card,
+.dmb-page.chatgpt-theme .dmb-type-list article,
+.dmb-page.chatgpt-theme .dmb-component-strip,
+.dmb-page.chatgpt-theme .dmb-component-grid,
+.dmb-page.chatgpt-theme .dmb-spacing-scale,
+.dmb-page.chatgpt-theme .dmb-radius-grid article,
+.dmb-page.chatgpt-theme .dmb-shadow-grid article,
+.dmb-page.chatgpt-theme .dmb-border-grid article,
+.dmb-page.chatgpt-theme .dmb-component-grid article,
+.dmb-page.chatgpt-theme .dmb-mobile-screenshot {
+  border-color: #E5E5E5;
+  background: #FFFFFF;
+  box-shadow: none;
+}
+
+.dmb-page.chatgpt-theme .dmb-tags span,
+.dmb-page.chatgpt-theme .dmb-muted {
+  border-color: #E5E5E5;
+  background: #FFFFFF;
+  color: #676767;
+}
+
+.dmb-page.chatgpt-theme .dmb-do {
+  border-color: #E5E5E5;
+  background: #F7F7F8;
+  color: #0D0D0D;
+}
+
+.dmb-page.chatgpt-theme .dmb-dont {
+  border-color: color-mix(in srgb, #E53E3E 32%, transparent);
+  background: color-mix(in srgb, #E53E3E 6%, #FFFFFF);
+  color: #E53E3E;
+}
+
+.dmb-page.chatgpt-theme .dmb-lightbox > button {
+  border-radius: 500px;
+  background: #0D0D0D;
+}

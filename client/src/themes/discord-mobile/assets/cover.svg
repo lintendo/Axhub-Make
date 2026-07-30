@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="960" viewBox="0 0 1440 960" role="img" aria-label="Discord dark community theme token preview">
+  <defs>
+    <linearGradient id="nitro" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5865F2"/>
+      <stop offset="1" stop-color="#EB459E"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1440" height="960" fill="#313338"/>
+  <rect width="20" height="960" fill="#5865F2"/>
+
+  <g font-family="gg sans, -apple-system, BlinkMacSystemFont, SF Pro Text, Helvetica Neue, Arial, sans-serif">
+    <text x="88" y="102" fill="#949BA4" font-size="18" font-weight="700" letter-spacing="2.2">DARK COMMUNITY SYSTEM</text>
+    <text x="88" y="226" fill="#F2F3F5" font-size="92" font-weight="700" letter-spacing="-2">Discord</text>
+    <text x="88" y="282" fill="#B5BAC1" font-size="25">Three sibling grays. One load-bearing Blurple.</text>
+
+    <g transform="translate(88 354)">
+      <rect width="180" height="126" rx="12" fill="#5865F2"/>
+      <text x="18" y="31" fill="#FFFFFF" font-size="14" font-weight="700">BLURPLE</text>
+      <text x="18" y="99" fill="#FFFFFF" font-size="29" font-weight="700">#5865F2</text>
+    </g>
+    <g transform="translate(284 354)">
+      <rect width="180" height="126" rx="12" fill="#1E1F22" stroke="#3F4147"/>
+      <text x="18" y="31" fill="#B5BAC1" font-size="14" font-weight="700">SERVER RAIL</text>
+      <text x="18" y="99" fill="#F2F3F5" font-size="29" font-weight="700">#1E1F22</text>
+    </g>
+    <g transform="translate(480 354)">
+      <rect width="180" height="126" rx="12" fill="#2B2D31" stroke="#3F4147"/>
+      <text x="18" y="31" fill="#B5BAC1" font-size="14" font-weight="700">CHANNELS</text>
+      <text x="18" y="99" fill="#F2F3F5" font-size="29" font-weight="700">#2B2D31</text>
+    </g>
+
+    <g transform="translate(88 548)">
+      <text x="0" y="0" fill="#F2F3F5" font-size="42" font-weight="700">gg sans</text>
+      <text x="0" y="42" fill="#949BA4" font-size="17">400 / 500 / 600 / 700 · compact chat rhythm</text>
+      <rect x="0" y="88" width="210" height="48" rx="8" fill="#5865F2"/>
+      <text x="105" y="118" fill="#FFFFFF" text-anchor="middle" font-size="15" font-weight="600">Join community</text>
+      <rect x="226" y="88" width="176" height="48" rx="8" fill="#4E5058"/>
+      <text x="314" y="118" fill="#FFFFFF" text-anchor="middle" font-size="15" font-weight="500">Maybe later</text>
+      <circle cx="24" cy="192" r="9" fill="#23A55A"/>
+      <circle cx="58" cy="192" r="9" fill="#F0B232"/>
+      <circle cx="92" cy="192" r="9" fill="#F23F43"/>
+      <text x="124" y="198" fill="#B5BAC1" font-size="15">presence is always visible</text>
+    </g>
+
+    <g transform="translate(790 64)">
+      <rect width="548" height="832" rx="48" fill="#1E1F22" stroke="#3F4147" stroke-width="2"/>
+      <rect x="16" y="16" width="516" height="800" rx="36" fill="#313338"/>
+
+      <rect x="16" y="16" width="86" height="800" rx="36" fill="#1E1F22"/>
+      <rect x="102" y="16" width="178" height="800" fill="#2B2D31"/>
+
+      <rect x="16" y="43" width="4" height="40" rx="2" fill="#F2F3F5"/>
+      <rect x="34" y="38" width="50" height="50" rx="12" fill="#5865F2"/>
+      <text x="59" y="70" fill="#FFFFFF" text-anchor="middle" font-size="18" font-weight="700">AX</text>
+      <circle cx="59" cy="126" r="25" fill="url(#nitro)"/>
+      <rect x="34" y="166" width="50" height="50" rx="16" fill="#383A40"/>
+      <text x="59" y="197" fill="#F2F3F5" text-anchor="middle" font-size="16" font-weight="700">UI</text>
+      <circle cx="59" cy="254" r="25" fill="#383A40"/>
+      <text x="59" y="262" fill="#23A55A" text-anchor="middle" font-size="30">+</text>
+
+      <text x="122" y="66" fill="#F2F3F5" font-size="17" font-weight="700">Axhub Club</text>
+      <line x1="102" y1="88" x2="280" y2="88" stroke="#3F4147"/>
+      <text x="122" y="128" fill="#949BA4" font-size="12" font-weight="700" letter-spacing="1">TEXT CHANNELS</text>
+      <rect x="114" y="144" width="154" height="38" rx="8" fill="#404249"/>
+      <rect x="114" y="144" width="3" height="38" rx="2" fill="#5865F2"/>
+      <text x="128" y="169" fill="#F2F3F5" font-size="16" font-weight="600"># general</text>
+      <text x="128" y="211" fill="#949BA4" font-size="16"># product</text>
+      <text x="128" y="250" fill="#949BA4" font-size="16"># design</text>
+      <text x="122" y="306" fill="#949BA4" font-size="12" font-weight="700" letter-spacing="1">VOICE CHANNELS</text>
+      <text x="128" y="345" fill="#B5BAC1" font-size="16">🔊 Lounge</text>
+      <circle cx="140" cy="380" r="13" fill="#5865F2"/>
+      <circle cx="150" cy="390" r="5" fill="#23A55A" stroke="#2B2D31" stroke-width="2"/>
+      <text x="163" y="386" fill="#B5BAC1" font-size="14">Mira</text>
+
+      <rect x="280" y="16" width="252" height="56" rx="0" fill="#1E1F22"/>
+      <text x="300" y="51" fill="#F2F3F5" font-size="18" font-weight="700"># general</text>
+      <line x1="280" y1="72" x2="532" y2="72" stroke="#3F4147"/>
+
+      <circle cx="312" cy="124" r="20" fill="url(#nitro)"/>
+      <circle cx="326" cy="139" r="6" fill="#23A55A" stroke="#313338" stroke-width="3"/>
+      <text x="344" y="116" fill="#EB459E" font-size="16" font-weight="600">Mira</text>
+      <text x="389" y="116" fill="#949BA4" font-size="11">Today at 9:41</text>
+      <text x="344" y="142" fill="#F2F3F5" font-size="15">The dark surfaces finally feel right.</text>
+
+      <circle cx="312" cy="208" r="20" fill="#5865F2"/>
+      <circle cx="326" cy="223" r="6" fill="#F0B232" stroke="#313338" stroke-width="3"/>
+      <text x="344" y="201" fill="#57F287" font-size="16" font-weight="600">Theo</text>
+      <text x="390" y="201" fill="#949BA4" font-size="11">Today at 9:42</text>
+      <text x="344" y="227" fill="#F2F3F5" font-size="15">Blurple is action, not decoration.</text>
+      <rect x="344" y="244" width="68" height="30" rx="15" fill="#3B4EAF" stroke="#5865F2"/>
+      <text x="378" y="264" fill="#F2F3F5" text-anchor="middle" font-size="14">🔥 12</text>
+
+      <rect x="298" y="716" width="216" height="52" rx="8" fill="#383A40"/>
+      <circle cx="322" cy="742" r="14" fill="#4E5058"/>
+      <text x="322" y="748" fill="#B5BAC1" text-anchor="middle" font-size="22">+</text>
+      <text x="346" y="748" fill="#949BA4" font-size="14">Message #general</text>
+      <circle cx="488" cy="742" r="16" fill="#5865F2"/>
+      <path d="M482 749l13-7l-13-7l3 7z" fill="#FFFFFF"/>
+    </g>
+  </g>
+</svg>

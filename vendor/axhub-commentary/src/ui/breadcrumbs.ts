@@ -56,12 +56,15 @@ export interface BreadcrumbsOptions {
   /** Optional host-owned actions shown for the selected element. */
   getElementTools?: (element: Element | null) => CommentaryElementTool[];
   /** Execute a host-owned action for the selected element. */
-  onElementToolAction?: (
-    tool: CommentaryElementTool,
-    element: Element,
-  ) => void | Promise<void>;
+  onElementToolAction?: (tool: CommentaryElementTool, element: Element) => void | Promise<void>;
   /** Whether local annotation markdown editing is available for the selected element */
   canEditAnnotationMarkdown?: (element: Element | null) => boolean;
+  /** Resolve synthetic editor targets to the host element used by annotation checks */
+  resolveAnnotationTarget?: (element: Element | null) => Element | null;
+  /** Return a host-specific reason that prevents creating an annotation for the selected element */
+  getCreateAnnotationBlockReason?: (element: Element | null) => string | undefined;
+  /** Select whether the Markdown composer edits annotation metadata or document source */
+  annotationMarkdownEditorKind?: 'annotation' | 'document-source';
   /** Return an edit URL for the selected annotation document, or an empty value to hide the document edit entry */
   getAnnotationDocumentEditUrl?: (element: Element | null) => string | null | undefined;
   /** Read the local annotation markdown bound to the selected element */
@@ -143,7 +146,10 @@ function truncateLabel(text: string, maxChars: number): string {
 /**
  * Format an element's display label (tag + id or classes)
  */
-function formatElementLabel(element: Element): { label: string; fullLabel: string } {
+function formatElementLabel(element: Element): {
+  label: string;
+  fullLabel: string;
+} {
   const tag = element.tagName.toLowerCase();
   const id = element.id?.trim();
 
@@ -315,9 +321,10 @@ export function createBreadcrumbs(options: BreadcrumbsOptions): Breadcrumbs {
     const frag = document.createDocumentFragment();
 
     const assistantPanelOpen = options.getAssistantPanelOpen?.();
-    const contextAppendAvailable = typeof assistantPanelOpen === 'boolean'
-      ? assistantPanelOpen
-      : Boolean(options.getAgentBridgeAvailable?.() ?? false);
+    const contextAppendAvailable =
+      typeof assistantPanelOpen === 'boolean'
+        ? assistantPanelOpen
+        : Boolean(options.getAgentBridgeAvailable?.() ?? false);
 
     if (currentTarget && options.onAppendElementToAgentContext && contextAppendAvailable) {
       const sendBtn = document.createElement('button');

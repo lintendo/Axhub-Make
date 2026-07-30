@@ -147,6 +147,35 @@ describe('release make artifact helpers', () => {
     );
   });
 
+  it('allowlists generated-client scripts instead of publishing the whole scripts directory', () => {
+    const manifest = JSON.parse(
+      fs.readFileSync(path.resolve('client/template-manifest.json'), 'utf8'),
+    );
+    const expectedClientRootScripts = [
+      'scripts/build-all.js',
+      'scripts/canvas-fig-sync.mjs',
+      'scripts/capture-theme-homepage.mjs',
+      'scripts/capture-theme-source.mjs',
+      'scripts/check-app-ready.mjs',
+      'scripts/chrome-export-converter.mjs',
+      'scripts/scan-entries.js',
+      'scripts/sync-project-metadata.d.ts',
+      'scripts/sync-project-metadata.mjs',
+      'scripts/sync-project-metadata.mjs.d.ts',
+      'scripts/sync-vendor-if-present.mjs',
+    ];
+
+    assert(!manifest.runtime.directories.includes('scripts'));
+    assert.deepEqual(
+      manifest.runtime.files
+        .filter((entry) => entry.startsWith('scripts/'))
+        .sort((left, right) => left.localeCompare(right)),
+      expectedClientRootScripts,
+    );
+    assert(manifest.runtime.directories.includes('scripts/templates'));
+    assert(manifest.runtime.directories.includes('scripts/utils'));
+  });
+
   it('keeps tracked source files free of local machine paths', () => {
     assert.equal(containsLocalMachinePath(`/${'Users'}/example/project`), true);
     assert.equal(containsLocalMachinePath(`/${'Volumes'}/ExampleDisk/project`), true);
@@ -366,6 +395,27 @@ describe('release make artifact helpers', () => {
     assert(rules.every(({ description }) => typeof description === 'string' && description.trim()));
   });
 
+  it('does not publish the triple ampersand test skill', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.resolve('client/template-manifest.json'), 'utf8'));
+    const excludedPaths = (manifest.runtime.fileRules || [])
+      .filter(({ action }) => action === 'exclude')
+      .map(({ pattern }) => new RegExp(pattern, 'u'));
+    const skillRoots = ['.agents', '.claude'];
+
+    for (const skillRoot of skillRoots) {
+      const relativeSkillPath = `${skillRoot}/skills/triple-ampersand-operator`;
+      assert(
+        excludedPaths.some((pattern) => pattern.test(`${relativeSkillPath}/SKILL.md`)),
+        `${relativeSkillPath} must be excluded by the client template manifest`,
+      );
+      assert.equal(
+        fs.existsSync(path.resolve('client', relativeSkillPath)),
+        false,
+        `${relativeSkillPath} must not exist in client template source`,
+      );
+    }
+  });
+
   it('derives allowed Make metadata entries from the template manifest', () => {
     assert.deepEqual(
       releaseMake.listAllowedMakeClientTemplateMetadataEntries({
@@ -401,13 +451,15 @@ describe('release make artifact helpers', () => {
     );
   });
 
-  it('pins the Make client release dependencies and pnpm version', () => {
+  it('keeps the approved annotation range while pinning exact client dependencies and pnpm', () => {
     const clientPackageJson = JSON.parse(fs.readFileSync(path.resolve('client/package.json'), 'utf8'));
 
-    assert.equal(clientPackageJson.version, '0.1.15');
+    assert.equal(clientPackageJson.version, '0.1.16');
     assert.equal(clientPackageJson.packageManager, 'pnpm@10.20.0');
-    assert.equal(clientPackageJson.dependencies['@axhub/annotation'], '1.0.16');
+    assert.equal(clientPackageJson.dependencies['@axhub/annotation'], '^1.0.17');
     assert.equal(clientPackageJson.dependencies['lucide-react'], '0.562.0');
+    assert.equal(clientPackageJson.devDependencies['@types/react'], '^18.2.0');
+    assert.equal(clientPackageJson.devDependencies['@types/react-dom'], '^18.2.0');
   });
 
   it('keeps live comments ignored in the publishing checkout', () => {
@@ -432,10 +484,12 @@ describe('release make artifact helpers', () => {
         'font:subset:beginner-guide': 'node scripts/subset-beginner-guide-fonts.mjs',
       },
       dependencies: {
-        '@axhub/annotation': '1.0.16',
+        '@axhub/annotation': '^1.0.17',
         'lucide-react': '0.562.0',
       },
       devDependencies: {
+        '@types/react': '^18.2.0',
+        '@types/react-dom': '^18.2.0',
         '@vitest/coverage-v8': '4.0.16',
         '@vitest/ui': '4.0.16',
         react: '^18.2.0',
@@ -449,10 +503,12 @@ describe('release make artifact helpers', () => {
     assert.equal(packageJson.packageManager, 'pnpm@10.20.0');
     assert.deepEqual(packageJson.scripts, { dev: 'vite' });
     assert.deepEqual(packageJson.dependencies, {
-      '@axhub/annotation': '1.0.16',
+      '@axhub/annotation': '^1.0.17',
       'lucide-react': '0.562.0',
     });
     assert.deepEqual(packageJson.devDependencies, {
+      '@types/react': '^18.2.0',
+      '@types/react-dom': '^18.2.0',
       react: '18.2.0',
       'react-dom': '18.2.0',
       vite: '5.4.21',
@@ -538,13 +594,15 @@ describe('release make artifact helpers', () => {
     writeFile(path.join(clientRoot, 'template-manifest.json'), `${JSON.stringify({
       schemaVersion: 1,
       runtime: {
-        files: ['.gitignore', 'package.json'],
-        directories: ['.agents/skills', '.claude/skills', 'scripts'],
+        files: [
+          '.gitignore',
+          'package.json',
+          'scripts/build-all.js',
+          'scripts/capture-theme-homepage.mjs',
+          'scripts/capture-theme-source.mjs',
+        ],
+        directories: ['.agents/skills', '.claude/skills', 'scripts/utils'],
         fileRules: [{
-          action: 'exclude',
-          pattern: '^scripts/subset-beginner-guide-fonts\\.mjs$',
-          description: 'Do not publish the font development tool.',
-        }, {
           action: 'exclude',
           pattern: '^\\.(?:agents|claude)/skills/prototype-comments(?:/|$)',
           description: 'Do not publish the replaced prototype comments skill.',
@@ -622,8 +680,14 @@ describe('release make artifact helpers', () => {
     writeFile(path.join(clientRoot, 'src/prototypes/touch-and-talk-annotation-demo/.spec/spec.md'), '# Commentary spec\n');
     writeFile(path.join(clientRoot, 'src/prototypes/dev-only/index.tsx'), 'export {};\n');
     writeFile(path.join(clientRoot, 'tests/template.test.mjs'), 'export {};\n');
-    writeFile(path.join(clientRoot, 'scripts/capture-theme.test.mjs'), 'export {};\n');
+    writeFile(path.join(clientRoot, 'scripts/build-all.js'), 'export {};\n');
+    writeFile(path.join(clientRoot, 'scripts/capture-theme-homepage.mjs'), 'export {};\n');
+    writeFile(path.join(clientRoot, 'scripts/capture-theme-source.mjs'), 'export {};\n');
+    writeFile(path.join(clientRoot, 'scripts/utils/runtime.mjs'), 'export {};\n');
+    writeFile(path.join(clientRoot, 'scripts/collect-mobile-theme-screenshots.mjs'), 'export {};\n');
+    writeFile(path.join(clientRoot, 'scripts/capture-theme-homepage.test.mjs'), 'export {};\n');
     writeFile(path.join(clientRoot, 'scripts/subset-beginner-guide-fonts.mjs'), 'export {};\n');
+    writeFile(path.join(clientRoot, 'scripts/smoke-preview-routes.mjs'), 'export {};\n');
     writeFile(path.join(clientRoot, '.git/config'), '[core]\n');
     writeFile(path.join(clientRoot, '.DS_Store'), 'finder\n');
     writeFile(path.join(clientRoot, 'src/resources/.DS_Store'), 'finder\n');
@@ -735,7 +799,14 @@ describe('release make artifact helpers', () => {
     assert(entries.includes('src/prototypes/beginner-guide/TsangerJinKai02-W04.subset.woff2'));
     assert(!entries.some((entry) => entry.startsWith('tests/')));
     assert(!entries.some((entry) => /\.test\.[^/]+$/u.test(entry)));
+    assert(entries.includes('scripts/build-all.js'));
+    assert(entries.includes('scripts/capture-theme-homepage.mjs'));
+    assert(entries.includes('scripts/capture-theme-source.mjs'));
+    assert(entries.includes('scripts/utils/runtime.mjs'));
+    assert(!entries.includes('scripts/collect-mobile-theme-screenshots.mjs'));
     assert(!entries.includes('scripts/subset-beginner-guide-fonts.mjs'));
+    assert(!entries.includes('scripts/capture-theme-homepage.test.mjs'));
+    assert(!entries.includes('scripts/smoke-preview-routes.mjs'));
     assert(!entries.some((entry) => entry.startsWith('.git/')));
     assert(!entries.includes('.DS_Store'));
     assert(!entries.includes('src/resources/.DS_Store'));
@@ -819,7 +890,6 @@ describe('release make artifact helpers', () => {
   it('exposes only the npm beta release script from the workspace root', () => {
     const rootPackageJson = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'));
 
-    assert.equal(rootPackageJson.version, '0.6.8');
     assert.equal(rootPackageJson.scripts['release:make:npm:latest'], undefined);
     assert.equal(
       rootPackageJson.scripts['release:make:npm:prepare'],
@@ -1271,17 +1341,57 @@ describe('release make artifact helpers', () => {
     assert.equal(result.codesigned, false);
   });
 
-  it('builds npm exec smoke args that preserve tarball paths and exercise the make bin', () => {
+  it('builds npm exec smoke args that select the staged tarball when its path contains spaces', () => {
     assert.deepEqual(
-      releaseMake.createNpmExecSmokeArgs('/tmp/release artifacts/axhub-make-1.2.3.tgz'),
+      releaseMake.createNpmExecSmokeArgs('/tmp/axhub release/axhub-make-1.2.3.tgz'),
       [
         'exec',
         '--yes',
-        '--package=/tmp/release artifacts/axhub-make-1.2.3.tgz',
+        '--package=/tmp/axhub release/axhub-make-1.2.3.tgz',
         '--',
         'make',
         '--help',
       ],
+    );
+  });
+
+  it('launches the released CLI smoke probe without a legacy project-root argument', () => {
+    const launch = releaseMake.createServerProbeLaunchOptions({
+      port: 51728,
+      adminRoot: '/tmp/axhub-make-admin',
+      makeHomeDir: '/tmp/axhub-make-state-home',
+      canvasFigSyncPath: '/tmp/canvas-fig-sync.mjs',
+      env: {
+        AXHUB_MAKE_HOME_DIR: '/tmp/should-not-escape-smoke-isolation',
+        CUSTOM_SMOKE_ENV: 'enabled',
+      },
+    });
+
+    assert.deepEqual(launch.args, [
+      '--host',
+      '127.0.0.1',
+      '--port',
+      '51728',
+      '--admin-root',
+      '/tmp/axhub-make-admin',
+    ]);
+    assert.deepEqual(launch.env, {
+      AXHUB_MAKE_CANVAS_FIG_SYNC: '/tmp/canvas-fig-sync.mjs',
+      AXHUB_MAKE_HOME_DIR: '/tmp/axhub-make-state-home',
+      CUSTOM_SMOKE_ENV: 'enabled',
+    });
+  });
+
+  it('runs the installed package CLI through Node instead of a Windows cmd shim', () => {
+    assert.deepEqual(
+      releaseMake.createInstalledNpmBinCommand('/tmp/axhub make install', 'axhub-make', {
+        platform: 'win32',
+        nodeExecutable: 'node',
+      }),
+      {
+        command: 'node',
+        args: [path.join('/tmp/axhub make install', 'node_modules', '@axhub', 'make', 'bin/cli.mjs')],
+      },
     );
   });
 

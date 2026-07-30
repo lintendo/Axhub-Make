@@ -693,6 +693,10 @@ export function mountShadowHost(_options: ShadowHostOptions = {}): ShadowHostMan
   // Create host element
   const host = document.createElement('div');
   host.id = WEB_EDITOR_V2_HOST_ID;
+  // Figma's fullscreen canvas retargets events crossing the Shadow DOM boundary
+  // to this host. Mark it like Figma's own draggable controls so the canvas does
+  // not claim pointermove after a drag starts inside the commentary UI.
+  host.classList.add('data-fullscreen-prevent-event-capture');
   host.setAttribute('data-mcp-web-editor', 'v2');
 
   // Apply host styles with !important to resist page CSS

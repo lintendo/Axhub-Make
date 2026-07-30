@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="960" viewBox="0 0 1440 960" role="img" aria-label="ChatGPT monochromatic mobile theme token preview">
+  <defs>
+    <radialGradient id="voice" cx="40%" cy="35%" r="70%">
+      <stop offset="0" stop-color="#93C5FD"/>
+      <stop offset="0.55" stop-color="#60A5FA"/>
+      <stop offset="1" stop-color="#3B82F6"/>
+    </radialGradient>
+  </defs>
+  <rect width="1440" height="960" fill="#FFFFFF"/>
+  <rect width="16" height="960" fill="#0D0D0D"/>
+
+  <g font-family="Söhne, -apple-system, BlinkMacSystemFont, Inter, Segoe UI, Helvetica, Arial, sans-serif">
+    <text x="88" y="102" fill="#676767" font-size="18" font-weight="500" letter-spacing="2">CONVERSATIONAL DOCUMENT</text>
+    <text x="88" y="226" fill="#0D0D0D" font-size="88" font-weight="600" letter-spacing="-2">ChatGPT</text>
+    <text x="88" y="282" fill="#676767" font-size="25">Monochrome chat. Text is the interface.</text>
+
+    <g transform="translate(88 354)">
+      <rect width="180" height="126" rx="18" fill="#0D0D0D"/>
+      <text x="18" y="31" fill="#FFFFFF" font-size="14" font-weight="500">SEND / TEXT</text>
+      <text x="18" y="99" fill="#FFFFFF" font-size="29" font-weight="600">#0D0D0D</text>
+    </g>
+    <g transform="translate(284 354)">
+      <rect width="180" height="126" rx="18" fill="#F7F7F8" stroke="#E5E5E5"/>
+      <text x="18" y="31" fill="#676767" font-size="14" font-weight="500">USER BUBBLE</text>
+      <text x="18" y="99" fill="#0D0D0D" font-size="29" font-weight="600">#F7F7F8</text>
+    </g>
+    <g transform="translate(480 354)">
+      <rect width="180" height="126" rx="18" fill="#2A7FFF"/>
+      <text x="18" y="31" fill="#FFFFFF" font-size="14" font-weight="500">LINK ONLY</text>
+      <text x="18" y="99" fill="#FFFFFF" font-size="29" font-weight="600">#2A7FFF</text>
+    </g>
+
+    <g transform="translate(88 548)">
+      <text x="0" y="0" fill="#0D0D0D" font-size="42" font-weight="600">Söhne</text>
+      <text x="0" y="42" fill="#676767" font-size="17">400 / 500 / 600 · editorial chat rhythm</text>
+      <circle cx="28" cy="112" r="28" fill="#0D0D0D"/>
+      <path d="M28 126V98m0 0l-10 10m10-10l10 10" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="76" y="84" width="286" height="56" rx="28" fill="#FFFFFF" stroke="#E5E5E5"/>
+      <text x="98" y="119" fill="#676767" font-size="16">Message ChatGPT…</text>
+      <text x="0" y="204" fill="#676767" font-size="15">4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 56 · 72</text>
+    </g>
+
+    <g transform="translate(822 60)">
+      <rect width="500" height="840" rx="48" fill="#0D0D0D"/>
+      <rect x="16" y="16" width="468" height="808" rx="36" fill="#FFFFFF"/>
+      <rect x="42" y="42" width="118" height="38" rx="19" fill="#FFFFFF" stroke="#E5E5E5"/>
+      <text x="65" y="67" fill="#0D0D0D" font-size="14" font-weight="500">GPT-5 ⌄</text>
+      <text x="446" y="69" fill="#0D0D0D" text-anchor="middle" font-size="26">＋</text>
+
+      <rect x="180" y="144" width="270" height="88" rx="18" fill="#F7F7F8"/>
+      <text x="202" y="179" fill="#0D0D0D" font-size="16">Explain why the interface</text>
+      <text x="202" y="204" fill="#0D0D0D" font-size="16">no longer uses green.</text>
+
+      <circle cx="64" cy="282" r="16" fill="#0D0D0D"/>
+      <text x="64" y="288" fill="#FFFFFF" text-anchor="middle" font-size="15">✦</text>
+      <text x="94" y="276" fill="#0D0D0D" font-size="16">The post-2024 visual system is</text>
+      <text x="94" y="303" fill="#0D0D0D" font-size="16">deliberately monochromatic.</text>
+      <text x="94" y="346" fill="#0D0D0D" font-size="20" font-weight="600">What changed</text>
+      <text x="94" y="377" fill="#0D0D0D" font-size="16">• Black and white carry action.</text>
+      <text x="94" y="404" fill="#0D0D0D" font-size="16">• Assistant prose stays unboxed.</text>
+      <text x="94" y="431" fill="#0D0D0D" font-size="16">• <tspan fill="#2A7FFF">Blue links</tspan> are used sparingly.</text>
+
+      <rect x="94" y="468" width="330" height="112" rx="8" fill="#F7F7F8" stroke="#E5E5E5"/>
+      <rect x="94" y="468" width="330" height="34" rx="8" fill="#F0F0F0"/>
+      <text x="108" y="490" fill="#676767" font-size="12" font-weight="500">tsx</text>
+      <text x="396" y="490" fill="#676767" text-anchor="end" font-size="12">Copy</text>
+      <text x="108" y="532" fill="#0D0D0D" font-family="Menlo, SF Mono, monospace" font-size="13">const accent = '#0D0D0D';</text>
+      <text x="108" y="558" fill="#0D0D0D" font-family="Menlo, SF Mono, monospace" font-size="13">render(answer);</text>
+
+      <circle cx="322" cy="656" r="62" fill="url(#voice)" opacity="0.9"/>
+      <text x="322" y="662" fill="#FFFFFF" text-anchor="middle" font-size="14" font-weight="500">Voice</text>
+
+      <rect x="42" y="744" width="416" height="56" rx="28" fill="#FFFFFF" stroke="#E5E5E5"/>
+      <text x="66" y="779" fill="#676767" font-size="16">Message ChatGPT…</text>
+      <circle cx="427" cy="772" r="16" fill="#0D0D0D"/>
+      <path d="M427 780V764m0 0l-6 6m6-6l6 6" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>

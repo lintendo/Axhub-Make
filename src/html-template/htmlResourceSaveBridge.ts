@@ -91,6 +91,7 @@ async function requestParentConfirm(message: string): Promise<boolean | null> {
   const requestId = nextParentDialogRequestId();
   return await new Promise((resolve) => {
     let settled = false;
+    let parentAcknowledged = false;
     const finish = (value: boolean | null) => {
       if (settled) return;
       settled = true;
@@ -100,10 +101,19 @@ async function requestParentConfirm(message: string): Promise<boolean | null> {
     };
     const handleMessage = (event: MessageEvent) => {
       const payload = event.data as ParentDialogResponse | undefined;
-      if (payload?.type !== 'WEB_EDITOR_DIALOG_RESPONSE' || payload.requestId !== requestId) return;
+      if (!payload || payload.requestId !== requestId) return;
+      if (payload.type === 'WEB_EDITOR_DIALOG_ACK') {
+        parentAcknowledged = true;
+        window.clearTimeout(timeoutId);
+        return;
+      }
+      if (payload.type !== 'WEB_EDITOR_DIALOG_RESPONSE') return;
       finish(payload.confirmed ?? true);
     };
-    const timeoutId = window.setTimeout(() => finish(null), 60_000);
+    const timeoutId = window.setTimeout(() => {
+      if (parentAcknowledged) return;
+      finish(false);
+    }, 60_000);
     window.addEventListener('message', handleMessage);
     window.parent.postMessage({
       type: 'WEB_EDITOR_DIALOG_REQUEST',

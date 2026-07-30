@@ -1,0 +1,342 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "awesome-ios-design-md",
+    "originalDetailUrl": "https://github.com/meliwat/awesome-ios-design-md/blob/5d3aeca239caef3ea4080034eb22ab87cc77fa24/design-md/travel/waze/DESIGN.md",
+    "fallbackRawUrl": "",
+    "mirrorSource": "",
+    "websiteUrl": "",
+    "upstreamCommit": "5d3aeca239caef3ea4080034eb22ab87cc77fa24",
+    "license": "MIT"
+  },
+  "identity": {
+    "id": "mobile-waze-mobile",
+    "slug": "waze-mobile",
+    "brand": "Waze",
+    "titleZh": "Waze 主题",
+    "titleEn": "Waze",
+    "descriptionZh": "Waze 的 Design.md 主题展示，围绕移动端、出行、地图与交通组织页面。",
+    "descriptionEn": "Waze mobile product theme."
+  },
+  "tags": {
+    "sourceTags": [
+      "移动端"
+    ],
+    "generatedTags": [
+      "mobile-product"
+    ],
+    "designTags": [
+      "出行、地图与交通"
+    ],
+    "distributionTags": [
+      "移动端",
+      "出行、地图与交通"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "sourcePath": ".local/theme-portfolio/normalized/waze-mobile/DESIGN.md"
+    },
+    "tailwind": null,
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md_and_metadata"
+    },
+    "cover": null,
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/cover.svg",
+      "publicPath": "assets/cover.svg",
+      "importPath": "./assets/cover.svg?url",
+      "sourcePath": "assets/cover.svg"
+    },
+    "productScreenshots": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/waze-navigation-live-traffic/id323229106?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/waze-navigation-live-traffic/id323229106?uo=4",
+          "marketId": "323229106",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/65/54/e5/6554e54a-854b-8270-2d6d-ca73cb449412/98def561-b8fc-4650-8946-15239d81a878_Usecase_01.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "ce1e27be739812228e3bf4c648c4c580d3e279336735bbc6eea2ad8af0529875",
+          "byteLength": 20030,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/waze-navigation-live-traffic/id323229106?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/waze-navigation-live-traffic/id323229106?uo=4",
+          "marketId": "323229106",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/81/df/ed/81dfedae-d72e-a25d-24e7-2f43b64ab618/cf7d60dc-7f33-474b-ab60-bd3b9ff24dc0_Usecase_02.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "dd58a5504b85443993d3c0eca358c57ee2f8a56bff44747395dc8fd420f8f2de",
+          "byteLength": 18520,
+          "width": 392,
+          "height": 696
+        }
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp",
+        "source": {
+          "kind": "apple-app-store",
+          "pageUrl": "https://apps.apple.com/us/app/waze-navigation-live-traffic/id323229106?uo=4",
+          "officialPageUrl": "https://apps.apple.com/us/app/waze-navigation-live-traffic/id323229106?uo=4",
+          "marketId": "323229106",
+          "storefront": "us",
+          "assetUrl": "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/c7/04/84/c70484a3-4301-f9cf-9716-a95e0ac6bc8a/ff02c3c6-aaf3-439e-98e2-328fd053fe98_Usecase_03.jpg/392x696bb.jpg",
+          "collectedAt": "2026-07-27T19:06:22.413Z",
+          "usage": "official-promotional"
+        },
+        "integrity": {
+          "sha256": "24bb6a077ca930a28e15cec86a519d498135bd7489dd9085d6124b38bbb2ef54",
+          "byteLength": 20212,
+          "width": 392,
+          "height": 696
+        }
+      }
+    ]
+  },
+  "tokens": {
+    "palette": [
+      "#7E55BE",
+      "#6b7280"
+    ],
+    "typography": {
+      "display": "SF Pro",
+      "body": "Inter",
+      "mono": "ui-monospace",
+      "hints": [
+        "SF Pro",
+        "Inter",
+        "ui-monospace"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "spacing": {
+      "xxs": "4px",
+      "xs": "8px",
+      "source": "design-md"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-01.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-02.webp"
+    },
+    {
+      "type": "product-screenshot",
+      "path": "assets/product-screenshot-03.webp"
+    }
+  ],
+  "display": {
+    "brand": "Waze 主题",
+    "brandAlias": "Waze",
+    "description": "Waze 的 Design.md 主题展示，围绕移动端、出行、地图与交通组织页面。",
+    "descriptionEn": "Waze mobile product theme.",
+    "variant": "mobile-product",
+    "distributionTags": [
+      "移动端",
+      "出行、地图与交通"
+    ],
+    "fontStylesheets": [
+      "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    ],
+    "palette": [
+      {
+        "color": "#7E55BE",
+        "labelZh": "主色",
+        "labelEn": "Primary",
+        "textColor": "#ffffff"
+      },
+      {
+        "color": "#6b7280",
+        "labelZh": "主色悬停",
+        "labelEn": "Primary Hover",
+        "textColor": "#ffffff"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "阴影 1 - Shadow 1",
+        "value": "rgba(0,0,0,0.20) 0 4px 12px",
+        "cssValue": "rgba(0,0,0,0.20) 0 4px 12px",
+        "description": "Shadow: `rgba(0,0,0,0.20) 0 4px 12px`"
+      },
+      {
+        "label": "阴影 2 - Shadow 2",
+        "value": "rgba(126,85,190,0.40) 0 6px 16px",
+        "cssValue": "rgba(126,85,190,0.40) 0 6px 16px",
+        "description": "Shadow: `rgba(126,85,190,0.40) 0 6px 16px` — tinted purple shadow"
+      },
+      {
+        "label": "阴影 3 - Shadow 3",
+        "value": "rgba(0,0,0,0.30) 0 3px 8px",
+        "cssValue": "rgba(0,0,0,0.30) 0 3px 8px",
+        "description": "Shadow: `rgba(0,0,0,0.30) 0 3px 8px` for visibility over saturated cartography"
+      },
+      {
+        "label": "阴影 4 - Shadow 4",
+        "value": "rgba(0,0,0,0.10) 0 4px 8px",
+        "cssValue": "rgba(0,0,0,0.10) 0 4px 8px",
+        "description": "Background: `#FFFFFF` with `rgba(0,0,0,0.10) 0 4px 8px` shadow"
+      },
+      {
+        "label": "阴影 5 - Shadow 5",
+        "value": "rgba(126,85,190,0.30) 0 4px 12px",
+        "cssValue": "rgba(126,85,190,0.30) 0 4px 12px",
+        "description": "Tinted purple shadow: `rgba(126,85,190,0.30) 0 4px 12px`"
+      },
+      {
+        "label": "阴影 6 - Shadow 6",
+        "value": "rgba(126,85,190,0.40)",
+        "cssValue": "rgba(126,85,190,0.40)",
+        "description": "Shadow: `rgba(126,85,190,0.40) 0 6px 16px` — tinted purple shadow"
+      }
+    ],
+    "borders": [
+      {
+        "label": "边框 1 - Border 1",
+        "value": "#D6D6D9",
+        "cssValue": "#D6D6D9",
+        "description": "Divider (`#D6D6D9`): Hairlines."
+      },
+      {
+        "label": "边框 2 - Border 2",
+        "value": "#4A4D58",
+        "cssValue": "#4A4D58",
+        "description": "Dark Divider (`#4A4D58`): Hairlines."
+      },
+      {
+        "label": "边框 3 - Border 3",
+        "value": "#7E55BE",
+        "cssValue": "#7E55BE",
+        "description": "The accent is Waze Purple (`#7E55BE`) — the iconic violet of the Waze chat-bubble logomark, the navigation polyline, and the floating action button. Surrounding it is Waze Cyan (`#33CCFF`) — used on the location puck and informational glyphs, and on the second layer of the Waze logo. Together they create the signature electric cool-tone duo that no other map app uses. Pinned over the map: red `#EF6A65` police reports, orange `#F69833` traffic, yellow `#F9C42E` road closures, green `#75C73E` cleared hazards, each rendered as a chunky cartoon speech bubble with a small Wazer emoji avatar. The map cartography is more saturated than Apple's — bright cyan water, mint-green parks, warm white land."
+      },
+      {
+        "label": "边框 4 - Border 4",
+        "value": "#EF6A65",
+        "cssValue": "#EF6A65",
+        "description": "The accent is Waze Purple (`#7E55BE`) — the iconic violet of the Waze chat-bubble logomark, the navigation polyline, and the floating action button. Surrounding it is Waze Cyan (`#33CCFF`) — used on the location puck and informational glyphs, and on the second layer of the Waze logo. Together they create the signature electric cool-tone duo that no other map app uses. Pinned over the map: red `#EF6A65` police reports, orange `#F69833` traffic, yellow `#F9C42E` road closures, green `#75C73E` cleared hazards, each rendered as a chunky cartoon speech bubble with a small Wazer emoji avatar. The map cartography is more saturated than Apple's — bright cyan water, mint-green parks, warm white land."
+      },
+      {
+        "label": "边框 5 - Border 5",
+        "value": "#1A1A1A",
+        "cssValue": "#1A1A1A",
+        "description": "Ink (`#1A1A1A`): Primary text — Waze's slightly warm near-black."
+      }
+    ],
+    "typography": [
+      "SF Pro",
+      "Inter",
+      "ui-monospace"
+    ],
+    "previewImages": [
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-01.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-02.webp"
+      },
+      {
+        "type": "product-screenshot",
+        "path": "assets/product-screenshot-03.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "移动端",
+        "title": "以产品流程为中心",
+        "body": "适合在 390×844 画布中预览的移动产品体验。"
+      },
+      {
+        "eyebrow": "Token",
+        "title": "颜色与字体可复用",
+        "body": "页面从本地 metadata 与 Design.md 提取 palette、typography 和标签，用于快速预览主题质感。"
+      },
+      {
+        "eyebrow": "组件",
+        "title": "面向真实界面片段",
+        "body": "按钮、输入、卡片和间距样例保持克制，便于比较不同主题的系统性差异。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "建议：Use Waze Purple {#7E55BE} as the brand primary — logo, polyline, FAB, \"Go\" button。",
+        "建议：Use Waze Cyan {#33CCFF} as the secondary — current-location puck, info glyphs。",
+        "建议：Render hazard reports as chunky cartoon speech bubbles with rounded 14pt corners, full-saturation colors, white icons inside, and a triangular tail pointing to the hazard location。",
+        "建议：Use Boing typography (or SF Pro Rounded as fallback) — roundness is the brand。",
+        "建议：Use Boing Mono on every numeric — distance, time, speed, ETA。"
+      ],
+      "dont": [
+        "避免：use a plain blue location dot — Waze's puck is a CYAN ARROW, not a circular dot。",
+        "避免：render hazard reports as small web-accessible icon pins — they're chunky cartoon speech bubbles with tails。",
+        "避免：tone down the cartography — bright cyan water and mint parks are the signature; making them subtle defeats the brand。",
+        "避免：replace Boing with a sharp grotesque (Helvetica, Inter without rounding) — the warmth comes from roundness。",
+        "避免：make the \"Go\" button anything other than full-pill 56pt-tall Waze Purple。"
+      ]
+    },
+    "radius": {
+      "control": "7px",
+      "card": "7px",
+      "preview": "7px",
+      "pill": "9999px",
+      "source": "design-md"
+    },
+    "spacing": {
+      "xxs": "4px",
+      "xs": "8px",
+      "source": "design-md"
+    },
+    "mobilePreview": {
+      "pattern": "map",
+      "navigation": [
+        "地图",
+        "行程",
+        "我的"
+      ],
+      "primaryAction": "开始导航"
+    }
+  },
+  "status": {
+    "displayPage": "in-progress",
+    "collectionErrors": [],
+    "productScreenshots": {
+      "collection": "complete",
+      "regression": "pending",
+      "expected": 3,
+      "actual": 3,
+      "lastRegressionAt": null,
+      "errors": []
+    }
+  }
+}
