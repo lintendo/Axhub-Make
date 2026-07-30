@@ -372,6 +372,8 @@ function createOnlineTemplateManifest(version = ONLINE_TEMPLATE_VERSION) {
 function installRemoteTemplateFetchMock(options: {
   failPrimary?: boolean;
   failMirror?: boolean;
+  failOnlinePrimary?: boolean;
+  failOnlineMirror?: boolean;
   manifest?: Record<string, unknown>;
   failManifest?: boolean;
   unsafePrimaryZipEntry?: string;
@@ -397,15 +399,27 @@ function installRemoteTemplateFetchMock(options: {
     if (options.customTemplateUrl && url === options.customTemplateUrl) {
       return new Response(primaryZip, { headers: { 'Content-Type': 'application/zip' } });
     }
-    if (url === TEMPLATE_ZIP_URL || url === ONLINE_TEMPLATE_ZIP_URL) {
+    if (url === TEMPLATE_ZIP_URL) {
       if (options.failPrimary) {
         return new Response('Primary template zip unavailable', { status: 503 });
       }
       return new Response(primaryZip, { headers: { 'Content-Type': 'application/zip' } });
     }
-    if (url === TEMPLATE_MIRROR_ZIP_URL || url === ONLINE_TEMPLATE_MIRROR_ZIP_URL) {
+    if (url === ONLINE_TEMPLATE_ZIP_URL) {
+      if (options.failPrimary || options.failOnlinePrimary) {
+        return new Response('Online primary template zip unavailable', { status: 503 });
+      }
+      return new Response(primaryZip, { headers: { 'Content-Type': 'application/zip' } });
+    }
+    if (url === TEMPLATE_MIRROR_ZIP_URL) {
       if (options.failMirror) {
         return new Response('Mirror template zip unavailable', { status: 503 });
+      }
+      return new Response(mirrorZip, { headers: { 'Content-Type': 'application/zip' } });
+    }
+    if (url === ONLINE_TEMPLATE_MIRROR_ZIP_URL) {
+      if (options.failMirror || options.failOnlineMirror) {
+        return new Response('Online mirror template zip unavailable', { status: 503 });
       }
       return new Response(mirrorZip, { headers: { 'Content-Type': 'application/zip' } });
     }
@@ -418,6 +432,9 @@ function installRemoteTemplateFetchMock(options: {
 function installRemoteTemplateCommandMock(options: {
   failPrimary?: boolean;
   failMirror?: boolean;
+  failOnlinePrimary?: boolean;
+  failOnlineMirror?: boolean;
+  manifest?: Record<string, unknown>;
   unsafePrimaryZipEntry?: string;
   customTemplateUrl?: string;
   metadataId?: string;
@@ -2608,6 +2625,141 @@ describe('make-server make client project APIs', () => {
       );
       expect(fs.existsSync(getRuntimeServerInfoPath(targetRoot))).toBe(true);
       expect(fs.existsSync(getProjectMetadataPath(targetRoot))).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('creates a blank make client project from the online latest template manifest', async () => {
+    const defaultRoot = createTempRoot();
+    writeProjectMetadata(defaultRoot);
+    const parentRoot = createTempRoot('axhub-make-latest-parent-');
+    const registryHome = createTempRoot('axhub-make-projects-api-home-');
+    const server = await startTestServer(defaultRoot, registryHome);
+
+    installRemoteTemplateCommandMock({
+      manifest: createOnlineTemplateManifest(),
+      metadataId: 'latest-template-client',
+      metadataName: 'Latest Template Client',
+    });
+    childProcessMock.spawn.mockImplementation((_file: string, _args: string[], options: { cwd?: string }) => {
+      const targetRoot = String(options.cwd || '');
+      writeMakeClientMetadata(targetRoot, 'latest-template-client', 'Latest Template Client');
+      writeServerInfo(targetRoot, 'runtime', {
+        pid: process.pid,
+        port: 51723,
+        host: 'localhost',
+        origin: 'http://localhost:51723',
+        projectRoot: targetRoot,
+        startedAt: new Date().toISOString(),
+      });
+      const child = {
+        once: vi.fn((event: string, callback: (...args: any[]) => void) => {
+          if (event === 'spawn') {
+            setTimeout(callback, 0);
+          }
+          return child;
+        }),
+        unref: vi.fn(),
+      };
+      return child;
+    });
+
+    try {
+      const response = await fetch(`${server.origin}/api/projects/make/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parentRoot,
+          folderName: 'latest-template-client',
+          projectName: 'Latest Template Client',
+        }),
+      });
+      const targetRoot = path.join(parentRoot, 'latest-template-client');
+      const marker = JSON.parse(fs.readFileSync(getMakeClientMarkerPath(targetRoot), 'utf8'));
+
+      expect(response.status).toBe(201);
+      expect(marker).toMatchObject({
+        repository: TEMPLATE_SOURCE_URL,
+        templateUrl: ONLINE_TEMPLATE_ZIP_URL,
+        templateVersion: ONLINE_TEMPLATE_VERSION,
+      });
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        TEMPLATE_MANIFEST_URL,
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        ONLINE_TEMPLATE_ZIP_URL,
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+      expect(globalThis.fetch).not.toHaveBeenCalledWith(
+        TEMPLATE_ZIP_URL,
+        expect.any(Object),
+      );
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('falls back to the bundled template when online latest zips fail', async () => {
+    const defaultRoot = createTempRoot();
+    writeProjectMetadata(defaultRoot);
+    const parentRoot = createTempRoot('axhub-make-online-fallback-parent-');
+    const registryHome = createTempRoot('axhub-make-projects-api-home-');
+    const server = await startTestServer(defaultRoot, registryHome);
+
+    installRemoteTemplateCommandMock({
+      manifest: createOnlineTemplateManifest(),
+      failOnlinePrimary: true,
+      failOnlineMirror: true,
+      metadataId: 'bundled-fallback-client',
+      metadataName: 'Bundled Fallback Client',
+    });
+    childProcessMock.spawn.mockImplementation((_file: string, _args: string[], options: { cwd?: string }) => {
+      const targetRoot = String(options.cwd || '');
+      writeMakeClientMetadata(targetRoot, 'bundled-fallback-client', 'Bundled Fallback Client');
+      writeServerInfo(targetRoot, 'runtime', {
+        pid: process.pid,
+        port: 51724,
+        host: 'localhost',
+        origin: 'http://localhost:51724',
+        projectRoot: targetRoot,
+        startedAt: new Date().toISOString(),
+      });
+      const child = {
+        once: vi.fn((event: string, callback: (...args: any[]) => void) => {
+          if (event === 'spawn') {
+            setTimeout(callback, 0);
+          }
+          return child;
+        }),
+        unref: vi.fn(),
+      };
+      return child;
+    });
+
+    try {
+      const response = await fetch(`${server.origin}/api/projects/make/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parentRoot,
+          folderName: 'bundled-fallback-client',
+          projectName: 'Bundled Fallback Client',
+        }),
+      });
+      expect(response.status).toBe(201);
+      const targetRoot = path.join(parentRoot, 'bundled-fallback-client');
+      const marker = JSON.parse(fs.readFileSync(getMakeClientMarkerPath(targetRoot), 'utf8'));
+
+      expect(marker).toMatchObject({
+        repository: TEMPLATE_SOURCE_URL,
+        templateUrl: TEMPLATE_ZIP_URL,
+        templateVersion: DEFAULT_TEMPLATE_VERSION,
+      });
+      expect(globalThis.fetch).toHaveBeenCalledWith(ONLINE_TEMPLATE_ZIP_URL, expect.any(Object));
+      expect(globalThis.fetch).toHaveBeenCalledWith(ONLINE_TEMPLATE_MIRROR_ZIP_URL, expect.any(Object));
+      expect(globalThis.fetch).toHaveBeenCalledWith(TEMPLATE_ZIP_URL, expect.any(Object));
     } finally {
       await server.close();
     }

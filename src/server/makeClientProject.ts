@@ -1246,10 +1246,21 @@ async function fetchMakeClientTemplateFromRemote(
 ): Promise<{ markerRepository: string; templateUrl: string; templateVersion?: string }> {
   void runner;
   const failures: Array<{ url: string; cache: { status: MakeClientTemplateCacheStatus; path: string } | null; error: string }> = [];
+  const templateMetadata = await resolveMakeClientUpdateMetadata();
+  const bundledTemplateSources = makeClientTemplateSources();
+  const preferredTemplateSources = compareTemplateVersions(
+    templateMetadata.version,
+    DEFAULT_MAKE_CLIENT_TEMPLATE_VERSION,
+  ) >= 0
+    ? [...templateMetadata.sources, ...bundledTemplateSources]
+    : bundledTemplateSources;
+  const templateSources = preferredTemplateSources.filter((source, index) => (
+    preferredTemplateSources.findIndex((candidate) => candidate.url === source.url) === index
+  ));
   const tempParent = fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-make-client-template-'));
 
   try {
-    for (const source of makeClientTemplateSources()) {
+    for (const source of templateSources) {
       const checkoutRoot = path.join(tempParent, failures.length === 0 ? 'primary' : `fallback-${failures.length}`);
       let cache: { status: MakeClientTemplateCacheStatus; path: string } | null = null;
       try {
