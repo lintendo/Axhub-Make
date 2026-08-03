@@ -1,6 +1,6 @@
 {
   "name": "@axhub/make-client",
-  "version": "0.1.16",
+  "version": "0.1.18",
   "private": true,
   "description": "Official Axhub Make client runtime",
   "type": "module",
@@ -41,7 +41,7 @@
     "ws": "^8.18.3"
   },
   "dependencies": {
-    "@axhub/annotation": "^1.0.17",
+    "@axhub/annotation": "^1.0.18",
     "lucide-react": "0.562.0"
   }
 }

@@ -247,8 +247,8 @@ importers:
   client:
     dependencies:
       '@axhub/annotation':
-        specifier: ^1.0.17
-        version: 1.0.17(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        specifier: ^1.0.18
+        version: 1.0.18(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       lucide-react:
         specifier: 0.562.0
         version: 0.562.0(react@18.2.0)
@@ -494,8 +494,8 @@ packages:
       - next
       - styled-jsx
 
-  '@axhub/annotation@1.0.17':
-    resolution: {integrity: sha512-rLK9arbO1xu2Zk9XzXYgxFS7v6t+h9Fxv3apsr9nKFWDGRsWpozDXaCd86cqN1hIeebYu1PnncLHDvuCqMGg2Q==}
+  '@axhub/annotation@1.0.18':
+    resolution: {integrity: sha512-M9dmDjR9oI72tn0Cr0uM+ejfZ4RR3l3DERkn+0XI7tV8h02PL9ThLEYuP/aPWNVllZiTNpBGCSLTChzG5w126w==}
     peerDependencies:
       react: 18.2.0
       react-dom: 18.2.0
@@ -8528,7 +8528,7 @@ snapshots:
       - tailwindcss
       - use-sync-external-store
 
-  '@axhub/annotation@1.0.17(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
+  '@axhub/annotation@1.0.18(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
     dependencies:
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)

@@ -470,9 +470,9 @@ describe('release make artifact helpers', () => {
   it('keeps the approved annotation range while pinning exact client dependencies and pnpm', () => {
     const clientPackageJson = JSON.parse(fs.readFileSync(path.resolve('client/package.json'), 'utf8'));
 
-    assert.equal(clientPackageJson.version, '0.1.16');
+    assert.equal(clientPackageJson.version, '0.1.18');
     assert.equal(clientPackageJson.packageManager, 'pnpm@10.20.0');
-    assert.equal(clientPackageJson.dependencies['@axhub/annotation'], '^1.0.17');
+    assert.equal(clientPackageJson.dependencies['@axhub/annotation'], '^1.0.18');
     assert.equal(clientPackageJson.dependencies['lucide-react'], '0.562.0');
     assert.equal(clientPackageJson.devDependencies['@types/react'], '^18.2.0');
     assert.equal(clientPackageJson.devDependencies['@types/react-dom'], '^18.2.0');

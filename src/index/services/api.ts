@@ -81,6 +81,7 @@ export interface MakeClientUpdateStatus {
     metadataSource: 'online' | 'bundled';
     metadataError?: string;
     updateAvailable: boolean;
+    repairAvailable: boolean;
     canApply: boolean;
     backupPolicy: 'zip-before-overwrite';
     lastBackup: MakeClientUpdateBackupRecord | null;

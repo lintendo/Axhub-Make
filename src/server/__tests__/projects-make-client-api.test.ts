@@ -215,7 +215,7 @@ function writeMakeClientMetadata(projectRoot: string, id = 'make-client-a', name
 
 function writeMakeClientTemplate(
   templateRoot: string,
-  options: { packageContent?: string } = {},
+  options: { packageContent?: string; includeResourceTemplates?: boolean } = {},
 ) {
   if (options.packageContent !== undefined) {
     fs.mkdirSync(templateRoot, { recursive: true });
@@ -247,6 +247,50 @@ function writeMakeClientTemplate(
   fs.writeFileSync(path.join(templateRoot, 'src', 'prototypes', 'beginner-guide', 'index.tsx'), 'export default function BeginnerGuide() { return "updated"; }\n', 'utf8');
   fs.mkdirSync(path.join(templateRoot, 'src', 'prototypes', 'annotation-demo'), { recursive: true });
   fs.writeFileSync(path.join(templateRoot, 'src', 'prototypes', 'annotation-demo', 'index.tsx'), 'export default function AnnotationDemo() { return "updated"; }\n', 'utf8');
+  if (options.includeResourceTemplates) {
+    fs.mkdirSync(path.join(templateRoot, 'src', 'resources', 'templates'), { recursive: true });
+    fs.writeFileSync(
+      path.join(templateRoot, 'src', 'resources', 'templates', 'prd-template.md'),
+      '# Official PRD template\n',
+      'utf8',
+    );
+    fs.writeFileSync(
+      path.join(templateRoot, 'src', 'resources', 'templates', 'prd-comprehensive-template.md'),
+      '# Official comprehensive PRD template\n',
+      'utf8',
+    );
+    fs.writeFileSync(
+      path.join(templateRoot, 'src', 'resources', 'templates', 'prototype-review-report-template.md'),
+      '# Official prototype review template\n',
+      'utf8',
+    );
+    fs.writeFileSync(
+      path.join(templateRoot, 'src', 'resources', 'templates', 'ui-review-report-template.md'),
+      '# Official UI review template\n',
+      'utf8',
+    );
+    fs.writeFileSync(
+      path.join(templateRoot, 'src', 'resources', 'templates', '规格文档 HTML 模板.html'),
+      '<!doctype html>\n',
+      'utf8',
+    );
+    fs.writeFileSync(
+      path.join(templateRoot, 'src', 'resources', 'templates', '规格文档 Markdown 模板.md'),
+      '# Official specification template\n',
+      'utf8',
+    );
+    fs.writeFileSync(
+      path.join(templateRoot, 'src', 'resources', 'templates', 'prd-linked-template.md'),
+      '# Official linked PRD template\n',
+      'utf8',
+    );
+    fs.mkdirSync(path.join(templateRoot, 'src', 'resources', 'templates', 'research'), { recursive: true });
+    fs.writeFileSync(
+      path.join(templateRoot, 'src', 'resources', 'templates', 'research', 'discovery.md'),
+      '# Official discovery template\n',
+      'utf8',
+    );
+  }
   writeJson(getMakeClientMarkerPath(templateRoot), {
     schemaVersion: 1,
     kind: 'axhub-make-client',
@@ -327,7 +371,7 @@ function writeStaleMakeClientRuntimePlugins(projectRoot: string) {
   fs.writeFileSync(path.join(projectRoot, 'vite-plugins', 'utils', 'moduleSpecifierQuery.ts'), 'export const stale = true;\n', 'utf8');
 }
 
-function createMakeClientTemplateZip(options: { unsafeEntry?: string; packageContent?: string } = {}) {
+function createMakeClientTemplateZip(options: { unsafeEntry?: string; packageContent?: string; includeResourceTemplates?: boolean } = {}) {
   const sourceRoot = createTempRoot('axhub-make-template-zip-source-');
   const zipRoot = createTempRoot('axhub-make-template-zip-file-');
   if (options.unsafeEntry) {
@@ -339,7 +383,10 @@ function createMakeClientTemplateZip(options: { unsafeEntry?: string; packageCon
   }
   writeMakeClientTemplate(
     path.join(sourceRoot, 'axhub-make-client-template'),
-    { ...(options.packageContent !== undefined ? { packageContent: options.packageContent } : {}) },
+    {
+      ...(options.packageContent !== undefined ? { packageContent: options.packageContent } : {}),
+      ...(options.includeResourceTemplates ? { includeResourceTemplates: true } : {}),
+    },
   );
   const zipPath = path.join(zipRoot, 'axhub-make-client-template.zip');
   createZipFromDirectory(sourceRoot, zipPath);
@@ -379,10 +426,12 @@ function installRemoteTemplateFetchMock(options: {
   unsafePrimaryZipEntry?: string;
   customTemplateUrl?: string;
   packageContent?: string;
+  includeResourceTemplates?: boolean;
 } = {}) {
   const primaryZip = createMakeClientTemplateZip({
     ...(options.unsafePrimaryZipEntry ? { unsafeEntry: options.unsafePrimaryZipEntry } : {}),
     ...(options.packageContent !== undefined ? { packageContent: options.packageContent } : {}),
+    ...(options.includeResourceTemplates ? { includeResourceTemplates: true } : {}),
   });
   const mirrorZip = createMakeClientTemplateZip();
   const originalFetch = globalThis.fetch;
@@ -4237,6 +4286,18 @@ describe('make-server make client project APIs', () => {
     writeMakeClientMarker(projectRoot, 'online-current-status-client', 'Online Current Status Client', ONLINE_TEMPLATE_VERSION);
     writeMakeClientPackage(projectRoot, ONLINE_TEMPLATE_VERSION);
     writeMakeClientMetadata(projectRoot, 'online-current-status-client', 'Online Current Status Client');
+    const resourceTemplatesRoot = path.join(projectRoot, 'src', 'resources', 'templates');
+    fs.mkdirSync(resourceTemplatesRoot, { recursive: true });
+    for (const relativePath of [
+      'prd-template.md',
+      'prd-comprehensive-template.md',
+      'prototype-review-report-template.md',
+      'ui-review-report-template.md',
+      '规格文档 HTML 模板.html',
+      '规格文档 Markdown 模板.md',
+    ]) {
+      fs.writeFileSync(path.join(resourceTemplatesRoot, relativePath), 'official template\n', 'utf8');
+    }
     installRemoteTemplateFetchMock({ manifest: createOnlineTemplateManifest() });
     installMakeClientUpdateCommandMock();
     const server = await startTestServer(defaultRoot);
@@ -5035,6 +5096,132 @@ describe('make-server make client project APIs', () => {
         ['run', 'metadata:sync'],
         expect.objectContaining({ cwd: projectRoot }),
       );
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('repairs missing official resource templates in current-version projects while preserving project-owned resources', async () => {
+    const defaultRoot = createTempRoot();
+    writeProjectMetadata(defaultRoot, {
+      project: { id: 'default-client', name: 'Default Client' },
+    });
+    const projectRoot = createTempRoot('axhub-make-client-resource-template-update-');
+    writeMakeClientMarker(projectRoot, 'resource-template-update-client', 'Resource Template Update Client', DEFAULT_TEMPLATE_VERSION);
+    writeMakeClientPackage(projectRoot, DEFAULT_TEMPLATE_VERSION);
+    writeMakeClientMetadata(projectRoot, 'resource-template-update-client', 'Resource Template Update Client');
+    fs.mkdirSync(path.join(projectRoot, 'src', 'resources', 'templates'), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, 'src', 'resources', 'notes.md'), '# User notes\n', 'utf8');
+    fs.writeFileSync(path.join(projectRoot, 'src', 'resources', 'templates', 'prd-template.md'), '# Custom PRD template\n', 'utf8');
+    initCleanGitRepo(projectRoot);
+    installRemoteTemplateFetchMock({ includeResourceTemplates: true });
+    installMakeClientUpdateCommandMock({
+      metadataId: 'resource-template-update-client',
+      metadataName: 'Resource Template Update Client',
+    });
+    const server = await startTestServer(defaultRoot);
+
+    try {
+      const registerResponse = await fetch(`${server.origin}/api/projects/make/register-existing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ root: projectRoot }),
+      });
+      expect(registerResponse.status).toBe(201);
+      commitGitChangesIfNeeded(projectRoot, 'registered');
+
+      const statusResponse = await fetch(`${server.origin}/api/projects/resource-template-update-client/make-client/update/status`);
+      const statusBody = await statusResponse.json();
+      expect(statusResponse.status).toBe(200);
+      expect(statusBody).toMatchObject({
+        currentVersion: DEFAULT_TEMPLATE_VERSION,
+        targetVersion: DEFAULT_TEMPLATE_VERSION,
+        updateAvailable: true,
+        repairAvailable: true,
+        canApply: true,
+      });
+
+      const applyResponse = await fetch(`${server.origin}/api/projects/resource-template-update-client/make-client/update/apply`, {
+        method: 'POST',
+      });
+      const applyBody = await applyResponse.json();
+
+      expect(applyResponse.status).toBe(200);
+      expect(applyBody).toMatchObject({
+        currentVersion: DEFAULT_TEMPLATE_VERSION,
+        targetVersion: DEFAULT_TEMPLATE_VERSION,
+        installMethod: 'skipped',
+      });
+      expect(applyBody.plannedFiles).not.toEqual(expect.arrayContaining([
+        'package.json',
+        'src/prototypes/beginner-guide/index.tsx',
+      ]));
+      expect(applyBody.writtenFiles).toEqual(expect.arrayContaining([
+        'src/resources/templates/prd-comprehensive-template.md',
+      ]));
+      expect(fs.readFileSync(path.join(projectRoot, 'src', 'resources', 'templates', 'prd-template.md'), 'utf8'))
+        .toBe('# Custom PRD template\n');
+      expect(fs.readFileSync(path.join(projectRoot, 'src', 'resources', 'templates', 'prd-comprehensive-template.md'), 'utf8'))
+        .toBe('# Official comprehensive PRD template\n');
+      expect(fs.readFileSync(path.join(projectRoot, 'src', 'resources', 'notes.md'), 'utf8')).toBe('# User notes\n');
+
+      const nextStatusResponse = await fetch(`${server.origin}/api/projects/resource-template-update-client/make-client/update/status`);
+      const nextStatusBody = await nextStatusResponse.json();
+      expect(nextStatusResponse.status).toBe(200);
+      expect(nextStatusBody).toMatchObject({
+        updateAvailable: false,
+        repairAvailable: false,
+        canApply: false,
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it.skipIf(process.platform === 'win32')('does not write official resource templates through project symlinks', async () => {
+    const defaultRoot = createTempRoot();
+    writeProjectMetadata(defaultRoot, {
+      project: { id: 'default-client', name: 'Default Client' },
+    });
+    const projectRoot = createTempRoot('axhub-make-client-resource-template-symlink-');
+    writeMakeClientMarker(projectRoot, 'resource-template-symlink-client', 'Resource Template Symlink Client', '0.1.0');
+    writeMakeClientPackage(projectRoot, '0.1.0');
+    writeMakeClientMetadata(projectRoot, 'resource-template-symlink-client', 'Resource Template Symlink Client');
+    const templatesRoot = path.join(projectRoot, 'src', 'resources', 'templates');
+    const outsideRoot = createTempRoot('axhub-make-client-resource-template-outside-');
+    const danglingTarget = path.join(outsideRoot, 'prd-linked-template.md');
+    fs.mkdirSync(templatesRoot, { recursive: true });
+    fs.symlinkSync(danglingTarget, path.join(templatesRoot, 'prd-linked-template.md'), 'file');
+    fs.symlinkSync(outsideRoot, path.join(templatesRoot, 'research'), 'dir');
+    initCleanGitRepo(projectRoot);
+    installRemoteTemplateFetchMock({ includeResourceTemplates: true });
+    installMakeClientUpdateCommandMock({
+      metadataId: 'resource-template-symlink-client',
+      metadataName: 'Resource Template Symlink Client',
+    });
+    const server = await startTestServer(defaultRoot);
+
+    try {
+      const registerResponse = await fetch(`${server.origin}/api/projects/make/register-existing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ root: projectRoot }),
+      });
+      expect(registerResponse.status).toBe(201);
+      commitGitChangesIfNeeded(projectRoot, 'registered');
+
+      const applyResponse = await fetch(`${server.origin}/api/projects/resource-template-symlink-client/make-client/update/apply`, {
+        method: 'POST',
+      });
+      const applyBody = await applyResponse.json();
+
+      expect(applyResponse.status).toBe(200);
+      expect(applyBody.writtenFiles).not.toEqual(expect.arrayContaining([
+        'src/resources/templates/prd-linked-template.md',
+        'src/resources/templates/research/discovery.md',
+      ]));
+      expect(fs.existsSync(danglingTarget)).toBe(false);
+      expect(fs.existsSync(path.join(outsideRoot, 'discovery.md'))).toBe(false);
     } finally {
       await server.close();
     }

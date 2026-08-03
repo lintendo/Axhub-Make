@@ -1,7 +1,7 @@
 export const MAKE_CLIENT_TEMPLATE_ZIP_NAME = 'axhub-make-client-template.zip';
 export const MAKE_CLIENT_TEMPLATE_LATEST_MANIFEST_NAME = 'axhub-make-client-template.latest.json';
-export const DEFAULT_MAKE_CLIENT_TEMPLATE_VERSION = '0.1.16';
-export const DEFAULT_MAKE_CLIENT_TEMPLATE_RELEASE_NOTES = "# Axhub Make Client 0.1.16\n\n- 默认主题库精简为 122 个主题，包括 72 个 PC 主题和 50 个移动端主题\n- 标注运行时升级到 `@axhub/annotation` 1.0.17\n- 将生产、采集和回归脚本迁出客户端发布模板，仅保留基础主题创建能力\n- 清理未使用的客户端依赖，保持 `lucide-react` 版本不变";
+export const DEFAULT_MAKE_CLIENT_TEMPLATE_VERSION = '0.1.18';
+export const DEFAULT_MAKE_CLIENT_TEMPLATE_RELEASE_NOTES = "# Axhub Make Client 0.1.18\n\n- 更新客户端工作规则和内置技能，完善原型开发与截图还原流程\n- 为 `screenshot-to-prototype` 新增 rembg 背景移除能力和重建清单校验\n- `check-app-ready` 返回 Make 管理端深链，便于直接打开目标资源\n- 支持仅包含主规格的原型参与项目元数据同步\n- 更新内置示例原型及相关标注内容";
 export const PRIMARY_MAKE_CLIENT_TEMPLATE_RELEASE_REPOSITORY = 'lintendo/Axhub-Make';
 export const GITEE_MAKE_CLIENT_TEMPLATE_RELEASE_BASE_URL = 'https://gitee.com/axhub/Axhub-Make/releases/download';
 export const GITEE_MAKE_CLIENT_TEMPLATE_LATEST_RELEASE_TAG = 'make-client-template-latest';

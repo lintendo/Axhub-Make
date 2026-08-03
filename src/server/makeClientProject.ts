@@ -113,6 +113,15 @@ const MAKE_CLIENT_RUNTIME_PATCH_FILES = [
   'vite-plugins/utils/previewTitle.ts',
 ];
 
+const MAKE_CLIENT_RESOURCE_TEMPLATE_FILES = [
+  'src/resources/templates/prd-template.md',
+  'src/resources/templates/prd-comprehensive-template.md',
+  'src/resources/templates/prototype-review-report-template.md',
+  'src/resources/templates/ui-review-report-template.md',
+  'src/resources/templates/规格文档 HTML 模板.html',
+  'src/resources/templates/规格文档 Markdown 模板.md',
+] as const;
+
 export interface MakeClientDevStatus {
   projectId: string;
   makeClient: boolean;
@@ -161,6 +170,7 @@ export interface MakeClientUpdateStatus {
   metadataSource: MakeClientUpdateMetadataSource;
   metadataError?: string;
   updateAvailable: boolean;
+  repairAvailable: boolean;
   canApply: boolean;
   backupPolicy: MakeClientUpdateBackupPolicy;
   lastBackup: MakeClientUpdateBackupRecord | null;
@@ -1463,7 +1473,12 @@ export async function getMakeClientUpdateStatus(
   const metadata = await resolveMakeClientUpdateMetadata();
   const targetVersion = metadata.version;
   const templateSources = metadata.sources;
-  const updateAvailable = isTemplateUpdateAvailable(currentVersion, targetVersion);
+  const versionUpdateAvailable = isTemplateUpdateAvailable(currentVersion, targetVersion);
+  const repairAvailable = compareTemplateVersions(currentVersion, targetVersion) === 0
+    && MAKE_CLIENT_RESOURCE_TEMPLATE_FILES.some((relativePath) => (
+      isMakeClientResourceTemplateTargetMissing(root, relativePath)
+    ));
+  const updateAvailable = versionUpdateAvailable || repairAvailable;
   const blockedReasons = buildMakeClientUpdateBlockedReasons({
     updateAvailable,
     templateSources,
@@ -1477,6 +1492,7 @@ export async function getMakeClientUpdateStatus(
     metadataSource: metadata.source,
     ...(metadata.error ? { metadataError: metadata.error } : {}),
     updateAvailable,
+    repairAvailable,
     canApply: blockedReasons.length === 0,
     backupPolicy: 'zip-before-overwrite',
     lastBackup: readLatestMakeClientUpdateBackupRecord(root),
@@ -1579,6 +1595,29 @@ function shouldSkipMakeClientUpdateEntry(relativePath: string, entryName: string
   return false;
 }
 
+function isMakeClientResourceTemplatePath(relativePath: string): boolean {
+  return normalizeRelativePath(relativePath).startsWith('src/resources/templates/');
+}
+
+function isMakeClientResourceTemplateTargetMissing(projectRoot: string, relativePath: string): boolean {
+  let currentPath = path.resolve(projectRoot);
+  for (const segment of normalizeRelativePath(relativePath).split('/')) {
+    currentPath = path.join(currentPath, segment);
+    try {
+      const stats = fs.lstatSync(currentPath);
+      if (stats.isSymbolicLink() || !stats.isDirectory()) {
+        return false;
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return true;
+      }
+      return false;
+    }
+  }
+  return false;
+}
+
 function readMakeClientPackageJsonForUpdate(
   filePath: string,
   source: MakeClientPackageJsonSource,
@@ -1617,7 +1656,11 @@ function readMakeClientPackageJsonForUpdate(
   }
 }
 
-function collectMakeClientUpdateTemplateFiles(templateRoot: string): string[] {
+function collectMakeClientUpdateTemplateFiles(
+  templateRoot: string,
+  projectRoot?: string,
+  options: { resourceTemplatesOnly?: boolean } = {},
+): string[] {
   const markerRelativePath = '.axhub/make/client.json';
   const files: string[] = [];
   const walk = (sourceDir: string, relativeDir = '') => {
@@ -1636,11 +1679,43 @@ function collectMakeClientUpdateTemplateFiles(templateRoot: string): string[] {
       }
     }
   };
-  walk(templateRoot);
-  return [
-    ...Array.from(new Set(files.filter((relativePath) => relativePath !== markerRelativePath))).sort(),
-    markerRelativePath,
-  ];
+  if (!options.resourceTemplatesOnly) {
+    walk(templateRoot);
+  }
+
+  const resourceTemplatesRoot = path.join(templateRoot, 'src', 'resources', 'templates');
+  if (projectRoot && fs.existsSync(resourceTemplatesRoot) && fs.statSync(resourceTemplatesRoot).isDirectory()) {
+    const collectMissingResourceTemplates = (sourceDir: string, relativeDir: string) => {
+      for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+        const relativePath = path.join(relativeDir, entry.name);
+        const sourcePath = path.join(sourceDir, entry.name);
+        if (entry.isDirectory()) {
+          collectMissingResourceTemplates(sourcePath, relativePath);
+          continue;
+        }
+        if (!entry.isFile()) continue;
+
+        const normalizedPath = normalizeRelativePath(relativePath);
+        const targetPath = path.resolve(projectRoot, ...normalizedPath.split('/'));
+        if (!isInsideRoot(projectRoot, targetPath)) {
+          throw new MakeClientProjectError(
+            'MAKE_CLIENT_TEMPLATE_UNAVAILABLE',
+            `Unsafe Make client resource template path: ${normalizedPath}`,
+            { status: 500, phase: 'overwrite' },
+          );
+        }
+        if (isMakeClientResourceTemplateTargetMissing(projectRoot, normalizedPath)) {
+          files.push(normalizedPath);
+        }
+      }
+    };
+    collectMissingResourceTemplates(resourceTemplatesRoot, path.join('src', 'resources', 'templates'));
+  }
+
+  const plannedFiles = Array.from(new Set(files.filter((relativePath) => relativePath !== markerRelativePath))).sort();
+  return plannedFiles.length > 0 || !options.resourceTemplatesOnly
+    ? [...plannedFiles, markerRelativePath]
+    : [];
 }
 
 function createMakeClientUpdateBackupRoot(projectRoot: string): string {
@@ -1784,6 +1859,12 @@ function writeMakeClientUpdateTemplateFiles(params: {
       );
     }
     if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
+      continue;
+    }
+    if (
+      isMakeClientResourceTemplatePath(relativePath)
+      && !isMakeClientResourceTemplateTargetMissing(params.projectRoot, relativePath)
+    ) {
       continue;
     }
     fs.mkdirSync(path.dirname(targetPath), { recursive: true });
@@ -2026,6 +2107,8 @@ export async function applyMakeClientUpdate(
   const marker = validateExistingMakeClientProject(root);
   const status = await getMakeClientUpdateStatus(projectId, root, { commandRunner: runner });
   assertMakeClientUpdateCanApply(status);
+  const resourceRepairOnly = status.repairAvailable
+    && compareTemplateVersions(status.currentVersion, status.targetVersion) === 0;
 
   let extractedTemplate: Awaited<ReturnType<typeof extractMakeClientUpdateTemplate>> | null = null;
   let backupRoot = '';
@@ -2053,11 +2136,20 @@ export async function applyMakeClientUpdate(
   try {
     extractedTemplate = await extractMakeClientUpdateTemplate(status.targetVersion, status.template.sources);
     templateUrl = extractedTemplate.source.url;
-    plannedFiles = collectMakeClientUpdateTemplateFiles(extractedTemplate.templateRoot);
+    plannedFiles = collectMakeClientUpdateTemplateFiles(extractedTemplate.templateRoot, root, {
+      resourceTemplatesOnly: resourceRepairOnly,
+    });
+    if (resourceRepairOnly && plannedFiles.length === 0) {
+      throw new MakeClientProjectError(
+        'MAKE_CLIENT_UPDATE_NOT_AVAILABLE',
+        '当前客户端模板已完整，无需修复',
+        { status: 409, phase: 'version' },
+      );
+    }
     const templatePackagePath = path.join(extractedTemplate.templateRoot, packageRelativePath);
     const templatePackage = readMakeClientPackageJsonForUpdate(templatePackagePath, 'template');
     const packageJsonContent = mergeMakeClientPackageJson(projectPackage.packageJson, templatePackage.packageJson);
-    const packageChanged = packageJsonContent !== projectPackage.content;
+    const packageChanged = !resourceRepairOnly && packageJsonContent !== projectPackage.content;
 
     backupRoot = createMakeClientUpdateBackupRoot(root);
     backupExistingMakeClientUpdateFiles(root, backupRoot, plannedFiles);
@@ -2087,7 +2179,7 @@ export async function applyMakeClientUpdate(
     let metadataSynced = false;
     let postUpdateWarning: MakeClientUpdatePostUpdateWarning | undefined;
     try {
-      if (packageChanged || !hasInstalledMakeClientDependencies(root)) {
+      if (!resourceRepairOnly && (packageChanged || !hasInstalledMakeClientDependencies(root))) {
         installMethod = await installMakeClientDependenciesForUpdate(runner, root);
       }
       await syncMakeClientMetadataWithNpm(runner, root);
