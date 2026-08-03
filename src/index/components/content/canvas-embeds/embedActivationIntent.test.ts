@@ -14,6 +14,7 @@ describe('embed activation intent', () => {
                 selectedEmbedIdAtPointerDown: null,
                 released: true,
                 moved: false,
+                activationRequested: false,
             },
         })).toBe('select-only');
     });
@@ -26,6 +27,7 @@ describe('embed activation intent', () => {
                 selectedEmbedIdAtPointerDown: 'embed-1',
                 released: true,
                 moved: false,
+                activationRequested: true,
             },
         })).toBe('activate');
 
@@ -36,6 +38,20 @@ describe('embed activation intent', () => {
                 selectedEmbedIdAtPointerDown: 'embed-1',
                 released: true,
                 moved: true,
+                activationRequested: true,
+            },
+        })).toBe('select-only');
+    });
+
+    it('does not activate a selected embed after an ordinary single click', () => {
+        expect(resolveEmbedClickActivationMode({
+            currentSelectedId: 'embed-1',
+            previousSelectedId: 'embed-1',
+            pointerIntent: {
+                selectedEmbedIdAtPointerDown: 'embed-1',
+                released: true,
+                moved: false,
+                activationRequested: false,
             },
         })).toBe('select-only');
     });
@@ -48,6 +64,7 @@ describe('embed activation intent', () => {
                 selectedEmbedIdAtPointerDown: 'embed-1',
                 released: false,
                 moved: false,
+                activationRequested: true,
             },
         })).toBe('select-only');
 
