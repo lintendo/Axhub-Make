@@ -28,7 +28,7 @@
 - Consumes: `buildPrototypeAnnotationAcpPrompt({ currentFilePath, currentFileDisplayName?, projectPath? }): string`。
 - Produces: 包含显示名称、项目相对入口文件和固定提问的提示词字符串。
 
-- [ ] **Step 1: 写入失败测试**
+- [x] **Step 1: 写入失败测试**
 
 更新标注提示词测试，使其验证：
 
@@ -49,7 +49,7 @@ expect(prompt).not.toContain('/workspace/demo/project');
 
 输入使用绝对 `currentFilePath` 和对应 `projectPath`，证明输出在项目边界转换为相对路径。再增加 Windows 分隔符用例，期望输出同样为 `/` 分隔的项目相对路径。
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 ```bash
 pnpm exec vitest run src/index/utils/quickEditPrompts.test.ts
@@ -57,7 +57,7 @@ pnpm exec vitest run src/index/utils/quickEditPrompts.test.ts
 
 预期：标注提示词测试失败，因为当前输出没有入口文件和固定提问，且仍包含技能已覆盖的技术要求。
 
-- [ ] **Step 3: 实现入口路径规范化和精简提示词**
+- [x] **Step 3: 实现入口路径规范化和精简提示词**
 
 在 `quickEditPrompts.ts` 增加浏览器可用的字符串路径辅助函数：
 
@@ -78,7 +78,7 @@ function getProjectRelativeEntryPath(currentFilePath: string, projectPath?: stri
 
 构建器在路径为空时维持现有错误；无法得到项目相对入口文件时抛出明确错误。将提示词改为：引用技能、输出目标名称和入口文件、要求读取业务资料、嵌入设计文档中的一次性固定问题，并要求等待一次回复后直接执行。
 
-- [ ] **Step 4: 运行定向测试并确认 GREEN**
+- [x] **Step 4: 运行定向测试并确认 GREEN**
 
 ```bash
 pnpm exec vitest run src/index/utils/quickEditPrompts.test.ts
@@ -86,7 +86,7 @@ pnpm exec vitest run src/index/utils/quickEditPrompts.test.ts
 
 预期：全部测试通过，无错误或警告。
 
-- [ ] **Step 5: 检查最终差异**
+- [x] **Step 5: 检查最终差异**
 
 ```bash
 git diff --check
