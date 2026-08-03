@@ -187,9 +187,12 @@ describe('IndexPage source', () => {
     expect(source).toContain('buildMakeClientUpdateReminderDismissedKey');
     expect(source).toContain('readMakeClientUpdateReminderDismissed');
     expect(source).toContain('writeMakeClientUpdateReminderDismissed');
+    expect(source).toContain("type MakeClientUpdateReminderMode = 'update' | 'repair';");
+    expect(source).toContain("const reminderMode: MakeClientUpdateReminderMode = status?.repairAvailable === true ? 'repair' : 'update';");
+    expect(source).toContain("return mode === 'repair' ? `${key}.repair` : key;");
     expect(source).toContain('apiService.getMakeClientUpdateStatus(activeProjectId)');
     expect(source).toContain('setMakeClientUpdateAvailable(updateAvailable)');
-    expect(source).toContain('setMakeClientUpdateReminderVisible(updateAvailable && !readMakeClientUpdateReminderDismissed(activeProjectId, status.targetVersion))');
+    expect(source).toContain('setMakeClientUpdateReminderVisible(updateAvailable && !readMakeClientUpdateReminderDismissed(activeProjectId, status.targetVersion, reminderMode))');
     expect(source).toContain('setMakeClientUpdateReminderVisible(false);');
     expect(source).toContain('setMakeClientUpdateAvailable(false);');
     expect(source).toContain('handleMakeClientUpdateAvailabilityChange');

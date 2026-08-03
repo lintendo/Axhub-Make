@@ -93,9 +93,12 @@ const PROTOTYPE_ROUTE_PAGE_ID_RE = /^[a-z0-9-]+$/u;
 const MAKE_STATE_DIR_NOT_WRITABLE = 'MAKE_STATE_DIR_NOT_WRITABLE';
 const MAKE_CLIENT_UPDATE_REMINDER_DISMISSED_PREFIX = 'axhub.make.clientUpdateReminder.dismissed';
 
+type MakeClientUpdateReminderMode = 'update' | 'repair';
+
 type MakeClientUpdateReminderTarget = {
     projectId: string;
     targetVersion: string;
+    mode: MakeClientUpdateReminderMode;
 };
 
 function normalizePrototypeRoutePageId(value: unknown): string {
@@ -199,27 +202,40 @@ function buildMakeStatePermissionPrompt(health: unknown): string {
     ].join('\n');
 }
 
-function buildMakeClientUpdateReminderDismissedKey(projectId: string, targetVersion: string): string {
-    return `${MAKE_CLIENT_UPDATE_REMINDER_DISMISSED_PREFIX}.${encodeURIComponent(projectId)}.${encodeURIComponent(targetVersion)}`;
+function buildMakeClientUpdateReminderDismissedKey(
+    projectId: string,
+    targetVersion: string,
+    mode: MakeClientUpdateReminderMode = 'update',
+): string {
+    const key = `${MAKE_CLIENT_UPDATE_REMINDER_DISMISSED_PREFIX}.${encodeURIComponent(projectId)}.${encodeURIComponent(targetVersion)}`;
+    return mode === 'repair' ? `${key}.repair` : key;
 }
 
-function readMakeClientUpdateReminderDismissed(projectId: string, targetVersion: string): boolean {
+function readMakeClientUpdateReminderDismissed(
+    projectId: string,
+    targetVersion: string,
+    mode: MakeClientUpdateReminderMode = 'update',
+): boolean {
     if (!projectId || !targetVersion || typeof window === 'undefined') {
         return false;
     }
     try {
-        return window.localStorage.getItem(buildMakeClientUpdateReminderDismissedKey(projectId, targetVersion)) === '1';
+        return window.localStorage.getItem(buildMakeClientUpdateReminderDismissedKey(projectId, targetVersion, mode)) === '1';
     } catch {
         return false;
     }
 }
 
-function writeMakeClientUpdateReminderDismissed(projectId: string, targetVersion: string): void {
+function writeMakeClientUpdateReminderDismissed(
+    projectId: string,
+    targetVersion: string,
+    mode: MakeClientUpdateReminderMode = 'update',
+): void {
     if (!projectId || !targetVersion || typeof window === 'undefined') {
         return;
     }
     try {
-        window.localStorage.setItem(buildMakeClientUpdateReminderDismissedKey(projectId, targetVersion), '1');
+        window.localStorage.setItem(buildMakeClientUpdateReminderDismissedKey(projectId, targetVersion, mode), '1');
     } catch {
         // Ignore storage failures; the update entry remains available without the one-time dismissal memory.
     }
@@ -311,7 +327,7 @@ export default function IndexPage({
         const activeProjectId = String(workspace.activeProjectId || '').trim();
         const reminderTarget = makeClientUpdateReminderTargetRef.current;
         if (reminderTarget && reminderTarget.projectId === activeProjectId) {
-            writeMakeClientUpdateReminderDismissed(reminderTarget.projectId, reminderTarget.targetVersion);
+            writeMakeClientUpdateReminderDismissed(reminderTarget.projectId, reminderTarget.targetVersion, reminderTarget.mode);
             makeClientUpdateReminderPendingSeenProjectIdRef.current = '';
         } else if (activeProjectId) {
             makeClientUpdateReminderPendingSeenProjectIdRef.current = activeProjectId;
@@ -338,6 +354,7 @@ export default function IndexPage({
         setMakeClientUpdateAvailable(updateAvailable);
         const projectId = String(status?.projectId || workspace.activeProjectId || '').trim();
         const targetVersion = String(status?.targetVersion || '').trim();
+        const reminderMode: MakeClientUpdateReminderMode = status?.repairAvailable === true ? 'repair' : 'update';
         if (!updateAvailable || !projectId || !targetVersion) {
             makeClientUpdateReminderTargetRef.current = null;
             if (makeClientUpdateReminderPendingSeenProjectIdRef.current === projectId) {
@@ -346,14 +363,14 @@ export default function IndexPage({
             setMakeClientUpdateReminderVisible(false);
             return;
         }
-        makeClientUpdateReminderTargetRef.current = { projectId, targetVersion };
+        makeClientUpdateReminderTargetRef.current = { projectId, targetVersion, mode: reminderMode };
         if (makeClientUpdateReminderPendingSeenProjectIdRef.current === projectId) {
-            writeMakeClientUpdateReminderDismissed(projectId, targetVersion);
+            writeMakeClientUpdateReminderDismissed(projectId, targetVersion, reminderMode);
             makeClientUpdateReminderPendingSeenProjectIdRef.current = '';
             setMakeClientUpdateReminderVisible(false);
             return;
         }
-        setMakeClientUpdateReminderVisible(updateAvailable && !readMakeClientUpdateReminderDismissed(projectId, targetVersion));
+        setMakeClientUpdateReminderVisible(updateAvailable && !readMakeClientUpdateReminderDismissed(projectId, targetVersion, reminderMode));
     }, [workspace.activeProjectId]);
 
     useEffect(() => {
@@ -371,16 +388,17 @@ export default function IndexPage({
             .then((status) => {
                 if (!cancelled) {
                     const updateAvailable = status.updateAvailable === true;
+                    const reminderMode: MakeClientUpdateReminderMode = status?.repairAvailable === true ? 'repair' : 'update';
                     setMakeClientUpdateAvailable(updateAvailable);
                     if (updateAvailable && status.targetVersion) {
-                        makeClientUpdateReminderTargetRef.current = { projectId: activeProjectId, targetVersion: status.targetVersion };
+                        makeClientUpdateReminderTargetRef.current = { projectId: activeProjectId, targetVersion: status.targetVersion, mode: reminderMode };
                         if (makeClientUpdateReminderPendingSeenProjectIdRef.current === activeProjectId) {
-                            writeMakeClientUpdateReminderDismissed(activeProjectId, status.targetVersion);
+                            writeMakeClientUpdateReminderDismissed(activeProjectId, status.targetVersion, reminderMode);
                             makeClientUpdateReminderPendingSeenProjectIdRef.current = '';
                             setMakeClientUpdateReminderVisible(false);
                             return;
                         }
-                        setMakeClientUpdateReminderVisible(updateAvailable && !readMakeClientUpdateReminderDismissed(activeProjectId, status.targetVersion));
+                        setMakeClientUpdateReminderVisible(updateAvailable && !readMakeClientUpdateReminderDismissed(activeProjectId, status.targetVersion, reminderMode));
                     } else {
                         makeClientUpdateReminderTargetRef.current = null;
                         if (makeClientUpdateReminderPendingSeenProjectIdRef.current === activeProjectId) {
