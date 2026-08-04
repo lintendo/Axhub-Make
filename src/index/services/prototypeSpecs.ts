@@ -42,6 +42,8 @@ export const prototypeSpecsApi = {
 
 function getPrototypeDirectory(prototypeFilePath: string, prototypeId: string): string {
     const normalized = String(prototypeFilePath || '').trim().replace(/\\/gu, '/').replace(/\/+$/gu, '');
+    const specMarkerIndex = normalized.indexOf('/.spec/');
+    if (specMarkerIndex > 0) return normalized.slice(0, specMarkerIndex);
     const slashIndex = normalized.lastIndexOf('/');
     if (slashIndex > 0) return normalized.slice(0, slashIndex);
     const fallbackId = String(prototypeId || '').trim();

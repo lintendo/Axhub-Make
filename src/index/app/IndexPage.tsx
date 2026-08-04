@@ -72,6 +72,10 @@ import {
 } from '../domains/notifications/notificationDiagnostics';
 import { createNotificationPlayer, type NotificationPlayer } from '../domains/notifications/notificationPlayer';
 import { readNotificationSettings } from '../domains/notifications/notificationSettings';
+import {
+    resolveEffectiveSidebarCollapsed,
+    resolveResponsiveSidebarDefaultCollapsed,
+} from '../components/sidebar/responsiveSidebarState';
 import './styles/index-page.css';
 
 interface AppInnerProps {
@@ -282,7 +286,28 @@ export default function IndexPage({
         };
     }, []);
 
-    const [collapsed, setCollapsed] = useState(false);
+    const initialResourceDeepLink = useMemo(() => parseResourceDeepLink(), []);
+    const [responsiveSidebarDefaultCollapsed, setResponsiveSidebarDefaultCollapsed] = useState(() => (
+        typeof window === 'undefined'
+            ? false
+            : resolveResponsiveSidebarDefaultCollapsed({
+                workspaceWidth: window.innerWidth,
+                assistantVisible: false,
+                assistantWidth: 0,
+            })
+    ));
+    const [sidebarPinnedCollapsed, setSidebarPinnedCollapsed] = useState<boolean | null>(() => (
+        initialResourceDeepLink?.collapseSidebar ? true : null
+    ));
+    const collapsed = resolveEffectiveSidebarCollapsed({
+        responsiveDefaultCollapsed: responsiveSidebarDefaultCollapsed,
+        pinnedCollapsed: sidebarPinnedCollapsed,
+    });
+    const collapsedRef = useRef(collapsed);
+    collapsedRef.current = collapsed;
+    const setCollapsed = useCallback<React.Dispatch<React.SetStateAction<boolean>>>((next) => {
+        setSidebarPinnedCollapsed(typeof next === 'function' ? next(collapsedRef.current) : next);
+    }, []);
     const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
     const [settingsDialogInitialTab, setSettingsDialogInitialTab] = useState<SettingsDialogInitialTab>('project');
     const [settingsDialogAIContext, setSettingsDialogAIContext] = useState<SettingsDialogAIContext | null>(null);
@@ -311,7 +336,6 @@ export default function IndexPage({
     const startGuideResourceUploadInputRef = useRef<HTMLInputElement | null>(null);
     const makeClientUpdateReminderTargetRef = useRef<MakeClientUpdateReminderTarget | null>(null);
     const makeClientUpdateReminderPendingSeenProjectIdRef = useRef('');
-    const initialResourceDeepLink = useMemo(() => parseResourceDeepLink(), []);
     const [initialResourceDeepLinkHandled, setInitialResourceDeepLinkHandled] = useState(() => !initialResourceDeepLink);
     const handleInitialResourceDeepLinkHandled = useCallback(() => {
         setInitialResourceDeepLinkHandled(true);
@@ -1237,6 +1261,7 @@ export default function IndexPage({
                 view: viewMode,
                 pageId: selectedPrototypePageId || undefined,
                 projectId: activeProjectId || undefined,
+                device: preview.previewDeviceParam || undefined,
             };
         }
         if (currentContentIsDocumentResource && resources.selectedDoc) {
@@ -1262,7 +1287,7 @@ export default function IndexPage({
             };
         }
         return null;
-    }, [contentMode, resources.selectedDoc, resources.selectedTemplate, resources.selectedTheme, selectedItem, selectedPrototypePageId, sidebarTab, viewMode, workspace.activeProjectId]);
+    }, [contentMode, preview.previewDeviceParam, resources.selectedDoc, resources.selectedTemplate, resources.selectedTheme, selectedItem, selectedPrototypePageId, sidebarTab, viewMode, workspace.activeProjectId]);
 
     const currentDeepLinkUrl = useMemo(() => (
         currentDeepLinkTarget ? buildIndexDeepLinkUrl(currentDeepLinkTarget) : ''
@@ -2471,6 +2496,10 @@ export default function IndexPage({
                 sidebarProps={sidebarProps}
                 presentationAreaProps={presentationAreaProps}
                 assistantPanelProps={assistantPanelProps}
+                responsiveSidebarProps={{
+                    defaultCollapsed: responsiveSidebarDefaultCollapsed,
+                    onDefaultCollapsedChange: setResponsiveSidebarDefaultCollapsed,
+                }}
                 dialogsProps={dialogsProps}
                 mobileProps={mobileProps}
             />

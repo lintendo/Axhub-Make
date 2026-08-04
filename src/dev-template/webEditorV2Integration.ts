@@ -62,6 +62,7 @@ export interface WebEditorV2Controller {
 
 export interface WebEditorV2EnableOptions {
   toolbarMode?: CommentaryToolbarMode;
+  interactionProfile?: WebEditorV2InitOptions['interactionProfile'];
   initialDarkMode?: boolean;
   mobileMode?: boolean;
   assistantPanelOpen?: boolean;
@@ -73,6 +74,13 @@ export interface WebEditorV2EnableOptions {
 
 function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function readAnnotationInteractionProfileFromSearch(
+  search: string,
+): WebEditorV2InitOptions['interactionProfile'] | undefined {
+  const params = new URLSearchParams(search);
+  return params.get('annotationSession') === '1' ? 'annotation' : undefined;
 }
 
 const ANNOTATION_PAGE_CONTEXT_MISMATCH_MESSAGE =
@@ -1628,6 +1636,7 @@ export const createWebEditorV2Controller = (
   let editor: WebEditorV2Api | null = null;
   let editorInitPromise: Promise<WebEditorV2Api> | null = null;
   let runtimeToolbarMode: CommentaryToolbarMode | undefined;
+  let runtimeInteractionProfile: WebEditorV2InitOptions['interactionProfile'] | undefined;
   let runtimeAssistantPanelOpen = false;
   let runtimeCommentPageScope = '';
   let runtimeAnnotationApiBaseUrl = '';
@@ -1736,17 +1745,28 @@ export const createWebEditorV2Controller = (
         typeof window !== 'undefined'
           ? readEditorMobileModeFromSearch(window.location.search)
           : undefined;
+      const searchInteractionProfile =
+        typeof window !== 'undefined'
+          ? readAnnotationInteractionProfileFromSearch(window.location.search)
+          : undefined;
       const { skillInstallSource, ...restUiOptions } = options.ui ?? {};
       const normalizedSkillInstallSource =
         typeof skillInstallSource === 'string' ? normalizeSkillSource(skillInstallSource) : null;
       const resolvedToolbarMode = runtimeToolbarMode ?? searchToolbarMode ?? restUiOptions.toolbarMode;
+      const resolvedInteractionProfile =
+        runtimeInteractionProfile ?? searchInteractionProfile ?? options.interactionProfile;
       const resolvedUi = {
         breadcrumbs: true,
         propertyPanel: true,
         showCopyPromptAction: true,
         getAssistantPanelOpen: () => runtimeAssistantPanelOpen,
         ...(resolvedToolbarMode === 'host'
-          ? { onHostToolbarAction: requestParentHostToolbarAction }
+          ? {
+              onHostToolbarAction: requestParentHostToolbarAction,
+              onRequestFullExit: async () => {
+                await requestParentHostToolbarAction({ type: 'full-exit' });
+              },
+            }
           : {}),
         onEnableAnnotation: async () => {
           if (annotationClient.isEnabled()) return true;
@@ -1802,6 +1822,7 @@ export const createWebEditorV2Controller = (
 
       editor = createCommentary({
         ...editorOptions,
+        ...(resolvedInteractionProfile ? { interactionProfile: resolvedInteractionProfile } : {}),
         ...(typeof resolvedMobileMode === 'boolean' ? { mobileMode: resolvedMobileMode } : {}),
         ui: resolvedUi,
         host: {
@@ -1874,6 +1895,7 @@ export const createWebEditorV2Controller = (
 
   const applyEnableOptions = (enableOptions?: WebEditorV2EnableOptions) => {
     const nextToolbarMode = enableOptions?.toolbarMode;
+    const nextInteractionProfile = enableOptions?.interactionProfile;
     const nextInitialDarkMode = enableOptions?.initialDarkMode;
     const nextCommentPageScope = normalizeString(enableOptions?.commentPageScope);
     const hasExplicitCommentPageScope = typeof enableOptions?.commentPageScope === 'string';
@@ -1898,6 +1920,11 @@ export const createWebEditorV2Controller = (
 
     if (nextToolbarMode && nextToolbarMode !== runtimeToolbarMode) {
       runtimeToolbarMode = nextToolbarMode;
+      shouldRecreateInactiveEditor = true;
+    }
+
+    if (nextInteractionProfile && nextInteractionProfile !== runtimeInteractionProfile) {
+      runtimeInteractionProfile = nextInteractionProfile;
       shouldRecreateInactiveEditor = true;
     }
 

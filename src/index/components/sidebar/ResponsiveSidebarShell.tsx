@@ -14,28 +14,28 @@ export default function ResponsiveSidebarShell({
     const responsiveSidebar = useResponsiveSidebarController();
     const fallbackContentId = React.useId();
     const contentId = responsiveSidebar?.contentId ?? fallbackContentId;
-    const compactOpen = responsiveSidebar?.compactOpen === true;
+    const previewOpen = responsiveSidebar?.previewOpen === true;
 
     return (
         <div
             className={cn(
                 'ax-sidebar-shell',
                 collapsed && 'is-collapsed',
-                compactOpen && 'is-compact-open',
+                collapsed && previewOpen && 'is-preview-open',
             )}
-            data-compact-open={compactOpen ? 'true' : 'false'}
-            onPointerEnter={responsiveSidebar?.compactDesktop ? responsiveSidebar?.interaction.pointerEnter : undefined}
-            onPointerLeave={responsiveSidebar?.compactDesktop ? responsiveSidebar?.interaction.pointerLeave : undefined}
-            onFocusCapture={responsiveSidebar?.compactDesktop ? responsiveSidebar?.interaction.focusEnter : undefined}
+            data-preview-open={collapsed && previewOpen ? 'true' : 'false'}
+            onPointerEnter={collapsed ? responsiveSidebar?.interaction.pointerEnter : undefined}
+            onPointerLeave={collapsed ? responsiveSidebar?.interaction.pointerLeave : undefined}
+            onFocusCapture={collapsed ? responsiveSidebar?.interaction.focusEnter : undefined}
             onBlurCapture={(event) => {
-                if (!responsiveSidebar?.compactDesktop) return;
+                if (!collapsed) return;
                 if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
                     responsiveSidebar?.interaction.focusLeave();
                 }
             }}
             onKeyDownCapture={(event) => {
                 if (event.key === 'Escape') {
-                    if (!responsiveSidebar?.compactDesktop || !responsiveSidebar.compactOpen) return;
+                    if (!collapsed || !previewOpen || !responsiveSidebar) return;
                     responsiveSidebar.closeAndRestoreFocus();
                 }
             }}

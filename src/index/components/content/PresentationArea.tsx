@@ -97,6 +97,14 @@ export default function PresentationArea(rawProps: PresentationAreaProps) {
                     ideAvailability={props.ideAvailability}
                     quickEditAvailable={props.quickEditAvailable}
                     quickEditActive={props.quickEditActive}
+                    prototypeAnnotationSessionActive={props.prototypeAnnotationSessionActive}
+                    prototypeAnnotationEnabled={props.prototypeAnnotationEnabled}
+                    prototypeAnnotationEnableLoading={props.prototypeAnnotationEnableLoading}
+                    prototypeAnnotationPromptCopying={props.prototypeAnnotationPromptCopying}
+                    handleOpenPrototypeAnnotationSession={props.handleOpenPrototypeAnnotationSession}
+                    handleCheckPrototypeAnnotationEnabled={props.handleCheckPrototypeAnnotationEnabled}
+                    handleEnablePrototypeAnnotation={props.handleEnablePrototypeAnnotation}
+                    handleCopyPrototypeAnnotationPrompt={props.handleCopyPrototypeAnnotationPrompt}
                     docEditState={props.docEditState}
                     markdownPromptCopying={props.markdownPromptCopying}
                     quickEditRuntimeStatus={props.quickEditRuntimeStatus}
@@ -123,7 +131,7 @@ export default function PresentationArea(rawProps: PresentationAreaProps) {
             ) : (
                 <div className="ax-sidebar-compact-fallback-trigger">
                     <ResponsiveSidebarTriggerButton
-                        compactOnly
+                        collapsedOnly
                         collapsed={props.collapsed}
                         setCollapsed={props.setCollapsed}
                         className="bg-background/90 shadow-sm"
@@ -151,6 +159,7 @@ export default function PresentationArea(rawProps: PresentationAreaProps) {
                         handleChangePreviewScaleMode={props.handleChangePreviewScaleMode}
                         handleChangeSplitPreviewWidth={props.handleChangeSplitPreviewWidth}
                         handleChangeSplitPreviewHeight={props.handleChangeSplitPreviewHeight}
+                        handlePreviewContainerSizeChange={props.handlePreviewContainerSizeChange}
                         quickEditActive={props.quickEditActive}
                         onRunPrototypePanePromptAction={props.handleRunPrototypePanePromptAction}
                         currentDevice={props.currentDevice}

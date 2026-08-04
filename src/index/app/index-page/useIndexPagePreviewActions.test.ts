@@ -39,6 +39,13 @@ function getSourceSegment(source: string, startNeedle: string, endNeedle: string
 }
 
 describe('useIndexPagePreviewActions source', () => {
+  it('exposes preview container width changes from the device actions hook', () => {
+    const source = readPreviewRootSource();
+
+    expect(source).toContain('const handlePreviewContainerSizeChange = previewDeviceActions.handlePreviewContainerSizeChange;');
+    expect(source).toContain('handlePreviewContainerSizeChange,');
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -84,6 +91,36 @@ describe('useIndexPagePreviewActions source', () => {
     expect(source).not.toContain("event.data.type !== 'COPY_TO_FIGMA_RESULT'");
   });
 
+  it('shows the cross-origin browser hint only after an affected action fails', () => {
+    const source = readPreviewRootSource();
+    const actionHintSegment = getSourceSegment(
+      source,
+      'const showCrossOriginPreviewActionHint = useCallback',
+      'const handleCopyToAxure = useCallback',
+    );
+    const axureFailureSegment = getSourceSegment(
+      source,
+      'const handleCopyToAxure = useCallback',
+      'const handleCopyToFigma = useCallback',
+    );
+    const figmaFailureSegment = getSourceSegment(
+      source,
+      'const handleCopyToFigma = useCallback',
+      'const handleCopyCurrentScreenshot = useCallback',
+    );
+    const screenshotFailureSegment = getSourceSegment(
+      source,
+      'const handleCopyCurrentScreenshot = useCallback',
+      'const handleExportMake = useCallback',
+    );
+
+    expect(actionHintSegment).toContain('getIframeOrigin(targetIframe) === window.location.origin');
+    expect(actionHintSegment).toContain("id: 'axhub-preview-cross-origin-action'");
+    expect(axureFailureSegment).toContain('showCrossOriginPreviewActionHint();');
+    expect(figmaFailureSegment).toContain('showCrossOriginPreviewActionHint();');
+    expect(screenshotFailureSegment).toContain('showCrossOriginPreviewActionHint();');
+  });
+
   it('does not mention the old page-switch figma paste workaround after copy succeeds', () => {
     const source = readPreviewActionsSource();
 
@@ -123,6 +160,52 @@ describe('useIndexPagePreviewActions source', () => {
     expect(source).toContain('previewDeviceActions.handleActivateSplitPreview');
     expect(source).not.toContain("from 'lucide-react'");
     expect(source).not.toContain('const [previewConfig, setPreviewConfig] = useState<PreviewConfig>');
+  });
+
+  it('locks automatic viewport selection while annotation mode changes sidebar width', () => {
+    const source = readPreviewRootSource();
+    const completeOpenSource = getSourceSegment(
+      source,
+      'const completePrototypeEditorOpen = useCallback(() => {',
+      'const reenterPrototypeEditorAfterIframeLoad = useCallback',
+    );
+    const enterDocumentSource = getSourceSegment(
+      source,
+      "const enterDocumentEditor = useCallback(async (mode: SpecQuickEditMode = 'comment'",
+      'const enterHtmlDocumentEditor = useCallback',
+    );
+    const enterHtmlSource = getSourceSegment(
+      source,
+      'const enterHtmlDocumentEditor = useCallback',
+      'const handleEnableDocEdit = useCallback',
+    );
+    const exitSource = getSourceSegment(
+      source,
+      'const handleExitWebEditor = useCallback',
+      'exitWebEditorRef.current = handleExitWebEditor;',
+    );
+
+    expect(source).toContain('const lockAdaptiveDesktopPreview = previewDeviceActions.lockAdaptiveDesktopPreview;');
+    expect(source).toContain('const unlockAdaptiveDesktopPreview = previewDeviceActions.unlockAdaptiveDesktopPreview;');
+    expect(completeOpenSource.indexOf('lockAdaptiveDesktopPreview();'))
+      .toBeLessThan(completeOpenSource.indexOf('setCollapsed(true);'));
+    expect(enterDocumentSource).not.toContain('lockAdaptiveDesktopPreview();');
+    expect(enterHtmlSource).toContain('lockAdaptiveDesktopPreview();');
+    expect(exitSource).toContain('unlockAdaptiveDesktopPreview();');
+  });
+
+  it('keeps the preview layout stable while opening the review sidebar', () => {
+    const source = readPreviewRootSource();
+    const toggleSource = getSourceSegment(
+      source,
+      'const handleReviewPanelToggle = useCallback(() => {',
+      'const openReviewReportDetail = useCallback',
+    );
+
+    expect(toggleSource).toContain('const nextOpen = !reviewPanelOpen;');
+    expect(toggleSource).toContain('lockAdaptiveDesktopPreview();');
+    expect(toggleSource).toContain('unlockAdaptiveDesktopPreview();');
+    expect(toggleSource).toContain('setReviewPanelOpen(nextOpen);');
   });
 
   it('uses shared content mode resolution so resource tab browsing does not exit prototype canvas', () => {
@@ -1126,6 +1209,92 @@ describe('useIndexPagePreviewActions source', () => {
     expect(enableAnnotationSource).not.toContain('iframe.src = currentSrc;');
   });
 
+  it('checks persisted prototype annotation status before showing the enable dialog', () => {
+    const source = readPreviewActionsSource();
+    const statusCheckSource = getSourceSegment(
+      source,
+      'const handleCheckPrototypeAnnotationEnabled = useCallback(async (): Promise<boolean | null> => {',
+      'const handleEnablePrototypeAnnotation = useCallback',
+    );
+
+    expect(statusCheckSource).toContain('const targetPath = resolvePrototypeAnnotationTargetPath(selectedItem);');
+    expect(statusCheckSource).toContain('const projectScope = requireProjectScope(projectId);');
+    expect(statusCheckSource).toContain('apiService.getPrototypeAnnotationStatus(targetPath, projectScope)');
+    expect(statusCheckSource).toContain('return status.enabled === true;');
+    expect(statusCheckSource).toContain("messageApi.error('读取需求标注状态失败，请稍后重试');");
+    expect(statusCheckSource).toContain('return null;');
+  });
+
+  it('restarts an active quick-edit session before entering PRD annotation mode', () => {
+    const source = readPreviewActionsSource();
+    const annotationEntrySource = getSourceSegment(
+      source,
+      'const handleOpenPrototypeAnnotationSession = useCallback',
+      'const handleCopyPrototypeAnnotationPrompt = useCallback',
+    );
+
+    expect(annotationEntrySource).toContain('const wasQuickEditActive = quickEditRuntimeActiveRef.current;');
+    expect(annotationEntrySource).toContain('pendingPrototypeAnnotationSessionOpenRef.current = true;');
+    expect(annotationEntrySource).toContain('if (wasQuickEditActive) {');
+    expect(annotationEntrySource).toContain(
+      'await handleExitWebEditor({ restoreDevice: false, restorePanelOnly: false });',
+    );
+    expect(annotationEntrySource).toContain('return handleOpenWebEditor();');
+  });
+
+  it('exits PRD annotation directly instead of restoring the prior standalone comment panel', () => {
+    const source = readPreviewRootSource();
+    const exitSource = getSourceSegment(
+      source,
+      'const handleExitWebEditor = useCallback(async',
+      'exitWebEditorRef.current = handleExitWebEditor;',
+    );
+
+    expect(exitSource).toContain(
+      'const isPrototypeAnnotationSession = activePrototypeEditorLaunchOptionsRef.current?.annotationSession === true;',
+    );
+    expect(exitSource).toContain(
+      'const shouldRestorePanelOnly = options?.restorePanelOnly === false || isPrototypeAnnotationSession',
+    );
+    expect(exitSource).toContain(': standalonePanelBeforeQuickEditRef.current;');
+  });
+
+  it('marks quick edit inactive before exit state changes can queue an iframe restore', () => {
+    const source = readPreviewRootSource();
+    const exitSource = getSourceSegment(
+      source,
+      'const handleExitWebEditor = useCallback(async',
+      'exitWebEditorRef.current = handleExitWebEditor;',
+    );
+    const runtimeInactiveIndex = exitSource.indexOf('quickEditRuntimeActiveRef.current = false;');
+    const launchOptionsResetIndex = exitSource.indexOf(
+      'activePrototypeEditorLaunchOptionsRef.current = null;',
+    );
+    const firstAwaitIndex = exitSource.indexOf('await ');
+
+    expect(runtimeInactiveIndex).toBeGreaterThan(-1);
+    expect(runtimeInactiveIndex).toBeLessThan(launchOptionsResetIndex);
+    expect(runtimeInactiveIndex).toBeLessThan(firstAwaitIndex);
+  });
+
+  it('handles in-card full exit in the Make host without routing back into the iframe editor', () => {
+    const source = readPreviewRootSource();
+    const runHostToolbarActionSource = getSourceSegment(
+      source,
+      'const runHostToolbarAction = useCallback(async (action: CommentaryHostToolbarAction) => {',
+      'const runQuickEditSaveAction = useCallback',
+    );
+    const fullExitStart = runHostToolbarActionSource.indexOf("if (nextAction.type === 'full-exit') {");
+    const fullExitEnd = runHostToolbarActionSource.indexOf('if (documentEditorActiveRef.current)', fullExitStart);
+
+    expect(fullExitStart).toBeGreaterThan(-1);
+    expect(fullExitEnd).toBeGreaterThan(fullExitStart);
+    const fullExitSource = runHostToolbarActionSource.slice(fullExitStart, fullExitEnd);
+    expect(fullExitSource).toContain('await abortAnnotationDirectRun({ showFeedback: false });');
+    expect(fullExitSource).toContain('await exitWebEditorRef.current({ restorePanelOnly: false });');
+    expect(fullExitSource).not.toContain('runHostToolbarAction?.(nextAction)');
+  });
+
   it('uses the latest host toolbar state ref when connecting local AI from fallback quick edit mode', () => {
     const source = readPreviewRootSource();
     const fallbackActionSource = getSourceSegment(
@@ -1220,7 +1389,7 @@ describe('useIndexPagePreviewActions source', () => {
     expect(source).toContain("case 'completed':");
     expect(source).toContain("case 'aborted':");
     expect(source).toContain("case 'error':");
-    expect(directRunSource).toContain('await persistAcceptedAnnotationEditingState(event, applyAnnotationEditingTaskState);');
+    expect(directRunSource).toContain("await applyAnnotationEditingTaskState(event.editingTargets, 'editing', event.taskRef);");
     expect(directRunSource).toContain("await applyAnnotationEditingTaskState(event.editingTargets, 'completed', event.taskRef);");
     expect(directRunSource).toContain("await applyAnnotationEditingTaskState(event.editingTargets, 'idle', event.taskRef);");
     expect(directRunSource).toContain("await applyAnnotationEditingTaskState(event.editingTargets, 'error', terminalTaskRef);");
@@ -1353,11 +1522,21 @@ describe('useIndexPagePreviewActions source', () => {
       'const runQuickEditHostToolbarAction = useCallback(async (action: CommentaryHostToolbarAction) => {',
       'const runHostToolbarAction = useCallback(async (action: CommentaryHostToolbarAction) => {',
     );
+    const hostActionSource = getSourceSegment(
+      source,
+      'const runHostToolbarAction = useCallback(async (action: CommentaryHostToolbarAction) => {',
+      'const runQuickEditSaveAction = useCallback',
+    );
 
     expect(source).not.toContain('onInvalidateAnnotationAssistantConversation');
     expect(source).toContain('await annotationDirectRunRegistryRef.current.abortAll();');
-    expect(fallbackActionSource).toContain("nextAction.type === 'full-exit'");
-    expect(fallbackActionSource).toContain("await abortAnnotationDirectRun({ showFeedback: false });");
+    expect(fallbackActionSource).not.toContain("nextAction.type === 'full-exit'");
+    expect(hostActionSource).toContain("nextAction.type === 'full-exit'");
+    expect(hostActionSource).toContain("await abortAnnotationDirectRun({ showFeedback: false });");
+    expect(hostActionSource).toContain(
+      'await exitWebEditorRef.current({ restorePanelOnly: false });',
+    );
+    expect(source.match(/nextAction\.type === 'full-exit'/g) ?? []).toHaveLength(1);
   });
 
   it('keeps host-delegated card sends pane-scoped before split prompt collection', () => {

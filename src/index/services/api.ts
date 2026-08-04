@@ -843,7 +843,25 @@ async function readApiJsonResponse<T>(response: Response, fallbackMessage: strin
     return result as T;
 }
 
+export interface PrototypeAnnotationStatusResponse {
+    enabled: boolean;
+    exists: boolean;
+    source: unknown | null;
+    path: string;
+}
+
 export const apiService = {
+    async getPrototypeAnnotationStatus(
+        targetPath: string,
+        scope: ProjectScope,
+    ): Promise<PrototypeAnnotationStatusResponse> {
+        const response = await fetch(withProjectScope(
+            `/api/prototype-annotation?targetPath=${encodeURIComponent(targetPath)}`,
+            scope,
+        ), { cache: 'no-store' });
+        return readApiJsonResponse<PrototypeAnnotationStatusResponse>(response, '读取需求标注状态失败');
+    },
+
     async createPlaceholderPrototype(scope: ProjectScope): Promise<CreatePlaceholderPrototypeResponse> {
         const response = await fetch(withProjectScope('/api/prototypes/create-placeholder', scope), {
             method: 'POST',

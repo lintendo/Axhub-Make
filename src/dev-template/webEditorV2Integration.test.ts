@@ -101,6 +101,40 @@ describe('createWebEditorV2Controller launch options', () => {
     expect(start).toHaveBeenCalledTimes(1);
   });
 
+  it('passes the annotation interaction profile into commentary', async () => {
+    mocked.createCommentary.mockReturnValue({
+      start: vi.fn(),
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: false, version: 2 })),
+      getStatus: vi.fn(() => ({ active: false, undoCount: 0, redoCount: 0 })),
+      acknowledgeSavedTextChanges: vi.fn(),
+      acknowledgeSavedStyleChanges: vi.fn(),
+      getHostToolbarState: vi.fn(),
+      subscribeHostToolbarState: vi.fn(() => () => undefined),
+      runHostToolbarAction: vi.fn(async () => true),
+      destroy: vi.fn(),
+    });
+
+    vi.stubGlobal('window', {
+      location: {
+        search: '',
+        pathname: '/prototypes/home',
+        href: 'http://localhost:51720/prototypes/home',
+        protocol: 'http:',
+        hostname: 'localhost',
+      },
+      confirm: vi.fn(() => true),
+      alert: vi.fn(),
+    });
+
+    const controller = createWebEditorV2Controller();
+    await controller.enable({ interactionProfile: 'annotation' } as never);
+
+    expect(mocked.createCommentary).toHaveBeenCalledWith(
+      expect.objectContaining({ interactionProfile: 'annotation' }),
+    );
+  });
+
   it('does not fetch runtime fallback for ignored AI bridge options', async () => {
     const start = vi.fn();
     const stop = vi.fn();
@@ -3406,6 +3440,31 @@ describe('createWebEditorV2Controller', () => {
     } as MessageEvent);
 
     await expect(actionPromise).resolves.toBe(true);
+
+    expect(editorOptions.ui.onRequestFullExit).toEqual(expect.any(Function));
+    const fullExitPromise = editorOptions.ui.onRequestFullExit();
+    const fullExitRequest = parentWindow.postMessage.mock.calls[1]?.[0] as {
+      requestId: string;
+      type: string;
+      action: unknown;
+    };
+
+    expect(fullExitRequest).toEqual(expect.objectContaining({
+      type: 'AXHUB_PROTOTYPE_EDITOR_HOST_TOOLBAR_ACTION_REQUEST',
+      action: { type: 'full-exit' },
+    }));
+
+    const [fullExitMessageListener] = Array.from(listeners.get('message') ?? []);
+    fullExitMessageListener?.({
+      data: {
+        type: 'AXHUB_PROTOTYPE_EDITOR_HOST_TOOLBAR_ACTION_RESULT',
+        requestId: fullExitRequest.requestId,
+        handled: true,
+      },
+      source: parentWindow,
+    } as MessageEvent);
+
+    await expect(fullExitPromise).resolves.toBeUndefined();
     expect(start).toHaveBeenCalledTimes(1);
   });
 

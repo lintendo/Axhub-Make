@@ -50,6 +50,13 @@ describe('spec-template quick editing regression boundary', () => {
     expect(viewerSource).toContain("asset=${encodeURIComponent(assetPath)}");
   });
 
+  it('passes the active document image resolver into edit mode', () => {
+    const viewerSource = readSpecTemplateSource('MarkdownViewer.tsx');
+
+    expect(viewerSource).toContain('resolveCurrentDocumentImageSrc');
+    expect(viewerSource).toContain('imageSrcResolver={resolveCurrentDocumentImageSrc}');
+  });
+
   it('supports opening Markdown documents directly in edit mode from the URL', () => {
     const viewerSource = readSpecTemplateSource('MarkdownViewer.tsx');
 

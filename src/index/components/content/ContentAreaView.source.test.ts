@@ -10,6 +10,10 @@ function readResourceStartPromptGridSource() {
   return readFileSync(resolve(__dirname, './ResourceStartPromptGrid.tsx'), 'utf8');
 }
 
+function readStartPromptCardSource() {
+  return readFileSync(resolve(__dirname, './StartPromptCard.tsx'), 'utf8');
+}
+
 function readCanvasAiSceneRegistrySource() {
   return readFileSync(resolve(__dirname, '../../domains/ai-generation/canvasAiSceneRegistry.ts'), 'utf8');
 }
@@ -23,6 +27,36 @@ function getSourceSegment(source: string, startNeedle: string, endNeedle: string
 }
 
 describe('ContentAreaView review zoom source', () => {
+  it('keeps preview loading alive when a cross-origin iframe cannot accept resize listeners', () => {
+    const source = readContentAreaViewSource();
+    const measurementSegment = getSourceSegment(
+      source,
+      'const attachIframeMeasurement = (',
+      '    const handleSingleIframeLoad = () => {',
+    );
+
+    expect(measurementSegment).toContain('try {\n            const frameWindow = iframe.contentWindow;');
+    expect(measurementSegment).not.toContain('toast.info(');
+    expect(measurementSegment).not.toContain('axhub-preview-cross-origin-measurement');
+    expect(source).toContain('onPreviewIframeLoad?.(previewIframeRef.current);');
+  });
+
+  it('reports stable preview width changes through the existing resize observer', () => {
+    const source = readContentAreaViewSource();
+    const measurementEffect = getSourceSegment(
+      source,
+      'const updateSize = () => {',
+      '    const previewLayout = useMemo',
+    );
+
+    expect(source).toContain('handlePreviewContainerSizeChange: (width: number) => void;');
+    expect(source).toContain('handlePreviewContainerSizeChange,');
+    expect(measurementEffect).toContain('resolveStablePreviewContainerSize');
+    expect(measurementEffect).toContain('horizontalInset: 0,');
+    expect(measurementEffect).toContain('handlePreviewContainerSizeChange(next.width)');
+    expect((measurementEffect.match(/new ResizeObserver/g) || []).length).toBe(1);
+  });
+
   it('allows embedded prototype and theme preview iframes to write clipboard text', () => {
     const source = readContentAreaViewSource();
     const scaledIframeHelper = getSourceSegment(
@@ -53,6 +87,12 @@ describe('ContentAreaView review zoom source', () => {
     expect(source).not.toContain('reviewPageZoomEnabled');
     expect(source).not.toContain('desktopReviewZoomLayout');
     expect(source).not.toContain('reviewPageZoom');
+  });
+
+  it('explains disabled runtime preview without claiming a spec-only prototype lacks clientUrl', () => {
+    const source = readContentAreaViewSource();
+
+    expect(source).toContain("selectedItem.clientUrl ? '当前原型尚未生成可运行页面' : '当前原型缺少 clientUrl，无法打开预览'");
   });
 
   it('wraps the resource canvas render path in a scoped error boundary', () => {
@@ -357,6 +397,7 @@ describe('ContentAreaView review zoom source', () => {
   it('renders every resource capability in a quiet title-free grid', () => {
     const source = readContentAreaViewSource();
     const resourceGridSegment = readResourceStartPromptGridSource();
+    const startPromptCardSegment = readStartPromptCardSource();
     const resourceCardsSegment = getSourceSegment(
       source,
       'const RESOURCE_START_PROMPT_CARDS',
@@ -422,16 +463,16 @@ describe('ContentAreaView review zoom source', () => {
     expect(startGuideSegment).toContain('onImageSizeChange={(size) =>');
     expect(startGuideSegment).toContain('setImageStartParams((current) => applyResourceStartImageSize(current, size))');
     expect(resourceGridSegment).toContain('<ul');
-    expect(resourceGridSegment).toContain('<li key={card.id}');
+    expect(resourceGridSegment).toContain('<StartPromptCard');
+    expect(resourceGridSegment).toContain('key={card.id}');
     expect(resourceGridSegment).toContain('aria-label="资源生成能力"');
-    expect(resourceGridSegment).toContain('aria-label={card.title}');
+    expect(resourceGridSegment).toContain('title={card.title}');
     expect(resourceGridSegment).not.toContain('role="listitem"');
-    expect(resourceGridSegment).toContain('disabled={disabled}');
+    expect(resourceGridSegment).toContain('selectionDisabled={disabled}');
     expect(resourceGridSegment).toContain('mt-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4');
-    expect(resourceGridSegment).toContain('min-h-16');
-    expect(resourceGridSegment).toContain('rounded-[10px]');
-    expect(resourceGridSegment).not.toContain('shadow-');
-    expect(resourceGridSegment).not.toContain('translate');
+    expect(startPromptCardSegment).toContain('min-h-16');
+    expect(startPromptCardSegment).toContain('rounded-[10px]');
+    expect(startPromptCardSegment).not.toContain('shadow-');
     expect(resourceGridSegment).toContain('resolveResourceStartPromptSelection({ card, activeScene })');
     expect(resourceGridSegment).toContain('onSceneChange(selection.scene);');
     expect(resourceGridSegment).toContain('selectPrompt(pendingSelection.prompt);');
@@ -532,6 +573,32 @@ describe('ContentAreaView review zoom source', () => {
     expect(optimizeSegment).toContain('model: request.model');
     expect(optimizeSegment).toContain('mode: request.mode');
     expect(optimizeSegment).toContain('thought: request.thought');
+  });
+
+  it('checks the default AI Agent before every start-guide submission side effect', () => {
+    const source = readContentAreaViewSource();
+    const submitSegment = getSourceSegment(
+      source,
+      'const handleSubmitPrototypeStartRequest = async (request: CanvasAiGenerationRequest) => {',
+      '    const selectedPrototypeRuntimeUnavailable',
+    );
+    const preflightIndex = submitSegment.indexOf(
+      'if (!resolveAcpPromptClientProvider(normalizePromptClientPreference(preferredPromptClient))) {',
+    );
+
+    expect(preflightIndex).toBeGreaterThan(-1);
+    expect(submitSegment).toContain('onOpenAISettings?.();');
+    expect(submitSegment).toContain("toast.warning('请先在 AI 设置中选择本地 AI Agent');");
+    expect(submitSegment).toContain('return false;');
+    for (const sideEffect of [
+      "request.source === 'resource-start'",
+      "request.source === 'theme-start'",
+      'onCreatePrototypeForDraftStart?.()',
+      'apiService.startPlaceholderPrototypeGeneration',
+      "setViewMode?.('canvas')",
+    ]) {
+      expect(preflightIndex).toBeLessThan(submitSegment.indexOf(sideEffect));
+    }
   });
 
   it('persists prototype placeholder settings beside the retained composer draft', () => {
@@ -766,7 +833,7 @@ describe('ContentAreaView review zoom source', () => {
     expect(startGuideSegment).toContain('...(documentUsePrdPlanning ? { usePrdPlanning: true } : {})');
   });
 
-  it('copies local AI prompt text from the same placeholder prompt builder used by creation', () => {
+  it('copies local AI prompt text from the composer and resource or design cards', () => {
     const source = readContentAreaViewSource();
     const prototypeSettingsSegment = getSourceSegment(
       source,
@@ -799,12 +866,22 @@ describe('ContentAreaView review zoom source', () => {
     expect(startGuideSegment).toContain("const copyPlaceholderStartPrompt = useCallback((prompt: string) => {");
     expect(startGuideSegment).toContain("return buildPlaceholderStartPrompt(trimmedPrompt, 'local-ai-acknowledgement').prompt;");
     expect(startGuideSegment).toContain('onCopyPrompt={({ prompt }) => copyPlaceholderStartPrompt(prompt)}');
-    expect(source).not.toContain("import { copyToClipboard } from '../../utils/clipboard';");
+    expect(source).toContain("import { copyToClipboard } from '../../utils/clipboard';");
+    expect(source).toContain("import { buildStartGuidePrompt } from './startGuidePrompt';");
+    expect(startGuideSegment).toContain('const copyResourceStartCardPrompt = async (card: ResourceStartPromptCard) => {');
+    expect(startGuideSegment).toContain('const copyThemeStartCardPrompt = async (card: ThemeStartPromptCard) => {');
+    expect(startGuideSegment).toContain("finalGuide: 'local-ai-acknowledgement',");
+    expect(startGuideSegment).toContain('scene: card.scene,');
+    expect(startGuideSegment).toContain('card.imageSize ? applyResourceStartImageSize(effectiveImageStartParams, card.imageSize)');
+    expect(startGuideSegment).toContain("usePrdPlanning: card.prdPlanning === 'enable',");
+    expect(startGuideSegment).toContain('await copyToClipboard(prompt);');
+    expect(startGuideSegment).toContain("toast.success('提示词已复制到剪贴板');");
+    expect(startGuideSegment).toContain("toast.error(error instanceof Error ? error.message : '复制提示词失败');");
+    expect(startGuideSegment).toContain('onCopyPrompt={copyResourceStartCardPrompt}');
+    expect(startGuideSegment).toContain('onCopyPrompt={copyThemeStartCardPrompt}');
     expect(source).not.toContain("const COPY_START_PROMPT_TOOLTIP = '复制提示词给本地AI使用';");
-    expect(source).not.toContain('复制提示词给本地AI使用');
     expect(source).not.toContain('function StartSettingsCopyPromptButton({ onCopyPrompt }');
     expect(source).not.toContain('aria-label={COPY_START_PROMPT_TOOLTIP}');
-    expect(startGuideSegment).not.toContain('await copyToClipboard(prompt);');
     for (const segment of [prototypeSettingsSegment, imageSettingsSegment, documentSettingsSegment]) {
       expect(segment).not.toContain('onCopyPrompt,');
       expect(segment).not.toContain('onCopyPrompt?: () => void;');
@@ -1064,6 +1141,8 @@ describe('ContentAreaView review zoom source', () => {
     expect(startGuideSegment).toContain('preferredPromptClient?: PromptClientPreference;');
     expect(startGuideSegment).toContain('preferredPromptClient={preferredPromptClient}');
     expect(startGuideSegment).toContain('showSelectors');
+    expect(startGuideSegment).toContain('disableEditingWithoutConfiguredAgent');
+    expect(startGuideSegment.match(/disableEditingWithoutConfiguredAgent/g)).toHaveLength(1);
     expect(startGuideSegment).toContain('workspacePath={assistantProjectPath}');
     expect(startGuideSegment).toContain('projectResourceTrees={{');
     expect(startGuideSegment).toContain('projectResourceItems={{');
@@ -1316,7 +1395,10 @@ describe('ContentAreaView review zoom source', () => {
     );
 
     expect(source).toContain('resolveStablePreviewContainerSize,');
-    expect(measurementEffect).toContain('setPreviewContainerSize((previous) => resolveStablePreviewContainerSize({');
+    expect(measurementEffect).toContain('const previous = previewContainerSizeRef.current;');
+    expect(measurementEffect).toContain('const next = resolveStablePreviewContainerSize({');
+    expect(measurementEffect).toContain('setPreviewContainerSize(next);');
+    expect(measurementEffect).toContain('handlePreviewContainerSizeChange(next.width);');
     expect(measurementEffect).toContain('clientWidth: node.clientWidth,');
     expect(measurementEffect).toContain('clientHeight: node.clientHeight,');
     expect(measurementEffect).toContain('const animationFrameId = window.requestAnimationFrame(updateSize);');

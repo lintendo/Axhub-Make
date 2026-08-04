@@ -427,6 +427,7 @@ function handleThemes(
       listThemesForContext(projectContext, themesDir, handlers),
       projectRoot,
       options.runtimeOrigin,
+      req,
     ));
     return true;
   }
@@ -504,6 +505,7 @@ function handleThemes(
       listThemesForContext(projectContext, themesDir, handlers),
       projectRoot,
       options.runtimeOrigin,
+      req,
     ).find((theme) => (
       theme.name === themeName || handlers.stringValue((theme as Record<string, unknown>).id) === themeName
     )) || { name: themeName });

@@ -1017,6 +1017,24 @@ describe('ContentPanel LAN share source', () => {
   });
 });
 
+describe('ContentPanel prototype menu capabilities source', () => {
+  it('separates preview access from local directory management for spec-only prototypes', () => {
+    const source = readContentPanelSource();
+    const itemActionsSource = source.slice(
+      source.indexOf('const renderItemActions ='),
+      source.indexOf('const renderFolderActions ='),
+    );
+
+    expect(source).toContain("import { getPrototypeLocalBasePath, hasExplicitLocalPath } from '../../utils/localPath';");
+    expect(itemActionsSource).toContain("const prototypeLocalBasePath = isPrototypeItem ? getPrototypeLocalBasePath(item) : '';");
+    expect(itemActionsSource).toContain('const showLocalPathActions = isPrototypeItem ? Boolean(prototypeLocalBasePath) : hasExplicitLocalPath(item);');
+    expect(itemActionsSource).toContain('const showPrototypeAccessLinks = isPrototypeItem && item.previewDisabled !== true && hasShareUrl;');
+    expect(itemActionsSource).toContain('{showPrototypeAccessLinks ? (');
+    expect(itemActionsSource).not.toContain('{isPrototypeItem ? (\n                    <DropdownMenuSub>');
+    expect(itemActionsSource).toContain('{canDeleteItem ? (\n                    <>\n                        <DropdownMenuSeparator />');
+  });
+});
+
 describe('ContentPanel project switcher source', () => {
   it('uses middle-ellipsized display paths while keeping the full project root in the tooltip', () => {
     const source = readContentPanelSource();

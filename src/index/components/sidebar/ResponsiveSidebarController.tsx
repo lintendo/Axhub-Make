@@ -1,19 +1,16 @@
 import React from 'react';
 
 import {
-    closeCompactSidebarAndRestoreFocus,
-    createCompactSidebarInteraction,
-    type CompactSidebarInteraction,
+    closeSidebarPreviewAndRestoreFocus,
+    createSidebarPreviewInteraction,
+    type SidebarPreviewInteraction,
 } from './responsiveSidebarInteraction';
 
-export const COMPACT_DESKTOP_SIDEBAR_MEDIA_QUERY = '(max-width: 1024px) and (hover: hover) and (pointer: fine)';
-
 export interface ResponsiveSidebarControllerValue {
-    compactDesktop: boolean;
-    compactOpen: boolean;
+    previewOpen: boolean;
     contentId: string;
     triggerRef: React.MutableRefObject<HTMLButtonElement | null>;
-    interaction: CompactSidebarInteraction;
+    interaction: SidebarPreviewInteraction;
     closeAndRestoreFocus: () => void;
 }
 
@@ -22,64 +19,33 @@ interface ResponsiveSidebarTriggerButtonProps extends React.ButtonHTMLAttributes
 }
 
 export interface ResponsiveSidebarTriggerBindings {
-    compactDesktop: boolean;
     buttonProps: ResponsiveSidebarTriggerButtonProps;
 }
 
 const ResponsiveSidebarContext = React.createContext<ResponsiveSidebarControllerValue | null>(null);
 
-export function handleResponsiveSidebarToggleClick(
-    compactDesktop: boolean,
-    toggle: () => void,
-) {
-    if (compactDesktop) return false;
-    toggle();
-    return true;
-}
-
 export function ResponsiveSidebarProvider({ children }: { children: React.ReactNode }) {
-    const [compactDesktop, setCompactDesktop] = React.useState(false);
-    const [compactOpen, setCompactOpen] = React.useState(false);
+    const [previewOpen, setPreviewOpen] = React.useState(false);
     const contentId = React.useId();
     const triggerRef = React.useRef<HTMLButtonElement>(null);
     const interaction = React.useMemo(
-        () => createCompactSidebarInteraction(setCompactOpen),
+        () => createSidebarPreviewInteraction(setPreviewOpen),
         [],
     );
 
     React.useEffect(() => () => interaction.dispose(), [interaction]);
 
-    React.useEffect(() => {
-        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-            return;
-        }
-
-        const mediaQuery = window.matchMedia(COMPACT_DESKTOP_SIDEBAR_MEDIA_QUERY);
-        const syncCompactDesktop = (event?: MediaQueryListEvent) => {
-            const nextCompactDesktop = event?.matches ?? mediaQuery.matches;
-            setCompactDesktop(nextCompactDesktop);
-            if (!nextCompactDesktop) {
-                interaction.close();
-            }
-        };
-
-        syncCompactDesktop();
-        mediaQuery.addEventListener('change', syncCompactDesktop);
-        return () => mediaQuery.removeEventListener('change', syncCompactDesktop);
-    }, [interaction]);
-
     const closeAndRestoreFocus = React.useCallback(() => {
-        closeCompactSidebarAndRestoreFocus(interaction, triggerRef.current);
+        closeSidebarPreviewAndRestoreFocus(interaction, triggerRef.current);
     }, [interaction]);
 
     const value = React.useMemo<ResponsiveSidebarControllerValue>(() => ({
-        compactDesktop,
-        compactOpen,
+        previewOpen,
         contentId,
         triggerRef,
         interaction,
         closeAndRestoreFocus,
-    }), [closeAndRestoreFocus, compactDesktop, compactOpen, contentId, interaction]);
+    }), [closeAndRestoreFocus, contentId, interaction, previewOpen]);
 
     return (
         <ResponsiveSidebarContext.Provider value={value}>
@@ -97,32 +63,27 @@ export function useResponsiveSidebarTriggerBindings(
     toggle: () => void,
 ): ResponsiveSidebarTriggerBindings {
     const responsiveSidebar = useResponsiveSidebarController();
-    const compactDesktop = responsiveSidebar?.compactDesktop === true;
+    const previewOpen = responsiveSidebar?.previewOpen === true;
 
     return {
-        compactDesktop,
         buttonProps: {
             ref: responsiveSidebar?.triggerRef,
-            onPointerEnter: compactDesktop ? responsiveSidebar?.interaction.pointerEnter : undefined,
-            onPointerLeave: compactDesktop ? responsiveSidebar?.interaction.pointerLeave : undefined,
-            onPointerDown: (event) => {
-                if (compactDesktop) {
-                    event.preventDefault();
-                }
-            },
-            onFocus: compactDesktop ? responsiveSidebar?.interaction.focusEnter : undefined,
-            onBlur: compactDesktop ? responsiveSidebar?.interaction.focusLeave : undefined,
+            onPointerEnter: collapsed ? responsiveSidebar?.interaction.pointerEnter : undefined,
+            onPointerLeave: collapsed ? responsiveSidebar?.interaction.pointerLeave : undefined,
+            onFocus: collapsed ? responsiveSidebar?.interaction.focusEnter : undefined,
+            onBlur: collapsed ? responsiveSidebar?.interaction.focusLeave : undefined,
             onKeyDown: (event) => {
-                if (event.key === 'Escape' && compactDesktop) {
-                    responsiveSidebar?.interaction.close();
+                if (event.key === 'Escape' && collapsed) {
+                    responsiveSidebar?.closeAndRestoreFocus();
                 }
             },
-            onClick: () => handleResponsiveSidebarToggleClick(compactDesktop, toggle),
-            'aria-label': compactDesktop
-                ? '预览侧边栏'
-                : collapsed ? '展开侧边栏' : '收起侧边栏',
-            'aria-controls': compactDesktop ? responsiveSidebar?.contentId : undefined,
-            'aria-expanded': compactDesktop ? responsiveSidebar?.compactOpen : undefined,
+            onClick: () => {
+                responsiveSidebar?.interaction.suppressUntilPointerLeave();
+                toggle();
+            },
+            'aria-label': collapsed ? '展开侧边栏' : '收起侧边栏',
+            'aria-controls': collapsed ? responsiveSidebar?.contentId : undefined,
+            'aria-expanded': collapsed ? previewOpen : undefined,
         },
     };
 }

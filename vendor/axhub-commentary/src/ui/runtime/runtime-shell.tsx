@@ -41,19 +41,20 @@ import {
   DEFAULT_WEB_EDITOR_UI_SETTINGS,
   applyInteractionProfileToUiSettings,
   applyMobileSettingsOverride,
+  type WebEditorInteractionProfile,
   type WebEditorUiSettings,
   sanitizeWebEditorUiSettings,
 } from '../../core/editor/ui-settings';
 
 function normalizeRuntimeUiSettings(
   settings: unknown,
-  interactionProfile: 'design' | 'text-comment',
+  interactionProfile: WebEditorInteractionProfile,
 ): WebEditorUiSettings {
   const normalized = applyMobileSettingsOverride(
     applyInteractionProfileToUiSettings(sanitizeWebEditorUiSettings(settings), interactionProfile),
   );
 
-  if (interactionProfile === 'text-comment' || isMobileDevice()) {
+  if (interactionProfile !== 'design' || isMobileDevice()) {
     return normalized;
   }
 
@@ -198,8 +199,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   const [anchorRect, setAnchorRect] = React.useState<ViewportRect | null>(null);
   const [uiMode, setUiMode] = React.useState<CommentEntryMode>(initialUiMode);
   const [toolMinimized, setToolMinimized] = React.useState(false);
-  const [propertyPanelOpen, setPropertyPanelOpen] =
-    React.useState<boolean>(initialPropertyPanelOpen);
+  const [propertyPanelOpen, setPropertyPanelOpen] = React.useState<boolean>(initialPropertyPanelOpen);
   const [bubbleStyleEditorOpen, setBubbleStyleEditorOpen] = React.useState(false);
   const [inlineTextEditing, setInlineTextEditing] = React.useState(false);
   const [blockingLayerOpen, setBlockingLayerOpen] = React.useState(false);
@@ -1290,6 +1290,9 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
           agentVisualState={agentVisualState}
           hideExecutionControls={Boolean(
             breadcrumbsOptions.hideExecutionControls ?? propertyPanelOptions?.hideExecutionControls,
+          )}
+          hideCurrentElementExecutionAction={Boolean(
+            propertyPanelOptions?.hideCurrentElementExecutionAction,
           )}
           hideContextAppendAction={Boolean(
             breadcrumbsOptions.hideExecutionControls ?? propertyPanelOptions?.hideExecutionControls,

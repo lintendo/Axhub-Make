@@ -9,6 +9,7 @@ import type {
     PresentationAreaGroupedProps,
 } from '../../types/index-page.types';
 import type { AcpContextItem } from '../../domains/assistant/assistantAcpContext';
+import { resolveResponsiveSidebarDefaultCollapsed } from '../sidebar/responsiveSidebarState';
 
 interface IndexPageDesktopProps {
     sidebarProps: NewSidebarGroupedProps;
@@ -27,17 +28,50 @@ interface IndexPageDesktopProps {
         onAddContextItems: (items: AcpContextItem[]) => boolean | Promise<boolean>;
         onToggle: () => void;
     };
+    responsiveSidebar: {
+        defaultCollapsed: boolean;
+        onDefaultCollapsedChange: (collapsed: boolean) => void;
+    };
 }
 
 export default function IndexPageDesktop({
     sidebarProps,
     presentationAreaProps,
     assistantPanel,
+    responsiveSidebar,
 }: IndexPageDesktopProps) {
+    const workspaceRef = React.useRef<HTMLDivElement | null>(null);
+    const lastResponsiveSidebarDefaultRef = React.useRef(responsiveSidebar.defaultCollapsed);
+
+    React.useEffect(() => {
+        const workspace = workspaceRef.current;
+        if (!workspace) return;
+
+        const updateResponsiveSidebarDefault = () => {
+            const nextCollapsed = resolveResponsiveSidebarDefaultCollapsed({
+                workspaceWidth: workspaceRef.current ? workspaceRef.current.clientWidth : 0,
+                assistantVisible: assistantPanel.visible,
+                assistantWidth: assistantPanel.width,
+            });
+            if (nextCollapsed === lastResponsiveSidebarDefaultRef.current) return;
+            lastResponsiveSidebarDefaultRef.current = nextCollapsed;
+            responsiveSidebar.onDefaultCollapsedChange(nextCollapsed);
+        };
+
+        updateResponsiveSidebarDefault();
+        const observer = new ResizeObserver(updateResponsiveSidebarDefault);
+        observer.observe(workspace);
+        return () => observer.disconnect();
+    }, [
+        assistantPanel.visible,
+        assistantPanel.width,
+        responsiveSidebar.onDefaultCollapsedChange,
+    ]);
+
     return (
         <ResponsiveSidebarProvider>
             <div className="pc-layout">
-                <div style={{ display: 'flex', height: '100vh', minHeight: 0 }}>
+                <div ref={workspaceRef} style={{ display: 'flex', height: '100vh', minHeight: 0 }}>
                     <NewSidebar {...sidebarProps} />
 
                     <div style={{ display: 'flex', flex: 1, minWidth: 0 }}>

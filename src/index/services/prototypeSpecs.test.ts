@@ -93,5 +93,14 @@ describe('prototypeSpecsApi', () => {
     });
     expect(markdownItem.previewUrl).toContain('/spec-template.html?url=');
     expect(decodeURIComponent(markdownItem.previewUrl || '')).toContain('/api/projects/make-project/prototypes/home/spec/content?path=spec.md');
+
+    const specOnlyItem = createPrototypeSpecItem({
+      projectId: 'make-project',
+      prototypeId: 'spec-only',
+      prototypeFilePath: 'src/prototypes/spec-only/.spec/spec.html',
+      descriptor: htmlDescriptor,
+      path: 'spec.html',
+    });
+    expect(specOnlyItem.filePath).toBe('src/prototypes/spec-only/.spec/spec.html');
   });
 });

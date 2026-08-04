@@ -10,6 +10,36 @@ afterEach(() => {
 });
 
 describe('apiService source', () => {
+  it('reads project-scoped prototype annotation status without enabling it', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      enabled: true,
+      exists: true,
+      source: { format: 'axhub-annotation-source' },
+      path: 'src/prototypes/annotation-demo/annotation-source.json',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const annotationApi = apiService as typeof apiService & {
+      getPrototypeAnnotationStatus?: (
+        targetPath: string,
+        scope: { projectId: string },
+      ) => Promise<{ enabled: boolean }>;
+    };
+
+    expect(annotationApi.getPrototypeAnnotationStatus).toBeTypeOf('function');
+    if (!annotationApi.getPrototypeAnnotationStatus) return;
+
+    await expect(annotationApi.getPrototypeAnnotationStatus(
+      'prototypes/annotation-demo',
+      { projectId: 'make-project' },
+    )).resolves.toMatchObject({ enabled: true, exists: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/prototype-annotation?targetPath=prototypes%2Fannotation-demo&projectId=make-project',
+      { cache: 'no-store' },
+    );
+  });
+
   it('forwards the Axure image asset preference to the export bundle endpoint', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       entry: { name: 'home', group: 'prototypes', displayName: 'Home', code: '' },

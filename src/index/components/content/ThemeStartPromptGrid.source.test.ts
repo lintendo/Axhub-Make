@@ -14,6 +14,10 @@ function readResourceGridSource() {
   return readFileSync(resolve(__dirname, './ResourceStartPromptGrid.tsx'), 'utf8');
 }
 
+function readStartPromptCardSource() {
+  return readFileSync(resolve(__dirname, './StartPromptCard.tsx'), 'utf8');
+}
+
 function readThemeCardsSource() {
   const source = readContentSource();
   const start = source.indexOf('const THEME_START_PROMPT_CARDS');
@@ -27,6 +31,7 @@ describe('theme start prompt grid source', () => {
   it('keeps the theme source cards compact and accessible', () => {
     const source = readGridSource();
     const contentSource = readContentSource();
+    const cardSource = readStartPromptCardSource();
 
     expect(contentSource).toContain('生成设计规范');
     expect(contentSource).toContain('从 Refero 导入');
@@ -36,10 +41,16 @@ describe('theme start prompt grid source', () => {
     expect(contentSource).toContain('Figma 导入');
     expect(contentSource).toContain('截图导入');
     expect(contentSource).toContain('styles.refero.design');
-    expect(source).toContain('aria-label={card.title}');
-    expect(source).toContain('disabled={disabled}');
-    expect(source).not.toContain('shadow-');
-    expect(source).not.toContain('translate');
+    expect(cardSource).toContain('aria-label={title}');
+    expect(cardSource).toContain('aria-label="复制提示词给本地 AI 使用"');
+    expect(cardSource).toContain('<TooltipContent side="top">复制提示词给本地 AI 使用</TooltipContent>');
+    expect(source).toContain('StartPromptCard');
+    expect(source).toContain('onCopyPrompt');
+    expect(cardSource).toContain('disabled={selectionDisabled}');
+    expect(cardSource).toContain('group-hover:opacity-100');
+    expect(cardSource).toContain('focus-visible:opacity-100');
+    expect(cardSource).not.toContain('group-focus-within:');
+    expect(cardSource).not.toContain('shadow-');
   });
 
   it('uses realistic user prompts instead of exposing the internal theme workflow', () => {
@@ -72,13 +83,15 @@ describe('theme start prompt grid source', () => {
   it('matches the resource grid dimensions and separates cards from the composer', () => {
     const themeSource = readGridSource();
     const resourceSource = readResourceGridSource();
+    const cardSource = readStartPromptCardSource();
     const gridClassName = 'mt-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4';
-    const cardClassName = 'group flex min-h-16 w-full items-center gap-3 rounded-[10px] border border-slate-200/80 bg-white/80 px-4 py-3 text-left text-[13px] font-medium text-slate-700';
+    const cardClassName = 'flex min-h-16 w-full items-center gap-3 rounded-[10px] border border-slate-200/80 bg-white/80 px-4 py-3 pr-12 text-left text-[13px] font-medium text-slate-700';
 
     expect(themeSource).toContain(gridClassName);
     expect(resourceSource).toContain(gridClassName);
-    expect(themeSource).toContain(cardClassName);
-    expect(resourceSource).toContain(cardClassName);
+    expect(cardSource).toContain(cardClassName);
+    expect(themeSource).toContain('StartPromptCard');
+    expect(resourceSource).toContain('StartPromptCard');
     expect(themeSource).not.toContain('lg:grid-cols-3');
   });
 });

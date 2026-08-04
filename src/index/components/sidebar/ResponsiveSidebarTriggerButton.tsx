@@ -7,21 +7,21 @@ interface ResponsiveSidebarTriggerButtonProps {
     collapsed: boolean;
     setCollapsed: (collapsed: boolean) => void;
     className?: string;
-    compactOnly?: boolean;
+    collapsedOnly?: boolean;
 }
 
 export default function ResponsiveSidebarTriggerButton({
     collapsed,
     setCollapsed,
     className,
-    compactOnly = false,
+    collapsedOnly = false,
 }: ResponsiveSidebarTriggerButtonProps) {
     const bindings = useResponsiveSidebarTriggerBindings(
         collapsed,
         () => setCollapsed(!collapsed),
     );
 
-    if (compactOnly && !bindings.compactDesktop) return null;
+    if (collapsedOnly && !collapsed) return null;
 
     return (
         <Button

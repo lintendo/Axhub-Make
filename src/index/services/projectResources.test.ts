@@ -263,7 +263,29 @@ describe('project resource frontend adapter', () => {
 	        previewDisabled: true,
 	      }),
 	    ]);
-	    expect(bundle.data.prototypes[0]).not.toHaveProperty('demoUrl');
+    expect(bundle.data.prototypes[0]).not.toHaveProperty('demoUrl');
+  });
+
+  it('preserves a main spec path for prototypes that are not runnable yet', () => {
+    const bundle = normalizeProjectResourcesPayload({
+      resources: {
+        prototypes: [{
+          id: 'spec-only',
+          title: 'Spec Only',
+          clientUrl: '/prototypes/spec-only',
+          previewDisabled: true,
+          specFilePath: 'src/prototypes/spec-only/.spec/spec.html',
+        }],
+      },
+    }, 'client-project');
+
+    expect(bundle.data.prototypes).toEqual([
+      expect.objectContaining({
+        name: 'spec-only',
+        previewDisabled: true,
+        specFilePath: 'src/prototypes/spec-only/.spec/spec.html',
+      }),
+    ]);
   });
 
   it('does not infer placeholder state from untitled prototype names when a preview URL exists', () => {

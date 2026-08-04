@@ -211,11 +211,12 @@ export function buildPromptCardSkillSavePayload(
   note: string,
   selectedSkills: readonly PromptCardSkill[],
 ): PromptCardSkillSavePayload {
+  const normalizedNote = String(note ?? '')
+    .replace(/\r\n/g, '\n')
+    .trim();
   return {
-    note: String(note ?? '')
-      .replace(/\r\n/g, '\n')
-      .trim(),
-    skillIds: selectedSkills.map((skill) => skill.id),
+    note: normalizedNote,
+    skillIds: normalizedNote ? selectedSkills.map((skill) => skill.id) : [],
   };
 }
 
@@ -237,6 +238,30 @@ export function deserializePromptCardSkillSelection(
     .map((skillId) => skillById.get(skillId))
     .filter((skill): skill is PromptCardSkill => Boolean(skill))
     .filter((skill) => (enabledIds ? enabledIds.has(skill.id) : true));
+}
+
+export function appendImplicitAnnotationSkillToPrompt(
+  prompt: string,
+  annotationSession: boolean,
+  enabledSkillIds?: readonly unknown[] | null,
+  skillOptions: readonly PromptCardSkillOption[] = [],
+): string {
+  const normalizedPrompt = String(prompt ?? '').trim();
+  if (!normalizedPrompt || !annotationSession) return normalizedPrompt;
+
+  const defaultSkill = mergePromptCardSkills(skillOptions).find(
+    (skill) => skill.id === 'prototype-annotation',
+  );
+  if (!defaultSkill) return normalizedPrompt;
+  if (
+    Array.isArray(enabledSkillIds) &&
+    !enabledSkillIds.some((skillId) => String(skillId ?? '').trim() === defaultSkill.id)
+  ) {
+    return normalizedPrompt;
+  }
+  if (normalizedPrompt.includes(defaultSkill.prompt)) return normalizedPrompt;
+
+  return `${normalizedPrompt}\n\n${buildPromptCardSkillPrefix([defaultSkill])}`;
 }
 
 export function mergePromptCardSkillsIntoPromptNote(

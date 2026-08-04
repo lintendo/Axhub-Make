@@ -43,6 +43,8 @@ export interface PrototypeResource {
   generationStatus?: PrototypeGenerationStatus;
   filePath?: string;
   absoluteFilePath?: string;
+  specFilePath?: string;
+  previewDisabled?: boolean;
   artifacts?: PrototypeResourceArtifacts;
   pages?: PrototypeResourcePage[];
   defaultPageId?: string;
@@ -345,6 +347,7 @@ function normalizePrototypeResources(value: unknown): PrototypeResource[] {
       }
       const filePath = stringValue(item.filePath);
       const absoluteFilePath = stringValue(item.absoluteFilePath);
+      const specFilePath = stringValue(item.specFilePath);
       const artifacts = item.artifacts && typeof item.artifacts === 'object' && !Array.isArray(item.artifacts)
         ? item.artifacts as PrototypeResourceArtifacts
         : null;
@@ -371,6 +374,8 @@ function normalizePrototypeResources(value: unknown): PrototypeResource[] {
         ...(generationStatus ? { generationStatus } : {}),
         ...(filePath ? { filePath } : {}),
         ...(absoluteFilePath ? { absoluteFilePath } : {}),
+        ...(specFilePath ? { specFilePath } : {}),
+        ...(item.previewDisabled === true ? { previewDisabled: true } : {}),
         ...(artifacts ? { artifacts } : {}),
         ...(pages.length > 0 ? { pages, defaultPageId } : {}),
         ...(importReport ? { importReport } : {}),

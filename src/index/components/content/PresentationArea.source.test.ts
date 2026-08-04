@@ -25,7 +25,7 @@ describe('PresentationArea resource folder source', () => {
     expect(source).toContain("import ResponsiveSidebarTriggerButton from '../sidebar/ResponsiveSidebarTriggerButton';");
     expect(source).toContain('className="ax-sidebar-compact-fallback-trigger"');
     expect(source).toContain('<ResponsiveSidebarTriggerButton');
-    expect(source).toContain('compactOnly');
+    expect(source).toContain('collapsedOnly');
     expect(source).toContain('collapsed={props.collapsed}');
     expect(source).toContain('setCollapsed={props.setCollapsed}');
   });

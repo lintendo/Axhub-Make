@@ -23,3 +23,19 @@ export function hasExplicitLocalPath(item: unknown): boolean {
 export function stripIndexFilePath(value: string): string {
     return value.trim().replace(/\/index\.(t|j)sx?$/i, '');
 }
+
+export function getPrototypeLocalBasePath(item: unknown): string {
+    const explicitPath = getExplicitLocalPath(item).replace(/\\/g, '/').trim();
+    if (explicitPath) {
+        return stripIndexFilePath(explicitPath).replace(/\/+$/u, '');
+    }
+    if (!item || typeof item !== 'object') {
+        return '';
+    }
+    const specFilePath = String((item as { specFilePath?: unknown }).specFilePath || '')
+        .replace(/\\/g, '/')
+        .trim();
+    const specDirectoryMarker = '/.spec/';
+    const markerIndex = specFilePath.lastIndexOf(specDirectoryMarker);
+    return markerIndex > 0 ? specFilePath.slice(0, markerIndex).replace(/\/+$/u, '') : '';
+}

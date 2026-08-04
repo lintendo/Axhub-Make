@@ -113,7 +113,7 @@ describe('CanvasGenerationComposer source', () => {
     expect(source).toContain('function CanvasComposerSendButtonWithCopyMenu');
     expect(source).toContain('Loader2');
     expect(displayComponentSegment).toContain('const [optimizingPrompt, setOptimizingPrompt] = useState(false);');
-    expect(displayComponentSegment).toContain('const controlsDisabled = disabled || optimizingPrompt || submitting;');
+    expect(displayComponentSegment).toContain('const controlsDisabled = disabled || editingDisabled || optimizingPrompt || submitting;');
     expect(displayComponentSegment).toContain('const hasDisplayPromptText = displayText.trim().length > 0;');
     expect(displayComponentSegment).toContain('aria-live="polite"');
     expect(displayComponentSegment).toContain('正在优化提示词');
@@ -279,7 +279,7 @@ describe('CanvasGenerationComposer source', () => {
     expect(source).toContain('window.dispatchEvent(new CustomEvent(ACP_CAPABILITY_REFRESH_EVENT');
     expect(source).toContain('workspacePath: workspacePath ?? null');
     expect(source).toContain('const canvasAcpRuntime = useCanvasAcpRuntimeBridge({ enabled: showSelectors, projectId, workspacePath });');
-    expect(source).toContain('onEnsureAcpRuntime={canvasAcpRuntime.ensureRuntime}');
+    expect(source).toContain('onEnsureAcpRuntime={canEnsureAcpRuntime ? canvasAcpRuntime.ensureRuntime : undefined}');
   });
 
   it('renders a stable model selection placeholder that probes ACP before opening AI settings', () => {
@@ -300,6 +300,7 @@ describe('CanvasGenerationComposer source', () => {
     expect(displayPropsSegment).toContain('onOpenAISettings?: () => void;');
     expect(runtimePropsSegment).toContain('onOpenAISettings?: () => void;');
     expect(fallbackSegment).toContain('请选择模型');
+    expect(fallbackSegment).toContain('设置 AI Agent');
     expect(fallbackSegment).toContain('data-axhub-acp-model-fallback-trigger');
     expect(fallbackSegment).toContain('aria-haspopup="menu"');
     expect(fallbackSegment).toContain('aria-expanded={false}');
@@ -313,7 +314,8 @@ describe('CanvasGenerationComposer source', () => {
     expect(fallbackSegment).toContain('ChevronDown');
     expect(fallbackSegment).not.toContain('data-acp-config-option');
     expect(source).toContain('<CanvasAcpModelSelectorFallback');
-    expect(source).toContain('showSelectors && canvasAcpRuntime.needsFallback');
+    expect(source).toContain('runtimeNeedsFallback: canvasAcpRuntime.needsFallback');
+    expect(source).toContain('showModelSelectorFallback={selectorVisibility.showSettingsFallback}');
     expect(source).toContain('onOpenAISettings={onOpenAISettings}');
     expect(source).toContain('onEnsureAcpRuntime={onEnsureAcpRuntime}');
   });
@@ -345,7 +347,7 @@ describe('CanvasGenerationComposer source', () => {
     expect(displayComponentSegment).not.toContain('quickPrompt.prompt');
     expect(displayComponentSegment).not.toContain('CanvasGenerationDisplayQuickPromptsButton');
     expect(displayComponentSegment).toContain('<ComposerAttachments />');
-    expect(displayComponentSegment).toContain('{disabled ? null : (');
+    expect(displayComponentSegment).toContain('{disabled || editingDisabled ? null : (');
     expect(displayComponentSegment).toContain('<CanvasComposerAttachmentMenu');
     expect(displayComponentSegment).toContain('onProjectResourceClick={() => setProjectResourceDialogOpen(true)}');
     expect(displayComponentSegment).not.toContain('<CanvasProjectResourceButton');
@@ -470,6 +472,82 @@ describe('CanvasGenerationComposer source', () => {
       expect(segment).toContain('workspacePath ?? \'global\',');
       expect(segment).toContain('key={acpRuntimeKey}');
     }
+  });
+
+  it('uses configured-default visibility only for the opt-in display composer', () => {
+    const source = readCanvasGenerationComposerSource();
+    const displayAcpSegment = source.slice(
+      source.indexOf('function CanvasGenerationDisplayComposerWithAcp'),
+      source.indexOf('export function CanvasGenerationDisplayComposer'),
+    );
+    const runtimeAcpSegment = source.slice(
+      source.indexOf('function CanvasGenerationRuntimeComposerWithAcp'),
+      source.indexOf('export default function CanvasGenerationComposer'),
+    );
+
+    expect(source).toContain('export function resolveCanvasAcpSelectorVisibility({');
+    expect(displayAcpSegment).toContain('const selectorVisibility = resolveCanvasAcpSelectorVisibility({');
+    expect(displayAcpSegment).toContain('enabled: showSelectors,');
+    expect(displayAcpSegment).toContain('preferredPromptClient,');
+    expect(displayAcpSegment).toContain('runtimeNeedsFallback: canvasAcpRuntime.needsFallback,');
+    expect(displayAcpSegment).toContain('requireConfiguredDefaultAgent: disableEditingWithoutConfiguredAgent,');
+    expect(displayAcpSegment).toContain('const canEnsureAcpRuntime = !disableEditingWithoutConfiguredAgent || selectorVisibility.defaultAgentConfigured;');
+    expect(displayAcpSegment).toContain('onEnsureAcpRuntime={canEnsureAcpRuntime ? canvasAcpRuntime.ensureRuntime : undefined}');
+    expect(displayAcpSegment).toContain('showModelSelectorFallback={selectorVisibility.showSettingsFallback}');
+    expect(displayAcpSegment).toContain('showSelectors={selectorVisibility.showSelectors}');
+    expect(runtimeAcpSegment).not.toContain('resolveCanvasAcpSelectorVisibility({');
+    expect(runtimeAcpSegment).toContain('onEnsureAcpRuntime={canvasAcpRuntime.ensureRuntime}');
+    expect(runtimeAcpSegment).toContain('showModelSelectorFallback={showSelectors && canvasAcpRuntime.needsFallback}');
+    expect(runtimeAcpSegment).toContain('showSelectors={showSelectors && !canvasAcpRuntime.needsFallback}');
+    expect(source).toContain("{onEnsureAcpRuntime ? '请选择模型' : '设置 AI Agent'}");
+  });
+
+  it('can lock display editing without disabling the AI settings fallback', () => {
+    const source = readCanvasGenerationComposerSource();
+    const displayPropsSegment = source.slice(
+      source.indexOf('export interface CanvasGenerationDisplayComposerProps'),
+      source.indexOf('interface CanvasGenerationRuntimeComposerProps'),
+    );
+    const displayComponentSegment = source.slice(
+      source.indexOf('function CanvasGenerationDisplayComposerContent('),
+      source.indexOf('function CanvasGenerationDisplayComposerWithoutAcp'),
+    );
+    const displayAcpSegment = source.slice(
+      source.indexOf('function CanvasGenerationDisplayComposerWithAcp'),
+      source.indexOf('export function CanvasGenerationDisplayComposer'),
+    );
+    const attachmentRegion = displayComponentSegment.slice(
+      displayComponentSegment.indexOf('<ComposerAttachments />') - 240,
+      displayComponentSegment.indexOf('<ComposerAttachments />') + 80,
+    );
+    const leadingActionsRegion = displayComponentSegment.slice(
+      displayComponentSegment.indexOf('{leadingActions ? ('),
+      displayComponentSegment.indexOf('{showSelectors ? <CanvasAcpComposerSelectors />'),
+    );
+    const postSelectorActionsRegion = displayComponentSegment.slice(
+      displayComponentSegment.indexOf('{resolvedPostSelectorActions ? ('),
+      displayComponentSegment.indexOf('<CanvasPromptOptimizeButton'),
+    );
+
+    expect(displayPropsSegment).toContain('disableEditingWithoutConfiguredAgent?: boolean;');
+    expect(source).toContain('export function resolveCanvasGenerationDisplayEditingDisabled({');
+    expect(displayAcpSegment).toContain('const editingDisabled = resolveCanvasGenerationDisplayEditingDisabled({');
+    expect(displayAcpSegment).toContain('disableEditingWithoutConfiguredAgent,');
+    expect(displayAcpSegment).toContain('defaultAgentConfigured: selectorVisibility.defaultAgentConfigured,');
+    expect(displayAcpSegment).toContain('editingDisabled={editingDisabled}');
+    expect(displayComponentSegment).toContain("const resolvedPlaceholder = editingDisabled ? '请使用本地 AI 应用，或前往 AI 设置完成配置' : placeholder;");
+    expect(displayComponentSegment).not.toContain('请使用下方本地 AI 应用');
+    expect(displayComponentSegment).toContain('const controlsDisabled = disabled || editingDisabled || optimizingPrompt || submitting;');
+    expect(displayComponentSegment).toContain('const selectorControlsDisabled = disabled || optimizingPrompt || submitting;');
+    expect(displayComponentSegment).toContain('placeholder={resolvedPlaceholder}');
+    expect(displayComponentSegment).toContain('disabled={controlsDisabled}');
+    expect(displayComponentSegment).toContain("className={cn('inline-flex min-w-0 items-center gap-1', selectorControlsDisabled ? 'pointer-events-none opacity-60' : '')}");
+    expect(attachmentRegion).toContain('<fieldset');
+    expect(attachmentRegion).toContain('disabled={controlsDisabled}');
+    expect(leadingActionsRegion).toContain('<fieldset');
+    expect(leadingActionsRegion).toContain('disabled={controlsDisabled}');
+    expect(postSelectorActionsRegion).toContain('<fieldset');
+    expect(postSelectorActionsRegion).toContain('disabled={controlsDisabled}');
   });
 
   it('backs the placeholder display composer attachment button with the all-file ACP UI attachment adapter', () => {
@@ -920,7 +998,7 @@ describe('CanvasGenerationComposer source', () => {
     expect(source).toContain('type CanvasGenerationDisplaySubmitResult = boolean | void;');
     expect(displayComponentSegment).toContain('const attachmentSelection = await resolveComposerAttachmentSubmitSelection(displayReferenceAttachments);');
     expect(displayComponentSegment).toContain('const [submitting, setSubmitting] = useState(false);');
-    expect(displayComponentSegment).toContain('const controlsDisabled = disabled || optimizingPrompt || submitting;');
+    expect(displayComponentSegment).toContain('const controlsDisabled = disabled || editingDisabled || optimizingPrompt || submitting;');
     expect(displayComponentSegment).toContain('setSubmitting(true);');
     expect(displayComponentSegment).toContain('const submitResult = await onSubmitText?.(text, {');
     expect(displayComponentSegment).toContain('localContextRefs: currentLocalContextRefsRef.current,');

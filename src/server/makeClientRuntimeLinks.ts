@@ -1,3 +1,5 @@
+import type { IncomingMessage } from 'node:http';
+
 import {
   readMakeClientMarker,
   readServerInfo,
@@ -5,15 +7,69 @@ import {
   type ProjectMetadata,
 } from './projectCore/index.ts';
 
-function getMakeClientRuntimeOrigin(projectRoot: string, runtimeOriginOverride?: string): string {
+type RuntimeLinkRequest = Pick<IncomingMessage, 'headers'>;
+
+function getFirstHeaderValue(value: string | string[] | undefined): string {
+  const rawValue = Array.isArray(value) ? value[0] || '' : value || '';
+  return rawValue.split(',')[0].trim();
+}
+
+function isLoopbackHostname(value: string): boolean {
+  const hostname = value.trim().toLowerCase().replace(/^\[|\]$/gu, '');
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+}
+
+function getRequestHostname(request?: RuntimeLinkRequest): string {
+  const rawHost = getFirstHeaderValue(request?.headers['x-forwarded-host'])
+    || getFirstHeaderValue(request?.headers.host);
+  if (!rawHost) {
+    return '';
+  }
+  try {
+    const parsed = new URL(`http://${rawHost}`);
+    if (parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash) {
+      return '';
+    }
+    return parsed.hostname;
+  } catch {
+    return '';
+  }
+}
+
+function resolveRuntimeOriginForRequest(runtimeOrigin: string, request?: RuntimeLinkRequest): string {
+  const requestHostname = getRequestHostname(request);
+  if (!requestHostname || isLoopbackHostname(requestHostname)) {
+    return runtimeOrigin;
+  }
+  try {
+    const parsed = new URL(runtimeOrigin);
+    if (!isLoopbackHostname(parsed.hostname)) {
+      return runtimeOrigin;
+    }
+    parsed.hostname = requestHostname;
+    return parsed.toString().replace(/\/+$/u, '');
+  } catch {
+    return runtimeOrigin;
+  }
+}
+
+function getMakeClientRuntimeOrigin(
+  projectRoot: string,
+  runtimeOriginOverride?: string,
+  request?: RuntimeLinkRequest,
+): string {
+  let runtimeOrigin = '';
   const marker = readMakeClientMarker(projectRoot);
   if (marker) {
     const runtime = readServerInfo(projectRoot, 'runtime');
     if (runtime?.origin && resolveProjectRoot(runtime.projectRoot) === resolveProjectRoot(projectRoot)) {
-      return runtime.origin.replace(/\/+$/u, '');
+      runtimeOrigin = runtime.origin.replace(/\/+$/u, '');
     }
   }
-  return runtimeOriginOverride?.trim().replace(/\/+$/u, '') || '';
+  if (!runtimeOrigin) {
+    runtimeOrigin = runtimeOriginOverride?.trim().replace(/\/+$/u, '') || '';
+  }
+  return resolveRuntimeOriginForRequest(runtimeOrigin, request);
 }
 
 function replaceResourceUrlOrigin(value: unknown, runtimeOrigin: string): string {
@@ -53,8 +109,9 @@ export function backfillMakeClientThemePreviewLinks<T extends ResourceWithUrls>(
   themes: T[],
   projectRoot: string,
   runtimeOriginOverride?: string,
+  request?: RuntimeLinkRequest,
 ): T[] {
-  const runtimeOrigin = getMakeClientRuntimeOrigin(projectRoot, runtimeOriginOverride);
+  const runtimeOrigin = getMakeClientRuntimeOrigin(projectRoot, runtimeOriginOverride, request);
   if (!runtimeOrigin) {
     return themes;
   }
@@ -94,8 +151,9 @@ export function backfillMakeClientPrototypePreviewLinks<T extends ResourceWithUr
   prototypes: T[],
   projectRoot: string,
   runtimeOriginOverride?: string,
+  request?: RuntimeLinkRequest,
 ): T[] {
-  const runtimeOrigin = getMakeClientRuntimeOrigin(projectRoot, runtimeOriginOverride);
+  const runtimeOrigin = getMakeClientRuntimeOrigin(projectRoot, runtimeOriginOverride, request);
   if (!runtimeOrigin) {
     return prototypes;
   }
@@ -132,9 +190,20 @@ export function backfillMakeClientResourcePreviewLinks(
   metadata: ProjectMetadata,
   projectRoot: string,
   runtimeOriginOverride?: string,
+  request?: RuntimeLinkRequest,
 ): ProjectMetadata {
-  const prototypes = backfillMakeClientPrototypePreviewLinks(metadata.resources.prototypes, projectRoot, runtimeOriginOverride);
-  const themes = backfillMakeClientThemePreviewLinks(metadata.resources.themes, projectRoot, runtimeOriginOverride);
+  const prototypes = backfillMakeClientPrototypePreviewLinks(
+    metadata.resources.prototypes,
+    projectRoot,
+    runtimeOriginOverride,
+    request,
+  );
+  const themes = backfillMakeClientThemePreviewLinks(
+    metadata.resources.themes,
+    projectRoot,
+    runtimeOriginOverride,
+    request,
+  );
   if (prototypes === metadata.resources.prototypes && themes === metadata.resources.themes) {
     return metadata;
   }

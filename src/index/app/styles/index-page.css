@@ -113,9 +113,10 @@
 }
 
 .ax-sidebar-shell.is-collapsed {
-    flex-basis: 0;
-    width: 0;
-    overflow: hidden;
+    z-index: 30;
+    flex-basis: 0 !important;
+    width: 0 !important;
+    overflow: visible;
 }
 
 .ax-sidebar-content {
@@ -133,7 +134,11 @@
 }
 
 .ax-sidebar-compact-fallback-trigger {
-    display: none;
+    position: absolute;
+    z-index: 20;
+    top: 6px;
+    left: 8px;
+    display: flex;
 }
 
 @container (max-width: 600px) {
@@ -142,52 +147,34 @@
     }
 }
 
-@media (max-width: 1024px) and (hover: hover) and (pointer: fine) {
-    .ax-sidebar-shell,
-    .ax-sidebar-shell.is-collapsed {
-        z-index: 30;
-        flex-basis: 0 !important;
-        width: 0 !important;
-        overflow: visible;
-    }
+.ax-sidebar-shell.is-collapsed .ax-sidebar-content {
+    position: absolute;
+    z-index: 40;
+    top: 48px;
+    bottom: 8px;
+    left: 8px;
+    width: 240px;
+    height: auto;
+    border: 1px solid hsl(var(--border));
+    border-radius: 10px;
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+    transform: translateX(-8px) scale(0.98);
+    transform-origin: top left;
+    transition: opacity 0.16s ease, transform 0.16s ease;
+}
 
-    .ax-sidebar-content {
-        position: absolute;
-        z-index: 40;
-        top: 8px;
-        bottom: 8px;
-        left: 8px;
-        width: 240px;
-        height: auto;
-        border: 1px solid hsl(var(--border));
-        border-radius: 10px;
-        box-shadow: var(--shadow-lg);
-        opacity: 0;
-        pointer-events: none;
-        visibility: hidden;
-        transform: translateX(-8px) scale(0.98);
-        transform-origin: top left;
-        transition: opacity 0.16s ease, transform 0.16s ease;
-    }
+.ax-sidebar-shell.is-collapsed.is-preview-open .ax-sidebar-content {
+    opacity: 1;
+    pointer-events: auto;
+    visibility: visible;
+    transform: translateX(0) scale(1);
+}
 
-    .ax-sidebar-shell.is-compact-open .ax-sidebar-content {
-        opacity: 1;
-        pointer-events: auto;
-        visibility: visible;
-        transform: translateX(0) scale(1);
-    }
-
-    .ax-sidebar-compact-fallback-trigger {
-        position: absolute;
-        z-index: 20;
-        top: 6px;
-        left: 8px;
-        display: flex;
-    }
-
-    .axhub-canvas-sidebar-toggle-anchor {
-        display: none !important;
-    }
+.axhub-canvas-sidebar-toggle-anchor {
+    display: none !important;
 }
 
 @media (max-width: 640px) and (hover: none) and (pointer: coarse) {

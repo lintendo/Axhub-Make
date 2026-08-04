@@ -6,7 +6,7 @@ import {
     generateRenameDocReferencePrompt,
     generateRenameTemplateReferencePrompt,
 } from '../../utils';
-import { getExplicitLocalPath, stripIndexFilePath } from '../../utils/localPath';
+import { getExplicitLocalPath, getPrototypeLocalBasePath, stripIndexFilePath } from '../../utils/localPath';
 import type { DocReferenceCheckResult } from '../index-page.helpers';
 
 export function ensureStringArray(value: unknown): string[] {
@@ -19,6 +19,31 @@ export function getLocalPathForItem(item: unknown): string {
 
 export function getLocalBasePathForItem(item: unknown): string {
     return stripIndexFilePath(getLocalPathForItem(item));
+}
+
+export function getPrototypeBasePathForItem(item: unknown): string {
+    return getPrototypeLocalBasePath(item);
+}
+
+export function getProjectRelativeResourcePathForItem(item: unknown): string {
+    const localPath = getLocalPathForItem(item)
+        .replace(/\\/g, '/')
+        .trim()
+        .replace(/^(?:\.\/)+/u, '');
+    if (!localPath) {
+        return '';
+    }
+    const resourceRoot = 'src/resources/';
+    if (localPath.startsWith(resourceRoot)) {
+        return localPath;
+    }
+    const isAbsolutePath = localPath.startsWith('/') || /^[a-z]:\//iu.test(localPath);
+    if (isAbsolutePath) {
+        const absoluteResourceRoot = `/${resourceRoot}`;
+        const resourceRootIndex = localPath.lastIndexOf(absoluteResourceRoot);
+        return resourceRootIndex >= 0 ? localPath.slice(resourceRootIndex + 1) : '';
+    }
+    return `${resourceRoot}${localPath}`;
 }
 
 export function buildLocalSiblingPath(localPath: string, siblingName: string): string {

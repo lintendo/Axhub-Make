@@ -53,6 +53,42 @@ describe('resource deep links', () => {
         });
     });
 
+    it('builds and parses one canonical manual preview device parameter', () => {
+        const url = buildIndexDeepLinkUrl({
+            resourceType: 'prototype',
+            resourceId: 'home',
+            projectId: 'client-a',
+            device: '1280x800',
+        }, 'http://localhost:51720/current/path?ignored=1');
+
+        expect(url).toBe('http://localhost:51720/?projectId=client-a&p=home&device=1280x800');
+        expect(parseIndexDeepLink(url)).toEqual({
+            resourceType: 'prototype',
+            resourceId: 'home',
+            view: 'demo',
+            projectId: 'client-a',
+            device: '1280x800',
+            collapseSidebar: false,
+        });
+    });
+
+    it('ignores invalid device values without disrupting the resource link', () => {
+        expect(buildIndexDeepLinkUrl({
+            resourceType: 'prototype',
+            resourceId: 'home',
+            projectId: 'client-a',
+            device: '393×852',
+        }, 'http://localhost:51720/')).toBe('http://localhost:51720/?projectId=client-a&p=home');
+
+        expect(parseIndexDeepLink('/?projectId=client-a&p=home&device=bad')).toEqual({
+            resourceType: 'prototype',
+            resourceId: 'home',
+            view: 'demo',
+            projectId: 'client-a',
+            collapseSidebar: false,
+        });
+    });
+
     it('builds and parses a project spec review link that opens the spec with the sidebar collapsed', () => {
         const target: ResourceDeepLinkTarget & { openSpec: true } = {
             resourceType: 'prototype',

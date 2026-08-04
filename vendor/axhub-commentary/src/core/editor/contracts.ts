@@ -246,6 +246,7 @@ export interface EditorPersistenceService {
   getCommentTaskState?(
     elementKey: WebEditorElementKey,
   ): PrototypeEditCommentStatus | null;
+  resetCompletedCommentStateForElement(elementKey: WebEditorElementKey): void;
   waitForPendingWrites(): Promise<void>;
   listEditingConversationTasks(): PersistedConversationTask[];
   transitionConversationTaskTerminal(

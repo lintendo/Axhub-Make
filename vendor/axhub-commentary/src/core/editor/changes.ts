@@ -66,6 +66,7 @@ export function createChangesService(options: {
   getCommentTaskState?: (
     elementKey: WebEditorElementKey,
   ) => PrototypeEditCommentStatus | null;
+  onCommentEdited?: (elementKey: WebEditorElementKey) => void;
   onSelectMarkedElement?: (element: Element, anchor: MarkerAnchor) => void;
   onStatusChange?: () => void;
 }): EditorChangesService {
@@ -689,6 +690,16 @@ export function createChangesService(options: {
     options.onStatusChange?.();
   }
 
+  function notifyCommentEdited(meta: ElementEditMeta): void {
+    const hasPersistentContent = Boolean(
+      normalizeNote(meta.note).trim()
+      || meta.images.length > 0
+      || hasRecordedTweak(meta),
+    );
+    if (!meta.commentId || !hasPersistentContent) return;
+    options.onCommentEdited?.(meta.elementKey);
+  }
+
   function syncEditMetaWithTransactions(): void {
     const tm = state.transactionManager;
     if (!tm) {
@@ -879,7 +890,10 @@ export function createChangesService(options: {
     const meta = getMetaForElement(element);
     if (!meta) return;
     meta.note = normalizeNote(note);
-    if (options.skillIds) {
+    const hasNote = Boolean(meta.note.trim());
+    if (!hasNote) {
+      delete meta.skillIds;
+    } else if (options.skillIds) {
       const nextSkillIds = normalizePromptCardSkillIds(options.skillIds);
       if (nextSkillIds.length > 0) {
         meta.skillIds = nextSkillIds;
@@ -891,12 +905,12 @@ export function createChangesService(options: {
     if (pendingAnchor) {
       meta.anchor = pendingAnchor;
       state.pendingMarkerAnchors.delete(meta.elementKey);
-    } else if (!meta.anchor && normalizeNote(meta.note).trim()) {
+    } else if (!meta.anchor && hasNote) {
       const fallbackElement = element && element.isConnected ? element : locateElement(meta.locator);
       meta.anchor = fallbackElement ? buildFallbackAnchor(fallbackElement) : null;
     }
 
-    if (normalizeNote(meta.note).trim() || (meta.skillIds?.length ?? 0) > 0) {
+    if (hasNote) {
       ensureElementEditCommentId(meta);
       if (meta.dirtySince === null) {
         meta.dirtySince = Date.now();
@@ -913,6 +927,7 @@ export function createChangesService(options: {
     }
 
     pruneIdleMeta(meta.elementKey);
+    notifyCommentEdited(meta);
     notifyEditMetaChanged();
   }
 
@@ -954,6 +969,7 @@ export function createChangesService(options: {
     }
 
     pruneIdleMeta(meta.elementKey);
+    notifyCommentEdited(meta);
     notifyEditMetaChanged();
   }
 
@@ -1008,6 +1024,7 @@ export function createChangesService(options: {
     }
 
     pruneIdleMeta(meta.elementKey);
+    notifyCommentEdited(meta);
     notifyEditMetaChanged();
   }
 
@@ -1025,6 +1042,7 @@ export function createChangesService(options: {
     }
 
     pruneIdleMeta(meta.elementKey);
+    notifyCommentEdited(meta);
     options.scheduleCacheWrite();
     renderChangeMarkers();
   }

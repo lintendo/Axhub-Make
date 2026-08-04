@@ -59,4 +59,23 @@ describe('PresentationToolbar source', () => {
     expect(source).toContain("quickEditRuntimeStatus === 'pending'");
     expect(source).toContain("? '正在连接批注编辑器'");
   });
+
+  it('does not expose source open actions for resources or themes', () => {
+    const source = readSource();
+    const documentActions = getSourceSegment(
+      source,
+      'const resourceActionButtons = (() => {',
+      "if (contentMode === 'theme' && selectedTheme) {",
+    );
+    const themeActions = getSourceSegment(
+      source,
+      "if (contentMode === 'theme' && selectedTheme) {",
+      "if (contentMode === 'data' && selectedDataTable) {",
+    );
+
+    expect(documentActions).not.toContain('<Code2 /> 打开');
+    expect(documentActions).not.toContain('canOpenMarkdownSource');
+    expect(themeActions).not.toContain('<Code2 /> 打开');
+    expect(themeActions).not.toContain('canOpenThemeSource');
+  });
 });

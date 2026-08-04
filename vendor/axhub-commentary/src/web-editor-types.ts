@@ -656,6 +656,12 @@ export interface CommentaryHostToolbarAgentOption {
   disabled?: boolean;
 }
 
+export interface CommentaryHostSurfaceVisibilityControl {
+  initialVisible?: boolean;
+  showTitle?: string;
+  hideTitle?: string;
+}
+
 export interface CommentaryAiExecutionProviderOption {
   value: string;
   label: string;
@@ -759,6 +765,7 @@ export type CommentaryHostToolbarAction =
   | { type: 'toggle-page-animations' }
   | { type: 'toggle-page-zoom' }
   | { type: 'toggle-selection-mode'; active?: boolean }
+  | { type: 'set-host-surface-visibility'; visible: boolean }
   | { type: 'enable-annotation' }
   | { type: 'open-keyboard-shortcuts' }
   | { type: 'full-exit' };

@@ -22,8 +22,10 @@ import type { EditorLifecycleDeps, ExternalEditingElementTarget } from './contra
 import { resolveTextCommentElementMeta, TEXT_COMMENT_TARGET_ATTR } from './text-comment-target';
 import { getGlobalCommentaryTweakProtocol } from '../../tweak/protocol';
 import { resolveWebEditorOptions } from './state';
+import type { WebEditorInteractionProfile } from './ui-settings';
 import type { PropertyPanelOptions } from '../../ui/property-panel';
 import type { CommentaryHostToolbarAction } from '../../web-editor-types';
+import { appendImplicitAnnotationSkillToPrompt } from '../../ui/runtime/prompt-card-skills';
 
 interface EditorLifecycle {
   start(): void;
@@ -103,7 +105,10 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
   let routeChangeCleanup: (() => void) | null = null;
   let interactionProfileRestartQueued = false;
 
-  function resolveActiveInteractionProfile(): 'design' | 'text-comment' {
+  function resolveActiveInteractionProfile(): WebEditorInteractionProfile {
+    if (options.interactionProfile === 'annotation') {
+      return 'annotation';
+    }
     return options.interactionProfile === 'text-comment' || state.uiSettings.documentCommentMode
       ? 'text-comment'
       : 'design';
@@ -214,9 +219,17 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
   }
 
   function buildSaveRunPromptForAgentElement(element: Element): string {
-    return canReuseAgentConversationForElement(element)
+    const prompt = canReuseAgentConversationForElement(element)
       ? services.summaries.buildAppendSaveRunPromptForElement(element)
       : services.summaries.buildSaveRunPromptForElement(element);
+    return appendImplicitAnnotationSkillToPrompt(
+      prompt,
+      options.interactionProfile === 'annotation',
+      options.ui.commentarySkillSettingsConfigured
+        ? options.ui.commentarySelectedSkillIds
+        : undefined,
+      options.ui.commentarySkillOptions,
+    );
   }
 
   function createHostExternalEditingTaskRef(): {
@@ -1655,6 +1668,8 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
           showCopyPromptAction: options.ui.showCopyPromptAction,
           toolbarMode: options.ui.toolbarMode,
           hideExecutionControls: options.ui.hideExecutionControls,
+          hideCurrentElementExecutionAction: options.ui.hideCurrentElementExecutionAction,
+          hostSurfaceVisibilityControl: options.ui.hostSurfaceVisibilityControl,
           aiExecutionConfigSummary: options.ui.aiExecutionConfigSummary,
           aiExecutionConfigConfigured: options.ui.aiExecutionConfigConfigured,
           aiExecutionProvider: options.ui.aiExecutionProvider,
@@ -2138,6 +2153,8 @@ export function createLifecycleService(deps: EditorLifecycleDeps): EditorLifecyc
           showCopyPromptAction: options.ui.showCopyPromptAction,
           toolbarMode: options.ui.toolbarMode,
           hideExecutionControls: options.ui.hideExecutionControls,
+          hideCurrentElementExecutionAction: options.ui.hideCurrentElementExecutionAction,
+          hostSurfaceVisibilityControl: options.ui.hostSurfaceVisibilityControl,
           aiExecutionConfigSummary: options.ui.aiExecutionConfigSummary,
           aiExecutionConfigConfigured: options.ui.aiExecutionConfigConfigured,
           aiExecutionProvider: options.ui.aiExecutionProvider,

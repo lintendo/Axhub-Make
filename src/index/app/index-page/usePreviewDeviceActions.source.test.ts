@@ -67,4 +67,13 @@ describe('usePreviewDeviceActions source', () => {
     expect(widthHandlerSource).toContain('saveStoredCustomPreviewSize(');
     expect(heightHandlerSource).toContain('saveStoredCustomPreviewSize(');
   });
+
+  it('separates manual device intent from adaptive display state', () => {
+    const source = readUsePreviewDeviceActionsSource();
+
+    expect(source).toContain('const [previewIntentConfig, setPreviewIntentConfig]');
+    expect(source).toContain('resolveAdaptiveDesktopPreviewConfig(previewIntentConfig, previewContainerWidth)');
+    expect(source).toContain('serializePreviewDeviceParam(previewIntentConfig)');
+    expect(source).toContain('handlePreviewContainerSizeChange');
+  });
 });

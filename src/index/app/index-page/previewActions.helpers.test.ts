@@ -228,6 +228,24 @@ describe('previewActions.helpers', () => {
     expect(url.hash).toBe('#page=more-scenarios');
   });
 
+  it('adds annotation session mode to prototype editor urls', () => {
+    vi.stubGlobal('window', {
+      location: {
+        origin: 'http://localhost:53817',
+      },
+      __RUNTIME_ORIGIN__: 'http://localhost:51720',
+    });
+
+    const url = new URL(buildProjectPrototypeIframeUrl({
+      name: 'annotation-demo',
+      clientUrl: 'http://localhost:51720/prototypes/annotation-demo',
+      previewUrl: 'http://localhost:51720/prototypes/annotation-demo',
+    }, { hostToolbar: true, annotationSession: true }));
+
+    expect(url.searchParams.get('agentToolbar')).toBe('host');
+    expect(url.searchParams.get('annotationSession')).toBe('1');
+  });
+
   it('builds same-origin prototype screenshot iframe URLs from runtime-origin previews', () => {
     vi.stubGlobal('window', {
       location: {

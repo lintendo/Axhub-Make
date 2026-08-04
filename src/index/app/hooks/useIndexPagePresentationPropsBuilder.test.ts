@@ -7,6 +7,12 @@ function readPresentationPropsBuilderSource() {
 }
 
 describe('useIndexPagePresentationPropsBuilder source', () => {
+  it('forwards preview container width measurements into preview actions', () => {
+    const source = readPresentationPropsBuilderSource();
+
+    expect(source).toContain('handlePreviewContainerSizeChange: preview.handlePreviewContainerSizeChange,');
+  });
+
   it('forwards resource and design start draft state into the presentation area', () => {
     const source = readPresentationPropsBuilderSource();
 

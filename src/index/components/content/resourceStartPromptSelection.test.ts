@@ -4,6 +4,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { resolveResourceStartPromptSelection } from './resourceStartPromptSelection';
 import * as resourceStartPromptSelection from './resourceStartPromptSelection';
 
+vi.mock('@/components/ui/tooltip', () => ({
+  Tooltip: ({ children }: { children: React.ReactNode }) => children,
+  TooltipContent: ({ children }: { children: React.ReactNode }) => children,
+  TooltipProvider: ({ children }: { children: React.ReactNode }) => children,
+  TooltipTrigger: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 describe('resource start prompt selection', () => {
   it('applies prompts immediately when the card already matches the active scene', () => {
     expect(resolveResourceStartPromptSelection({
@@ -62,6 +69,7 @@ describe('resource start prompt selection', () => {
         activeScene,
         disabled: false,
         selectPrompt,
+        onCopyPrompt: vi.fn(),
         onImageSizeChange: vi.fn(),
         onPrdPlanningChange: vi.fn(),
         onSceneChange: (scene) => {
@@ -76,7 +84,7 @@ describe('resource start prompt selection', () => {
       renderer = create(React.createElement(Harness));
     });
     await act(async () => {
-      renderer.root.findAllByType('button')[1].props.onClick();
+      renderer.root.findByProps({ 'aria-label': 'Document' }).props.onClick();
     });
 
     expect(sceneChange).toHaveBeenCalledOnce();
@@ -99,15 +107,16 @@ describe('resource start prompt selection', () => {
         activeScene: 'design',
         disabled: false,
         selectPrompt: vi.fn(),
+        onCopyPrompt: vi.fn(),
         onSceneChange: vi.fn(),
         onImageSizeChange: imageSizeChange,
         onPrdPlanningChange: vi.fn(),
       }));
     });
 
-    for (const button of renderer.root.findAllByType('button')) {
+    for (const title of ['APP', 'Dashboard']) {
       await act(async () => {
-        button.props.onClick();
+        renderer.root.findByProps({ 'aria-label': title }).props.onClick();
       });
     }
 
@@ -130,15 +139,16 @@ describe('resource start prompt selection', () => {
         activeScene: 'document',
         disabled: false,
         selectPrompt: vi.fn(),
+        onCopyPrompt: vi.fn(),
         onSceneChange: vi.fn(),
         onImageSizeChange: vi.fn(),
         onPrdPlanningChange: planningChange,
       }));
     });
 
-    for (const button of renderer.root.findAllByType('button')) {
+    for (const title of ['PRD', 'Flow', 'Design']) {
       await act(async () => {
-        button.props.onClick();
+        renderer.root.findByProps({ 'aria-label': title }).props.onClick();
       });
     }
 
@@ -159,18 +169,49 @@ describe('resource start prompt selection', () => {
         activeScene: 'design',
         disabled: true,
         selectPrompt,
+        onCopyPrompt: vi.fn(),
         onSceneChange: sceneChange,
         onImageSizeChange: imageSizeChange,
         onPrdPlanningChange: planningChange,
       }));
     });
     await act(async () => {
-      renderer.root.findByType('button').props.onClick();
+      renderer.root.findByProps({ 'aria-label': 'Document' }).props.onClick();
     });
 
     expect(sceneChange).not.toHaveBeenCalled();
     expect(selectPrompt).not.toHaveBeenCalled();
     expect(planningChange).not.toHaveBeenCalled();
     expect(imageSizeChange).not.toHaveBeenCalled();
+  });
+
+  it('keeps the local-AI copy action available while card selection is disabled', async () => {
+    const { ResourceStartPromptGrid } = await import('./ResourceStartPromptGrid');
+    const onCopyPrompt = vi.fn();
+    const selectPrompt = vi.fn();
+    const TestIcon = () => React.createElement('svg');
+    const card = { id: 'document', scene: 'document' as const, title: 'Document', prompt: 'Document prompt', icon: TestIcon };
+    let renderer: ReactTestRenderer;
+
+    await act(async () => {
+      renderer = create(React.createElement(ResourceStartPromptGrid, {
+        cards: [card],
+        activeScene: 'document',
+        disabled: true,
+        selectPrompt,
+        onCopyPrompt,
+        onSceneChange: vi.fn(),
+        onImageSizeChange: vi.fn(),
+        onPrdPlanningChange: vi.fn(),
+      } as any));
+    });
+
+    const copyButton = renderer!.root.findByProps({ 'aria-label': '复制提示词给本地 AI 使用' });
+    await act(async () => {
+      copyButton.props.onClick();
+    });
+
+    expect(onCopyPrompt).toHaveBeenCalledWith(card);
+    expect(selectPrompt).not.toHaveBeenCalled();
   });
 });

@@ -7,6 +7,7 @@ export type MultiPageColumns = 1 | 2 | 3 | 4;
 export interface PreviewConfig {
   previewMode: PreviewMode;
   singlePreset: PreviewSinglePreset;
+  adaptiveDesktop?: boolean;
   customWidth: number | null;
   customHeight: number | null;
   multiPageColumns: MultiPageColumns;
@@ -93,6 +94,10 @@ export const DEVICE_PRESET_SIZES: Record<PreviewDeviceId, { width: number; heigh
   mobile: { width: 393, height: 852 },
   tablet: { width: 820, height: 1180 },
 };
+
+export const ADAPTIVE_DESKTOP_WIDTH = 1440;
+export const ADAPTIVE_DESKTOP_HEIGHT = 900;
+export const ADAPTIVE_DESKTOP_ACTIVATION_WIDTH = 1280;
 
 export const MULTI_PAGE_MAX_VISIBLE = 16;
 export const MULTI_PAGE_ACTIVE_LIMIT = 2;
@@ -220,6 +225,37 @@ export function createDefaultPreviewConfig(): PreviewConfig {
     ...DEFAULT_PREVIEW_CONFIG,
     splitWidths: { ...DEFAULT_PREVIEW_CONFIG.splitWidths },
     splitHeights: { ...DEFAULT_PREVIEW_CONFIG.splitHeights },
+  };
+}
+
+export function resolveAdaptiveDesktopPreviewConfig(
+  intentConfig: PreviewConfig,
+  previewWidth: number,
+  lockedAdaptiveDesktop: boolean | null = null,
+): PreviewConfig {
+  if (
+    intentConfig.previewMode !== 'single'
+    || intentConfig.singlePreset !== 'desktop'
+  ) {
+    return { ...intentConfig, adaptiveDesktop: false };
+  }
+
+  const adaptiveDesktop = lockedAdaptiveDesktop ?? (
+    Number.isFinite(previewWidth)
+    && previewWidth > 0
+    && previewWidth < ADAPTIVE_DESKTOP_ACTIVATION_WIDTH
+  );
+  if (!adaptiveDesktop) {
+    return { ...intentConfig, adaptiveDesktop: false };
+  }
+
+  return {
+    ...intentConfig,
+    singlePreset: 'custom',
+    customWidth: ADAPTIVE_DESKTOP_WIDTH,
+    customHeight: ADAPTIVE_DESKTOP_HEIGHT,
+    scaleMode: 'fit-screen',
+    adaptiveDesktop: true,
   };
 }
 
@@ -411,7 +447,7 @@ export function resolvePreviewLayout(params: {
     const measuredSize = resolveMeasuredSize(
       clampPositive(config.customWidth, DEVICE_PRESET_SIZES.desktop.width),
       clampPositive(config.customHeight, DEVICE_PRESET_SIZES.desktop.height),
-      params.actualSingleContentSize,
+      config.adaptiveDesktop ? null : params.actualSingleContentSize,
       config.scaleMode,
     );
     const metrics = createViewportMetrics(

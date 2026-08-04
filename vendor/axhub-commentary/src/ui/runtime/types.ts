@@ -212,6 +212,7 @@ export interface PromptCardViewProps
   bubbleStyleEditorOpen: boolean;
   agentVisualState: 'sleeping' | 'awake';
   hideExecutionControls?: boolean;
+  hideCurrentElementExecutionAction?: boolean;
   hideContextAppendAction?: boolean;
   enabledSkillIds?: readonly string[] | null;
   skillOptions?: readonly CommentarySkillOption[] | null;

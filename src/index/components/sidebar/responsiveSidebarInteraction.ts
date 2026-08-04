@@ -1,32 +1,34 @@
-export const COMPACT_SIDEBAR_CLOSE_DELAY_MS = 120;
+export const SIDEBAR_PREVIEW_CLOSE_DELAY_MS = 120;
 
-export interface CompactSidebarInteraction {
+export interface SidebarPreviewInteraction {
     pointerEnter: () => void;
     pointerLeave: () => void;
     focusEnter: () => void;
     focusLeave: () => void;
     close: () => void;
+    suppressUntilPointerLeave: () => void;
     dispose: () => void;
 }
 
-interface CompactSidebarTrigger {
+interface SidebarPreviewTrigger {
     focus: () => void;
 }
 
-export function closeCompactSidebarAndRestoreFocus(
-    interaction: Pick<CompactSidebarInteraction, 'close'>,
-    trigger: CompactSidebarTrigger | null,
+export function closeSidebarPreviewAndRestoreFocus(
+    interaction: Pick<SidebarPreviewInteraction, 'close'>,
+    trigger: SidebarPreviewTrigger | null,
 ) {
     trigger?.focus();
     interaction.close();
 }
 
-export function createCompactSidebarInteraction(
+export function createSidebarPreviewInteraction(
     setOpen: (open: boolean) => void,
-): CompactSidebarInteraction {
+): SidebarPreviewInteraction {
     let closeTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
     let pointerInside = false;
     let focusInside = false;
+    let suppressPointerUntilLeave = false;
 
     const cancelClose = () => {
         if (closeTimer !== null) {
@@ -54,15 +56,17 @@ export function createCompactSidebarInteraction(
         closeTimer = globalThis.setTimeout(() => {
             closeTimer = null;
             setOpen(false);
-        }, COMPACT_SIDEBAR_CLOSE_DELAY_MS);
+        }, SIDEBAR_PREVIEW_CLOSE_DELAY_MS);
     };
 
     return {
         pointerEnter: () => {
+            if (suppressPointerUntilLeave) return;
             pointerInside = true;
             open();
         },
         pointerLeave: () => {
+            suppressPointerUntilLeave = false;
             pointerInside = false;
             scheduleCloseIfOutside();
         },
@@ -75,6 +79,10 @@ export function createCompactSidebarInteraction(
             scheduleCloseIfOutside();
         },
         close,
+        suppressUntilPointerLeave: () => {
+            close();
+            suppressPointerUntilLeave = true;
+        },
         dispose: cancelClose,
     };
 }

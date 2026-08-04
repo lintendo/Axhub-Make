@@ -392,6 +392,62 @@ describe('CanvasGenerationComposer message extraction', () => {
     });
   });
 
+  it('requires a configured default Agent only when the display composer opts in', async () => {
+    const mod = await import('./CanvasGenerationComposer');
+    const resolveVisibility = (mod as Record<string, unknown>).resolveCanvasAcpSelectorVisibility;
+
+    expect(resolveVisibility).toBeTypeOf('function');
+    if (typeof resolveVisibility !== 'function') return;
+
+    expect(resolveVisibility({
+      enabled: false,
+      preferredPromptClient: null,
+      runtimeNeedsFallback: false,
+    })).toEqual({ defaultAgentConfigured: false, showSelectors: false, showSettingsFallback: false });
+    expect(resolveVisibility({
+      enabled: true,
+      preferredPromptClient: null,
+      runtimeNeedsFallback: false,
+    })).toEqual({ defaultAgentConfigured: false, showSelectors: true, showSettingsFallback: false });
+    expect(resolveVisibility({
+      enabled: true,
+      preferredPromptClient: null,
+      runtimeNeedsFallback: false,
+      requireConfiguredDefaultAgent: true,
+    })).toEqual({ defaultAgentConfigured: false, showSelectors: false, showSettingsFallback: true });
+    expect(resolveVisibility({
+      enabled: true,
+      preferredPromptClient: 'acp:claude',
+      runtimeNeedsFallback: false,
+    })).toEqual({ defaultAgentConfigured: true, showSelectors: true, showSettingsFallback: false });
+    expect(resolveVisibility({
+      enabled: true,
+      preferredPromptClient: 'acp:claude',
+      runtimeNeedsFallback: true,
+    })).toEqual({ defaultAgentConfigured: true, showSelectors: false, showSettingsFallback: true });
+  });
+
+  it('locks display editing only when the caller requires a configured default Agent', async () => {
+    const mod = await import('./CanvasGenerationComposer');
+    const resolveEditingDisabled = (mod as Record<string, unknown>).resolveCanvasGenerationDisplayEditingDisabled;
+
+    expect(resolveEditingDisabled).toBeTypeOf('function');
+    if (typeof resolveEditingDisabled !== 'function') return;
+
+    expect(resolveEditingDisabled({
+      disableEditingWithoutConfiguredAgent: false,
+      defaultAgentConfigured: false,
+    })).toBe(false);
+    expect(resolveEditingDisabled({
+      disableEditingWithoutConfiguredAgent: true,
+      defaultAgentConfigured: false,
+    })).toBe(true);
+    expect(resolveEditingDisabled({
+      disableEditingWithoutConfiguredAgent: true,
+      defaultAgentConfigured: true,
+    })).toBe(false);
+  });
+
   it('falls back to fixed ACP provider options when the runtime context omits providerOptions', async () => {
     const { resolveCanvasAcpRuntimeProviderOptions } = await loadMessageExtraction();
 

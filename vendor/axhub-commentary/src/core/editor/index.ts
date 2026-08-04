@@ -891,6 +891,9 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
     scheduleCacheWrite: () => persistence?.scheduleWrite(),
     persistMarkerVisibility: (visible) => persistence?.setMarkerVisibility(visible),
     getCommentTaskState: (elementKey) => persistence?.getCommentTaskState?.(elementKey) ?? null,
+    onCommentEdited: (elementKey) => {
+      persistence?.resetCompletedCommentStateForElement(elementKey);
+    },
     onSelectMarkedElement: (element, anchor) => {
       if (!element.isConnected) return;
       state.eventController?.setMode('selecting');

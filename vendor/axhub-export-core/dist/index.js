@@ -2873,7 +2873,11 @@ async function enhanceTextNodeWithInlineStyles(textNode, inlineStyles, targetEle
     }
   }
   if (inlineStyles.fontWeight) {
-    enhancedNode.fontWeight = Math.round(inlineStyles.fontWeight);
+    const numericFontWeight = Number(inlineStyles.fontWeight);
+    enhancedNode.fontWeight = Number.isFinite(numericFontWeight) ? Math.round(numericFontWeight) : inlineStyles.fontWeight;
+  }
+  if (inlineStyles.fontStyle) {
+    enhancedNode.fontStyle = inlineStyles.fontStyle;
   }
   if (inlineStyles.textAlign) {
     const textAlign = inlineStyles.textAlign;
@@ -3045,6 +3049,13 @@ async function buildTextNodeWithComputedStyles(textNode, computedStyles, targetE
     if (fontFamilyStack) {
       textNode.fontFamily = fontFamilyStack;
     }
+  }
+  if (computedStyles.fontWeight) {
+    const numericFontWeight = Number(computedStyles.fontWeight);
+    textNode.fontWeight = Number.isFinite(numericFontWeight) ? Math.round(numericFontWeight) : computedStyles.fontWeight;
+  }
+  if (computedStyles.fontStyle) {
+    textNode.fontStyle = computedStyles.fontStyle;
   }
   if (["underline", "strikethrough"].includes(computedStyles.textDecoration)) {
     textNode.textDecoration = computedStyles.textDecoration.toUpperCase();
@@ -7767,6 +7778,7 @@ __export(index_exports, {
   copyDocumentForFigmaNewOfficialClipboard: () => copyDocumentForFigmaNewOfficialClipboard,
   copyLayersToFigmaClipboard: () => copyLayersToFigmaClipboard,
   copyToFigmaWithKiwi: () => copyToFigmaWithKiwi,
+  deriveStandardFontStyle: () => deriveStandardFontStyle,
   extractAxurePayload: () => extractAxurePayload,
   getProtocolVersion: () => getProtocolVersion,
   hasChromeRuntime: () => hasChromeRuntime,
@@ -7787,6 +7799,7 @@ __export(index_exports, {
   safeCopyToFigmaWithKiwi: () => safeCopyToFigmaWithKiwi,
   safeHtmlToAxure: () => safeHtmlToAxure,
   safeHtmlToFigma: () => safeHtmlToFigma,
+  serializeDocumentForFigmaNewOfficialClipboard: () => serializeDocumentForFigmaNewOfficialClipboard,
   validateAndNormalizeStandardFigmaNode: () => validateAndNormalizeStandardFigmaNode,
   validateFigmaSchema: () => validateFigmaSchema,
   validateStandardFigmaLayerPayload: () => validateStandardFigmaLayerPayload
@@ -28887,46 +28900,62 @@ var normalizeLegacyFontStyleToken = (style) => {
   if (typeof style !== "string") {
     return "Regular";
   }
-  const normalized = style.trim().toLowerCase().replace(/\s+/g, " ");
+  const original = style.trim().replace(/\s+/g, " ");
+  const normalized = original.toLowerCase();
   if (!normalized) {
     return "Regular";
   }
-  let isBold = false;
-  let isItalic = false;
   if (normalized === "normal" || normalized === "regular" || normalized === "book" || normalized === "roman") {
     return "Regular";
   }
-  if (normalized.includes("italic") || normalized.includes("oblique")) {
-    isItalic = true;
-  }
-  if (normalized.includes("bold") || normalized.includes("semibold") || normalized.includes("demibold")) {
-    isBold = true;
-  }
   const numericStyle = Number(normalized);
-  if (Number.isFinite(numericStyle) && numericStyle >= 700) {
-    isBold = true;
+  if (Number.isFinite(numericStyle)) {
+    if (numericStyle >= 800) return "Black";
+    if (numericStyle >= 600) return "Bold";
+    if (numericStyle >= 500) return "Medium";
+    if (numericStyle >= 400) return "Regular";
+    if (numericStyle >= 300) return "Light";
+    return "Thin";
   }
-  if (isBold && isItalic) {
-    return "Bold Italic";
+  const isItalic = normalized.includes("italic") || normalized.includes("oblique");
+  let base = "Regular";
+  if (normalized.includes("black") || normalized.includes("heavy")) {
+    base = "Black";
+  } else if (normalized.includes("extra bold") || normalized.includes("extra-bold")) {
+    base = "Extra Bold";
+  } else if (normalized.includes("bold") || normalized.includes("semibold") || normalized.includes("demibold")) {
+    base = "Bold";
+  } else if (normalized.includes("medium")) {
+    base = "Medium";
+  } else if (normalized.includes("light")) {
+    base = normalized.includes("extra light") || normalized.includes("extra-light") ? "Extra Light" : "Light";
+  } else if (normalized.includes("thin")) {
+    base = "Thin";
+  } else if (!isItalic) {
+    return original;
   }
-  if (isBold) {
-    return "Bold";
-  }
-  if (isItalic) {
-    return "Italic";
-  }
-  return "Regular";
+  return isItalic && base !== "Italic" ? `${base} Italic` : isItalic ? "Italic" : base;
 };
-var deriveLegacyFontStyle = (fontWeight, fontStyle, fallback) => {
+var deriveStandardFontStyle = (fontWeight, fontStyle, fallback) => {
   let style = normalizeLegacyFontStyleToken(fallback);
   const numericWeight = typeof fontWeight === "number" ? fontWeight : Number(fontWeight);
-  const isBoldWeight = fontWeight === "bold" || Number.isFinite(numericWeight) && numericWeight >= 700;
-  if (isBoldWeight) {
-    style = style === "Italic" ? "Bold Italic" : "Bold";
+  const normalizedWeight = typeof fontWeight === "string" ? fontWeight.toLowerCase() : "";
+  if (normalizedWeight === "black" || normalizedWeight === "heavy" || Number.isFinite(numericWeight) && numericWeight >= 800) {
+    style = style.includes("Italic") ? "Black Italic" : "Black";
+  } else if (normalizedWeight === "bold" || Number.isFinite(numericWeight) && numericWeight >= 600) {
+    style = style.includes("Italic") ? "Bold Italic" : "Bold";
+  } else if (Number.isFinite(numericWeight) && numericWeight >= 500) {
+    style = style.includes("Italic") ? "Medium Italic" : "Medium";
+  } else if (Number.isFinite(numericWeight) && numericWeight >= 400) {
+    style = style.includes("Italic") ? "Italic" : "Regular";
+  } else if (Number.isFinite(numericWeight) && numericWeight >= 300) {
+    style = style.includes("Italic") ? "Light Italic" : "Light";
+  } else if (Number.isFinite(numericWeight) && numericWeight > 0) {
+    style = style.includes("Italic") ? "Thin Italic" : "Thin";
   }
   const normalizedFontStyle = typeof fontStyle === "string" ? fontStyle.toLowerCase() : "";
   if (normalizedFontStyle === "italic" || normalizedFontStyle === "oblique") {
-    style = style === "Bold" ? "Bold Italic" : "Italic";
+    style = style === "Regular" ? "Italic" : style.endsWith("Italic") ? style : `${style} Italic`;
   }
   return style;
 };
@@ -29130,7 +29159,7 @@ var normalizeNode = (node, path, diagnostics, availableFontLookup = null) => {
       typeof normalizedFontName.style === "string" ? normalizedFontName.style : STANDARD_FIGMA_CONTRACT_FALLBACKS.text.fontStyle
     );
     const resolvedFamily = resolveSingleSafeFontFamily(sourceFamilyRaw, availableFontLookup);
-    const resolvedStyle = deriveLegacyFontStyle(
+    const resolvedStyle = deriveStandardFontStyle(
       node.fontWeight,
       node.fontStyle,
       baseStyle
@@ -30183,7 +30212,11 @@ var normalizeTextNode = (target, source, path, diagnostics) => {
   );
   target.fontName = {
     family: typeof rawFontName?.family === "string" ? rawFontName.family : typeof source.fontFamily === "string" ? source.fontFamily : STANDARD_FIGMA_CONTRACT_FALLBACKS.text.fontFamily,
-    style: typeof rawFontName?.style === "string" ? rawFontName.style : typeof source.fontStyle === "string" ? source.fontStyle : STANDARD_FIGMA_CONTRACT_FALLBACKS.text.fontStyle,
+    style: deriveStandardFontStyle(
+      source.fontWeight,
+      source.fontStyle,
+      typeof rawFontName?.style === "string" ? rawFontName.style : STANDARD_FIGMA_CONTRACT_FALLBACKS.text.fontStyle
+    ),
     postscript: typeof rawFontName?.postscript === "string" ? rawFontName.postscript : typeof source.fontPostScriptName === "string" ? source.fontPostScriptName : ""
   };
   target.textAlignHorizontal = normalizeEnum3(
@@ -30479,7 +30512,9 @@ var convertLayersToStandardFigmaNodes = (layers, options = {}) => {
       stats
     };
   }
-  const contractValidation = validateStandardFigmaLayerPayload(normalizedNodes);
+  const contractValidation = validateStandardFigmaLayerPayload(normalizedNodes, {
+    availableFontFamilies: options.availableFontFamilies
+  });
   const mergedDiagnostics = dedupeDiagnostics([
     ...dedupedDiagnostics,
     ...contractValidation.diagnostics
@@ -30532,6 +30567,8 @@ var ALLOWED_ATTRIBUTES = /* @__PURE__ */ new Set([
   "for",
   "href",
   "id",
+  "indeterminate",
+  "label",
   "multiple",
   "placeholder",
   "poster",
@@ -30649,6 +30686,8 @@ var DEFAULT_STYLE_VALUES = {
   clipPath: "none",
   clipRule: "nonzero",
   colorScheme: "normal",
+  accentColor: "auto",
+  appearance: "none",
   columnCount: "auto",
   columnFill: "balance",
   columnRuleColor: "rgb(0, 0, 0)",
@@ -30661,6 +30700,7 @@ var DEFAULT_STYLE_VALUES = {
   content: "normal",
   contentVisibility: "visible",
   filter: "none",
+  float: "none",
   isolation: "auto",
   justifyItems: "normal",
   justifySelf: "auto",
@@ -30671,6 +30711,7 @@ var DEFAULT_STYLE_VALUES = {
   listStyleType: "disc",
   mixBlendMode: "normal",
   objectFit: "fill",
+  order: "0",
   opacity: "1",
   outlineColor: "rgb(0, 0, 0)",
   outlineOffset: "0px",
@@ -30720,6 +30761,7 @@ var DEFAULT_STYLE_VALUES = {
   fontKerning: "auto",
   fontOpticalSizing: "auto",
   fontPalette: "normal",
+  fontVariationSettings: "normal",
   fontSizeAdjust: "none",
   fontWeight: "400",
   fontStyle: "normal",
@@ -30741,25 +30783,49 @@ var DEFAULT_STYLE_VALUES = {
   textDecorationLine: "none",
   textShadow: "none",
   textTransform: "none",
+  textWrapStyle: "auto",
   whiteSpace: "normal",
   visibility: "visible",
   overflow: "visible",
   overflowX: "visible",
   overflowY: "visible",
+  perspective: "none",
+  perspectiveOrigin: "50% 50%",
   objectPosition: "50% 50%",
   top: "auto",
   zIndex: "auto",
   transform: "none",
   transformOrigin: "auto",
+  transformStyle: "flat",
   translate: "none",
   rotate: "none",
-  scale: "none"
+  scale: "none",
+  backfaceVisibility: "visible",
+  webkitTextFillColor: "",
+  maskImage: "none",
+  maskMode: "match-source",
+  maskOrigin: "border-box",
+  maskPosition: "0% 0%",
+  maskRepeat: "repeat",
+  maskSize: "auto"
 };
 var BORDER_STYLE_WIDTH_COLOR_KEYS = [
   { style: "borderTopStyle", width: "borderTopWidth", color: "borderTopColor" },
-  { style: "borderRightStyle", width: "borderRightWidth", color: "borderRightColor" },
-  { style: "borderBottomStyle", width: "borderBottomWidth", color: "borderBottomColor" },
-  { style: "borderLeftStyle", width: "borderLeftWidth", color: "borderLeftColor" }
+  {
+    style: "borderRightStyle",
+    width: "borderRightWidth",
+    color: "borderRightColor"
+  },
+  {
+    style: "borderBottomStyle",
+    width: "borderBottomWidth",
+    color: "borderBottomColor"
+  },
+  {
+    style: "borderLeftStyle",
+    width: "borderLeftWidth",
+    color: "borderLeftColor"
+  }
 ];
 var AssetCollector = class {
   constructor() {
@@ -30780,7 +30846,7 @@ var AssetCollector = class {
     });
     return absoluteUrl;
   }
-  async captureCanvas(canvas, key) {
+  async captureCanvas(canvas, key, kind = "canvas") {
     if (this.assets.has(key)) {
       return key;
     }
@@ -30792,11 +30858,34 @@ var AssetCollector = class {
     }
     this.assets.set(key, {
       id: key,
-      kind: "canvas",
+      kind,
       mimeType: getDataUrlMimeType2(dataUrl),
       dataUrl
     });
     return key;
+  }
+  async captureVideoFrame(video, key) {
+    if (this.assets.has(key)) {
+      return key;
+    }
+    const width = Math.max(1, video.videoWidth || video.clientWidth || video.offsetWidth || 1);
+    const height = Math.max(1, video.videoHeight || video.clientHeight || video.offsetHeight || 1);
+    if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || width <= 1 || height <= 1) {
+      return null;
+    }
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) return null;
+      context.drawImage(video, 0, 0, width, height);
+      await this.captureCanvas(canvas, key, "video");
+      return key;
+    } catch (error) {
+      console.warn("[FigmaNewCapture] Failed to capture video frame:", error);
+      return null;
+    }
   }
   toRecord() {
     return Object.fromEntries(this.assets.entries());
@@ -30858,6 +30947,25 @@ var FontCollector = class {
     }
     return false;
   }
+  measureMetrics(fontFamily, fontStretch, fontStyle, fontWeight, fontSize) {
+    const ctx = this.ctx;
+    if (!ctx) return void 0;
+    try {
+      const normalizedStretch = this.normalizeStretch(fontStretch);
+      ctx.font = `${normalizedStretch} ${fontStyle} ${fontWeight} ${fontSize} "${fontFamily}"`;
+      const measured = ctx.measureText("Hg");
+      const ascent = measured.fontBoundingBoxAscent;
+      const descent = measured.fontBoundingBoxDescent;
+      if (!Number.isFinite(ascent) || !Number.isFinite(descent)) return void 0;
+      return {
+        fontBoundingBoxAscent: ascent,
+        fontBoundingBoxDescent: descent,
+        lineBoxHeight: ascent + descent
+      };
+    } catch {
+      return void 0;
+    }
+  }
   addUsage(familyKey, fontStretch, fontStyle, fontWeight, fontSize) {
     const usageKey = `${familyKey}|${fontStretch}|${fontStyle}|${fontWeight}|${fontSize}`;
     if (this.processedUsages.has(usageKey)) return;
@@ -30869,7 +30977,8 @@ var FontCollector = class {
       fontWeight,
       fontStyle,
       fontStretch,
-      fontSize
+      fontSize,
+      metrics: this.measureMetrics(family.familyName, fontStretch, fontStyle, fontWeight, fontSize)
     });
   }
   addFontFamily(fontFamily, fontStretch, fontStyle, fontWeight, fontSize) {
@@ -31046,7 +31155,14 @@ var convertUrlToDataUrl2 = async (url) => {
     if (debuggerDataUrl) {
       return debuggerDataUrl;
     }
-    const response = await fetch(fullUrl);
+    const timeout = new AbortController();
+    const timeoutId = globalThis.setTimeout(() => timeout.abort(), 1e4);
+    let response;
+    try {
+      response = await fetch(fullUrl, { signal: timeout.signal });
+    } finally {
+      globalThis.clearTimeout(timeoutId);
+    }
     if (!response.ok) {
       throw new Error(`Failed to fetch image: ${fullUrl} - ${response.status}`);
     }
@@ -31064,15 +31180,16 @@ var computeLineCountFromRects = (rects, vertical) => {
   const values = Array.from(rects).filter((rect) => rect.width > 0 && rect.height > 0).map((rect) => Math.round(vertical ? rect.left : rect.top));
   return values.length > 0 ? new Set(values).size : 0;
 };
-var mergeAdjacentTextNodes = (parent) => {
+var mergeAdjacentTextNodes = (source) => {
   const merged = [];
-  for (let index = 0; index < parent.childNodes.length; index += 1) {
-    const child = parent.childNodes[index];
+  const childNodes = Array.isArray(source) ? source : Array.from(source.childNodes);
+  for (let index = 0; index < childNodes.length; index += 1) {
+    const child = childNodes[index];
     if (child.nodeType === TEXT_NODE) {
       const bucket = [child];
       let cursor = index + 1;
-      while (cursor < parent.childNodes.length && parent.childNodes[cursor].nodeType === TEXT_NODE) {
-        bucket.push(parent.childNodes[cursor]);
+      while (cursor < childNodes.length && childNodes[cursor].nodeType === TEXT_NODE) {
+        bucket.push(childNodes[cursor]);
         cursor += 1;
       }
       merged.push(bucket.length === 1 ? bucket[0] : bucket);
@@ -31170,6 +31287,86 @@ var getSparseStyles = (element, pseudo) => {
     delete result.outlineColor;
   }
   return result;
+};
+var extractCssUrls = (value) => {
+  if (!value || value === "none") return [];
+  const urls = [];
+  for (const match of value.matchAll(/url\(\s*(['"]?)(.*?)\1\s*\)/g)) {
+    const url = (match[2] || "").trim();
+    if (url) urls.push(url);
+  }
+  return urls;
+};
+var getDeclaredCssVariables = (element, includeStylesheetRules = false) => {
+  const variables = {};
+  const collectFromStyle = (style) => {
+    for (const propertyName of Array.from(style)) {
+      if (!propertyName.startsWith("--")) continue;
+      const value = style.getPropertyValue(propertyName).trim();
+      if (value) variables[propertyName] = value;
+    }
+  };
+  const visitRules = (rules) => {
+    for (const rule of Array.from(rules)) {
+      const styleRule = rule;
+      if (typeof styleRule.selectorText === "string" && styleRule.style) {
+        try {
+          if (element.matches(styleRule.selectorText)) collectFromStyle(styleRule.style);
+        } catch {
+        }
+      }
+      const nestedRules = rule.cssRules;
+      if (nestedRules) visitRules(nestedRules);
+    }
+  };
+  if (includeStylesheetRules) {
+    const root = element.getRootNode();
+    const adoptedSheets = [
+      ...document.adoptedStyleSheets || [],
+      ...root.adoptedStyleSheets || []
+    ];
+    const sheets = [...Array.from(document.styleSheets), ...adoptedSheets];
+    for (const sheet of sheets) {
+      try {
+        visitRules(sheet.cssRules);
+      } catch {
+      }
+    }
+  }
+  collectFromStyle(element.style);
+  return variables;
+};
+var getPseudoElementStyles = (element, styles) => {
+  const pseudoElementStyles = {};
+  for (const pseudo of ["before", "after"]) {
+    const pseudoStyles = getSparseStyles(element, `::${pseudo}`);
+    const content = pseudoStyles.content;
+    if (content && content !== "none" && content !== "normal") {
+      pseudoElementStyles[pseudo] = pseudoStyles;
+    }
+  }
+  if (styles.display === "list-item") {
+    const markerStyles = getSparseStyles(element, "::marker");
+    if (Object.keys(markerStyles).length > 0) {
+      pseudoElementStyles.marker = markerStyles;
+    }
+  }
+  if ((element instanceof HTMLInputElement && ["text", "search", "tel", "url", "email", "password", "number"].includes(element.type) || element instanceof HTMLTextAreaElement) && element.placeholder) {
+    const placeholderStyles = getSparseStyles(element, "::placeholder");
+    if (Object.keys(placeholderStyles).length > 0) {
+      pseudoElementStyles.placeholder = placeholderStyles;
+    }
+  }
+  return Object.keys(pseudoElementStyles).length > 0 ? pseudoElementStyles : void 0;
+};
+var getCaptureChildNodes = (element) => {
+  if (element instanceof HTMLSlotElement && element.getRootNode() instanceof ShadowRoot) {
+    return element.assignedNodes({ flatten: true });
+  }
+  if (element.shadowRoot) {
+    return Array.from(element.shadowRoot.childNodes);
+  }
+  return Array.from(element.childNodes);
 };
 var toCssAttributeName = (name) => name.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
 var serializeSvgWithComputedStyles = (svg) => {
@@ -31291,7 +31488,10 @@ var getQuadForTransformedElement = (element, styles, matrix) => {
   const transformedQuad = transformQuad(quad, transformWithoutTranslate);
   const translatedQuad = transformQuad(
     transformedQuad,
-    new DOMMatrix().translate(center.x + transformedOriginOffset.x, center.y + transformedOriginOffset.y)
+    new DOMMatrix().translate(
+      center.x + transformedOriginOffset.x,
+      center.y + transformedOriginOffset.y
+    )
   );
   return {
     p1: { x: translatedQuad.p1.x, y: translatedQuad.p1.y },
@@ -31342,9 +31542,15 @@ var getCapturedAttributes = (element) => {
   }
   if (element instanceof HTMLInputElement && typeof element.value === "string") {
     attributes.value = element.value;
+    attributes.checked = String(element.checked);
+    attributes.indeterminate = String(element.indeterminate);
   }
   if (element instanceof HTMLTextAreaElement && typeof element.value === "string") {
     attributes.value = element.value;
+  }
+  if (element instanceof HTMLOptionElement) {
+    attributes.selected = String(element.selected);
+    if (element.label) attributes.label = element.label;
   }
   return attributes;
 };
@@ -31355,14 +31561,11 @@ var isIgnoredElement = (element) => {
   return element.getAttribute("data-h2d-ignore") === "true";
 };
 var collectElementAssets = async (element, styles, assets, id) => {
-  const backgroundImage = styles.backgroundImage;
-  if (backgroundImage && backgroundImage !== "none") {
-    const matches = backgroundImage.matchAll(/url\("(.*?)"\)/g);
-    for (const match of matches) {
-      const url = (match[1] || "").trim();
-      if (!url) continue;
-      await assets.captureUrl(url, "background");
-    }
+  for (const url of [
+    ...extractCssUrls(styles.backgroundImage),
+    ...extractCssUrls(styles.maskImage)
+  ]) {
+    await assets.captureUrl(url, "background");
   }
   if (element instanceof HTMLImageElement && element.currentSrc) {
     await assets.captureUrl(element.currentSrc, "image");
@@ -31371,16 +31574,25 @@ var collectElementAssets = async (element, styles, assets, id) => {
     if (element.poster) {
       await assets.captureUrl(element.poster, "image");
     }
+    const frameKey = await assets.captureVideoFrame(element, `video:${id}`);
+    if (frameKey) {
+      return { placeholderUrl: frameKey };
+    }
     if (element.currentSrc) {
       await assets.captureUrl(element.currentSrc, "video");
     }
+    if (element.poster) {
+      return { placeholderUrl: toAbsoluteUrl2(element.poster) };
+    }
   }
   if (element instanceof HTMLCanvasElement) {
-    return { placeholderUrl: await assets.captureCanvas(element, `canvas:${id}`) };
+    return {
+      placeholderUrl: await assets.captureCanvas(element, `canvas:${id}`)
+    };
   }
   return {};
 };
-var captureElementNode = async (element, assets, fonts, nextId, parentTransformMatrix) => {
+var captureElementNode = async (element, assets, fonts, nextId, parentTransformMatrix, isRoot = false) => {
   if (isIgnoredElement(element)) {
     return null;
   }
@@ -31389,11 +31601,20 @@ var captureElementNode = async (element, assets, fonts, nextId, parentTransformM
   const localTransform = getTransformMatrix(styles);
   const combinedTransform = mergeTransformMatrices(parentTransformMatrix, localTransform);
   const rectInfo = getCapturedRect(element, styles, combinedTransform);
+  const variableStyles = getDeclaredCssVariables(element, isRoot);
+  const pseudoElementStyles = getPseudoElementStyles(element, styles);
   const { placeholderUrl } = await collectElementAssets(element, styles, assets, id);
+  for (const pseudoStyles of Object.values(pseudoElementStyles || {})) {
+    for (const url of [
+      ...extractCssUrls(pseudoStyles.backgroundImage),
+      ...extractCssUrls(pseudoStyles.maskImage)
+    ]) {
+      await assets.captureUrl(url, "background");
+    }
+  }
   fonts.addFromStyle(styles);
   const childNodes = [];
-  const childSource = element.shadowRoot ?? element;
-  for (const child of mergeAdjacentTextNodes(childSource)) {
+  for (const child of mergeAdjacentTextNodes(getCaptureChildNodes(element))) {
     if (Array.isArray(child) || child instanceof Text) {
       const capturedText = captureTextNode(child, nextId);
       if (capturedText) childNodes.push(capturedText);
@@ -31407,7 +31628,8 @@ var captureElementNode = async (element, assets, fonts, nextId, parentTransformM
       assets,
       fonts,
       nextId,
-      combinedTransform
+      combinedTransform,
+      false
     );
     if (capturedChild) {
       childNodes.push(capturedChild);
@@ -31416,13 +31638,6 @@ var captureElementNode = async (element, assets, fonts, nextId, parentTransformM
   let content;
   if (element instanceof SVGElement) {
     content = serializeSvgWithComputedStyles(element);
-  }
-  let pseudoElementStyles;
-  if ((element instanceof HTMLInputElement && ["text", "search", "tel", "url", "email", "password", "number"].includes(element.type) || element instanceof HTMLTextAreaElement) && element.placeholder) {
-    const placeholderStyles = getSparseStyles(element, "::placeholder");
-    if (Object.keys(placeholderStyles).length > 0) {
-      pseudoElementStyles = { placeholder: placeholderStyles };
-    }
   }
   return {
     nodeType: ELEMENT_NODE,
@@ -31435,6 +31650,7 @@ var captureElementNode = async (element, assets, fonts, nextId, parentTransformM
     content,
     placeholderUrl,
     pseudoElementStyles,
+    variableStyles: Object.keys(variableStyles).length > 0 ? variableStyles : void 0,
     relativeTransform: localTransform ? {
       a: localTransform.a,
       b: localTransform.b,
@@ -31494,7 +31710,7 @@ var captureDocumentForFigmaNew = async (selector = "body", options) => {
   const fonts = new FontCollector();
   let idCounter = 0;
   const nextId = () => `h2d-node-${++idCounter}`;
-  const root = await captureElementNode(rootElement, assets, fonts, nextId);
+  const root = await captureElementNode(rootElement, assets, fonts, nextId, void 0, true);
   if (!root) {
     throw new Error("Container node could not be serialized");
   }
@@ -31533,9 +31749,15 @@ var bytesToDataUrl = async (bytes) => {
     });
     const normalizedBytes = Uint8Array.from(bytes);
     fileReader.readAsDataURL(
-      new File([normalizedBytes.buffer], "", { type: "application/octet-stream" })
+      new File([normalizedBytes.buffer], "", {
+        type: "application/octet-stream"
+      })
     );
   });
+};
+var bytesToBase642 = async (bytes) => {
+  const dataUrl = await bytesToDataUrl(bytes);
+  return dataUrl.slice(dataUrl.indexOf(",") + 1);
 };
 var parseDataUrlToBytes = (dataUrl) => {
   const match = /^data:([^;,]+)?(?:;charset=[^;,]+)?(;base64)?,(.*)$/i.exec(dataUrl);
@@ -31565,6 +31787,7 @@ var serializeAssetBlob = async (asset) => {
   }
   return {
     type: asset.mimeType || "application/octet-stream",
+    // Figma's payload stores a FileReader data URL here, not a bare base64 string.
     base64Blob: await bytesToDataUrl(bytes)
   };
 };
@@ -31584,20 +31807,55 @@ var buildOfficialClipboardPayloadFromCapturedDocument = async (capturedDoc) => {
       };
     }
   }
-  const payload = {
-    ...capturedDoc,
+  return JSON.stringify({
+    version: 2,
+    root: capturedDoc.root,
+    documentTitle: capturedDoc.documentTitle,
+    documentRect: capturedDoc.documentRect,
+    viewportRect: capturedDoc.viewportRect,
+    devicePixelRatio: capturedDoc.devicePixelRatio,
     assets: serializedAssets,
     fonts: capturedDoc.fonts.families ?? {}
-  };
-  return JSON.stringify(payload);
+  });
 };
-var buildOfficialClipboardHtmlFromPayload = async (payloadText) => {
-  const payloadDataUrl = await bytesToDataUrl(new TextEncoder().encode(payloadText));
-  const payloadBase64 = payloadDataUrl.slice(payloadDataUrl.indexOf(",") + 1);
-  const start = "<!--(figh2d)";
-  const end = "(/figh2d)-->";
-  const html = `<span data-h2d="${start}${payloadBase64}${end}"></span>`;
+var getOfficialClipboardPayloadDiagnostics = (payloadText) => {
+  const payload = JSON.parse(payloadText);
+  const assets = Object.values(payload.assets || {});
+  const embeddedAssetCount = assets.filter((asset) => asset.blob).length;
+  return {
+    assetCount: assets.length,
+    embeddedAssetCount,
+    missingAssetCount: assets.length - embeddedAssetCount,
+    payloadSizeKb: Math.round(new TextEncoder().encode(payloadText).byteLength / 1024)
+  };
+};
+var buildOfficialClipboardHtmlFromPayload = async (payloadText, metadata = {
+  dataType: "h2d",
+  source: "mcp",
+  capturedAtIso: (/* @__PURE__ */ new Date()).toISOString()
+}) => {
+  const payloadBase64 = await bytesToBase642(new TextEncoder().encode(payloadText));
+  const metadataBase64 = await bytesToBase642(new TextEncoder().encode(JSON.stringify(metadata)));
+  const html = `<span data-metadata="<!--(figmeta)${metadataBase64}(/figmeta)-->"></span><span data-h2d="<!--(figh2d)${payloadBase64}(/figh2d)-->"></span>`;
   return new Blob([html], { type: "text/html" });
+};
+var serializeDocumentForFigmaNewOfficialClipboard = async (selector = "body") => {
+  const capturedDoc = await captureDocumentForFigmaNew(selector);
+  const payloadText = await buildOfficialClipboardPayloadFromCapturedDocument(capturedDoc);
+  const diagnostics = getOfficialClipboardPayloadDiagnostics(payloadText);
+  if (diagnostics.missingAssetCount > 0) {
+    return {
+      success: false,
+      error: `Captured ${diagnostics.assetCount} assets, but ${diagnostics.missingAssetCount} could not be embedded.`,
+      ...diagnostics
+    };
+  }
+  const htmlBlob = await buildOfficialClipboardHtmlFromPayload(payloadText);
+  return {
+    success: true,
+    ...diagnostics,
+    htmlBase64: await bytesToBase642(new Uint8Array(await htmlBlob.arrayBuffer()))
+  };
 };
 var waitForDocumentFocus = async () => {
   if (document.hasFocus()) {
@@ -31618,11 +31876,7 @@ var waitForDocumentFocus = async () => {
     const timeoutId = window.setTimeout(() => {
       finish();
     }, 300);
-    window.addEventListener(
-      "focus",
-      handleFocus,
-      { once: true }
-    );
+    window.addEventListener("focus", handleFocus, { once: true });
   });
 };
 var writeOfficialClipboardPayload = async (payloadText) => {
@@ -31640,10 +31894,18 @@ var writeOfficialClipboardPayload = async (payloadText) => {
 var copyDocumentForFigmaNewOfficialClipboard = async (selector = "body") => {
   const capturedDoc = await captureDocumentForFigmaNew(selector);
   const payloadText = await buildOfficialClipboardPayloadFromCapturedDocument(capturedDoc);
+  const diagnostics = getOfficialClipboardPayloadDiagnostics(payloadText);
+  if (diagnostics.missingAssetCount > 0) {
+    return {
+      success: false,
+      error: `Captured ${diagnostics.assetCount} assets, but ${diagnostics.missingAssetCount} could not be embedded.`,
+      ...diagnostics
+    };
+  }
   await writeOfficialClipboardPayload(payloadText);
   return {
     success: true,
-    payloadSizeKb: Math.round(payloadText.length / 1024)
+    ...diagnostics
   };
 };
 var createMirrorElement = (node) => {
@@ -31671,8 +31933,11 @@ var replaceCssUrlsWithAssets = (value, assets) => {
   });
 };
 var applyCapturedStyles = (element, node, assets) => {
+  for (const [name, value] of Object.entries(node.variableStyles || {})) {
+    element.style.setProperty(name, value);
+  }
   for (const [key, value] of Object.entries(node.styles)) {
-    const resolvedValue = key === "backgroundImage" ? replaceCssUrlsWithAssets(value, assets) : value;
+    const resolvedValue = key === "backgroundImage" || key === "maskImage" ? replaceCssUrlsWithAssets(value, assets) : value;
     try {
       element.style[key] = resolvedValue;
     } catch {
@@ -31698,9 +31963,9 @@ var hydrateSpecialElement = async (element, node, assets) => {
   if (element instanceof HTMLVideoElement) {
     const sourceUrl = node.attributes.currentSrc || node.attributes.src;
     const src = sourceUrl ? assetUrlForKey(assets, toAbsoluteUrl2(sourceUrl)) ?? sourceUrl : void 0;
-    const poster = node.attributes.poster ? assetUrlForKey(assets, toAbsoluteUrl2(node.attributes.poster)) ?? node.attributes.poster : void 0;
+    const poster = node.placeholderUrl ? assetUrlForKey(assets, node.placeholderUrl) : node.attributes.poster ? assetUrlForKey(assets, toAbsoluteUrl2(node.attributes.poster)) ?? node.attributes.poster : void 0;
     if (poster) element.poster = poster;
-    if (src) element.src = src;
+    if (src && !node.placeholderUrl) element.src = src;
   }
   if (element instanceof HTMLCanvasElement && node.placeholderUrl) {
     const dataUrl = assetUrlForKey(assets, node.placeholderUrl);
@@ -31711,6 +31976,15 @@ var hydrateSpecialElement = async (element, node, assets) => {
     if (typeof node.attributes.value === "string") {
       element.value = node.attributes.value;
     }
+  }
+  if (element instanceof HTMLInputElement) {
+    if (node.attributes.checked != null) element.checked = node.attributes.checked === "true";
+    if (node.attributes.indeterminate != null) {
+      element.indeterminate = node.attributes.indeterminate === "true";
+    }
+  }
+  if (element instanceof HTMLOptionElement && node.attributes.selected != null) {
+    element.selected = node.attributes.selected === "true";
   }
 };
 var waitForImageDecode = async (img) => {
@@ -31771,19 +32045,22 @@ var buildMirrorNode = async (node, assets) => {
   await hydrateSpecialElement(element, node, assets);
   return element;
 };
-var collectPlaceholderCssRules = (node, rules = []) => {
+var collectPseudoElementCssRules = (node, assets, rules = []) => {
   if (node.nodeType === TEXT_NODE) {
     return rules;
   }
-  const placeholderStyles = node.pseudoElementStyles?.placeholder;
-  if (placeholderStyles && Object.keys(placeholderStyles).length > 0) {
-    const declarations = Object.entries(placeholderStyles).map(([key, value]) => `${toCssAttributeName(key)}: ${value};`).join(" ");
+  for (const [pseudo, pseudoStyles] of Object.entries(node.pseudoElementStyles || {})) {
+    if (!pseudoStyles || Object.keys(pseudoStyles).length === 0) continue;
+    const declarations = Object.entries(pseudoStyles).map(([key, value]) => {
+      const resolvedValue = key === "backgroundImage" || key === "maskImage" ? replaceCssUrlsWithAssets(value, assets) : value;
+      return `${toCssAttributeName(key)}: ${resolvedValue};`;
+    }).join(" ");
     if (declarations) {
-      rules.push(`[data-figma-new-captured-id="${node.id}"]::placeholder { ${declarations} }`);
+      rules.push(`[data-figma-new-captured-id="${node.id}"]::${pseudo} { ${declarations} }`);
     }
   }
   for (const child of node.childNodes) {
-    collectPlaceholderCssRules(child, rules);
+    collectPseudoElementCssRules(child, assets, rules);
   }
   return rules;
 };
@@ -31815,10 +32092,10 @@ var withMirrorDom = async (capturedDoc, callback) => {
       mirrorRoot.style.height = `${docHeight}px`;
     }
     host.appendChild(mirrorRoot);
-    const placeholderRules = collectPlaceholderCssRules(capturedDoc.root);
-    if (placeholderRules.length > 0) {
+    const pseudoElementRules = collectPseudoElementCssRules(capturedDoc.root, capturedDoc.assets);
+    if (pseudoElementRules.length > 0) {
       const styleElement = document.createElement("style");
-      styleElement.textContent = placeholderRules.join("\n");
+      styleElement.textContent = pseudoElementRules.join("\n");
       host.appendChild(styleElement);
     }
     return await callback(mirrorRoot);
@@ -31836,8 +32113,14 @@ var capturedDocumentToFigmaLayers = async (capturedDoc, options = {}) => {
       useFrames: options.useFrames ?? false,
       rootName: options.rootName || capturedDoc.documentTitle || "FRAME",
       size: {
-        width: Math.max(1, Math.round(capturedDoc.documentRect.width || mirrorRoot.scrollWidth || 0)),
-        height: Math.max(1, Math.round(capturedDoc.documentRect.height || mirrorRoot.scrollHeight || 0))
+        width: Math.max(
+          1,
+          Math.round(capturedDoc.documentRect.width || mirrorRoot.scrollWidth || 0)
+        ),
+        height: Math.max(
+          1,
+          Math.round(capturedDoc.documentRect.height || mirrorRoot.scrollHeight || 0)
+        )
       },
       isAxure: options.isAxure ?? false,
       widgetId: options.widgetId ?? null,
@@ -32031,6 +32314,7 @@ function normalizeAxurePayloadFromFrameResults(frameResults) {
   copyDocumentForFigmaNewOfficialClipboard,
   copyLayersToFigmaClipboard,
   copyToFigmaWithKiwi,
+  deriveStandardFontStyle,
   extractAxurePayload,
   getProtocolVersion,
   hasChromeRuntime,
@@ -32051,6 +32335,7 @@ function normalizeAxurePayloadFromFrameResults(frameResults) {
   safeCopyToFigmaWithKiwi,
   safeHtmlToAxure,
   safeHtmlToFigma,
+  serializeDocumentForFigmaNewOfficialClipboard,
   validateAndNormalizeStandardFigmaNode,
   validateFigmaSchema,
   validateStandardFigmaLayerPayload

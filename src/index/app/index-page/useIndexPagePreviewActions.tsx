@@ -18,7 +18,7 @@ import {
 } from '../../services/api';
 import { downloadExportHtmlArchive } from '../../domains/export/export.api';
 import { requireProjectScope, withProjectScope } from '../../services/projectScope';
-import { buildQuickEditAcpPrompt } from '../../utils/quickEditPrompts';
+import { buildPrototypeAnnotationAcpPrompt, buildQuickEditAcpPrompt } from '../../utils/quickEditPrompts';
 import { resolveMarkdownPreviewIframeUrl } from '../../utils/markdownPreview';
 import { buildReviewPrompt, resolveReviewDocumentPath, type ReviewKind } from '../../utils/uiReviewPrompt';
 import { resolveSpecQuickEditSwitchDecision, type SpecQuickEditMode } from '../../utils/specQuickEdit';
@@ -37,7 +37,6 @@ import {
     type AnnotationDirectRunEvent,
     type AnnotationDirectRunTaskRef,
 } from '../../domains/assistant/annotationDirectRunManager';
-import { persistAcceptedAnnotationEditingState } from '../../domains/assistant/annotationDirectRunEditingPersistence';
 import type { NotificationIntent } from '../../domains/notifications/notificationCoordinator';
 import type {
     CommentaryHostToolbarAction,
@@ -379,6 +378,9 @@ export function useIndexPagePreviewActions(params: any) {
     const [editorStatus, setEditorStatus] = useState<{ mode: 'none' | 'quickEdit' }>({
         mode: 'none',
     });
+    const [prototypeAnnotationSessionActive, setPrototypeAnnotationSessionActive] = useState(false);
+    const [prototypeAnnotationStatusLoading, setPrototypeAnnotationStatusLoading] = useState(false);
+    const [prototypeAnnotationPromptCopying, setPrototypeAnnotationPromptCopying] = useState(false);
     const [docEditState, setDocEditState] = useState(createDefaultMarkdownQuickEditState);
     const [markdownPromptCopying, setMarkdownPromptCopying] = useState(false);
     const [reviewPanelOpen, setReviewPanelOpen] = useState(false);
@@ -463,6 +465,10 @@ export function useIndexPagePreviewActions(params: any) {
 
     const previewDeviceActions = usePreviewDeviceActions();
     const previewConfig = previewDeviceActions.previewConfig;
+    const previewDeviceParam = previewDeviceActions.previewDeviceParam;
+    const handlePreviewContainerSizeChange = previewDeviceActions.handlePreviewContainerSizeChange;
+    const lockAdaptiveDesktopPreview = previewDeviceActions.lockAdaptiveDesktopPreview;
+    const unlockAdaptiveDesktopPreview = previewDeviceActions.unlockAdaptiveDesktopPreview;
     const selectedDeviceId = previewDeviceActions.selectedDeviceId;
     const setSelectedDeviceId = previewDeviceActions.setSelectedDeviceId;
     const deviceSegmentOptions = previewDeviceActions.deviceSegmentOptions;
@@ -658,13 +664,22 @@ export function useIndexPagePreviewActions(params: any) {
         () => buildExportModalPreferencesStorageKey(assistantProjectPath),
         [assistantProjectPath],
     );
+    type PrototypeEditorLaunchOptions = {
+        hostToolbar: boolean;
+        annotationSession?: boolean;
+    };
     const prototypeEditorLaunchOptions = useMemo(() => ({
         hostToolbar: true,
-    }), []);
+    }) as PrototypeEditorLaunchOptions, []);
     type PrototypeEditorRestoreOptions = typeof prototypeEditorLaunchOptions & {
         selectionModeActive?: boolean;
     };
     const activePrototypeEditorLaunchOptionsRef = useRef<PrototypeEditorRestoreOptions | null>(null);
+    const pendingPrototypeAnnotationSessionOpenRef = useRef(false);
+    const skipPrototypeAnnotationEnableConfirmationRef = useRef(false);
+    const getAnnotationSession = useCallback(() => (
+        activePrototypeEditorLaunchOptionsRef.current?.annotationSession === true
+    ), []);
     const pendingPrototypeEditorRestoreRef = useRef<PrototypeEditorRestoreOptions | null>(null);
     const pendingPrototypeEditorOpenIntentRef = useRef(false);
     const prototypeEditorRestoreSeqRef = useRef(0);
@@ -761,6 +776,7 @@ export function useIndexPagePreviewActions(params: any) {
         isDarkModeRef,
         agentRunConcurrency,
         assistantPanelOpen: assistantContextAppendAvailable,
+        getAnnotationSession,
         messageApi,
         prototypeHostToolbarUnsubscribeRef,
         setHostToolbarState: setTrackedHostToolbarState,
@@ -801,9 +817,13 @@ export function useIndexPagePreviewActions(params: any) {
     }, []);
 
     const refreshEditorStatus = useCallback(() => {
+        const quickEditActive = quickEditRuntimeActiveRef.current;
         setEditorStatus({
-            mode: quickEditRuntimeActiveRef.current || documentEditorActiveRef.current ? 'quickEdit' : 'none',
+            mode: quickEditActive || documentEditorActiveRef.current ? 'quickEdit' : 'none',
         });
+        setPrototypeAnnotationSessionActive(
+            quickEditActive && activePrototypeEditorLaunchOptionsRef.current?.annotationSession === true,
+        );
     }, []);
 
     const completePrototypeEditorOpen = useCallback(() => {
@@ -811,8 +831,9 @@ export function useIndexPagePreviewActions(params: any) {
         if (sidebarCollapsedBeforeWebEditorRef.current === null) {
             sidebarCollapsedBeforeWebEditorRef.current = collapsed;
         }
+        lockAdaptiveDesktopPreview();
         setCollapsed(true);
-    }, [collapsed, setCollapsed]);
+    }, [collapsed, lockAdaptiveDesktopPreview, setCollapsed]);
 
     const reenterPrototypeEditorAfterIframeLoad = useCallback(async (
         restoreOptions: PrototypeEditorRestoreOptions,
@@ -1433,9 +1454,8 @@ export function useIndexPagePreviewActions(params: any) {
             switch (event.type) {
                 case 'started':
                 case 'prepared':
-                    break;
                 case 'accepted':
-                    await persistAcceptedAnnotationEditingState(event, applyAnnotationEditingTaskState);
+                    await applyAnnotationEditingTaskState(event.editingTargets, 'editing', event.taskRef);
                     break;
                 case 'completed':
                     await applyAnnotationEditingTaskState(event.editingTargets, 'completed', event.taskRef);
@@ -1538,22 +1558,26 @@ export function useIndexPagePreviewActions(params: any) {
     }, [messageApi]);
 
     const enablePrototypeAnnotationFromHost = useCallback(async () => {
+        const skipConfirmation = skipPrototypeAnnotationEnableConfirmationRef.current;
+        skipPrototypeAnnotationEnableConfirmationRef.current = false;
         const targetPath = resolvePrototypeAnnotationTargetPath(selectedItem);
         if (!targetPath) {
             messageApi.error('需求标注没有开启成功，请刷新页面后再试');
             return false;
         }
 
-        const confirmed = await appDialog.confirm({
-            title: '开启需求标注',
-            description: '开启需求标注功能后，你可以在当前原型里查看和编辑需求标注。这个入口开启后不能在这里关闭；如果之后需要关闭，请让 AI 帮你处理。',
-            confirmText: '开启',
-            cancelText: '取消',
-            tone: 'brand',
-            dismissible: false,
-        });
-        if (!confirmed) {
-            return false;
+        if (!skipConfirmation) {
+            const confirmed = await appDialog.confirm({
+                title: '开启需求标注',
+                description: '开启需求标注功能后，你可以在当前原型里查看和编辑需求标注。这个入口开启后不能在这里关闭；如果之后需要关闭，请让 AI 帮你处理。',
+                confirmText: '开启',
+                cancelText: '取消',
+                tone: 'brand',
+                dismissible: false,
+            });
+            if (!confirmed) {
+                return false;
+            }
         }
 
         const projectScope = requireProjectScope(projectId);
@@ -1680,14 +1704,6 @@ export function useIndexPagePreviewActions(params: any) {
                     };
                     hostToolbarStateRef.current = resolveHostToolbarStateForDisplay(hostToolbarStateRef.current, nextState, isDarkMode);
                     setHostToolbarState((previousState) => resolveHostToolbarStateForDisplay(previousState, nextState, isDarkMode));
-                    return true;
-                }
-                if (nextAction.type === 'full-exit') {
-                    if (!exitWebEditorRef.current) {
-                        return false;
-                    }
-                    await abortAnnotationDirectRun({ showFeedback: false });
-                    await exitWebEditorRef.current();
                     return true;
                 }
                 if (
@@ -1839,6 +1855,14 @@ export function useIndexPagePreviewActions(params: any) {
             }
             if (nextAction.type === 'interrupt-agent') {
                 return abortAnnotationDirectRun();
+            }
+            if (nextAction.type === 'full-exit') {
+                if (!exitWebEditorRef.current) {
+                    return false;
+                }
+                await abortAnnotationDirectRun({ showFeedback: false });
+                await exitWebEditorRef.current({ restorePanelOnly: false });
+                return true;
             }
             if (documentEditorActiveRef.current) {
                 const editorApi = getDocumentEditorApi();
@@ -2962,6 +2986,7 @@ export function useIndexPagePreviewActions(params: any) {
             setStandalonePanelOpen(false);
             setEditorStatus({ mode: 'quickEdit' });
             refreshEditorStatus();
+            lockAdaptiveDesktopPreview();
             if (!options?.preserveSidebar) {
                 if (sidebarCollapsedBeforeWebEditorRef.current === null) {
                     sidebarCollapsedBeforeWebEditorRef.current = collapsed;
@@ -2980,6 +3005,7 @@ export function useIndexPagePreviewActions(params: any) {
         enterPrototypeEditor,
         getPrimaryPreviewIframe,
         isDarkMode,
+        lockAdaptiveDesktopPreview,
         messageApi,
         prototypeEditorLaunchOptions,
         postPrototypeEditorHostToolbarAction,
@@ -3325,8 +3351,14 @@ export function useIndexPagePreviewActions(params: any) {
     ]);
 
     const handleReviewPanelToggle = useCallback(() => {
-        setReviewPanelOpen((open) => !open);
-    }, []);
+        const nextOpen = !reviewPanelOpen;
+        if (nextOpen) {
+            lockAdaptiveDesktopPreview();
+        } else {
+            unlockAdaptiveDesktopPreview();
+        }
+        setReviewPanelOpen(nextOpen);
+    }, [lockAdaptiveDesktopPreview, reviewPanelOpen, unlockAdaptiveDesktopPreview]);
 
     const openReviewReportDetail = useCallback(async (report: ReviewReportSummary | null) => {
         if (!report) return;
@@ -3584,6 +3616,11 @@ export function useIndexPagePreviewActions(params: any) {
             messageApi.warning('请先选择一个条目');
             return;
         }
+        const annotationSession = resourceType === 'prototype' && pendingPrototypeAnnotationSessionOpenRef.current;
+        pendingPrototypeAnnotationSessionOpenRef.current = false;
+        const launchOptions: PrototypeEditorLaunchOptions = annotationSession
+            ? { ...prototypeEditorLaunchOptions, annotationSession: true }
+            : prototypeEditorLaunchOptions;
         const primaryIframe = getPrimaryPreviewIframe();
         const runtimeReadyForPrimaryIframe = isQuickEditRuntimeReadyForIframe(
             quickEditRuntimeStatus,
@@ -3596,9 +3633,14 @@ export function useIndexPagePreviewActions(params: any) {
         if (resourceType === 'prototype' && !runtimeReadyForPrimaryIframe) {
             if (canWaitForPrimaryIframe) {
                 standalonePanelBeforeQuickEditRef.current = standalonePanelOpen;
-                activePrototypeEditorLaunchOptionsRef.current = prototypeEditorLaunchOptions;
+                if (annotationSession) {
+                    activePrototypeEditorLaunchOptionsRef.current = launchOptions;
+                    pendingPrototypeEditorRestoreRef.current = launchOptions;
+                } else {
+                    activePrototypeEditorLaunchOptionsRef.current = prototypeEditorLaunchOptions;
+                    pendingPrototypeEditorRestoreRef.current = prototypeEditorLaunchOptions;
+                }
                 prototypeEditorRestoreSeqRef.current += 1;
-                pendingPrototypeEditorRestoreRef.current = prototypeEditorLaunchOptions;
                 pendingPrototypeEditorOpenIntentRef.current = true;
                 setQuickEditRuntimeStatus('pending');
                 if (getPreviewIframeGeneration(primaryIframe) > 0) {
@@ -3615,7 +3657,9 @@ export function useIndexPagePreviewActions(params: any) {
         }
         try {
             standalonePanelBeforeQuickEditRef.current = standalonePanelOpen;
-            activePrototypeEditorLaunchOptionsRef.current = prototypeEditorLaunchOptions;
+            activePrototypeEditorLaunchOptionsRef.current = annotationSession
+                ? launchOptions
+                : prototypeEditorLaunchOptions;
             if (!await enterPrototypeEditor(primaryIframe)) {
                 activePrototypeEditorLaunchOptionsRef.current = null;
                 return;
@@ -3627,6 +3671,7 @@ export function useIndexPagePreviewActions(params: any) {
                 }
             }
             quickEditRuntimeActiveRef.current = true;
+            setPrototypeAnnotationSessionActive(annotationSession);
             setEditorStatus({ mode: 'quickEdit' });
             refreshEditorStatus();
             completePrototypeEditorOpen();
@@ -3662,11 +3707,14 @@ export function useIndexPagePreviewActions(params: any) {
     ]);
 
     const handleExitWebEditor = useCallback(async (options?: { restoreDevice?: boolean; restorePanelOnly?: boolean }) => {
-        const shouldRestorePanelOnly = options?.restorePanelOnly === false
+        const isPrototypeAnnotationSession = activePrototypeEditorLaunchOptionsRef.current?.annotationSession === true;
+        const shouldRestorePanelOnly = options?.restorePanelOnly === false || isPrototypeAnnotationSession
             ? false
             : standalonePanelBeforeQuickEditRef.current;
+        quickEditRuntimeActiveRef.current = false;
         standalonePanelBeforeQuickEditRef.current = false;
         activePrototypeEditorLaunchOptionsRef.current = null;
+        setPrototypeAnnotationSessionActive(false);
         prototypeEditorRestoreSeqRef.current += 1;
         pendingPrototypeEditorRestoreRef.current = null;
         pendingPrototypeEditorOpenIntentRef.current = false;
@@ -3690,7 +3738,6 @@ export function useIndexPagePreviewActions(params: any) {
                 }
             }));
             documentEditorActiveRef.current = false;
-            quickEditRuntimeActiveRef.current = false;
             clearAssistantSelectedElementsOnExit();
             setEditorStatus({ mode: 'none' });
             loadedPrototypeDecisionDataAvailableRef.current = false;
@@ -3715,6 +3762,8 @@ export function useIndexPagePreviewActions(params: any) {
         } catch (error) {
             console.error('[Axhub] 退出编辑器失败:', error);
             messageApi.error('退出编辑器失败');
+        } finally {
+            unlockAdaptiveDesktopPreview();
         }
     }, [
         clearAssistantSelectedElementsOnExit,
@@ -3730,6 +3779,7 @@ export function useIndexPagePreviewActions(params: any) {
         postPrototypeEditorDisable,
         refreshEditorStatus,
         setCollapsed,
+        unlockAdaptiveDesktopPreview,
     ]);
     exitWebEditorRef.current = handleExitWebEditor;
 
@@ -3774,6 +3824,76 @@ export function useIndexPagePreviewActions(params: any) {
         }
     }, [assistantContextV1, assistantProjectPath, messageApi, quickEditPromptCopying, selectedItem]);
 
+    const handleCheckPrototypeAnnotationEnabled = useCallback(async (): Promise<boolean | null> => {
+        const targetPath = resolvePrototypeAnnotationTargetPath(selectedItem);
+        if (!targetPath) {
+            messageApi.error('读取需求标注状态失败，请稍后重试');
+            return null;
+        }
+        setPrototypeAnnotationStatusLoading(true);
+        try {
+            const projectScope = requireProjectScope(projectId);
+            const status = await apiService.getPrototypeAnnotationStatus(targetPath, projectScope);
+            return status.enabled === true;
+        } catch (error) {
+            console.error('[Axhub] 读取需求标注状态失败:', error);
+            messageApi.error('读取需求标注状态失败，请稍后重试');
+            return null;
+        } finally {
+            setPrototypeAnnotationStatusLoading(false);
+        }
+    }, [messageApi, projectId, selectedItem]);
+
+    const handleEnablePrototypeAnnotation = useCallback(
+        () => {
+            skipPrototypeAnnotationEnableConfirmationRef.current = true;
+            return enablePrototypeAnnotationFromHost();
+        },
+        [enablePrototypeAnnotationFromHost],
+    );
+
+    const handleOpenPrototypeAnnotationSession = useCallback(async () => {
+        const wasQuickEditActive = quickEditRuntimeActiveRef.current;
+        pendingPrototypeAnnotationSessionOpenRef.current = true;
+        if (wasQuickEditActive) {
+            await handleExitWebEditor({ restoreDevice: false, restorePanelOnly: false });
+        }
+        return handleOpenWebEditor();
+    }, [handleExitWebEditor, handleOpenWebEditor]);
+
+    const handleCopyPrototypeAnnotationPrompt = useCallback(async () => {
+        if (prototypeAnnotationPromptCopying) return;
+        const currentFilePath = getAssistantContextCurrentFilePath(assistantContextV1);
+        if (!currentFilePath) {
+            messageApi.warning('当前文件路径为空，无法生成需求标注 Prompt');
+            return;
+        }
+        setPrototypeAnnotationPromptCopying(true);
+        try {
+            const prompt = buildPrototypeAnnotationAcpPrompt({
+                currentFilePath,
+                currentFileDisplayName: selectedItem?.displayName || '',
+                projectPath: assistantProjectPath,
+            });
+            await navigator.clipboard.writeText(prompt);
+            messageApi.success('需求标注 Prompt 已复制到剪贴板');
+        } catch (error: any) {
+            messageApi.error(error?.message || '复制需求标注 Prompt 失败');
+        } finally {
+            setPrototypeAnnotationPromptCopying(false);
+        }
+    }, [assistantContextV1, assistantProjectPath, messageApi, prototypeAnnotationPromptCopying, selectedItem]);
+
+    const showCrossOriginPreviewActionHint = useCallback(() => {
+        const targetIframe = getPreviewIframe();
+        if (!targetIframe || getIframeOrigin(targetIframe) === window.location.origin) {
+            return;
+        }
+        toast.info('当前预览与宿主页面跨源，此操作可能受内置浏览器限制；请改用 Chrome 浏览器重试', {
+            id: 'axhub-preview-cross-origin-action',
+        });
+    }, [getIframeOrigin, getPreviewIframe]);
+
     const handleCopyToAxure = useCallback(async (options: any) => {
         if (!currentRuntimeExportResource) {
             messageApi.warning('请先选择一个条目');
@@ -3803,6 +3923,7 @@ export function useIndexPagePreviewActions(params: any) {
                 status: 'failed',
                 errorMessage: String(error?.message || '复制到 Axure 失败'),
             }, currentRuntimeExportResourceType).catch(() => undefined);
+            showCrossOriginPreviewActionHint();
             messageApi.error(buildAxureBridgeUserMessage(String(error?.message || '')));
         } finally {
             hide();
@@ -3815,6 +3936,7 @@ export function useIndexPagePreviewActions(params: any) {
         messageApi,
         postCopyAxvg,
         requestAxureJson,
+        showCrossOriginPreviewActionHint,
     ]);
 
     const handleCopyToFigma = useCallback(async () => {
@@ -3844,6 +3966,7 @@ export function useIndexPagePreviewActions(params: any) {
                 status: 'failed',
                 errorMessage: String(error?.message || '复制到 Figma 失败'),
             }, currentRuntimeExportResourceType).catch(() => undefined);
+            showCrossOriginPreviewActionHint();
             messageApi.error(error?.message || '复制到 Figma 失败');
         } finally {
             hide();
@@ -3854,6 +3977,7 @@ export function useIndexPagePreviewActions(params: any) {
         exportAvailability.figmaDomDisabledReason,
         messageApi,
         requestCopyToFigma,
+        showCrossOriginPreviewActionHint,
     ]);
 
     const handleCopyCurrentScreenshot = useCallback(async () => {
@@ -3867,11 +3991,12 @@ export function useIndexPagePreviewActions(params: any) {
             await copyImageDataUrlToClipboard(result.dataUrl);
             messageApi.success('截图已复制到剪贴板');
         } catch (error: any) {
+            showCrossOriginPreviewActionHint();
             messageApi.error(error?.message || '复制截图失败');
         } finally {
             hide();
         }
-    }, [currentRuntimeExportResource, messageApi, requestCurrentScreenshot]);
+    }, [currentRuntimeExportResource, messageApi, requestCurrentScreenshot, showCrossOriginPreviewActionHint]);
 
     const handleExportMake = useCallback(async () => {
         if (activeTab !== 'prototypes' || !selectedItem) {
@@ -4768,6 +4893,8 @@ export function useIndexPagePreviewActions(params: any) {
     return {
         selectedDeviceId,
         previewConfig,
+        previewDeviceParam,
+        handlePreviewContainerSizeChange,
         setSelectedDeviceId,
         deviceSegmentOptions,
         handleSelectPreviewSinglePreset,
@@ -4785,6 +4912,11 @@ export function useIndexPagePreviewActions(params: any) {
         quickEditAvailable,
         quickEditPromptAvailable,
         quickEditPromptCopying,
+        prototypeAnnotationSessionActive,
+        prototypeAnnotationPromptCopying,
+        prototypeAnnotationEnabled: hostToolbarState?.annotationEnabled === true,
+        prototypeAnnotationEnableLoading: prototypeAnnotationStatusLoading
+            || hostToolbarState?.annotationEnableLoading === true,
         exportAvailability,
         editorStatus,
         docEditState,
@@ -4848,6 +4980,9 @@ export function useIndexPagePreviewActions(params: any) {
         handleSelectDoc,
         handleSelectTemplate,
         handleOpenWebEditor,
+        handleOpenPrototypeAnnotationSession,
+        handleCheckPrototypeAnnotationEnabled,
+        handleEnablePrototypeAnnotation,
         handleEnableDocEdit,
         handleSaveDocEdit,
         handleExitDocEdit,
@@ -4869,6 +5004,7 @@ export function useIndexPagePreviewActions(params: any) {
         runQuickEditSaveAction,
         handleExitWebEditor,
         handleCopyQuickEditPrompt,
+        handleCopyPrototypeAnnotationPrompt,
         handleRefreshElement,
         handleCopyLocalLink,
         handleCopyLANLink,

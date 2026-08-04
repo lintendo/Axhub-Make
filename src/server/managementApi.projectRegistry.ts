@@ -74,6 +74,30 @@ function collectLocalThemeDirectories(projectRoot: string, themesDir: string): M
   }
 }
 
+function reconcilePrototypeFilesystemFields(
+  prototype: ProjectMetadata['resources']['prototypes'][number],
+  scannedPrototype: ProjectMetadata['resources']['prototypes'][number],
+): ProjectMetadata['resources']['prototypes'][number] {
+  const fields = ['filePath', 'absoluteFilePath', 'specFilePath', 'previewDisabled'] as const;
+  if (fields.every((field) => prototype[field] === scannedPrototype[field])) {
+    return prototype;
+  }
+  const {
+    filePath: _filePath,
+    absoluteFilePath: _absoluteFilePath,
+    specFilePath: _specFilePath,
+    previewDisabled: _previewDisabled,
+    ...rest
+  } = prototype;
+  return {
+    ...rest,
+    ...(scannedPrototype.filePath ? { filePath: scannedPrototype.filePath } : {}),
+    ...(scannedPrototype.absoluteFilePath ? { absoluteFilePath: scannedPrototype.absoluteFilePath } : {}),
+    ...(scannedPrototype.specFilePath ? { specFilePath: scannedPrototype.specFilePath } : {}),
+    ...(scannedPrototype.previewDisabled === true ? { previewDisabled: true } : {}),
+  };
+}
+
 /**
  * Reconcile metadata resources with actual filesystem state.
  * - Reconciles prototype entries against the declared/default local source root.
@@ -113,36 +137,40 @@ function reconcileMetadataWithFilesystem(
         ? scannedPrototypeByKey.get(prototype.id) ?? scannedPrototypeByKey.get(prototype.name)
         : null;
       if (scannedPrototype) {
+        const filesystemPrototype = reconcilePrototypeFilesystemFields(prototype, scannedPrototype);
+        if (filesystemPrototype !== prototype) {
+          changed = true;
+        }
         if (scannedPrototype.placeholder === true) {
-          if (prototype.placeholder === true && prototype.placeholderGuide) {
-            return prototype;
+          if (filesystemPrototype.placeholder === true && filesystemPrototype.placeholderGuide) {
+            return filesystemPrototype;
           }
           changed = true;
           return {
-            ...prototype,
+            ...filesystemPrototype,
             placeholder: true,
             placeholderGuide: scannedPrototype.placeholderGuide || PROTOTYPE_PLACEHOLDER_GUIDE,
           };
         }
-        if (scannedPrototype.generationStatus === 'waiting' && prototype.generationStatus !== 'waiting') {
+        if (scannedPrototype.generationStatus === 'waiting' && filesystemPrototype.generationStatus !== 'waiting') {
           changed = true;
-          const { placeholder: _placeholder, placeholderGuide: _placeholderGuide, ...rest } = prototype;
+          const { placeholder: _placeholder, placeholderGuide: _placeholderGuide, ...rest } = filesystemPrototype;
           return {
             ...rest,
             generationStatus: 'waiting',
           };
         }
-        if (prototype.placeholder === true || prototype.placeholderGuide) {
+        if (filesystemPrototype.placeholder === true || filesystemPrototype.placeholderGuide) {
           changed = true;
-          const { placeholder: _placeholder, placeholderGuide: _placeholderGuide, ...rest } = prototype;
+          const { placeholder: _placeholder, placeholderGuide: _placeholderGuide, ...rest } = filesystemPrototype;
           return rest;
         }
-        if (scannedPrototype.generationStatus !== 'waiting' && prototype.generationStatus) {
+        if (scannedPrototype.generationStatus !== 'waiting' && filesystemPrototype.generationStatus) {
           changed = true;
-          const { generationStatus: _generationStatus, ...rest } = prototype;
+          const { generationStatus: _generationStatus, ...rest } = filesystemPrototype;
           return rest;
         }
-        return prototype;
+        return filesystemPrototype;
       }
       if (prototype.placeholder !== true || prototype.placeholderGuide) {
         return prototype;
@@ -339,6 +367,30 @@ function readMarkdownTitle(filePath: string): string {
   }
 }
 
+function findMainPrototypeSpec(prototypeDir: string): string | null {
+  const specDir = path.join(prototypeDir, '.spec');
+  for (const name of ['spec.html', 'spec.md']) {
+    const specPath = path.join(specDir, name);
+    try {
+      if (fs.statSync(specPath).isFile()) return specPath;
+    } catch {
+      // Missing or invalid specs are not discoverable resources.
+    }
+  }
+  return null;
+}
+
+function readPrototypeSpecTitle(filePath: string, fallback: string): string {
+  try {
+    const source = fs.readFileSync(filePath, 'utf8');
+    return path.extname(filePath).toLowerCase() === '.md'
+      ? readMarkdownTitle(filePath) || fallback
+      : source.match(/<title[^>]*>\s*([^<]+?)\s*<\/title>/iu)?.[1]?.trim() || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function createProjectRelativePath(projectRoot: string, absolutePath: string): string {
   return path.relative(projectRoot, absolutePath).split(path.sep).join('/');
 }
@@ -356,8 +408,24 @@ function scanFilesystemPrototypeResources(
     if (!entry.isDirectory() || entry.name.startsWith('.')) {
       continue;
     }
-    const indexFilePath = path.join(prototypesDir, entry.name, 'index.tsx');
-    if (!fs.existsSync(indexFilePath)) {
+    const prototypeDir = path.join(prototypesDir, entry.name);
+    const indexFilePath = path.join(prototypeDir, 'index.tsx');
+    const specFilePath = findMainPrototypeSpec(prototypeDir);
+    if (!fs.existsSync(indexFilePath) && !specFilePath) {
+      continue;
+    }
+    if (!fs.existsSync(indexFilePath) && specFilePath) {
+      prototypes.push({
+        id: entry.name,
+        name: entry.name,
+        title: readPrototypeSpecTitle(specFilePath, entry.name),
+        clientUrl: `/prototypes/${encodeURIComponent(entry.name)}`,
+        previewMode: 'clientRuntime',
+        previewDisabled: true,
+        description: '',
+        updatedAt: readFileUpdatedAt(specFilePath),
+        specFilePath: createProjectRelativePath(projectRoot, specFilePath),
+      });
       continue;
     }
     const hasGeneratedPlaceholder = hasGeneratedPlaceholderSource(indexFilePath);
@@ -375,6 +443,7 @@ function scanFilesystemPrototypeResources(
       updatedAt: readFileUpdatedAt(indexFilePath),
       filePath: createProjectRelativePath(projectRoot, indexFilePath),
       absoluteFilePath: indexFilePath,
+      ...(specFilePath ? { specFilePath: createProjectRelativePath(projectRoot, specFilePath) } : {}),
       ...(placeholder ? { placeholder: true, placeholderGuide: PROTOTYPE_PLACEHOLDER_GUIDE } : {}),
       ...(generationStatus ? { generationStatus } : {}),
     });
@@ -919,6 +988,7 @@ export function handleProjectRegistryApi(
           reconcileMetadataWithFilesystem(metadataStore, project.root),
           project.root,
           options.runtimeOrigin,
+          req,
         );
       } catch (error) {
         sendProjectMetadataError(res, error, { project, projectId });

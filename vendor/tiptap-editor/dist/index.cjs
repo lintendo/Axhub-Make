@@ -36,8 +36,8 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 
 // src/components/tiptap-templates/simple/simple-editor.tsx
-var import_react91 = require("react");
-var import_react92 = require("@tiptap/react");
+var import_react92 = require("react");
+var import_react93 = require("@tiptap/react");
 var import_markdown = require("@tiptap/markdown");
 var import_starter_kit = require("@tiptap/starter-kit");
 var import_extension_list = require("@tiptap/extension-list");
@@ -1465,6 +1465,7 @@ var ImageUploadNode2 = import_react12.Node.create({
 
 // src/components/tiptap-node/resizable-image-node/resizable-image-node-extension.ts
 var import_react16 = require("@tiptap/react");
+var import_react17 = require("react");
 var import_extension_image = __toESM(require("@tiptap/extension-image"), 1);
 
 // src/components/tiptap-node/resizable-image-node/resizable-image-node.tsx
@@ -1519,14 +1520,14 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 var ResizableImageNodeView = (props) => {
-  const { node, updateAttributes, selected, editor } = props;
+  const { node, updateAttributes, selected, editor, resolveImageSrc } = props;
   const containerRef = (0, import_react14.useRef)(null);
   const imgRef = (0, import_react14.useRef)(null);
   const parsed = (0, import_react14.useMemo)(() => {
     const src = String(node.attrs?.src || "");
     return parseAxhubWidthFromSrc(src);
   }, [node.attrs?.src]);
-  const appliedSrc = parsed.cleanSrc;
+  const appliedSrc = resolveImageSrc?.(parsed.cleanSrc) || parsed.cleanSrc;
   const appliedWidth = parsed.width;
   const [draftWidth, setDraftWidth] = (0, import_react14.useState)(null);
   const draftWidthRef = (0, import_react14.useRef)(null);
@@ -1628,19 +1629,28 @@ var ResizableImageNodeView = (props) => {
 
 // src/components/tiptap-node/resizable-image-node/resizable-image-node-extension.ts
 var ResizableImageNode = import_extension_image.default.extend({
+  addOptions() {
+    return {
+      ...this.parent?.(),
+      resolveImageSrc: void 0
+    };
+  },
   addNodeView() {
-    return (0, import_react16.ReactNodeViewRenderer)(ResizableImageNodeView);
+    return (0, import_react16.ReactNodeViewRenderer)((props) => (0, import_react17.createElement)(ResizableImageNodeView, {
+      ...props,
+      resolveImageSrc: this.options.resolveImageSrc
+    }));
   }
 });
 
 // src/components/tiptap-node/horizontal-rule-node/horizontal-rule-node-extension.ts
-var import_react17 = require("@tiptap/react");
+var import_react18 = require("@tiptap/react");
 var import_extension_horizontal_rule = __toESM(require("@tiptap/extension-horizontal-rule"), 1);
 var HorizontalRule = import_extension_horizontal_rule.default.extend({
   renderHTML() {
     return [
       "div",
-      (0, import_react17.mergeAttributes)(this.options.HTMLAttributes, { "data-type": this.name }),
+      (0, import_react18.mergeAttributes)(this.options.HTMLAttributes, { "data-type": this.name }),
       ["hr"]
     ];
   }
@@ -1655,12 +1665,12 @@ var import_heading_node = require("./heading-node-BYFDWV4U.scss");
 var import_paragraph_node = require("./paragraph-node-4PTN4ABT.scss");
 
 // src/components/tiptap-ui/heading-dropdown-menu/heading-dropdown-menu.tsx
-var import_react32 = require("react");
+var import_react33 = require("react");
 
 // src/components/tiptap-icons/chevron-down-icon.tsx
-var import_react18 = require("react");
+var import_react19 = require("react");
 var import_jsx_runtime9 = require("react/jsx-runtime");
-var ChevronDownIcon = (0, import_react18.memo)(({ className, ...props }) => {
+var ChevronDownIcon = (0, import_react19.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
     "svg",
     {
@@ -1686,15 +1696,15 @@ var ChevronDownIcon = (0, import_react18.memo)(({ className, ...props }) => {
 ChevronDownIcon.displayName = "ChevronDownIcon";
 
 // src/hooks/use-tiptap-editor.ts
-var import_react19 = require("@tiptap/react");
-var import_react20 = require("react");
+var import_react20 = require("@tiptap/react");
+var import_react21 = require("react");
 function useTiptapEditor(providedEditor) {
-  const { editor: coreEditor } = (0, import_react19.useCurrentEditor)();
-  const mainEditor = (0, import_react20.useMemo)(
+  const { editor: coreEditor } = (0, import_react20.useCurrentEditor)();
+  const mainEditor = (0, import_react21.useMemo)(
     () => providedEditor || coreEditor,
     [providedEditor, coreEditor]
   );
-  const editorState = (0, import_react19.useEditorState)({
+  const editorState = (0, import_react20.useEditorState)({
     editor: mainEditor,
     selector(context) {
       if (!context.editor) {
@@ -1715,15 +1725,15 @@ function useTiptapEditor(providedEditor) {
 }
 
 // src/components/tiptap-ui/heading-button/heading-button.tsx
-var import_react22 = require("react");
+var import_react23 = require("react");
 
 // src/components/tiptap-ui-primitive/badge/badge.tsx
-var import_react21 = require("react");
+var import_react22 = require("react");
 var import_badge_colors = require("./badge-colors-4TD6XHO3.scss");
 var import_badge_group = require("./badge-group-3G7S33KS.scss");
 var import_badge = require("./badge-2EHNGFC5.scss");
 var import_jsx_runtime10 = require("react/jsx-runtime");
-var Badge = (0, import_react21.forwardRef)(
+var Badge = (0, import_react22.forwardRef)(
   ({
     variant,
     size = "default",
@@ -1758,7 +1768,7 @@ function HeadingShortcutBadge({
 }) {
   return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(Badge, { children: parseShortcutKeys({ shortcutKeys }) });
 }
-var HeadingButton = (0, import_react22.forwardRef)(
+var HeadingButton = (0, import_react23.forwardRef)(
   ({
     editor: providedEditor,
     level,
@@ -1785,7 +1795,7 @@ var HeadingButton = (0, import_react22.forwardRef)(
       hideWhenUnavailable,
       onToggled
     });
-    const handleClick = (0, import_react22.useCallback)(
+    const handleClick = (0, import_react23.useCallback)(
       (event) => {
         onClick?.(event);
         if (event.defaultPrevented) return;
@@ -1824,13 +1834,13 @@ var HeadingButton = (0, import_react22.forwardRef)(
 HeadingButton.displayName = "HeadingButton";
 
 // src/components/tiptap-ui/heading-button/use-heading.ts
-var import_react29 = require("react");
+var import_react30 = require("react");
 var import_state2 = require("@tiptap/pm/state");
 
 // src/components/tiptap-icons/heading-one-icon.tsx
-var import_react23 = require("react");
+var import_react24 = require("react");
 var import_jsx_runtime12 = require("react/jsx-runtime");
-var HeadingOneIcon = (0, import_react23.memo)(({ className, ...props }) => {
+var HeadingOneIcon = (0, import_react24.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
     "svg",
     {
@@ -1863,9 +1873,9 @@ var HeadingOneIcon = (0, import_react23.memo)(({ className, ...props }) => {
 HeadingOneIcon.displayName = "HeadingOneIcon";
 
 // src/components/tiptap-icons/heading-two-icon.tsx
-var import_react24 = require("react");
+var import_react25 = require("react");
 var import_jsx_runtime13 = require("react/jsx-runtime");
-var HeadingTwoIcon = (0, import_react24.memo)(({ className, ...props }) => {
+var HeadingTwoIcon = (0, import_react25.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
     "svg",
     {
@@ -1898,9 +1908,9 @@ var HeadingTwoIcon = (0, import_react24.memo)(({ className, ...props }) => {
 HeadingTwoIcon.displayName = "HeadingTwoIcon";
 
 // src/components/tiptap-icons/heading-three-icon.tsx
-var import_react25 = require("react");
+var import_react26 = require("react");
 var import_jsx_runtime14 = require("react/jsx-runtime");
-var HeadingThreeIcon = (0, import_react25.memo)(({ className, ...props }) => {
+var HeadingThreeIcon = (0, import_react26.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(
     "svg",
     {
@@ -1944,9 +1954,9 @@ var HeadingThreeIcon = (0, import_react25.memo)(({ className, ...props }) => {
 HeadingThreeIcon.displayName = "HeadingThreeIcon";
 
 // src/components/tiptap-icons/heading-four-icon.tsx
-var import_react26 = require("react");
+var import_react27 = require("react");
 var import_jsx_runtime15 = require("react/jsx-runtime");
-var HeadingFourIcon = (0, import_react26.memo)(({ className, ...props }) => {
+var HeadingFourIcon = (0, import_react27.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(
     "svg",
     {
@@ -1979,9 +1989,9 @@ var HeadingFourIcon = (0, import_react26.memo)(({ className, ...props }) => {
 HeadingFourIcon.displayName = "HeadingFourIcon";
 
 // src/components/tiptap-icons/heading-five-icon.tsx
-var import_react27 = require("react");
+var import_react28 = require("react");
 var import_jsx_runtime16 = require("react/jsx-runtime");
-var HeadingFiveIcon = (0, import_react27.memo)(({ className, ...props }) => {
+var HeadingFiveIcon = (0, import_react28.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime16.jsxs)(
     "svg",
     {
@@ -2014,9 +2024,9 @@ var HeadingFiveIcon = (0, import_react27.memo)(({ className, ...props }) => {
 HeadingFiveIcon.displayName = "HeadingFiveIcon";
 
 // src/components/tiptap-icons/heading-six-icon.tsx
-var import_react28 = require("react");
+var import_react29 = require("react");
 var import_jsx_runtime17 = require("react/jsx-runtime");
-var HeadingSixIcon = (0, import_react28.memo)(({ className, ...props }) => {
+var HeadingSixIcon = (0, import_react29.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime17.jsxs)(
     "svg",
     {
@@ -2167,10 +2177,10 @@ function useHeading(config) {
     onToggled
   } = config;
   const { editor } = useTiptapEditor(providedEditor);
-  const [isVisible, setIsVisible] = (0, import_react29.useState)(true);
+  const [isVisible, setIsVisible] = (0, import_react30.useState)(true);
   const canToggleState = canToggle(editor, level);
   const isActive = isHeadingActive(editor, level);
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     if (!editor) return;
     const handleSelectionUpdate = () => {
       setIsVisible(shouldShowButton({ editor, level, hideWhenUnavailable }));
@@ -2181,7 +2191,7 @@ function useHeading(config) {
       editor.off("selectionUpdate", handleSelectionUpdate);
     };
   }, [editor, level, hideWhenUnavailable]);
-  const handleToggle = (0, import_react29.useCallback)(() => {
+  const handleToggle = (0, import_react30.useCallback)(() => {
     if (!editor) return false;
     const success = toggleHeading(editor, level);
     if (success) {
@@ -2201,7 +2211,7 @@ function useHeading(config) {
 }
 
 // src/components/tiptap-ui-primitive/dropdown-menu/dropdown-menu.tsx
-var import_react30 = require("react");
+var import_react31 = require("react");
 var DropdownMenuPrimitive = __toESM(require("@radix-ui/react-dropdown-menu"), 1);
 var import_dropdown_menu = require("./dropdown-menu-PBSLBMZL.scss");
 var import_jsx_runtime18 = require("react/jsx-runtime");
@@ -2215,10 +2225,10 @@ function DropdownMenuPortal({
 }) {
   return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(DropdownMenuPrimitive.Portal, { ...props });
 }
-var DropdownMenuTrigger = (0, import_react30.forwardRef)(({ ...props }, ref) => /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(DropdownMenuPrimitive.Trigger, { ref, ...props }));
+var DropdownMenuTrigger = (0, import_react31.forwardRef)(({ ...props }, ref) => /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(DropdownMenuPrimitive.Trigger, { ref, ...props }));
 DropdownMenuTrigger.displayName = DropdownMenuPrimitive.Trigger.displayName;
 var DropdownMenuItem = DropdownMenuPrimitive.Item;
-var DropdownMenuSubContent = (0, import_react30.forwardRef)(({ className, portal = true, ...props }, ref) => {
+var DropdownMenuSubContent = (0, import_react31.forwardRef)(({ className, portal = true, ...props }, ref) => {
   const content = /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(
     DropdownMenuPrimitive.SubContent,
     {
@@ -2230,7 +2240,7 @@ var DropdownMenuSubContent = (0, import_react30.forwardRef)(({ className, portal
   return portal ? /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(DropdownMenuPortal, { ...typeof portal === "object" ? portal : {}, children: content }) : content;
 });
 DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayName;
-var DropdownMenuContent = (0, import_react30.forwardRef)(({ className, sideOffset = 4, portal = false, ...props }, ref) => {
+var DropdownMenuContent = (0, import_react31.forwardRef)(({ className, sideOffset = 4, portal = false, ...props }, ref) => {
   const content = /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(
     DropdownMenuPrimitive.Content,
     {
@@ -2246,16 +2256,16 @@ var DropdownMenuContent = (0, import_react30.forwardRef)(({ className, sideOffse
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName;
 
 // src/components/tiptap-ui-primitive/card/card.tsx
-var import_react31 = require("react");
+var import_react32 = require("react");
 var import_card = require("./card-H7P4F6AT.scss");
 var import_jsx_runtime19 = require("react/jsx-runtime");
-var Card = (0, import_react31.forwardRef)(
+var Card = (0, import_react32.forwardRef)(
   ({ className, ...props }, ref) => {
     return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("div", { ref, className: cn("tiptap-card", className), ...props });
   }
 );
 Card.displayName = "Card";
-var CardHeader = (0, import_react31.forwardRef)(
+var CardHeader = (0, import_react32.forwardRef)(
   ({ className, ...props }, ref) => {
     return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
       "div",
@@ -2268,13 +2278,13 @@ var CardHeader = (0, import_react31.forwardRef)(
   }
 );
 CardHeader.displayName = "CardHeader";
-var CardBody = (0, import_react31.forwardRef)(
+var CardBody = (0, import_react32.forwardRef)(
   ({ className, ...props }, ref) => {
     return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("div", { ref, className: cn("tiptap-card-body", className), ...props });
   }
 );
 CardBody.displayName = "CardBody";
-var CardItemGroup = (0, import_react31.forwardRef)(({ className, orientation = "vertical", ...props }, ref) => {
+var CardItemGroup = (0, import_react32.forwardRef)(({ className, orientation = "vertical", ...props }, ref) => {
   return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
     "div",
     {
@@ -2286,7 +2296,7 @@ var CardItemGroup = (0, import_react31.forwardRef)(({ className, orientation = "
   );
 });
 CardItemGroup.displayName = "CardItemGroup";
-var CardGroupLabel = (0, import_react31.forwardRef)(
+var CardGroupLabel = (0, import_react32.forwardRef)(
   ({ className, ...props }, ref) => {
     return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
       "div",
@@ -2299,7 +2309,7 @@ var CardGroupLabel = (0, import_react31.forwardRef)(
   }
 );
 CardGroupLabel.displayName = "CardGroupLabel";
-var CardFooter = (0, import_react31.forwardRef)(
+var CardFooter = (0, import_react32.forwardRef)(
   ({ className, ...props }, ref) => {
     return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
       "div",
@@ -2315,7 +2325,7 @@ CardFooter.displayName = "CardFooter";
 
 // src/components/tiptap-ui/heading-dropdown-menu/heading-dropdown-menu.tsx
 var import_jsx_runtime20 = require("react/jsx-runtime");
-var HeadingDropdownMenu = (0, import_react32.forwardRef)(
+var HeadingDropdownMenu = (0, import_react33.forwardRef)(
   ({
     editor: providedEditor,
     levels = [1, 2, 3, 4, 5, 6],
@@ -2326,13 +2336,13 @@ var HeadingDropdownMenu = (0, import_react32.forwardRef)(
     ...buttonProps
   }, ref) => {
     const { editor } = useTiptapEditor(providedEditor);
-    const [isOpen, setIsOpen] = (0, import_react32.useState)(false);
+    const [isOpen, setIsOpen] = (0, import_react33.useState)(false);
     const { isVisible, isActive, canToggle: canToggle3, Icon } = useHeadingDropdownMenu({
       editor,
       levels,
       hideWhenUnavailable
     });
-    const handleOpenChange = (0, import_react32.useCallback)(
+    const handleOpenChange = (0, import_react33.useCallback)(
       (open) => {
         if (!editor || !canToggle3) return;
         setIsOpen(open);
@@ -2380,12 +2390,12 @@ var HeadingDropdownMenu = (0, import_react32.forwardRef)(
 HeadingDropdownMenu.displayName = "HeadingDropdownMenu";
 
 // src/components/tiptap-ui/heading-dropdown-menu/use-heading-dropdown-menu.ts
-var import_react34 = require("react");
+var import_react35 = require("react");
 
 // src/components/tiptap-icons/heading-icon.tsx
-var import_react33 = require("react");
+var import_react34 = require("react");
 var import_jsx_runtime21 = require("react/jsx-runtime");
-var HeadingIcon = (0, import_react33.memo)(({ className, ...props }) => {
+var HeadingIcon = (0, import_react34.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
     "svg",
     {
@@ -2420,11 +2430,11 @@ function useHeadingDropdownMenu(config) {
     hideWhenUnavailable = false
   } = config || {};
   const { editor } = useTiptapEditor(providedEditor);
-  const [isVisible, setIsVisible] = (0, import_react34.useState)(true);
+  const [isVisible, setIsVisible] = (0, import_react35.useState)(true);
   const activeLevel = getActiveHeadingLevel(editor, levels);
   const isActive = isHeadingActive(editor);
   const canToggleState = canToggle(editor);
-  (0, import_react34.useEffect)(() => {
+  (0, import_react35.useEffect)(() => {
     if (!editor) return;
     const handleSelectionUpdate = () => {
       setIsVisible(
@@ -2449,14 +2459,14 @@ function useHeadingDropdownMenu(config) {
 }
 
 // src/components/tiptap-ui/image-upload-button/image-upload-button.tsx
-var import_react35 = require("react");
+var import_react36 = require("react");
 var import_jsx_runtime22 = require("react/jsx-runtime");
 function ImageShortcutBadge({
   shortcutKeys = IMAGE_UPLOAD_SHORTCUT_KEY
 }) {
   return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Badge, { children: parseShortcutKeys({ shortcutKeys }) });
 }
-var ImageUploadButton = (0, import_react35.forwardRef)(
+var ImageUploadButton = (0, import_react36.forwardRef)(
   ({
     editor: providedEditor,
     text,
@@ -2482,7 +2492,7 @@ var ImageUploadButton = (0, import_react35.forwardRef)(
       hideWhenUnavailable,
       onInserted
     });
-    const handleClick = (0, import_react35.useCallback)(
+    const handleClick = (0, import_react36.useCallback)(
       (event) => {
         onClick?.(event);
         if (event.defaultPrevented) return;
@@ -2522,14 +2532,14 @@ var ImageUploadButton = (0, import_react35.forwardRef)(
 ImageUploadButton.displayName = "ImageUploadButton";
 
 // src/components/tiptap-ui/image-upload-button/use-image-upload.ts
-var import_react38 = require("react");
+var import_react39 = require("react");
 var import_react_hotkeys_hook = require("react-hotkeys-hook");
 
 // src/hooks/use-is-breakpoint.ts
-var import_react36 = require("react");
+var import_react37 = require("react");
 function useIsBreakpoint(mode = "max", breakpoint = 768) {
-  const [matches, setMatches] = (0, import_react36.useState)(void 0);
-  (0, import_react36.useEffect)(() => {
+  const [matches, setMatches] = (0, import_react37.useState)(void 0);
+  (0, import_react37.useEffect)(() => {
     const query = mode === "min" ? `(min-width: ${breakpoint}px)` : `(max-width: ${breakpoint - 1}px)`;
     const mql = window.matchMedia(query);
     const onChange = (e) => setMatches(e.matches);
@@ -2541,9 +2551,9 @@ function useIsBreakpoint(mode = "max", breakpoint = 768) {
 }
 
 // src/components/tiptap-icons/image-plus-icon.tsx
-var import_react37 = require("react");
+var import_react38 = require("react");
 var import_jsx_runtime23 = require("react/jsx-runtime");
-var ImagePlusIcon = (0, import_react37.memo)(({ className, ...props }) => {
+var ImagePlusIcon = (0, import_react38.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
     "svg",
     {
@@ -2610,10 +2620,10 @@ function useImageUpload(config) {
   } = config || {};
   const { editor } = useTiptapEditor(providedEditor);
   const isMobile = useIsBreakpoint();
-  const [isVisible, setIsVisible] = (0, import_react38.useState)(true);
+  const [isVisible, setIsVisible] = (0, import_react39.useState)(true);
   const canInsert = canInsertImage(editor);
   const isActive = isImageActive(editor);
-  (0, import_react38.useEffect)(() => {
+  (0, import_react39.useEffect)(() => {
     if (!editor) return;
     const handleSelectionUpdate = () => {
       setIsVisible(shouldShowButton2({ editor, hideWhenUnavailable }));
@@ -2624,7 +2634,7 @@ function useImageUpload(config) {
       editor.off("selectionUpdate", handleSelectionUpdate);
     };
   }, [editor, hideWhenUnavailable]);
-  const handleImage = (0, import_react38.useCallback)(() => {
+  const handleImage = (0, import_react39.useCallback)(() => {
     if (!editor) return false;
     const success = insertImage(editor);
     if (success) {
@@ -2656,10 +2666,10 @@ function useImageUpload(config) {
 }
 
 // src/components/tiptap-ui/list-dropdown-menu/list-dropdown-menu.tsx
-var import_react45 = require("react");
+var import_react46 = require("react");
 
 // src/components/tiptap-ui/list-button/list-button.tsx
-var import_react39 = require("react");
+var import_react40 = require("react");
 var import_jsx_runtime24 = require("react/jsx-runtime");
 function ListShortcutBadge({
   type,
@@ -2667,7 +2677,7 @@ function ListShortcutBadge({
 }) {
   return /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Badge, { children: parseShortcutKeys({ shortcutKeys }) });
 }
-var ListButton = (0, import_react39.forwardRef)(
+var ListButton = (0, import_react40.forwardRef)(
   ({
     editor: providedEditor,
     type,
@@ -2694,7 +2704,7 @@ var ListButton = (0, import_react39.forwardRef)(
       hideWhenUnavailable,
       onToggled
     });
-    const handleClick = (0, import_react39.useCallback)(
+    const handleClick = (0, import_react40.useCallback)(
       (event) => {
         onClick?.(event);
         if (event.defaultPrevented) return;
@@ -2733,13 +2743,13 @@ var ListButton = (0, import_react39.forwardRef)(
 ListButton.displayName = "ListButton";
 
 // src/components/tiptap-ui/list-button/use-list.ts
-var import_react43 = require("react");
+var import_react44 = require("react");
 var import_state3 = require("@tiptap/pm/state");
 
 // src/components/tiptap-icons/list-icon.tsx
-var import_react40 = require("react");
+var import_react41 = require("react");
 var import_jsx_runtime25 = require("react/jsx-runtime");
-var ListIcon = (0, import_react40.memo)(({ className, ...props }) => {
+var ListIcon = (0, import_react41.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)(
     "svg",
     {
@@ -2812,9 +2822,9 @@ var ListIcon = (0, import_react40.memo)(({ className, ...props }) => {
 ListIcon.displayName = "ListIcon";
 
 // src/components/tiptap-icons/list-ordered-icon.tsx
-var import_react41 = require("react");
+var import_react42 = require("react");
 var import_jsx_runtime26 = require("react/jsx-runtime");
-var ListOrderedIcon = (0, import_react41.memo)(({ className, ...props }) => {
+var ListOrderedIcon = (0, import_react42.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime26.jsxs)(
     "svg",
     {
@@ -2887,9 +2897,9 @@ var ListOrderedIcon = (0, import_react41.memo)(({ className, ...props }) => {
 ListOrderedIcon.displayName = "ListOrderedIcon";
 
 // src/components/tiptap-icons/list-todo-icon.tsx
-var import_react42 = require("react");
+var import_react43 = require("react");
 var import_jsx_runtime27 = require("react/jsx-runtime");
-var ListTodoIcon = (0, import_react42.memo)(({ className, ...props }) => {
+var ListTodoIcon = (0, import_react43.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)(
     "svg",
     {
@@ -3094,10 +3104,10 @@ function useList(config) {
     onToggled
   } = config;
   const { editor } = useTiptapEditor(providedEditor);
-  const [isVisible, setIsVisible] = (0, import_react43.useState)(true);
+  const [isVisible, setIsVisible] = (0, import_react44.useState)(true);
   const canToggle3 = canToggleList(editor, type);
   const isActive = isListActive(editor, type);
-  (0, import_react43.useEffect)(() => {
+  (0, import_react44.useEffect)(() => {
     if (!editor) return;
     const handleSelectionUpdate = () => {
       setIsVisible(shouldShowButton3({ editor, type, hideWhenUnavailable }));
@@ -3108,7 +3118,7 @@ function useList(config) {
       editor.off("selectionUpdate", handleSelectionUpdate);
     };
   }, [editor, type, hideWhenUnavailable]);
-  const handleToggle = (0, import_react43.useCallback)(() => {
+  const handleToggle = (0, import_react44.useCallback)(() => {
     if (!editor) return false;
     const success = toggleList(editor, type);
     if (success) {
@@ -3128,7 +3138,7 @@ function useList(config) {
 }
 
 // src/components/tiptap-ui/list-dropdown-menu/use-list-dropdown-menu.ts
-var import_react44 = require("react");
+var import_react45 = require("react");
 var listOptions = [
   {
     label: "\u65E0\u5E8F\u5217\u8868",
@@ -3182,14 +3192,14 @@ function useListDropdownMenu(config) {
     hideWhenUnavailable = false
   } = config || {};
   const { editor } = useTiptapEditor(providedEditor);
-  const [isVisible, setIsVisible] = (0, import_react44.useState)(true);
+  const [isVisible, setIsVisible] = (0, import_react45.useState)(true);
   const listInSchema = types.some((type) => isNodeInSchema(type, editor));
-  const filteredLists = (0, import_react44.useMemo)(() => getFilteredListOptions(types), [types]);
+  const filteredLists = (0, import_react45.useMemo)(() => getFilteredListOptions(types), [types]);
   const canToggleAny = canToggleAnyList(editor, types);
   const isAnyActive = isAnyListActive(editor, types);
   const activeType = getActiveListType(editor, types);
   const activeList = filteredLists.find((option) => option.type === activeType);
-  (0, import_react44.useEffect)(() => {
+  (0, import_react45.useEffect)(() => {
     if (!editor) return;
     const handleSelectionUpdate = () => {
       setIsVisible(
@@ -3231,13 +3241,13 @@ function ListDropdownMenu({
   ...props
 }) {
   const { editor } = useTiptapEditor(providedEditor);
-  const [isOpen, setIsOpen] = (0, import_react45.useState)(false);
+  const [isOpen, setIsOpen] = (0, import_react46.useState)(false);
   const { filteredLists, canToggle: canToggle3, isActive, isVisible, Icon } = useListDropdownMenu({
     editor,
     types,
     hideWhenUnavailable
   });
-  const handleOnOpenChange = (0, import_react45.useCallback)(
+  const handleOnOpenChange = (0, import_react46.useCallback)(
     (open) => {
       setIsOpen(open);
       onOpenChange?.(open);
@@ -3280,14 +3290,14 @@ function ListDropdownMenu({
 }
 
 // src/components/tiptap-ui/blockquote-button/blockquote-button.tsx
-var import_react46 = require("react");
+var import_react47 = require("react");
 var import_jsx_runtime29 = require("react/jsx-runtime");
 function BlockquoteShortcutBadge({
   shortcutKeys = BLOCKQUOTE_SHORTCUT_KEY
 }) {
   return /* @__PURE__ */ (0, import_jsx_runtime29.jsx)(Badge, { children: parseShortcutKeys({ shortcutKeys }) });
 }
-var BlockquoteButton = (0, import_react46.forwardRef)(
+var BlockquoteButton = (0, import_react47.forwardRef)(
   ({
     editor: providedEditor,
     text,
@@ -3312,7 +3322,7 @@ var BlockquoteButton = (0, import_react46.forwardRef)(
       hideWhenUnavailable,
       onToggled
     });
-    const handleClick = (0, import_react46.useCallback)(
+    const handleClick = (0, import_react47.useCallback)(
       (event) => {
         onClick?.(event);
         if (event.defaultPrevented) return;
@@ -3351,13 +3361,13 @@ var BlockquoteButton = (0, import_react46.forwardRef)(
 BlockquoteButton.displayName = "BlockquoteButton";
 
 // src/components/tiptap-ui/blockquote-button/use-blockquote.ts
-var import_react48 = require("react");
+var import_react49 = require("react");
 var import_state4 = require("@tiptap/pm/state");
 
 // src/components/tiptap-icons/blockquote-icon.tsx
-var import_react47 = require("react");
+var import_react48 = require("react");
 var import_jsx_runtime30 = require("react/jsx-runtime");
-var BlockquoteIcon = (0, import_react47.memo)(({ className, ...props }) => {
+var BlockquoteIcon = (0, import_react48.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime30.jsxs)(
     "svg",
     {
@@ -3497,10 +3507,10 @@ function useBlockquote(config) {
     onToggled
   } = config || {};
   const { editor } = useTiptapEditor(providedEditor);
-  const [isVisible, setIsVisible] = (0, import_react48.useState)(true);
+  const [isVisible, setIsVisible] = (0, import_react49.useState)(true);
   const canToggle3 = canToggleBlockquote(editor);
   const isActive = editor?.isActive("blockquote") || false;
-  (0, import_react48.useEffect)(() => {
+  (0, import_react49.useEffect)(() => {
     if (!editor) return;
     const handleSelectionUpdate = () => {
       setIsVisible(shouldShowButton4({ editor, hideWhenUnavailable }));
@@ -3511,7 +3521,7 @@ function useBlockquote(config) {
       editor.off("selectionUpdate", handleSelectionUpdate);
     };
   }, [editor, hideWhenUnavailable]);
-  const handleToggle = (0, import_react48.useCallback)(() => {
+  const handleToggle = (0, import_react49.useCallback)(() => {
     if (!editor) return false;
     const success = toggleBlockquote(editor);
     if (success) {
@@ -3531,14 +3541,14 @@ function useBlockquote(config) {
 }
 
 // src/components/tiptap-ui/code-block-button/code-block-button.tsx
-var import_react49 = require("react");
+var import_react50 = require("react");
 var import_jsx_runtime31 = require("react/jsx-runtime");
 function CodeBlockShortcutBadge({
   shortcutKeys = CODE_BLOCK_SHORTCUT_KEY
 }) {
   return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Badge, { children: parseShortcutKeys({ shortcutKeys }) });
 }
-var CodeBlockButton = (0, import_react49.forwardRef)(
+var CodeBlockButton = (0, import_react50.forwardRef)(
   ({
     editor: providedEditor,
     text,
@@ -3563,7 +3573,7 @@ var CodeBlockButton = (0, import_react49.forwardRef)(
       hideWhenUnavailable,
       onToggled
     });
-    const handleClick = (0, import_react49.useCallback)(
+    const handleClick = (0, import_react50.useCallback)(
       (event) => {
         onClick?.(event);
         if (event.defaultPrevented) return;
@@ -3602,13 +3612,13 @@ var CodeBlockButton = (0, import_react49.forwardRef)(
 CodeBlockButton.displayName = "CodeBlockButton";
 
 // src/components/tiptap-ui/code-block-button/use-code-block.ts
-var import_react51 = require("react");
+var import_react52 = require("react");
 var import_state5 = require("@tiptap/pm/state");
 
 // src/components/tiptap-icons/code-block-icon.tsx
-var import_react50 = require("react");
+var import_react51 = require("react");
 var import_jsx_runtime32 = require("react/jsx-runtime");
-var CodeBlockIcon = (0, import_react50.memo)(({ className, ...props }) => {
+var CodeBlockIcon = (0, import_react51.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime32.jsxs)(
     "svg",
     {
@@ -3739,10 +3749,10 @@ function useCodeBlock(config) {
     onToggled
   } = config || {};
   const { editor } = useTiptapEditor(providedEditor);
-  const [isVisible, setIsVisible] = (0, import_react51.useState)(true);
+  const [isVisible, setIsVisible] = (0, import_react52.useState)(true);
   const canToggleState = canToggle2(editor);
   const isActive = editor?.isActive("codeBlock") || false;
-  (0, import_react51.useEffect)(() => {
+  (0, import_react52.useEffect)(() => {
     if (!editor) return;
     const handleSelectionUpdate = () => {
       setIsVisible(shouldShowButton5({ editor, hideWhenUnavailable }));
@@ -3753,7 +3763,7 @@ function useCodeBlock(config) {
       editor.off("selectionUpdate", handleSelectionUpdate);
     };
   }, [editor, hideWhenUnavailable]);
-  const handleToggle = (0, import_react51.useCallback)(() => {
+  const handleToggle = (0, import_react52.useCallback)(() => {
     if (!editor) return false;
     const success = toggleCodeBlock(editor);
     if (success) {
@@ -3773,12 +3783,12 @@ function useCodeBlock(config) {
 }
 
 // src/components/tiptap-ui/color-highlight-popover/color-highlight-popover.tsx
-var import_react56 = require("react");
+var import_react57 = require("react");
 
 // src/components/tiptap-icons/ban-icon.tsx
-var import_react52 = require("react");
+var import_react53 = require("react");
 var import_jsx_runtime33 = require("react/jsx-runtime");
-var BanIcon = (0, import_react52.memo)(({ className, ...props }) => {
+var BanIcon = (0, import_react53.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime33.jsx)(
     "svg",
     {
@@ -3804,9 +3814,9 @@ var BanIcon = (0, import_react52.memo)(({ className, ...props }) => {
 BanIcon.displayName = "BanIcon";
 
 // src/components/tiptap-icons/highlighter-icon.tsx
-var import_react53 = require("react");
+var import_react54 = require("react");
 var import_jsx_runtime34 = require("react/jsx-runtime");
-var HighlighterIcon = (0, import_react53.memo)(({ className, ...props }) => {
+var HighlighterIcon = (0, import_react54.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime34.jsx)(
     "svg",
     {
@@ -3863,7 +3873,7 @@ function PopoverContent({
 }
 
 // src/components/tiptap-ui/color-highlight-button/color-highlight-button.tsx
-var import_react54 = require("react");
+var import_react55 = require("react");
 var import_color_highlight_button = require("./color-highlight-button-IPEAVLDR.scss");
 var import_jsx_runtime36 = require("react/jsx-runtime");
 function ColorHighlightShortcutBadge({
@@ -3871,7 +3881,7 @@ function ColorHighlightShortcutBadge({
 }) {
   return /* @__PURE__ */ (0, import_jsx_runtime36.jsx)(Badge, { children: parseShortcutKeys({ shortcutKeys }) });
 }
-var ColorHighlightButton = (0, import_react54.forwardRef)(
+var ColorHighlightButton = (0, import_react55.forwardRef)(
   ({
     editor: providedEditor,
     highlightColor,
@@ -3903,7 +3913,7 @@ var ColorHighlightButton = (0, import_react54.forwardRef)(
       mode,
       onApplied
     });
-    const handleClick = (0, import_react54.useCallback)(
+    const handleClick = (0, import_react55.useCallback)(
       (event) => {
         onClick?.(event);
         if (event.defaultPrevented) return;
@@ -3911,7 +3921,7 @@ var ColorHighlightButton = (0, import_react54.forwardRef)(
       },
       [handleColorHighlight, onClick]
     );
-    const buttonStyle = (0, import_react54.useMemo)(
+    const buttonStyle = (0, import_react55.useMemo)(
       () => ({
         ...style,
         "--highlight-color": highlightColor
@@ -3956,7 +3966,7 @@ var ColorHighlightButton = (0, import_react54.forwardRef)(
 ColorHighlightButton.displayName = "ColorHighlightButton";
 
 // src/components/tiptap-ui/color-highlight-button/use-color-highlight.ts
-var import_react55 = require("react");
+var import_react56 = require("react");
 var import_react_hotkeys_hook2 = require("react-hotkeys-hook");
 var COLOR_HIGHLIGHT_SHORTCUT_KEY = "mod+shift+h";
 var HIGHLIGHT_COLORS = [
@@ -4108,11 +4118,11 @@ function useColorHighlight(config) {
   } = config;
   const { editor } = useTiptapEditor(providedEditor);
   const isMobile = useIsBreakpoint();
-  const [isVisible, setIsVisible] = (0, import_react55.useState)(true);
+  const [isVisible, setIsVisible] = (0, import_react56.useState)(true);
   const canColorHighlightState = canColorHighlight(editor, mode);
   const actualColor = highlightColor ? getHighlightColorValue(highlightColor, useColorValue) : highlightColor;
   const isActive = isColorHighlightActive(editor, actualColor, mode);
-  (0, import_react55.useEffect)(() => {
+  (0, import_react56.useEffect)(() => {
     if (!editor) return;
     const handleSelectionUpdate = () => {
       setIsVisible(shouldShowButton6({ editor, hideWhenUnavailable, mode }));
@@ -4123,7 +4133,7 @@ function useColorHighlight(config) {
       editor.off("selectionUpdate", handleSelectionUpdate);
     };
   }, [editor, hideWhenUnavailable, mode]);
-  const handleColorHighlight = (0, import_react55.useCallback)(() => {
+  const handleColorHighlight = (0, import_react56.useCallback)(() => {
     if (!editor || !canColorHighlightState || !actualColor || !label)
       return false;
     if (mode === "mark") {
@@ -4151,7 +4161,7 @@ function useColorHighlight(config) {
       return success;
     }
   }, [canColorHighlightState, actualColor, editor, label, onApplied, mode]);
-  const handleRemoveHighlight = (0, import_react55.useCallback)(() => {
+  const handleRemoveHighlight = (0, import_react56.useCallback)(() => {
     const success = removeHighlight(editor, mode);
     if (success) {
       onApplied?.({ color: "", label: "\u79FB\u9664\u9AD8\u4EAE", mode });
@@ -4185,7 +4195,7 @@ function useColorHighlight(config) {
 
 // src/components/tiptap-ui/color-highlight-popover/color-highlight-popover.tsx
 var import_jsx_runtime37 = require("react/jsx-runtime");
-var ColorHighlightPopoverButton = (0, import_react56.forwardRef)(({ className, children, ...props }, ref) => /* @__PURE__ */ (0, import_jsx_runtime37.jsx)(
+var ColorHighlightPopoverButton = (0, import_react57.forwardRef)(({ className, children, ...props }, ref) => /* @__PURE__ */ (0, import_jsx_runtime37.jsx)(
   Button,
   {
     type: "button",
@@ -4215,8 +4225,8 @@ function ColorHighlightPopoverContent({
 }) {
   const { handleRemoveHighlight } = useColorHighlight({ editor });
   const isMobile = useIsBreakpoint();
-  const containerRef = (0, import_react56.useRef)(null);
-  const menuItems = (0, import_react56.useMemo)(
+  const containerRef = (0, import_react57.useRef)(null);
+  const menuItems = (0, import_react57.useMemo)(
     () => [...colors, { label: "\u79FB\u9664\u9AD8\u4EAE", value: "none" }],
     [colors]
   );
@@ -4289,7 +4299,7 @@ function ColorHighlightPopover({
   ...props
 }) {
   const { editor } = useTiptapEditor(providedEditor);
-  const [isOpen, setIsOpen] = (0, import_react56.useState)(false);
+  const [isOpen, setIsOpen] = (0, import_react57.useState)(false);
   const { isVisible, canColorHighlight: canColorHighlight2, isActive, label, Icon } = useColorHighlight({
     editor,
     hideWhenUnavailable,
@@ -4322,12 +4332,12 @@ function ColorHighlightPopover({
 }
 
 // src/components/tiptap-ui/link-popover/link-popover.tsx
-var import_react61 = require("react");
+var import_react62 = require("react");
 
 // src/components/tiptap-icons/corner-down-left-icon.tsx
-var import_react57 = require("react");
+var import_react58 = require("react");
 var import_jsx_runtime38 = require("react/jsx-runtime");
-var CornerDownLeftIcon = (0, import_react57.memo)(({ className, ...props }) => {
+var CornerDownLeftIcon = (0, import_react58.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime38.jsx)(
     "svg",
     {
@@ -4353,9 +4363,9 @@ var CornerDownLeftIcon = (0, import_react57.memo)(({ className, ...props }) => {
 CornerDownLeftIcon.displayName = "CornerDownLeftIcon";
 
 // src/components/tiptap-icons/external-link-icon.tsx
-var import_react58 = require("react");
+var import_react59 = require("react");
 var import_jsx_runtime39 = require("react/jsx-runtime");
-var ExternalLinkIcon = (0, import_react58.memo)(({ className, ...props }) => {
+var ExternalLinkIcon = (0, import_react59.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime39.jsxs)(
     "svg",
     {
@@ -4388,9 +4398,9 @@ var ExternalLinkIcon = (0, import_react58.memo)(({ className, ...props }) => {
 ExternalLinkIcon.displayName = "ExternalLinkIcon";
 
 // src/components/tiptap-icons/link-icon.tsx
-var import_react59 = require("react");
+var import_react60 = require("react");
 var import_jsx_runtime40 = require("react/jsx-runtime");
-var LinkIcon = (0, import_react59.memo)(({ className, ...props }) => {
+var LinkIcon = (0, import_react60.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime40.jsxs)(
     "svg",
     {
@@ -4423,9 +4433,9 @@ var LinkIcon = (0, import_react59.memo)(({ className, ...props }) => {
 LinkIcon.displayName = "LinkIcon";
 
 // src/components/tiptap-icons/trash-icon.tsx
-var import_react60 = require("react");
+var import_react61 = require("react");
 var import_jsx_runtime41 = require("react/jsx-runtime");
-var TrashIcon = (0, import_react60.memo)(({ className, ...props }) => {
+var TrashIcon = (0, import_react61.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime41.jsx)(
     "svg",
     {
@@ -4466,7 +4476,7 @@ function InputGroup({
 
 // src/components/tiptap-ui/link-popover/link-popover.tsx
 var import_jsx_runtime43 = require("react/jsx-runtime");
-var LinkButton = (0, import_react61.forwardRef)(
+var LinkButton = (0, import_react62.forwardRef)(
   ({ className, children, ...props }, ref) => {
     return /* @__PURE__ */ (0, import_jsx_runtime43.jsx)(
       Button,
@@ -4576,7 +4586,7 @@ var LinkContent = ({ editor }) => {
   });
   return /* @__PURE__ */ (0, import_jsx_runtime43.jsx)(LinkMain, { ...linkPopover });
 };
-var LinkPopover = (0, import_react61.forwardRef)(
+var LinkPopover = (0, import_react62.forwardRef)(
   ({
     editor: providedEditor,
     hideWhenUnavailable = false,
@@ -4588,7 +4598,7 @@ var LinkPopover = (0, import_react61.forwardRef)(
     ...buttonProps
   }, ref) => {
     const { editor } = useTiptapEditor(providedEditor);
-    const [isOpen, setIsOpen] = (0, import_react61.useState)(false);
+    const [isOpen, setIsOpen] = (0, import_react62.useState)(false);
     const {
       isVisible,
       canSet,
@@ -4605,18 +4615,18 @@ var LinkPopover = (0, import_react61.forwardRef)(
       hideWhenUnavailable,
       onSetLink
     });
-    const handleOnOpenChange = (0, import_react61.useCallback)(
+    const handleOnOpenChange = (0, import_react62.useCallback)(
       (nextIsOpen) => {
         setIsOpen(nextIsOpen);
         onOpenChange?.(nextIsOpen);
       },
       [onOpenChange]
     );
-    const handleSetLink = (0, import_react61.useCallback)(() => {
+    const handleSetLink = (0, import_react62.useCallback)(() => {
       setLink();
       setIsOpen(false);
     }, [setLink]);
-    const handleClick = (0, import_react61.useCallback)(
+    const handleClick = (0, import_react62.useCallback)(
       (event) => {
         onClick?.(event);
         if (event.defaultPrevented) return;
@@ -4624,7 +4634,7 @@ var LinkPopover = (0, import_react61.forwardRef)(
       },
       [onClick, isOpen]
     );
-    (0, import_react61.useEffect)(() => {
+    (0, import_react62.useEffect)(() => {
       if (autoOpenOnLinkActive && isActive) {
         setIsOpen(true);
       }
@@ -4664,7 +4674,7 @@ var LinkPopover = (0, import_react61.forwardRef)(
 LinkPopover.displayName = "LinkPopover";
 
 // src/components/tiptap-ui/link-popover/use-link-popover.ts
-var import_react62 = require("react");
+var import_react63 = require("react");
 function canSetLink(editor) {
   if (!editor || !editor.isEditable) return false;
   if (isNodeTypeSelected(editor, ["image"], true)) return false;
@@ -4695,15 +4705,15 @@ function shouldShowLinkButton(props) {
 }
 function useLinkHandler(props) {
   const { editor, onSetLink } = props;
-  const [url, setUrl] = (0, import_react62.useState)(null);
-  (0, import_react62.useEffect)(() => {
+  const [url, setUrl] = (0, import_react63.useState)(null);
+  (0, import_react63.useEffect)(() => {
     if (!editor) return;
     const { href } = editor.getAttributes("link");
     if (isLinkActive(editor) && url === null) {
       setUrl(href || "");
     }
   }, [editor, url]);
-  (0, import_react62.useEffect)(() => {
+  (0, import_react63.useEffect)(() => {
     if (!editor) return;
     const updateLinkState = () => {
       const { href } = editor.getAttributes("link");
@@ -4714,7 +4724,7 @@ function useLinkHandler(props) {
       editor.off("selectionUpdate", updateLinkState);
     };
   }, [editor]);
-  const setLink = (0, import_react62.useCallback)(() => {
+  const setLink = (0, import_react63.useCallback)(() => {
     if (!url || !editor) return;
     const { selection } = editor.state;
     const isEmpty = selection.empty;
@@ -4727,12 +4737,12 @@ function useLinkHandler(props) {
     setUrl(null);
     onSetLink?.();
   }, [editor, onSetLink, url]);
-  const removeLink = (0, import_react62.useCallback)(() => {
+  const removeLink = (0, import_react63.useCallback)(() => {
     if (!editor) return;
     editor.chain().focus().extendMarkRange("link").unsetLink().setMeta("preventAutolink", true).run();
     setUrl("");
   }, [editor]);
-  const openLink = (0, import_react62.useCallback)(
+  const openLink = (0, import_react63.useCallback)(
     (target = "_blank", features = "noopener,noreferrer") => {
       if (!url) return;
       const safeUrl = sanitizeUrl(url, window.location.href);
@@ -4754,8 +4764,8 @@ function useLinkState(props) {
   const { editor, hideWhenUnavailable = false } = props;
   const canSet = canSetLink(editor);
   const isActive = isLinkActive(editor);
-  const [isVisible, setIsVisible] = (0, import_react62.useState)(true);
-  (0, import_react62.useEffect)(() => {
+  const [isVisible, setIsVisible] = (0, import_react63.useState)(true);
+  (0, import_react63.useEffect)(() => {
     if (!editor) return;
     const handleSelectionUpdate = () => {
       setIsVisible(
@@ -4803,7 +4813,7 @@ function useLinkPopover(config) {
 }
 
 // src/components/tiptap-ui/mark-button/mark-button.tsx
-var import_react63 = require("react");
+var import_react64 = require("react");
 var import_jsx_runtime44 = require("react/jsx-runtime");
 function MarkShortcutBadge({
   type,
@@ -4811,7 +4821,7 @@ function MarkShortcutBadge({
 }) {
   return /* @__PURE__ */ (0, import_jsx_runtime44.jsx)(Badge, { children: parseShortcutKeys({ shortcutKeys }) });
 }
-var MarkButton = (0, import_react63.forwardRef)(
+var MarkButton = (0, import_react64.forwardRef)(
   ({
     editor: providedEditor,
     type,
@@ -4838,7 +4848,7 @@ var MarkButton = (0, import_react63.forwardRef)(
       hideWhenUnavailable,
       onToggled
     });
-    const handleClick = (0, import_react63.useCallback)(
+    const handleClick = (0, import_react64.useCallback)(
       (event) => {
         onClick?.(event);
         if (event.defaultPrevented) return;
@@ -4877,12 +4887,12 @@ var MarkButton = (0, import_react63.forwardRef)(
 MarkButton.displayName = "MarkButton";
 
 // src/components/tiptap-ui/mark-button/use-mark.ts
-var import_react71 = require("react");
+var import_react72 = require("react");
 
 // src/components/tiptap-icons/bold-icon.tsx
-var import_react64 = require("react");
+var import_react65 = require("react");
 var import_jsx_runtime45 = require("react/jsx-runtime");
-var BoldIcon = (0, import_react64.memo)(({ className, ...props }) => {
+var BoldIcon = (0, import_react65.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime45.jsx)(
     "svg",
     {
@@ -4908,9 +4918,9 @@ var BoldIcon = (0, import_react64.memo)(({ className, ...props }) => {
 BoldIcon.displayName = "BoldIcon";
 
 // src/components/tiptap-icons/code2-icon.tsx
-var import_react65 = require("react");
+var import_react66 = require("react");
 var import_jsx_runtime46 = require("react/jsx-runtime");
-var Code2Icon = (0, import_react65.memo)(({ className, ...props }) => {
+var Code2Icon = (0, import_react66.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime46.jsxs)(
     "svg",
     {
@@ -4950,9 +4960,9 @@ var Code2Icon = (0, import_react65.memo)(({ className, ...props }) => {
 Code2Icon.displayName = "Code2Icon";
 
 // src/components/tiptap-icons/italic-icon.tsx
-var import_react66 = require("react");
+var import_react67 = require("react");
 var import_jsx_runtime47 = require("react/jsx-runtime");
-var ItalicIcon = (0, import_react66.memo)(({ className, ...props }) => {
+var ItalicIcon = (0, import_react67.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime47.jsx)(
     "svg",
     {
@@ -4976,9 +4986,9 @@ var ItalicIcon = (0, import_react66.memo)(({ className, ...props }) => {
 ItalicIcon.displayName = "ItalicIcon";
 
 // src/components/tiptap-icons/strike-icon.tsx
-var import_react67 = require("react");
+var import_react68 = require("react");
 var import_jsx_runtime48 = require("react/jsx-runtime");
-var StrikeIcon = (0, import_react67.memo)(({ className, ...props }) => {
+var StrikeIcon = (0, import_react68.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime48.jsxs)(
     "svg",
     {
@@ -5011,9 +5021,9 @@ var StrikeIcon = (0, import_react67.memo)(({ className, ...props }) => {
 StrikeIcon.displayName = "StrikeIcon";
 
 // src/components/tiptap-icons/subscript-icon.tsx
-var import_react68 = require("react");
+var import_react69 = require("react");
 var import_jsx_runtime49 = require("react/jsx-runtime");
-var SubscriptIcon = (0, import_react68.memo)(({ className, ...props }) => {
+var SubscriptIcon = (0, import_react69.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime49.jsxs)(
     "svg",
     {
@@ -5059,9 +5069,9 @@ var SubscriptIcon = (0, import_react68.memo)(({ className, ...props }) => {
 SubscriptIcon.displayName = "SubscriptIcon";
 
 // src/components/tiptap-icons/superscript-icon.tsx
-var import_react69 = require("react");
+var import_react70 = require("react");
 var import_jsx_runtime50 = require("react/jsx-runtime");
-var SuperscriptIcon = (0, import_react69.memo)(({ className, ...props }) => {
+var SuperscriptIcon = (0, import_react70.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime50.jsxs)(
     "svg",
     {
@@ -5107,9 +5117,9 @@ var SuperscriptIcon = (0, import_react69.memo)(({ className, ...props }) => {
 SuperscriptIcon.displayName = "SuperscriptIcon";
 
 // src/components/tiptap-icons/underline-icon.tsx
-var import_react70 = require("react");
+var import_react71 = require("react");
 var import_jsx_runtime51 = require("react/jsx-runtime");
-var UnderlineIcon = (0, import_react70.memo)(({ className, ...props }) => {
+var UnderlineIcon = (0, import_react71.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime51.jsx)(
     "svg",
     {
@@ -5200,10 +5210,10 @@ function useMark(config) {
     onToggled
   } = config;
   const { editor } = useTiptapEditor(providedEditor);
-  const [isVisible, setIsVisible] = (0, import_react71.useState)(true);
+  const [isVisible, setIsVisible] = (0, import_react72.useState)(true);
   const canToggle3 = canToggleMark(editor, type);
   const isActive = isMarkActive(editor, type);
-  (0, import_react71.useEffect)(() => {
+  (0, import_react72.useEffect)(() => {
     if (!editor) return;
     const handleSelectionUpdate = () => {
       setIsVisible(shouldShowButton7({ editor, type, hideWhenUnavailable }));
@@ -5214,7 +5224,7 @@ function useMark(config) {
       editor.off("selectionUpdate", handleSelectionUpdate);
     };
   }, [editor, type, hideWhenUnavailable]);
-  const handleMark = (0, import_react71.useCallback)(() => {
+  const handleMark = (0, import_react72.useCallback)(() => {
     if (!editor) return false;
     const success = toggleMark(editor, type);
     if (success) {
@@ -5234,7 +5244,7 @@ function useMark(config) {
 }
 
 // src/components/tiptap-ui/text-align-button/text-align-button.tsx
-var import_react72 = require("react");
+var import_react73 = require("react");
 var import_jsx_runtime52 = require("react/jsx-runtime");
 function TextAlignShortcutBadge({
   align,
@@ -5242,7 +5252,7 @@ function TextAlignShortcutBadge({
 }) {
   return /* @__PURE__ */ (0, import_jsx_runtime52.jsx)(Badge, { children: parseShortcutKeys({ shortcutKeys }) });
 }
-var TextAlignButton = (0, import_react72.forwardRef)(
+var TextAlignButton = (0, import_react73.forwardRef)(
   ({
     editor: providedEditor,
     align,
@@ -5270,7 +5280,7 @@ var TextAlignButton = (0, import_react72.forwardRef)(
       hideWhenUnavailable,
       onAligned
     });
-    const handleClick = (0, import_react72.useCallback)(
+    const handleClick = (0, import_react73.useCallback)(
       (event) => {
         onClick?.(event);
         if (event.defaultPrevented) return;
@@ -5316,12 +5326,12 @@ var TextAlignButton = (0, import_react72.forwardRef)(
 TextAlignButton.displayName = "TextAlignButton";
 
 // src/components/tiptap-ui/text-align-button/use-text-align.ts
-var import_react77 = require("react");
+var import_react78 = require("react");
 
 // src/components/tiptap-icons/align-center-icon.tsx
-var import_react73 = require("react");
+var import_react74 = require("react");
 var import_jsx_runtime53 = require("react/jsx-runtime");
-var AlignCenterIcon = (0, import_react73.memo)(({ className, ...props }) => {
+var AlignCenterIcon = (0, import_react74.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime53.jsxs)(
     "svg",
     {
@@ -5367,9 +5377,9 @@ var AlignCenterIcon = (0, import_react73.memo)(({ className, ...props }) => {
 AlignCenterIcon.displayName = "AlignCenterIcon";
 
 // src/components/tiptap-icons/align-justify-icon.tsx
-var import_react74 = require("react");
+var import_react75 = require("react");
 var import_jsx_runtime54 = require("react/jsx-runtime");
-var AlignJustifyIcon = (0, import_react74.memo)(({ className, ...props }) => {
+var AlignJustifyIcon = (0, import_react75.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime54.jsxs)(
     "svg",
     {
@@ -5415,9 +5425,9 @@ var AlignJustifyIcon = (0, import_react74.memo)(({ className, ...props }) => {
 AlignJustifyIcon.displayName = "AlignJustifyIcon";
 
 // src/components/tiptap-icons/align-left-icon.tsx
-var import_react75 = require("react");
+var import_react76 = require("react");
 var import_jsx_runtime55 = require("react/jsx-runtime");
-var AlignLeftIcon = (0, import_react75.memo)(({ className, ...props }) => {
+var AlignLeftIcon = (0, import_react76.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime55.jsxs)(
     "svg",
     {
@@ -5463,9 +5473,9 @@ var AlignLeftIcon = (0, import_react75.memo)(({ className, ...props }) => {
 AlignLeftIcon.displayName = "AlignLeftIcon";
 
 // src/components/tiptap-icons/align-right-icon.tsx
-var import_react76 = require("react");
+var import_react77 = require("react");
 var import_jsx_runtime56 = require("react/jsx-runtime");
-var AlignRightIcon = (0, import_react76.memo)(({ className, ...props }) => {
+var AlignRightIcon = (0, import_react77.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime56.jsxs)(
     "svg",
     {
@@ -5571,10 +5581,10 @@ function useTextAlign(config) {
     onAligned
   } = config;
   const { editor } = useTiptapEditor(providedEditor);
-  const [isVisible, setIsVisible] = (0, import_react77.useState)(true);
+  const [isVisible, setIsVisible] = (0, import_react78.useState)(true);
   const canAlign = canSetTextAlign(editor, align);
   const isActive = isTextAlignActive(editor, align);
-  (0, import_react77.useEffect)(() => {
+  (0, import_react78.useEffect)(() => {
     if (!editor) return;
     const handleSelectionUpdate = () => {
       setIsVisible(shouldShowButton8({ editor, align, hideWhenUnavailable }));
@@ -5585,7 +5595,7 @@ function useTextAlign(config) {
       editor.off("selectionUpdate", handleSelectionUpdate);
     };
   }, [editor, hideWhenUnavailable, align]);
-  const handleTextAlign = (0, import_react77.useCallback)(() => {
+  const handleTextAlign = (0, import_react78.useCallback)(() => {
     if (!editor) return false;
     const success = setTextAlign(editor, align);
     if (success) {
@@ -5605,7 +5615,7 @@ function useTextAlign(config) {
 }
 
 // src/components/tiptap-ui/undo-redo-button/undo-redo-button.tsx
-var import_react78 = require("react");
+var import_react79 = require("react");
 var import_jsx_runtime57 = require("react/jsx-runtime");
 function HistoryShortcutBadge({
   action,
@@ -5613,7 +5623,7 @@ function HistoryShortcutBadge({
 }) {
   return /* @__PURE__ */ (0, import_jsx_runtime57.jsx)(Badge, { children: parseShortcutKeys({ shortcutKeys }) });
 }
-var UndoRedoButton = (0, import_react78.forwardRef)(
+var UndoRedoButton = (0, import_react79.forwardRef)(
   ({
     editor: providedEditor,
     action,
@@ -5632,7 +5642,7 @@ var UndoRedoButton = (0, import_react78.forwardRef)(
       hideWhenUnavailable,
       onExecuted
     });
-    const handleClick = (0, import_react78.useCallback)(
+    const handleClick = (0, import_react79.useCallback)(
       (event) => {
         onClick?.(event);
         if (event.defaultPrevented) return;
@@ -5675,12 +5685,12 @@ var UndoRedoButton = (0, import_react78.forwardRef)(
 UndoRedoButton.displayName = "UndoRedoButton";
 
 // src/components/tiptap-ui/undo-redo-button/use-undo-redo.ts
-var import_react81 = require("react");
+var import_react82 = require("react");
 
 // src/components/tiptap-icons/redo2-icon.tsx
-var import_react79 = require("react");
+var import_react80 = require("react");
 var import_jsx_runtime58 = require("react/jsx-runtime");
-var Redo2Icon = (0, import_react79.memo)(({ className, ...props }) => {
+var Redo2Icon = (0, import_react80.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime58.jsx)(
     "svg",
     {
@@ -5706,9 +5716,9 @@ var Redo2Icon = (0, import_react79.memo)(({ className, ...props }) => {
 Redo2Icon.displayName = "Redo2Icon";
 
 // src/components/tiptap-icons/undo2-icon.tsx
-var import_react80 = require("react");
+var import_react81 = require("react");
 var import_jsx_runtime59 = require("react/jsx-runtime");
-var Undo2Icon = (0, import_react80.memo)(({ className, ...props }) => {
+var Undo2Icon = (0, import_react81.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime59.jsx)(
     "svg",
     {
@@ -5773,9 +5783,9 @@ function useUndoRedo(config) {
     onExecuted
   } = config;
   const { editor } = useTiptapEditor(providedEditor);
-  const [isVisible, setIsVisible] = (0, import_react81.useState)(true);
+  const [isVisible, setIsVisible] = (0, import_react82.useState)(true);
   const canExecute = canExecuteUndoRedoAction(editor, action);
-  (0, import_react81.useEffect)(() => {
+  (0, import_react82.useEffect)(() => {
     if (!editor) return;
     const handleUpdate = () => {
       setIsVisible(shouldShowButton9({ editor, hideWhenUnavailable, action }));
@@ -5786,7 +5796,7 @@ function useUndoRedo(config) {
       editor.off("transaction", handleUpdate);
     };
   }, [editor, hideWhenUnavailable, action]);
-  const handleAction = (0, import_react81.useCallback)(() => {
+  const handleAction = (0, import_react82.useCallback)(() => {
     if (!editor) return false;
     const success = executeUndoRedoAction(editor, action);
     if (success) {
@@ -5805,9 +5815,9 @@ function useUndoRedo(config) {
 }
 
 // src/components/tiptap-icons/arrow-left-icon.tsx
-var import_react82 = require("react");
+var import_react83 = require("react");
 var import_jsx_runtime60 = require("react/jsx-runtime");
-var ArrowLeftIcon = (0, import_react82.memo)(({ className, ...props }) => {
+var ArrowLeftIcon = (0, import_react83.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime60.jsx)(
     "svg",
     {
@@ -5831,17 +5841,17 @@ var ArrowLeftIcon = (0, import_react82.memo)(({ className, ...props }) => {
 ArrowLeftIcon.displayName = "ArrowLeftIcon";
 
 // src/hooks/use-window-size.ts
-var import_react85 = require("react");
+var import_react86 = require("react");
 
 // src/hooks/use-throttled-callback.ts
 var import_lodash = __toESM(require("lodash.throttle"), 1);
 
 // src/hooks/use-unmount.ts
-var import_react83 = require("react");
+var import_react84 = require("react");
 var useUnmount = (callback) => {
-  const ref = (0, import_react83.useRef)(callback);
+  const ref = (0, import_react84.useRef)(callback);
   ref.current = callback;
-  (0, import_react83.useEffect)(
+  (0, import_react84.useEffect)(
     () => () => {
       ref.current();
     },
@@ -5850,13 +5860,13 @@ var useUnmount = (callback) => {
 };
 
 // src/hooks/use-throttled-callback.ts
-var import_react84 = require("react");
+var import_react85 = require("react");
 var defaultOptions = {
   leading: false,
   trailing: true
 };
 function useThrottledCallback(fn, wait = 250, dependencies = [], options = defaultOptions) {
-  const handler = (0, import_react84.useMemo)(
+  const handler = (0, import_react85.useMemo)(
     () => (0, import_lodash.default)(fn, wait, options),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     dependencies
@@ -5869,7 +5879,7 @@ function useThrottledCallback(fn, wait = 250, dependencies = [], options = defau
 
 // src/hooks/use-window-size.ts
 function useWindowSize() {
-  const [windowSize, setWindowSize] = (0, import_react85.useState)({
+  const [windowSize, setWindowSize] = (0, import_react86.useState)({
     width: 0,
     height: 0,
     offsetTop: 0,
@@ -5894,7 +5904,7 @@ function useWindowSize() {
       return { width, height, offsetTop, offsetLeft, scale };
     });
   }, 200);
-  (0, import_react85.useEffect)(() => {
+  (0, import_react86.useEffect)(() => {
     const visualViewport = window.visualViewport;
     if (!visualViewport) return;
     visualViewport.addEventListener("resize", handleViewportChange);
@@ -5907,7 +5917,7 @@ function useWindowSize() {
 }
 
 // src/hooks/use-element-rect.ts
-var import_react86 = require("react");
+var import_react87 = require("react");
 var initialRect = {
   x: 0,
   y: 0,
@@ -5927,8 +5937,8 @@ function useElementRect({
   throttleMs = 100,
   useResizeObserver = true
 } = {}) {
-  const [rect, setRect] = (0, import_react86.useState)(initialRect);
-  const getTargetElement = (0, import_react86.useCallback)(() => {
+  const [rect, setRect] = (0, import_react87.useState)(initialRect);
+  const getTargetElement = (0, import_react87.useCallback)(() => {
     if (!enabled || !isClientSide()) return null;
     if (!element) {
       return document.body;
@@ -5965,7 +5975,7 @@ function useElementRect({
     [enabled, getTargetElement],
     { leading: true, trailing: true }
   );
-  (0, import_react86.useEffect)(() => {
+  (0, import_react87.useEffect)(() => {
     if (!enabled || !isClientSide()) {
       setRect(initialRect);
       return;
@@ -6003,7 +6013,7 @@ function useBodyRect(options = {}) {
 }
 
 // src/hooks/use-cursor-visibility.ts
-var import_react87 = require("react");
+var import_react88 = require("react");
 function useCursorVisibility({
   editor,
   overlayHeight = 0
@@ -6014,7 +6024,7 @@ function useCursorVisibility({
     throttleMs: 100,
     useResizeObserver: true
   });
-  (0, import_react87.useEffect)(() => {
+  (0, import_react88.useEffect)(() => {
     const ensureCursorVisibility = () => {
       if (!editor) return;
       const { state, view } = editor;
@@ -6041,9 +6051,9 @@ function useCursorVisibility({
 }
 
 // src/components/tiptap-icons/moon-star-icon.tsx
-var import_react88 = require("react");
+var import_react89 = require("react");
 var import_jsx_runtime61 = require("react/jsx-runtime");
-var MoonStarIcon = (0, import_react88.memo)(({ className, ...props }) => {
+var MoonStarIcon = (0, import_react89.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime61.jsxs)(
     "svg",
     {
@@ -6078,9 +6088,9 @@ var MoonStarIcon = (0, import_react88.memo)(({ className, ...props }) => {
 MoonStarIcon.displayName = "MoonStarIcon";
 
 // src/components/tiptap-icons/sun-icon.tsx
-var import_react89 = require("react");
+var import_react90 = require("react");
 var import_jsx_runtime62 = require("react/jsx-runtime");
-var SunIcon = (0, import_react89.memo)(({ className, ...props }) => {
+var SunIcon = (0, import_react90.memo)(({ className, ...props }) => {
   return /* @__PURE__ */ (0, import_jsx_runtime62.jsxs)(
     "svg",
     {
@@ -6164,21 +6174,21 @@ var SunIcon = (0, import_react89.memo)(({ className, ...props }) => {
 SunIcon.displayName = "SunIcon";
 
 // src/components/tiptap-templates/simple/theme-toggle.tsx
-var import_react90 = require("react");
+var import_react91 = require("react");
 var import_jsx_runtime63 = require("react/jsx-runtime");
 function ThemeToggle() {
-  const [isDarkMode, setIsDarkMode] = (0, import_react90.useState)(false);
-  (0, import_react90.useEffect)(() => {
+  const [isDarkMode, setIsDarkMode] = (0, import_react91.useState)(false);
+  (0, import_react91.useEffect)(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = () => setIsDarkMode(mediaQuery.matches);
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
-  (0, import_react90.useEffect)(() => {
+  (0, import_react91.useEffect)(() => {
     const initialDarkMode = !!document.querySelector('meta[name="color-scheme"][content="dark"]') || window.matchMedia("(prefers-color-scheme: dark)").matches;
     setIsDarkMode(initialDarkMode);
   }, []);
-  (0, import_react90.useEffect)(() => {
+  (0, import_react91.useEffect)(() => {
     document.documentElement.classList.toggle("dark", isDarkMode);
   }, [isDarkMode]);
   const toggleDarkMode = () => setIsDarkMode((isDark) => !isDark);
@@ -6785,19 +6795,20 @@ function SimpleEditor({
   compactToolbar = false,
   toolbarPreset = "full",
   imageUpload,
+  imageSrcResolver,
   onEditorReady,
   onMarkdownChange,
   forceToolbarScrolled = false
 } = {}) {
   const isMobile = useIsBreakpoint();
   const { height } = useWindowSize();
-  const [mobileView, setMobileView] = (0, import_react91.useState)(
+  const [mobileView, setMobileView] = (0, import_react92.useState)(
     "main"
   );
-  const wrapperRef = (0, import_react91.useRef)(null);
-  const toolbarRef = (0, import_react91.useRef)(null);
-  const [isToolbarScrolled, setIsToolbarScrolled] = (0, import_react91.useState)(false);
-  const editor = (0, import_react92.useEditor)({
+  const wrapperRef = (0, import_react92.useRef)(null);
+  const toolbarRef = (0, import_react92.useRef)(null);
+  const [isToolbarScrolled, setIsToolbarScrolled] = (0, import_react92.useState)(false);
+  const editor = (0, import_react93.useEditor)({
     immediatelyRender: false,
     contentType,
     editable,
@@ -6826,7 +6837,9 @@ function SimpleEditor({
       import_extension_list.TaskItem.configure({ nested: true }),
       import_extension_highlight.Highlight.configure({ multicolor: true }),
       NodeBackground,
-      ResizableImageNode,
+      ResizableImageNode.configure({
+        resolveImageSrc: imageSrcResolver
+      }),
       import_extension_typography.Typography,
       import_extension_superscript.Superscript,
       import_extension_subscript.Subscript,
@@ -6850,19 +6863,19 @@ function SimpleEditor({
     editor,
     overlayHeight: toolbarRef.current?.getBoundingClientRect().height ?? 0
   });
-  (0, import_react91.useEffect)(() => {
+  (0, import_react92.useEffect)(() => {
     if (!isMobile && mobileView !== "main") {
       setMobileView("main");
     }
   }, [isMobile, mobileView]);
-  (0, import_react91.useEffect)(() => {
+  (0, import_react92.useEffect)(() => {
     onEditorReady?.(editor ?? null);
   }, [editor, onEditorReady]);
-  (0, import_react91.useEffect)(() => {
+  (0, import_react92.useEffect)(() => {
     if (!editor) return;
     editor.setEditable(editable);
   }, [editor, editable]);
-  (0, import_react91.useEffect)(() => {
+  (0, import_react92.useEffect)(() => {
     if (!editor || content === void 0) return;
     const currentValue = contentType === "html" ? editor.getHTML() : contentType === "markdown" ? editor.getMarkdown() : JSON.stringify(editor.getJSON());
     const nextValue = typeof content === "string" ? content : JSON.stringify(content);
@@ -6872,7 +6885,7 @@ function SimpleEditor({
       emitUpdate: false
     });
   }, [editor, content, contentType]);
-  (0, import_react91.useEffect)(() => {
+  (0, import_react92.useEffect)(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
     const updateScrollState = () => {
@@ -6892,7 +6905,7 @@ function SimpleEditor({
       className: "simple-editor-wrapper",
       "data-embedded": embedded ? "true" : "false",
       "data-scrolled": shouldElevateToolbar ? "true" : "false",
-      children: /* @__PURE__ */ (0, import_jsx_runtime64.jsxs)(import_react92.EditorContext.Provider, { value: { editor }, children: [
+      children: /* @__PURE__ */ (0, import_jsx_runtime64.jsxs)(import_react93.EditorContext.Provider, { value: { editor }, children: [
         /* @__PURE__ */ (0, import_jsx_runtime64.jsx)(
           Toolbar,
           {
@@ -6923,7 +6936,7 @@ function SimpleEditor({
           }
         ),
         /* @__PURE__ */ (0, import_jsx_runtime64.jsx)(
-          import_react92.EditorContent,
+          import_react93.EditorContent,
           {
             editor,
             role: "presentation",

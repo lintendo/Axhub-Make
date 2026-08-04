@@ -7,6 +7,7 @@ import {
   MULTI_PAGE_MAX_VISIBLE,
   normalizeMultiPageColumns,
   resolveDefaultMultiPageColumns,
+  resolveAdaptiveDesktopPreviewConfig,
   resolveMultiPageVisiblePages,
   resolvePreviewLayout,
   resolveStablePreviewContainerSize,
@@ -75,6 +76,51 @@ describe('preview layout', () => {
 
   it('defaults preview sizing to fit-screen so the full viewport is shown', () => {
     expect(createDefaultPreviewConfig().scaleMode).toBe('fit-screen');
+  });
+
+  it('derives a fixed 1440x900 viewport only below the adaptive activation width', () => {
+    expect(resolveAdaptiveDesktopPreviewConfig(createDefaultPreviewConfig(), 1279)).toMatchObject({
+      previewMode: 'single',
+      singlePreset: 'custom',
+      customWidth: 1440,
+      customHeight: 900,
+      adaptiveDesktop: true,
+    });
+
+    expect(resolveAdaptiveDesktopPreviewConfig(createDefaultPreviewConfig(), 1280)).toMatchObject({
+      singlePreset: 'desktop',
+      adaptiveDesktop: false,
+    });
+
+    expect(resolveAdaptiveDesktopPreviewConfig(createDefaultPreviewConfig(), 1350)).toMatchObject({
+      singlePreset: 'desktop',
+      adaptiveDesktop: false,
+    });
+  });
+
+  it('preserves manual and wide default configurations', () => {
+    expect(resolveAdaptiveDesktopPreviewConfig(createDefaultPreviewConfig(), 1440)).toMatchObject({
+      singlePreset: 'desktop',
+      adaptiveDesktop: false,
+    });
+    expect(resolveAdaptiveDesktopPreviewConfig({
+      ...createDefaultPreviewConfig(),
+      singlePreset: 'mobile',
+    }, 500)).toMatchObject({
+      singlePreset: 'mobile',
+      adaptiveDesktop: false,
+    });
+  });
+
+  it('honors a locked automatic desktop decision during temporary layout changes', () => {
+    expect(resolveAdaptiveDesktopPreviewConfig(createDefaultPreviewConfig(), 1519, true)).toMatchObject({
+      singlePreset: 'custom',
+      adaptiveDesktop: true,
+    });
+    expect(resolveAdaptiveDesktopPreviewConfig(createDefaultPreviewConfig(), 1100, false)).toMatchObject({
+      singlePreset: 'desktop',
+      adaptiveDesktop: false,
+    });
   });
 
   it('defaults multi-page preview to three columns with bounded live iframes', () => {
@@ -243,6 +289,28 @@ describe('preview layout', () => {
     expect(layout.single.logicalHeight).toBe(2200);
     expect(layout.single.viewportHeight).toBeLessThanOrEqual(700);
     expect(layout.single.scale).toBeCloseTo(700 / 2200, 5);
+  });
+
+  it('keeps adaptive desktop height fixed so long pages scroll inside the iframe', () => {
+    const layout = resolvePreviewLayout({
+      config: {
+        ...createDefaultPreviewConfig(),
+        singlePreset: 'custom',
+        customWidth: 1440,
+        customHeight: 900,
+        adaptiveDesktop: true,
+      },
+      containerWidth: 1100,
+      containerHeight: 700,
+      actualSingleContentSize: {
+        width: 1440,
+        height: 12000,
+      },
+    });
+
+    expect(layout.mode).toBe('single');
+    expect(layout.single.logicalHeight).toBe(900);
+    expect(layout.single.iframeHeight).toBe(900);
   });
 
   it('keeps mobile device chrome at the preset viewport size when the page content is tall', () => {

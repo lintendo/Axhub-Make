@@ -644,6 +644,10 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
     const isEditing = quickEditMode === 'edit';
     const isCommentMode = quickEditMode === 'comment';
 
+    const resolveCurrentDocumentImageSrc = useCallback((src: string) => (
+        resolveMarkdownImageSrc(src, currentDocRef.current?.url)
+    ), []);
+
     const clearPendingDraftPersist = useCallback(() => {
         if (draftPersistTimerRef.current !== null) {
             window.clearTimeout(draftPersistTimerRef.current);
@@ -1638,6 +1642,7 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
                         showThemeToggle={false}
                         toolbarPreset="full"
                         imageUpload={uploadImageToCurrentDoc}
+                        imageSrcResolver={resolveCurrentDocumentImageSrc}
                         onMarkdownChange={updateCurrentDocContent}
                     />
                 </div>

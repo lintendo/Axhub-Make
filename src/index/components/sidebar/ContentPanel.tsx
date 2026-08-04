@@ -73,7 +73,7 @@ import type { AcpProvider } from '@/common/assistant-context/types';
 import type { ThemeResourceItem } from '../../domains/resources/resource.types';
 import OpenInDropdown from './OpenInDropdown';
 import type { ProjectListItem, ResourceWriteCapabilities } from '../../services/projectResources';
-import { hasExplicitLocalPath } from '../../utils/localPath';
+import { getPrototypeLocalBasePath, hasExplicitLocalPath } from '../../utils/localPath';
 import { ASSISTANT_CONTEXT_DRAG_MIME, buildAssistantContextDragPayload } from '../../domains/assistant/assistantContextDrag';
 import { buildAssistantContextItemsFromResource } from '../../domains/assistant/assistantContextPayload';
 import { getClipboardImageFiles } from '../../domains/shared/clipboardImages';
@@ -2464,12 +2464,14 @@ export default function ContentPanel({
         const isPrototypeItem = dataTab === 'prototypes';
         const isDefaultDesign = isThemeItem && defaultThemeName === item.name;
         const showOpenResourceDirectoryAction = dataTab === 'docs';
-        const showLocalPathActions = hasExplicitLocalPath(item);
+        const prototypeLocalBasePath = isPrototypeItem ? getPrototypeLocalBasePath(item) : '';
+        const showLocalPathActions = isPrototypeItem ? Boolean(prototypeLocalBasePath) : hasExplicitLocalPath(item);
         const localShareUrl = buildItemUrl(item, 'demo')?.toString() || '';
         const lanShareUrl = buildLANItemUrl(item, 'demo');
         const lanTokenKey = `${activeProjectId || ''}:${item.name}:demo`;
         const lanTokenUrl = lanTokenUrls[lanTokenKey] || '';
         const hasShareUrl = Boolean(localShareUrl);
+        const showPrototypeAccessLinks = isPrototypeItem && item.previewDisabled !== true && hasShareUrl;
         const showLANShareGroup = Boolean(lanShareUrl);
         const canDownloadPrototypeZip = isPrototypeItem && showLocalPathActions && Boolean(handleDownloadItemSource);
         const canDownloadDesignZip = isThemeItem && showLocalPathActions && Boolean(handleDownloadThemeZip);
@@ -2620,7 +2622,7 @@ export default function ContentPanel({
                         </DropdownMenuItem>
                     </>
                 ) : null}
-                {isPrototypeItem ? (
+                {showPrototypeAccessLinks ? (
                     <DropdownMenuSub>
                         <DropdownMenuSubTrigger className="gap-2">
                             <Globe className="mr-2 h-4 w-4" />
@@ -2682,15 +2684,17 @@ export default function ContentPanel({
                         </DropdownMenuSubContent>
                     </DropdownMenuSub>
                 ) : null}
-                <DropdownMenuSeparator />
                 {canDeleteItem ? (
-                    <DropdownMenuItem
-                        onClick={() => handleDeleteItem(item)}
-                        className="text-destructive focus:text-destructive"
-                    >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        删除
-                    </DropdownMenuItem>
+                    <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                            onClick={() => handleDeleteItem(item)}
+                            className="text-destructive focus:text-destructive"
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            删除
+                        </DropdownMenuItem>
+                    </>
                 ) : null}
                     </DropdownMenuContent>
                 </DropdownMenu>

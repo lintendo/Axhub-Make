@@ -33,6 +33,7 @@ import type {
 import type {
   CommentaryClearEditsOptions,
   CommentaryClearEditsTarget,
+  CommentaryHostSurfaceVisibilityControl,
   CommentarySkillOption,
   CommentaryHostToolbarAction,
   CommentaryHostToolbarActionResult,
@@ -101,6 +102,10 @@ export interface PropertyPanelOptions {
   toolbarMode?: CommentaryToolbarMode;
   /** Hide UI affordances that directly execute Agent/agent tasks. */
   hideExecutionControls?: boolean;
+  /** Hide the current-element send action in the prompt bubble. */
+  hideCurrentElementExecutionAction?: boolean;
+  /** Replace the execution slot with a host-owned surface visibility toggle. */
+  hostSurfaceVisibilityControl?: CommentaryHostSurfaceVisibilityControl | null;
   /** Single-line summary for the host-managed AI execution settings. */
   aiExecutionConfigSummary?: string;
   /** Whether the host-managed AI execution settings are complete enough to run. */

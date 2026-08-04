@@ -30,6 +30,8 @@ import {
     ensureStringArray,
     getLocalBasePathForItem,
     getLocalPathForItem,
+    getPrototypeBasePathForItem,
+    getProjectRelativeResourcePathForItem,
     withResourceProject,
     withResourceProjectBody,
 } from './resourceActions.helpers';
@@ -1061,7 +1063,7 @@ export function useIndexPageResourceActions(params: any) {
     }, [activeProjectId]);
 
     const handleDownloadItemSource = useCallback((item: ItemData) => {
-        const localBasePath = getLocalBasePathForItem(item);
+        const localBasePath = getPrototypeBasePathForItem(item);
         if (!localBasePath) {
             messageApi.warning('当前资源未声明本地文件路径，无法导出源码');
             return;
@@ -1070,7 +1072,7 @@ export function useIndexPageResourceActions(params: any) {
     }, [handleDownloadZipByPath, messageApi]);
 
     const handleRenameItem = useCallback(async (item: ItemData, nextNameOverride?: string) => {
-        const localBasePath = getLocalBasePathForItem(item);
+        const localBasePath = getPrototypeBasePathForItem(item);
         if (!localBasePath) {
             messageApi.warning('当前资源未声明本地文件路径，无法重命名');
             return;
@@ -1139,7 +1141,7 @@ export function useIndexPageResourceActions(params: any) {
     }, [appDialog, buildResourceBody, buildResourceUrl, data.prototypes, loadData, loadSidebarTree, messageApi, setSelectedItem, setSidebarTrees, sidebarTrees.prototypes]);
 
     const handleDuplicateItem = useCallback(async (item: ItemData) => {
-        const localBasePath = getLocalBasePathForItem(item);
+        const localBasePath = getPrototypeBasePathForItem(item);
         if (!localBasePath) {
             messageApi.warning('当前资源未声明本地文件路径，无法创建副本');
             return;
@@ -1184,7 +1186,7 @@ export function useIndexPageResourceActions(params: any) {
         preferredIDE?: any,
         ideAvailabilityOverride?: any,
     ) => {
-        const localBasePath = getLocalBasePathForItem(item);
+        const localBasePath = getPrototypeBasePathForItem(item);
         if (!localBasePath) {
             messageApi.warning('当前资源未声明本地文件路径，无法删除');
             return;
@@ -1521,7 +1523,7 @@ export function useIndexPageResourceActions(params: any) {
 
     const handleCopyDocPath = useCallback(async (item: ItemData) => {
         try {
-            const localPath = getLocalPathForItem(item);
+            const localPath = getProjectRelativeResourcePathForItem(item);
             if (!localPath) {
                 messageApi.warning('当前资源未声明本地文件路径，无法复制路径');
                 return;
@@ -1628,13 +1630,18 @@ export function useIndexPageResourceActions(params: any) {
     }, [activeProjectId, getSidebarTabItems, messageApi, reloadDocsItems, setSidebarTrees]);
 
     const handleVersionManagement = useCallback((item: ItemData) => {
-        setCurrentVersionItem(item);
+        const localBasePath = getPrototypeBasePathForItem(item);
+        if (!localBasePath) {
+            messageApi.warning('当前资源未声明本地文件路径，无法查看版本');
+            return;
+        }
+        setCurrentVersionItem({ ...item, filePath: localBasePath });
         setVersionDialogVisible(true);
-    }, []);
+    }, [messageApi]);
 
     const handleCopyItemPath = useCallback(async (item: ItemData) => {
         try {
-            const localPath = getLocalBasePathForItem(item);
+            const localPath = getPrototypeBasePathForItem(item);
             if (!localPath) {
                 messageApi.warning('当前资源未声明本地文件路径，无法复制路径');
                 return;

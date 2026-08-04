@@ -1,5 +1,6 @@
 import type { ItemData, ViewMode } from '../../types';
 import type { ResourceSection, SidebarTab, ThemeResourceItem } from '../../types/index-page.types';
+import { parsePreviewDeviceParam } from './previewDeviceUrl';
 
 export type ResourceDeepLinkType = 'prototype' | 'doc' | 'project-doc' | 'template' | 'theme';
 
@@ -11,6 +12,7 @@ export interface ResourceDeepLinkTarget {
     projectId?: string;
     openSpec?: boolean;
     collapseSidebar?: boolean;
+    device?: string;
 }
 
 export function doesResourceDeepLinkRequireSidebarAssets(
@@ -217,6 +219,10 @@ export function buildIndexDeepLinkUrl(target: ResourceDeepLinkTarget, baseUrl?: 
         if (target.openSpec) {
             url.searchParams.set('spec', '1');
         }
+        const device = parsePreviewDeviceParam(target.device);
+        if (device) {
+            url.searchParams.set('device', `${device.width}x${device.height}`);
+        }
     } else if (target.resourceType === 'doc') {
         url.searchParams.set('doc', target.resourceId);
     } else if (target.resourceType === 'project-doc') {
@@ -273,6 +279,8 @@ export function parseIndexDeepLink(value?: string): ResourceDeepLinkTarget | nul
     const projectId = url.searchParams.get('projectId')?.trim() || undefined;
     const canvasView = parseOptionalCanvasViewMode(url);
     const collapseSidebar = url.searchParams.get('sidebar') === 'collapsed';
+    const parsedDevice = parsePreviewDeviceParam(url.searchParams.get('device'));
+    const device = parsedDevice ? `${parsedDevice.width}x${parsedDevice.height}` : undefined;
     const prototypeId = url.searchParams.get('p')?.trim();
     if (prototypeId) {
         return {
@@ -282,6 +290,7 @@ export function parseIndexDeepLink(value?: string): ResourceDeepLinkTarget | nul
             ...(url.searchParams.get('page')?.trim() ? { pageId: url.searchParams.get('page')?.trim() } : {}),
             ...(projectId ? { projectId } : {}),
             ...(url.searchParams.get('spec') === '1' ? { openSpec: true } : {}),
+            ...(device ? { device } : {}),
             collapseSidebar,
         };
     }
@@ -359,6 +368,7 @@ export function parseIndexDeepLink(value?: string): ResourceDeepLinkTarget | nul
         ...(resourceType === 'prototype' && pageId ? { pageId } : {}),
         ...(projectId ? { projectId } : {}),
         ...(resourceType === 'prototype' && url.searchParams.get('spec') === '1' ? { openSpec: true } : {}),
+        ...(resourceType === 'prototype' && device ? { device } : {}),
         collapseSidebar,
     };
 }

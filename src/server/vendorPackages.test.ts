@@ -14,6 +14,22 @@ import {
 
 const appRoot = path.resolve(__dirname, '..', '..');
 
+function collectFiles(root: string): string[] {
+  if (!fs.existsSync(root)) return [];
+  return fs.readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+    const filePath = path.join(root, entry.name);
+    return entry.isDirectory() ? collectFiles(filePath) : [filePath];
+  });
+}
+
+function readAdminBundleJavaScript(): string {
+  const adminRoot = path.join(appRoot, 'dist', 'admin');
+  return collectFiles(adminRoot)
+    .filter((filePath) => filePath.endsWith('.js'))
+    .map((filePath) => fs.readFileSync(filePath, 'utf8'))
+    .join('\n');
+}
+
 describe('make-server vendor packages', () => {
   it('uses vendored packages from make-server config instead of workspace paths', () => {
     const packageJson = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8'));
@@ -102,11 +118,20 @@ describe('make-server vendor packages', () => {
     expect(importMap.paths['tiptap-editor']).toEqual(['./vendor/tiptap-editor/dist/index.d.ts']);
   });
 
+  it('ships demand annotation copy in the prebuilt admin bundle', () => {
+    const bundleSource = readAdminBundleJavaScript();
+
+    expect(bundleSource).toContain('输入需求标注，支持 Markdown 格式');
+    expect(bundleSource).not.toContain('标注 Markdown');
+    expect(bundleSource).not.toContain('输入需求标注 Markdown');
+  });
+
   it('keeps vendored commentary from showing the AI note composer while annotation editing is open', () => {
     const sourcePath = path.join(appRoot, 'vendor/axhub-commentary/src/ui/runtime/prompt-card-view.tsx');
     const source = fs.readFileSync(sourcePath, 'utf8');
 
-    expect(source).toContain("return '输入给 AI 的需求，/ 选择技能';");
+    expect(source).toContain('function resolvePromptCardNotePlaceholder(isAnnotationSession: boolean)');
+    expect(source).toContain("? ANNOTATION_GENERATION_PLACEHOLDER\n    : '输入给 AI 的需求，/ 选择技能';");
     expect(source).not.toContain("return '输入需求，输入 / 选择技能';");
     expect(source).toContain('const showNoteComposer = !annotationEditorOpen && !bubbleStyleEditorOpen;');
     expect(source).toContain('{showNoteComposer ? (');
@@ -124,7 +149,7 @@ describe('make-server vendor packages', () => {
     const esmBundle = fs.readFileSync(esmBundlePath, 'utf8');
     const cjsBundle = fs.readFileSync(cjsBundlePath, 'utf8');
     const annotationEditorStart = source.indexOf('title="删除标注"');
-    const annotationEditorEnd = source.indexOf('<Input.TextArea', annotationEditorStart);
+    const annotationEditorEnd = source.indexOf(': ANNOTATION_MARKDOWN_PLACEHOLDER', annotationEditorStart);
     const annotationEditorSource = source.slice(annotationEditorStart, annotationEditorEnd);
 
     expect(source).toContain('需求标注');
@@ -156,7 +181,7 @@ describe('make-server vendor packages', () => {
     const noteTextareaElementStart = source.lastIndexOf('<Input.TextArea', noteTextareaStart);
     const noteTextareaEnd = source.indexOf('onChange={(event) => {', noteTextareaStart);
     const noteTextareaSource = source.slice(noteTextareaElementStart, noteTextareaEnd);
-    const annotationTextareaElementStart = annotationEditorEnd;
+    const annotationTextareaElementStart = source.lastIndexOf('<Input.TextArea', annotationEditorEnd);
     const annotationTextareaSaveStart = source.indexOf('onChange={(event) => {', annotationEditorEnd);
     const annotationTextareaSource = source.slice(annotationTextareaElementStart, annotationTextareaSaveStart);
 
@@ -164,25 +189,26 @@ describe('make-server vendor packages', () => {
     expect(noteTextareaSource).toContain("padding: '6px 10px'");
     expect(noteTextareaSource).not.toContain('padding: 0');
     expect(annotationTextareaSource).not.toContain('allowClear');
-    expect(annotationTextareaSource).toContain("padding: '6px 0'");
+    expect(annotationTextareaSource).toContain("padding: '10px 12px'");
     expect(annotationTextareaSource).not.toContain('padding: 0');
 
     for (const bundle of [esmBundle, cjsBundle]) {
       const bundleEditorStart = bundle.indexOf('title: "\\u5220\\u9664\\u6807\\u6CE8"');
-      const bundleEditorEnd = bundle.indexOf('className: "we-runtime-prompt-card__textarea"', bundleEditorStart);
+      const bundleEditorEnd = bundle.indexOf(': ANNOTATION_MARKDOWN_PLACEHOLDER', bundleEditorStart);
       const bundleEditorSource = bundle.slice(bundleEditorStart, bundleEditorEnd);
       const bundleNotePlaceholderStart = bundle.indexOf('placeholder: notePlaceholder');
       const bundleNoteTextareaStart = bundle.lastIndexOf('className: "we-runtime-prompt-card__textarea"', bundleNotePlaceholderStart);
       const bundleNoteTextareaEnd = bundle.indexOf('onChange: (event) => {', bundleNotePlaceholderStart);
       const bundleNoteTextareaSource = bundle.slice(bundleNoteTextareaStart, bundleNoteTextareaEnd);
+      const bundleAnnotationTextareaStart = bundle.lastIndexOf('className: "we-runtime-prompt-card__textarea"', bundleEditorEnd);
       const bundleAnnotationTextareaEnd = bundle.indexOf('onChange: (event) => {', bundleEditorEnd);
-      const bundleAnnotationTextareaSource = bundle.slice(bundleEditorEnd, bundleAnnotationTextareaEnd);
+      const bundleAnnotationTextareaSource = bundle.slice(bundleAnnotationTextareaStart, bundleAnnotationTextareaEnd);
 
       expect(bundleEditorStart).toBeGreaterThanOrEqual(0);
       expect(bundleEditorEnd).toBeGreaterThan(bundleEditorStart);
       expect(bundleEditorSource).toContain('onDeleteCurrentAnnotationNode?.();');
       expect(bundleEditorSource).not.toContain('onConfirmAnnotationMarkdown');
-      expect(bundle).toContain('return "\\u8F93\\u5165\\u7ED9 AI \\u7684\\u9700\\u6C42\\uFF0C/ \\u9009\\u62E9\\u6280\\u80FD";');
+      expect(bundle).toContain('\\u8F93\\u5165\\u7ED9 AI \\u7684\\u9700\\u6C42\\uFF0C/ \\u9009\\u62E9\\u6280\\u80FD');
       expect(bundle).not.toContain('return "\\u8F93\\u5165\\u9700\\u6C42\\uFF0C\\u8F93\\u5165 / \\u9009\\u62E9\\u6280\\u80FD";');
       expect(bundle).toContain('const showNoteComposer = !annotationEditorOpen && !bubbleStyleEditorOpen;');
       expect(bundle).toContain('showNoteComposer ?');
@@ -203,14 +229,13 @@ describe('make-server vendor packages', () => {
       expect(bundle).not.toContain('void onConfirmAnnotationMarkdown("")');
       expect(bundle).not.toContain('title: "\\u6E05\\u7A7A\\u6807\\u6CE8\\u5185\\u5BB9"');
       expect(bundle).not.toContain('title: "清空标注"');
-      expect(bundleEditorSource).not.toContain('allowClear: true');
       expect(bundle).toContain('.we-runtime-prompt-card__textarea,');
       expect(bundle).toContain('.we-runtime-prompt-card__textarea::-webkit-scrollbar');
       expect(bundleNoteTextareaSource).toContain('allowClear: true');
       expect(bundleNoteTextareaSource).toContain('padding: "6px 10px"');
       expect(bundleNoteTextareaSource).not.toContain('padding: 0');
       expect(bundleAnnotationTextareaSource).not.toContain('allowClear: true');
-      expect(bundleAnnotationTextareaSource).toContain('padding: "6px 0"');
+      expect(bundleAnnotationTextareaSource).toContain('padding: "10px 12px"');
       expect(bundleAnnotationTextareaSource).not.toContain('padding: 0');
     }
   });

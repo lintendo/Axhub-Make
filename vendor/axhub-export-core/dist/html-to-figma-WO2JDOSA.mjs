@@ -710,7 +710,11 @@ async function enhanceTextNodeWithInlineStyles(textNode, inlineStyles, targetEle
     }
   }
   if (inlineStyles.fontWeight) {
-    enhancedNode.fontWeight = Math.round(inlineStyles.fontWeight);
+    const numericFontWeight = Number(inlineStyles.fontWeight);
+    enhancedNode.fontWeight = Number.isFinite(numericFontWeight) ? Math.round(numericFontWeight) : inlineStyles.fontWeight;
+  }
+  if (inlineStyles.fontStyle) {
+    enhancedNode.fontStyle = inlineStyles.fontStyle;
   }
   if (inlineStyles.textAlign) {
     const textAlign = inlineStyles.textAlign;
@@ -882,6 +886,13 @@ async function buildTextNodeWithComputedStyles(textNode, computedStyles, targetE
     if (fontFamilyStack) {
       textNode.fontFamily = fontFamilyStack;
     }
+  }
+  if (computedStyles.fontWeight) {
+    const numericFontWeight = Number(computedStyles.fontWeight);
+    textNode.fontWeight = Number.isFinite(numericFontWeight) ? Math.round(numericFontWeight) : computedStyles.fontWeight;
+  }
+  if (computedStyles.fontStyle) {
+    textNode.fontStyle = computedStyles.fontStyle;
   }
   if (["underline", "strikethrough"].includes(computedStyles.textDecoration)) {
     textNode.textDecoration = computedStyles.textDecoration.toUpperCase();

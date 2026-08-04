@@ -6,6 +6,8 @@ import {
   DeleteOutlined,
   CaretRightFilled,
   ExclamationCircleFilled,
+  EyeInvisibleOutlined,
+  EyeOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
   HomeOutlined,
@@ -361,6 +363,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
     const toolbarMode = props.toolbarMode ?? options.toolbarMode ?? 'inline';
     const isHostToolbarMode = toolbarMode === 'host';
     const hideExecutionControls = Boolean(options.hideExecutionControls);
+    const hostSurfaceVisibilityControl = options.hostSurfaceVisibilityControl;
     const selectionModeAvailable = interactionProfile !== 'text-comment';
 
     const rootRef = React.useRef<HTMLDivElement | null>(null);
@@ -391,6 +394,9 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       Math.max(0, options.getModifiedElementCount?.() ?? 0),
     );
     const [actionBusy, setActionBusy] = React.useState(false);
+    const [hostSurfaceVisible, setHostSurfaceVisible] = React.useState(
+      () => hostSurfaceVisibilityControl?.initialVisible !== false,
+    );
     const [markdownSourceEditorOpen, setMarkdownSourceEditorOpen] = React.useState(
       () => options.getMarkdownSourceEditorOpen?.() === true,
     );
@@ -471,6 +477,10 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
     React.useEffect(() => {
       inlineTextEditingRef.current = inlineTextEditing;
     }, [inlineTextEditing]);
+
+    React.useEffect(() => {
+      setHostSurfaceVisible(hostSurfaceVisibilityControl?.initialVisible !== false);
+    }, [hostSurfaceVisibilityControl?.initialVisible]);
 
     React.useEffect(() => {
       onDismissSelectionRef.current = onDismissSelection;
@@ -757,6 +767,39 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         );
       }
     }, [actionBusy, options.htmlFileSaveEnabled, options.onHostToolbarAction, runAction]);
+
+    const handleToggleHostSurfaceVisibility = React.useCallback(async (): Promise<void> => {
+      if (actionBusy || !hostSurfaceVisibilityControl || !options.onHostToolbarAction) return;
+
+      const requestedVisible = !hostSurfaceVisible;
+      try {
+        const result = await runAction(() =>
+          options.onHostToolbarAction?.({
+            type: 'set-host-surface-visibility',
+            visible: requestedVisible,
+          }),
+        );
+        if (result === false || result === undefined) {
+          throw new Error('当前宿主无法切换窗口显示状态');
+        }
+        const record =
+          result && typeof result === 'object' ? (result as Record<string, unknown>) : {};
+        setHostSurfaceVisible(
+          typeof record.visible === 'boolean' ? record.visible : requestedVisible,
+        );
+      } catch (error) {
+        notifyRuntimeMessage(
+          'error',
+          error instanceof Error ? error.message : '窗口显示状态切换失败，请稍后重试',
+        );
+      }
+    }, [
+      actionBusy,
+      hostSurfaceVisibilityControl,
+      hostSurfaceVisible,
+      options.onHostToolbarAction,
+      runAction,
+    ]);
 
     const agentAwake = effectiveVisualState === 'awake';
 
@@ -1715,7 +1758,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         />
       ) : null;
 
-    const agentExecutionToolbarButton = inlineInterruptVisible ? (
+    const agentExecutionToolbarButton = hideExecutionControls ? null : inlineInterruptVisible ? (
       <Popconfirm
         title="终止全部修改"
         description="确认后会终止当前页面所有正在进行的 AI 修改。"
@@ -1758,6 +1801,29 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         }}
       />
     );
+
+    const hostSurfaceVisibilityToolbarButton =
+      hostSurfaceVisibilityControl && options.onHostToolbarAction ? (
+        <AgentToolbarIconButton
+          title={
+            hostSurfaceVisible
+              ? hostSurfaceVisibilityControl.hideTitle || '隐藏窗口'
+              : hostSurfaceVisibilityControl.showTitle || '显示窗口'
+          }
+          ariaLabel={
+            hostSurfaceVisible
+              ? hostSurfaceVisibilityControl.hideTitle || '隐藏窗口'
+              : hostSurfaceVisibilityControl.showTitle || '显示窗口'
+          }
+          icon={hostSurfaceVisible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+          awake={agentShellAwake}
+          active={hostSurfaceVisible}
+          disabled={actionBusy}
+          onClick={() => {
+            void handleToggleHostSurfaceVisibility();
+          }}
+        />
+      ) : null;
 
     const handleCopySkillInstallPrompt = React.useCallback(async () => {
       const text = buildSkillInstallPrompt(options.skillInstallSource);
@@ -2104,25 +2170,24 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         </Tooltip>
       ),
     };
-    const aiWorkspaceSettingsItem: SettingsItem | null =
-      hideExecutionControls || !options.onHostToolbarAction
-        ? null
-        : {
-            key: 'ai-workspace',
-            label: 'AI 工作目录',
-            action: handleOpenDirectoryPicker,
-            control: (
-              <span
-                className="we-runtime-settings-card__value we-runtime-settings-card__workspace-value"
-                title={aiExecutionWorkspacePath || undefined}
-              >
-                <span className="we-runtime-settings-card__workspace-value-text">
-                  {aiExecutionWorkspaceDisplayName || '未配置'}
-                </span>
-                <RightOutlined style={{ fontSize: 10 }} />
+    const aiWorkspaceSettingsItem: SettingsItem | null = !options.onHostToolbarAction
+      ? null
+      : {
+          key: 'ai-workspace',
+          label: 'AI 工作目录',
+          action: handleOpenDirectoryPicker,
+          control: (
+            <span
+              className="we-runtime-settings-card__value we-runtime-settings-card__workspace-value"
+              title={aiExecutionWorkspacePath || undefined}
+            >
+              <span className="we-runtime-settings-card__workspace-value-text">
+                {aiExecutionWorkspaceDisplayName || '未配置'}
               </span>
-            ),
-          };
+              <RightOutlined style={{ fontSize: 10 }} />
+            </span>
+          ),
+        };
     const propertyPanelSettingsItem: SettingsItem | null = showPropertyPanelSettingsItem
       ? {
           key: 'property-panel',
@@ -2834,7 +2899,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
           <Space size={4} style={{ minWidth: 0, flex: '0 0 auto' }}>
             {selectionModeToolbarButton}
             {markdownSourceEditorToolbarButton}
-            {agentExecutionToolbarButton}
+            {hostSurfaceVisibilityToolbarButton ?? agentExecutionToolbarButton}
             {copyToolbarButton}
             {propertyPanelToggleButton}
             {clearAllEditsToolbarButton}

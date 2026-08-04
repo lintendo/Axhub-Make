@@ -62,7 +62,7 @@ export function usePrototypeSpecController(params: {
     const requestGateRef = useRef(createPrototypeSpecRequestGate());
     const autoOpenGateRef = useRef(createPrototypeSpecAutoOpenGate());
     const prototypeId = String(selectedItem?.resourceId || selectedItem?.name || '').trim();
-    const prototypeFilePath = String(selectedItem?.filePath || '').trim();
+    const prototypeFilePath = String(selectedItem?.filePath || selectedItem?.specFilePath || '').trim();
     const resetKey = `${activeProjectId || ''}:${prototypeId}`;
     const isSupported = Boolean(activeProjectId && prototypeId && prototypeFilePath);
 

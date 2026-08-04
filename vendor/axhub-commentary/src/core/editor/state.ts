@@ -4,6 +4,7 @@ import type {
   WebEditorElementKey,
   CommentaryApi,
   CommentaryHostOptions,
+  CommentaryHostSurfaceVisibilityControl,
   CommentaryHostToolbarAction,
   CommentaryHostToolbarActionResult,
   CommentarySkillOption,
@@ -51,6 +52,10 @@ export interface WebEditorV2UiOptions {
   initialDarkMode?: boolean;
   showCopyPromptAction?: boolean;
   hideExecutionControls?: boolean;
+  /** Hide the current-element send action in the prompt bubble. */
+  hideCurrentElementExecutionAction?: boolean;
+  /** Replace the execution slot with a host-owned surface visibility toggle. */
+  hostSurfaceVisibilityControl?: CommentaryHostSurfaceVisibilityControl | null;
   aiExecutionConfigSummary?: string;
   aiExecutionConfigConfigured?: boolean;
   aiExecutionProvider?: string;
@@ -396,6 +401,8 @@ export function resolveWebEditorOptions(
       initialDarkMode: false,
       showCopyPromptAction: true,
       hideExecutionControls: false,
+      hideCurrentElementExecutionAction: false,
+      hostSurfaceVisibilityControl: null,
       aiExecutionConfigSummary: '',
       aiExecutionConfigConfigured: false,
       aiExecutionProvider: '',

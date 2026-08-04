@@ -1458,6 +1458,7 @@ var ImageUploadNode2 = Node.create({
 
 // src/components/tiptap-node/resizable-image-node/resizable-image-node-extension.ts
 import { ReactNodeViewRenderer as ReactNodeViewRenderer2 } from "@tiptap/react";
+import { createElement } from "react";
 import Image from "@tiptap/extension-image";
 
 // src/components/tiptap-node/resizable-image-node/resizable-image-node.tsx
@@ -1512,14 +1513,14 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 var ResizableImageNodeView = (props) => {
-  const { node, updateAttributes, selected, editor } = props;
+  const { node, updateAttributes, selected, editor, resolveImageSrc } = props;
   const containerRef = useRef4(null);
   const imgRef = useRef4(null);
   const parsed = useMemo3(() => {
     const src = String(node.attrs?.src || "");
     return parseAxhubWidthFromSrc(src);
   }, [node.attrs?.src]);
-  const appliedSrc = parsed.cleanSrc;
+  const appliedSrc = resolveImageSrc?.(parsed.cleanSrc) || parsed.cleanSrc;
   const appliedWidth = parsed.width;
   const [draftWidth, setDraftWidth] = useState5(null);
   const draftWidthRef = useRef4(null);
@@ -1621,8 +1622,17 @@ var ResizableImageNodeView = (props) => {
 
 // src/components/tiptap-node/resizable-image-node/resizable-image-node-extension.ts
 var ResizableImageNode = Image.extend({
+  addOptions() {
+    return {
+      ...this.parent?.(),
+      resolveImageSrc: void 0
+    };
+  },
   addNodeView() {
-    return ReactNodeViewRenderer2(ResizableImageNodeView);
+    return ReactNodeViewRenderer2((props) => createElement(ResizableImageNodeView, {
+      ...props,
+      resolveImageSrc: this.options.resolveImageSrc
+    }));
   }
 });
 
@@ -6778,6 +6788,7 @@ function SimpleEditor({
   compactToolbar = false,
   toolbarPreset = "full",
   imageUpload,
+  imageSrcResolver,
   onEditorReady,
   onMarkdownChange,
   forceToolbarScrolled = false
@@ -6819,7 +6830,9 @@ function SimpleEditor({
       TaskItem.configure({ nested: true }),
       Highlight.configure({ multicolor: true }),
       NodeBackground,
-      ResizableImageNode,
+      ResizableImageNode.configure({
+        resolveImageSrc: imageSrcResolver
+      }),
       Typography,
       Superscript,
       Subscript,

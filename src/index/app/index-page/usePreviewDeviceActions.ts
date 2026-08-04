@@ -1,4 +1,4 @@
-import { createElement, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { createElement, useCallback, useMemo, useState, type ReactNode, type SetStateAction } from 'react';
 import {
     Columns2,
     LayoutGrid,
@@ -11,6 +11,7 @@ import {
     DEVICE_PRESET_SIZES,
     getPreviewSelectedDeviceId,
     normalizeMultiPageColumns,
+    resolveAdaptiveDesktopPreviewConfig,
     resolveDefaultMultiPageColumns,
     type PreviewConfig,
     type MultiPageColumns,
@@ -27,9 +28,17 @@ import {
     saveStoredCustomPreviewSize,
     getPreviewCustomSizeStorage,
 } from './previewCustomSizeStorage';
+import {
+    parsePreviewDeviceParam,
+    serializePreviewDeviceParam,
+} from './previewDeviceUrl';
 
 type PreviewDeviceActions = {
     previewConfig: PreviewConfig;
+    previewDeviceParam: string | null;
+    handlePreviewContainerSizeChange: (width: number) => void;
+    lockAdaptiveDesktopPreview: () => void;
+    unlockAdaptiveDesktopPreview: () => void;
     selectedDeviceId: string;
     setSelectedDeviceId: (id: string) => void;
     deviceSegmentOptions: Array<{ value: string; icon: ReactNode }>;
@@ -48,15 +57,36 @@ type PreviewDeviceActions = {
 };
 
 export function usePreviewDeviceActions(): PreviewDeviceActions {
-    const [previewConfig, setPreviewConfig] = useState<PreviewConfig>(() => {
+    const [previewIntentConfig, setPreviewIntentConfig] = useState<PreviewConfig>(() => {
         const storedCustomSize = loadStoredCustomPreviewSize();
-        return {
+        const defaultConfig: PreviewConfig = {
             ...createDefaultPreviewConfig(),
             customWidth: storedCustomSize?.customWidth ?? null,
             customHeight: storedCustomSize?.customHeight ?? null,
         };
-    });
+        const urlSelection = typeof window === 'undefined'
+            ? null
+            : parsePreviewDeviceParam(new URLSearchParams(window.location.search).get('device'));
+        if (!urlSelection) {
+            return defaultConfig;
+        }
 
+        return {
+            ...defaultConfig,
+            singlePreset: urlSelection.preset,
+            customWidth: urlSelection.preset === 'custom' ? urlSelection.width : defaultConfig.customWidth,
+            customHeight: urlSelection.preset === 'custom' ? urlSelection.height : defaultConfig.customHeight,
+            scaleMode: 'fit-screen',
+        };
+    });
+    const [previewContainerWidth, setPreviewContainerWidth] = useState(0);
+    const [lockedAdaptiveDesktop, setLockedAdaptiveDesktop] = useState<boolean | null>(null);
+
+    const previewConfig = useMemo(
+        () => resolveAdaptiveDesktopPreviewConfig(previewIntentConfig, previewContainerWidth, lockedAdaptiveDesktop),
+        [lockedAdaptiveDesktop, previewContainerWidth, previewIntentConfig],
+    );
+    const previewDeviceParam = serializePreviewDeviceParam(previewIntentConfig);
     const selectedDeviceId = getPreviewSelectedDeviceId(previewConfig);
     const currentPreviewDeviceId = previewConfig.previewMode === 'single' && previewConfig.singlePreset !== 'custom'
         ? previewConfig.singlePreset
@@ -73,37 +103,42 @@ export function usePreviewDeviceActions(): PreviewDeviceActions {
         { value: 'multi-page', icon: createElement(LayoutGrid, { className: 'h-4 w-4' }) },
     ]), []);
 
+    const updatePreviewIntentConfig = useCallback((next: SetStateAction<PreviewConfig>) => {
+        setLockedAdaptiveDesktop(null);
+        setPreviewIntentConfig(next);
+    }, []);
+
     const setSelectedDeviceId = useCallback((id: string) => {
         if (id === 'desktop' || id === 'mobile' || id === 'tablet') {
-            setPreviewConfig((previous) => ({
+            updatePreviewIntentConfig((previous) => ({
                 ...previous,
                 previewMode: 'single',
                 singlePreset: id,
             }));
         }
-    }, []);
+    }, [updatePreviewIntentConfig]);
 
     const handleSelectPreviewSinglePreset = useCallback((preset: PreviewSinglePreset) => {
-        setPreviewConfig((previous) => ({
+        updatePreviewIntentConfig((previous) => ({
             ...previous,
             previewMode: 'single',
             singlePreset: preset,
         }));
-    }, []);
+    }, [updatePreviewIntentConfig]);
 
     const handleSelectCustomPreview = useCallback(() => {
-        setPreviewConfig((previous) => ({
+        updatePreviewIntentConfig((previous) => ({
             ...previous,
             previewMode: 'single',
             singlePreset: 'custom',
-            customWidth: normalizePreviewWidth(previous.customWidth ?? DEVICE_PRESET_SIZES.desktop.width, DEVICE_PRESET_SIZES.desktop.width),
-            customHeight: normalizePreviewHeight(previous.customHeight ?? DEVICE_PRESET_SIZES.desktop.height, DEVICE_PRESET_SIZES.desktop.height),
+            customWidth: normalizePreviewWidth(previewConfig.customWidth ?? DEVICE_PRESET_SIZES.desktop.width, DEVICE_PRESET_SIZES.desktop.width),
+            customHeight: normalizePreviewHeight(previewConfig.customHeight ?? DEVICE_PRESET_SIZES.desktop.height, DEVICE_PRESET_SIZES.desktop.height),
             scaleMode: 'fit-screen',
         }));
-    }, []);
+    }, [previewConfig.customHeight, previewConfig.customWidth, updatePreviewIntentConfig]);
 
     const handleActivateSplitPreview = useCallback(() => {
-        setPreviewConfig((previous) => ({
+        updatePreviewIntentConfig((previous) => ({
             ...previous,
             previewMode: 'split',
             splitWidths: {
@@ -116,10 +151,10 @@ export function usePreviewDeviceActions(): PreviewDeviceActions {
             },
             scaleMode: 'fit-screen',
         }));
-    }, []);
+    }, [updatePreviewIntentConfig]);
 
     const handleActivateMultiPagePreview = useCallback((pageCount?: number) => {
-        setPreviewConfig((previous) => ({
+        updatePreviewIntentConfig((previous) => ({
             ...previous,
             previewMode: 'multi-page',
             multiPageColumns: pageCount === undefined
@@ -127,42 +162,42 @@ export function usePreviewDeviceActions(): PreviewDeviceActions {
                 : resolveDefaultMultiPageColumns(pageCount),
             scaleMode: 'fit-screen',
         }));
-    }, []);
+    }, [updatePreviewIntentConfig]);
 
     const handleChangeMultiPageColumns = useCallback((columns: MultiPageColumns) => {
-        setPreviewConfig((previous) => ({
+        updatePreviewIntentConfig((previous) => ({
             ...previous,
             previewMode: 'multi-page',
             multiPageColumns: normalizeMultiPageColumns(columns),
         }));
-    }, []);
+    }, [updatePreviewIntentConfig]);
 
     const handleChangeCustomPreviewWidth = useCallback((width: number) => {
         const customWidth = normalizePreviewWidth(width, previewConfig.customWidth ?? DEVICE_PRESET_SIZES.desktop.width);
         const customHeight = normalizePreviewHeight(previewConfig.customHeight ?? DEVICE_PRESET_SIZES.desktop.height, DEVICE_PRESET_SIZES.desktop.height);
         saveStoredCustomPreviewSize(getPreviewCustomSizeStorage(), { customWidth, customHeight });
-        setPreviewConfig((previous) => ({
+        updatePreviewIntentConfig((previous) => ({
             ...previous,
             previewMode: previous.previewMode === 'multi-page' ? 'multi-page' : 'single',
             singlePreset: 'custom',
             customWidth,
         }));
-    }, [previewConfig.customHeight, previewConfig.customWidth]);
+    }, [previewConfig.customHeight, previewConfig.customWidth, updatePreviewIntentConfig]);
 
     const handleChangeCustomPreviewHeight = useCallback((height: number) => {
         const customWidth = normalizePreviewWidth(previewConfig.customWidth ?? DEVICE_PRESET_SIZES.desktop.width, DEVICE_PRESET_SIZES.desktop.width);
         const customHeight = normalizePreviewHeight(height, previewConfig.customHeight ?? DEVICE_PRESET_SIZES.desktop.height);
         saveStoredCustomPreviewSize(getPreviewCustomSizeStorage(), { customWidth, customHeight });
-        setPreviewConfig((previous) => ({
+        updatePreviewIntentConfig((previous) => ({
             ...previous,
             previewMode: previous.previewMode === 'multi-page' ? 'multi-page' : 'single',
             singlePreset: 'custom',
             customHeight,
         }));
-    }, [previewConfig.customHeight, previewConfig.customWidth]);
+    }, [previewConfig.customHeight, previewConfig.customWidth, updatePreviewIntentConfig]);
 
     const handleChangeSplitPreviewWidth = useCallback((pane: 'primary' | 'secondary', width: number) => {
-        setPreviewConfig((previous) => ({
+        updatePreviewIntentConfig((previous) => ({
             ...previous,
             previewMode: 'split',
             splitWidths: {
@@ -170,10 +205,10 @@ export function usePreviewDeviceActions(): PreviewDeviceActions {
                 [pane]: normalizePreviewWidth(width, pane === 'primary' ? DEVICE_PRESET_SIZES.desktop.width : DEVICE_PRESET_SIZES.mobile.width),
             },
         }));
-    }, []);
+    }, [updatePreviewIntentConfig]);
 
     const handleChangeSplitPreviewHeight = useCallback((pane: 'primary' | 'secondary', height: number) => {
-        setPreviewConfig((previous) => ({
+        updatePreviewIntentConfig((previous) => ({
             ...previous,
             previewMode: 'split',
             splitHeights: {
@@ -181,17 +216,51 @@ export function usePreviewDeviceActions(): PreviewDeviceActions {
                 [pane]: normalizePreviewHeight(height, pane === 'primary' ? DEVICE_PRESET_SIZES.desktop.height : DEVICE_PRESET_SIZES.mobile.height),
             },
         }));
-    }, []);
+    }, [updatePreviewIntentConfig]);
 
     const handleChangePreviewScaleMode = useCallback((mode: PreviewScaleMode) => {
-        setPreviewConfig((previous) => ({
-            ...previous,
-            scaleMode: mode,
-        }));
+        updatePreviewIntentConfig((previous) => {
+            if (previewConfig.adaptiveDesktop && mode !== previewConfig.scaleMode) {
+                return {
+                    ...previous,
+                    previewMode: 'single',
+                    singlePreset: 'custom',
+                    customWidth: previewConfig.customWidth,
+                    customHeight: previewConfig.customHeight,
+                    scaleMode: mode,
+                };
+            }
+            return {
+                ...previous,
+                scaleMode: mode,
+            };
+        });
+    }, [previewConfig.adaptiveDesktop, previewConfig.customHeight, previewConfig.customWidth, previewConfig.scaleMode, updatePreviewIntentConfig]);
+
+    const handlePreviewContainerSizeChange = useCallback((width: number) => {
+        if (!Number.isFinite(width) || width <= 0) {
+            return;
+        }
+        const nextWidth = Math.floor(width);
+        setPreviewContainerWidth((previous) => previous === nextWidth ? previous : nextWidth);
+    }, []);
+
+    const lockAdaptiveDesktopPreview = useCallback(() => {
+        setLockedAdaptiveDesktop((previous) => previous ?? (
+            resolveAdaptiveDesktopPreviewConfig(previewIntentConfig, previewContainerWidth).adaptiveDesktop === true
+        ));
+    }, [previewContainerWidth, previewIntentConfig]);
+
+    const unlockAdaptiveDesktopPreview = useCallback(() => {
+        setLockedAdaptiveDesktop(null);
     }, []);
 
     return {
         previewConfig,
+        previewDeviceParam,
+        handlePreviewContainerSizeChange,
+        lockAdaptiveDesktopPreview,
+        unlockAdaptiveDesktopPreview,
         selectedDeviceId,
         setSelectedDeviceId,
         deviceSegmentOptions,

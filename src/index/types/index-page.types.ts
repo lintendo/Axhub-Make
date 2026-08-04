@@ -307,6 +307,10 @@ export interface PresentationAreaState {
     localShareUrl: string;
     quickEditAvailable: boolean;
     quickEditActive?: boolean;
+    prototypeAnnotationSessionActive?: boolean;
+    prototypeAnnotationEnabled?: boolean;
+    prototypeAnnotationEnableLoading?: boolean;
+    prototypeAnnotationPromptCopying?: boolean;
     docEditState?: {
         enabled: boolean;
         dirty: boolean;
@@ -404,7 +408,12 @@ export interface PresentationAreaActions {
     handleChangeSplitPreviewWidth: (pane: 'primary' | 'secondary', width: number) => void;
     handleChangeSplitPreviewHeight: (pane: 'primary' | 'secondary', height: number) => void;
     handleChangePreviewScaleMode: (mode: PreviewScaleMode) => void;
-    handleOpenWebEditor: () => void;
+    handlePreviewContainerSizeChange: (width: number) => void;
+    handleOpenWebEditor: () => void | Promise<void>;
+    handleOpenPrototypeAnnotationSession: () => void | Promise<void>;
+    handleCheckPrototypeAnnotationEnabled: () => Promise<boolean | null>;
+    handleEnablePrototypeAnnotation: () => Promise<boolean>;
+    handleCopyPrototypeAnnotationPrompt: () => void | Promise<void>;
     handleEnableDocEdit: (mode?: SpecQuickEditMode, options?: { disableSelectionMode?: boolean; preserveSidebar?: boolean }) => void;
     handleSaveDocEdit: () => void;
     handleExitDocEdit: () => void;

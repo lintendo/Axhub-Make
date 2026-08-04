@@ -81,6 +81,42 @@ export interface CanvasAcpSelectorDefaults {
   providerOptions: readonly AcpProviderKey[];
 }
 
+export interface CanvasAcpSelectorVisibility {
+  defaultAgentConfigured: boolean;
+  showSelectors: boolean;
+  showSettingsFallback: boolean;
+}
+
+export function resolveCanvasAcpSelectorVisibility({
+  enabled,
+  preferredPromptClient,
+  requireConfiguredDefaultAgent = false,
+  runtimeNeedsFallback,
+}: {
+  enabled?: boolean;
+  preferredPromptClient?: PromptClientPreference;
+  requireConfiguredDefaultAgent?: boolean;
+  runtimeNeedsFallback: boolean;
+}): CanvasAcpSelectorVisibility {
+  const defaultAgentConfigured = Boolean(resolveAcpPromptClientProvider(preferredPromptClient));
+  const defaultAgentAvailable = !requireConfiguredDefaultAgent || defaultAgentConfigured;
+  return {
+    defaultAgentConfigured,
+    showSelectors: Boolean(enabled) && defaultAgentAvailable && !runtimeNeedsFallback,
+    showSettingsFallback: Boolean(enabled) && (!defaultAgentAvailable || runtimeNeedsFallback),
+  };
+}
+
+export function resolveCanvasGenerationDisplayEditingDisabled({
+  disableEditingWithoutConfiguredAgent,
+  defaultAgentConfigured,
+}: {
+  disableEditingWithoutConfiguredAgent?: boolean;
+  defaultAgentConfigured: boolean;
+}): boolean {
+  return Boolean(disableEditingWithoutConfiguredAgent) && !defaultAgentConfigured;
+}
+
 export function resolveCanvasAcpSelectorDefaults(
   preferredPromptClient?: PromptClientPreference,
 ): CanvasAcpSelectorDefaults {
@@ -233,6 +269,7 @@ export interface CanvasGenerationDisplayComposerProps {
   canPasteReferenceImages?: boolean;
   className?: string;
   disabled?: boolean;
+  disableEditingWithoutConfiguredAgent?: boolean;
   draftStorageKey?: string | null;
   externalFileDropTargetRef?: React.RefObject<HTMLElement>;
   initialLocalContextRefs?: CanvasLocalContextRef[];
@@ -1556,7 +1593,8 @@ function CanvasComposerSubmitButton({
   );
 }
 
-interface CanvasGenerationDisplayComposerContentProps extends Omit<CanvasGenerationDisplayComposerProps, 'onSubmit' | 'onOptimizePrompt' | 'preferredPromptClient' | 'showSelectors' | 'workspacePath'> {
+interface CanvasGenerationDisplayComposerContentProps extends Omit<CanvasGenerationDisplayComposerProps, 'disableEditingWithoutConfiguredAgent' | 'onSubmit' | 'onOptimizePrompt' | 'preferredPromptClient' | 'showSelectors' | 'workspacePath'> {
+  editingDisabled?: boolean;
   onEnsureAcpRuntime?: (autoStart?: boolean) => Promise<boolean>;
   onOptimizePrompt?: (text: string, selection: Pick<CanvasGenerationDisplaySubmitSelection, 'attachments' | 'referenceImages' | 'localContextRefs'>) => Promise<string>;
   onSubmitText?: (text: string, selection: Pick<CanvasGenerationDisplaySubmitSelection, 'attachments' | 'referenceImages' | 'localContextRefs'>) => CanvasGenerationDisplaySubmitResult | Promise<CanvasGenerationDisplaySubmitResult>;
@@ -1570,6 +1608,7 @@ function CanvasGenerationDisplayComposerContent({
   canPasteReferenceImages,
   className,
   disabled = false,
+  editingDisabled = false,
   draftStorageKey,
   externalFileDropTargetRef,
   initialLocalContextRefs,
@@ -1606,7 +1645,9 @@ function CanvasGenerationDisplayComposerContent({
   const [submitting, setSubmitting] = useState(false);
   const [displayText, setDisplayText] = useState('');
   const visibleContextItems = [...localContextItems, ...projectResourceContextItems];
-  const controlsDisabled = disabled || optimizingPrompt || submitting;
+  const controlsDisabled = disabled || editingDisabled || optimizingPrompt || submitting;
+  const selectorControlsDisabled = disabled || optimizingPrompt || submitting;
+  const resolvedPlaceholder = editingDisabled ? '请使用本地 AI 应用，或前往 AI 设置完成配置' : placeholder;
   const hasDisplayPromptText = displayText.trim().length > 0;
   const initialReferenceImagesKey = useMemo(
     () => JSON.stringify(initialReferenceImages ?? []),
@@ -1919,7 +1960,7 @@ function CanvasGenerationDisplayComposerContent({
             >
             <textarea
               ref={inputRef}
-              placeholder={placeholder}
+              placeholder={resolvedPlaceholder}
               className="aui-composer-input max-h-32 min-h-14 w-full resize-none bg-transparent px-1.75 py-1.5 text-[13px] outline-none placeholder:text-muted-foreground/80 disabled:cursor-not-allowed md:text-sm"
               rows={1}
               autoFocus
@@ -1932,9 +1973,12 @@ function CanvasGenerationDisplayComposerContent({
             <span className="sr-only" aria-live="polite">
               {submitting ? '正在发送' : optimizingPrompt ? '正在优化提示词' : ''}
             </span>
-            <div className={cn(controlsDisabled ? 'pointer-events-none opacity-60' : '')}>
+            <fieldset
+              disabled={controlsDisabled}
+              className={cn('m-0 min-w-0 border-0 p-0', controlsDisabled ? 'pointer-events-none opacity-60' : '')}
+            >
               <ComposerAttachments />
-            </div>
+            </fieldset>
             {visibleContextItems.length ? (
               <div className="flex flex-wrap gap-1.5 px-1">
                 {visibleContextItems.map((item) => (
@@ -1959,7 +2003,7 @@ function CanvasGenerationDisplayComposerContent({
             ) : null}
             <div className="aui-composer-action-wrapper relative flex items-center justify-between text-[13px] md:text-sm">
               <div className="flex min-w-0 items-center gap-1">
-                {disabled ? null : (
+                {disabled || editingDisabled ? null : (
                   <CanvasComposerAttachmentMenu
                     disabled={optimizingPrompt}
                     label="添加附件"
@@ -1967,16 +2011,17 @@ function CanvasGenerationDisplayComposerContent({
                   />
                 )}
                 {leadingActions ? (
-                  <div
+                  <fieldset
+                    disabled={controlsDisabled}
                     aria-disabled={controlsDisabled}
-                    className={cn('inline-flex min-w-0 items-center', controlsDisabled ? 'pointer-events-none opacity-60' : '')}
+                    className={cn('m-0 inline-flex min-w-0 items-center border-0 p-0', controlsDisabled ? 'pointer-events-none opacity-60' : '')}
                   >
                     {leadingActions}
-                  </div>
+                  </fieldset>
                 ) : null}
                 <div
-                  aria-disabled={controlsDisabled}
-                  className={cn('inline-flex min-w-0 items-center gap-1', controlsDisabled ? 'pointer-events-none opacity-60' : '')}
+                  aria-disabled={selectorControlsDisabled}
+                  className={cn('inline-flex min-w-0 items-center gap-1', selectorControlsDisabled ? 'pointer-events-none opacity-60' : '')}
                 >
                   {showSelectors ? <CanvasAcpComposerSelectors /> : null}
                   {showModelSelectorFallback ? (
@@ -1984,12 +2029,13 @@ function CanvasGenerationDisplayComposerContent({
                   ) : null}
                 </div>
                 {resolvedPostSelectorActions ? (
-                  <div
+                  <fieldset
+                    disabled={controlsDisabled}
                     aria-disabled={controlsDisabled}
-                    className={cn('inline-flex min-w-0 items-center', controlsDisabled ? 'pointer-events-none opacity-60' : '')}
+                    className={cn('m-0 inline-flex min-w-0 items-center border-0 p-0', controlsDisabled ? 'pointer-events-none opacity-60' : '')}
                   >
                     {resolvedPostSelectorActions}
-                  </div>
+                  </fieldset>
                 ) : null}
                 <CanvasPromptOptimizeButton
                   disabled={controlsDisabled}
@@ -2016,6 +2062,7 @@ function CanvasGenerationDisplayComposerContent({
 }
 
 function CanvasGenerationDisplayComposerWithoutAcp({
+  disableEditingWithoutConfiguredAgent: _disableEditingWithoutConfiguredAgent,
   onOptimizePrompt,
   onSubmit,
   preferredPromptClient: _preferredPromptClient,
@@ -2118,6 +2165,7 @@ function CanvasGenerationDisplayComposerRuntime({
 }
 
 function CanvasGenerationDisplayComposerWithAcp({
+  disableEditingWithoutConfiguredAgent,
   projectId,
   showSelectors,
   workspacePath,
@@ -2125,6 +2173,17 @@ function CanvasGenerationDisplayComposerWithAcp({
   ...props
 }: CanvasGenerationDisplayComposerProps) {
   const canvasAcpRuntime = useCanvasAcpRuntimeBridge({ enabled: showSelectors, projectId, workspacePath });
+  const selectorVisibility = resolveCanvasAcpSelectorVisibility({
+    enabled: showSelectors,
+    preferredPromptClient,
+    requireConfiguredDefaultAgent: disableEditingWithoutConfiguredAgent,
+    runtimeNeedsFallback: canvasAcpRuntime.needsFallback,
+  });
+  const canEnsureAcpRuntime = !disableEditingWithoutConfiguredAgent || selectorVisibility.defaultAgentConfigured;
+  const editingDisabled = resolveCanvasGenerationDisplayEditingDisabled({
+    disableEditingWithoutConfiguredAgent,
+    defaultAgentConfigured: selectorVisibility.defaultAgentConfigured,
+  });
   const acpSelectorDefaults = useMemo(() => resolveCanvasAcpSelectorDefaults(preferredPromptClient), [preferredPromptClient]);
   const acpRuntimeKey = useMemo(() => [
     acpSelectorDefaults.defaultProvider,
@@ -2142,10 +2201,11 @@ function CanvasGenerationDisplayComposerWithAcp({
     >
       <CanvasGenerationDisplayComposerRuntime
         {...props}
+        editingDisabled={editingDisabled}
         projectId={projectId}
-        onEnsureAcpRuntime={canvasAcpRuntime.ensureRuntime}
-        showModelSelectorFallback={showSelectors && canvasAcpRuntime.needsFallback}
-        showSelectors={showSelectors && !canvasAcpRuntime.needsFallback}
+        onEnsureAcpRuntime={canEnsureAcpRuntime ? canvasAcpRuntime.ensureRuntime : undefined}
+        showModelSelectorFallback={selectorVisibility.showSettingsFallback}
+        showSelectors={selectorVisibility.showSelectors}
       />
     </AcpUiProvider>
   );
@@ -2715,7 +2775,7 @@ function CanvasAcpModelSelectorFallback({
       onClick={() => { void handleClick(); }}
     >
       <Settings2 className="size-3.5 shrink-0" />
-      <span className="truncate">请选择模型</span>
+      <span className="truncate">{onEnsureAcpRuntime ? '请选择模型' : '设置 AI Agent'}</span>
       <ChevronDown className="size-3 shrink-0" />
     </button>
   );

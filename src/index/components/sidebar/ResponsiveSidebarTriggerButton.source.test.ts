@@ -7,7 +7,7 @@ describe('ResponsiveSidebarTriggerButton source', () => {
     const source = readFileSync(resolve(__dirname, './ResponsiveSidebarTriggerButton.tsx'), 'utf8');
 
     expect(source).toContain('useResponsiveSidebarTriggerBindings(');
-    expect(source).toContain('if (compactOnly && !bindings.compactDesktop) return null;');
+    expect(source).toContain('if (collapsedOnly && !collapsed) return null;');
     expect(source).toContain('<Button');
     expect(source).toContain('{...bindings.buttonProps}');
     expect(source).toContain('{collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}');

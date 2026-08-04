@@ -3,7 +3,6 @@
  * 用于在开发环境中渲染组件的引导模块
  */
 
-import '../index.css';
 import React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
 import * as ReactDOM from 'react-dom';
@@ -359,6 +358,9 @@ if (typeof window !== 'undefined') {
             : undefined,
           annotationProjectId: typeof launchOptions.annotationProjectId === 'string'
             ? launchOptions.annotationProjectId
+            : undefined,
+          interactionProfile: launchOptions.interactionProfile === 'annotation'
+            ? 'annotation'
             : undefined,
         }));
         ensurePrototypeEditorHostToolbarBridge();

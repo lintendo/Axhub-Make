@@ -1797,7 +1797,7 @@ function sanitizeWebEditorUiSettings(value) {
   };
 }
 function applyInteractionProfileToUiSettings(settings, profile) {
-  if (profile !== "text-comment") {
+  if (profile === "design") {
     return settings;
   }
   return {
@@ -1867,6 +1867,8 @@ function resolveWebEditorOptions(options = {}) {
       initialDarkMode: false,
       showCopyPromptAction: true,
       hideExecutionControls: false,
+      hideCurrentElementExecutionAction: false,
+      hostSurfaceVisibilityControl: null,
       aiExecutionConfigSummary: "",
       aiExecutionConfigConfigured: false,
       aiExecutionProvider: "",
@@ -2353,9 +2355,10 @@ function normalizePromptCardSkillIds(skillIds, skills = PROMPT_CARD_SKILLS) {
   return result;
 }
 function buildPromptCardSkillSavePayload(note, selectedSkills) {
+  const normalizedNote = String(note ?? "").replace(/\r\n/g, "\n").trim();
   return {
-    note: String(note ?? "").replace(/\r\n/g, "\n").trim(),
-    skillIds: selectedSkills.map((skill) => skill.id)
+    note: normalizedNote,
+    skillIds: normalizedNote ? selectedSkills.map((skill) => skill.id) : []
   };
 }
 function deserializePromptCardSkillSelection(payload, enabledSkillIds, skillOptions = []) {
@@ -2363,6 +2366,21 @@ function deserializePromptCardSkillSelection(payload, enabledSkillIds, skillOpti
   const skillById = new Map(skills.map((skill) => [skill.id, skill]));
   const enabledIds = Array.isArray(enabledSkillIds) ? new Set(enabledSkillIds.map((item) => String(item ?? "").trim()).filter(Boolean)) : null;
   return normalizePromptCardSkillIds(payload?.skillIds ?? [], skills).map((skillId) => skillById.get(skillId)).filter((skill) => Boolean(skill)).filter((skill) => enabledIds ? enabledIds.has(skill.id) : true);
+}
+function appendImplicitAnnotationSkillToPrompt(prompt, annotationSession, enabledSkillIds, skillOptions = []) {
+  const normalizedPrompt = String(prompt ?? "").trim();
+  if (!normalizedPrompt || !annotationSession) return normalizedPrompt;
+  const defaultSkill = mergePromptCardSkills(skillOptions).find(
+    (skill) => skill.id === "prototype-annotation"
+  );
+  if (!defaultSkill) return normalizedPrompt;
+  if (Array.isArray(enabledSkillIds) && !enabledSkillIds.some((skillId) => String(skillId ?? "").trim() === defaultSkill.id)) {
+    return normalizedPrompt;
+  }
+  if (normalizedPrompt.includes(defaultSkill.prompt)) return normalizedPrompt;
+  return `${normalizedPrompt}
+
+${buildPromptCardSkillPrefix([defaultSkill])}`;
 }
 function mergePromptCardSkillsIntoPromptNote(note, selectedSkills) {
   const prefix = buildPromptCardSkillPrefix(selectedSkills);
@@ -3041,6 +3059,13 @@ function createChangesService(options) {
     renderChangeMarkers();
     options.onStatusChange?.();
   }
+  function notifyCommentEdited(meta) {
+    const hasPersistentContent = Boolean(
+      normalizeNote2(meta.note).trim() || meta.images.length > 0 || hasRecordedTweak(meta)
+    );
+    if (!meta.commentId || !hasPersistentContent) return;
+    options.onCommentEdited?.(meta.elementKey);
+  }
   function syncEditMetaWithTransactions() {
     const tm = state2.transactionManager;
     if (!tm) {
@@ -3202,7 +3227,10 @@ function createChangesService(options) {
     const meta = getMetaForElement(element);
     if (!meta) return;
     meta.note = normalizeNote2(note);
-    if (options2.skillIds) {
+    const hasNote = Boolean(meta.note.trim());
+    if (!hasNote) {
+      delete meta.skillIds;
+    } else if (options2.skillIds) {
       const nextSkillIds = normalizePromptCardSkillIds(options2.skillIds);
       if (nextSkillIds.length > 0) {
         meta.skillIds = nextSkillIds;
@@ -3214,11 +3242,11 @@ function createChangesService(options) {
     if (pendingAnchor) {
       meta.anchor = pendingAnchor;
       state2.pendingMarkerAnchors.delete(meta.elementKey);
-    } else if (!meta.anchor && normalizeNote2(meta.note).trim()) {
+    } else if (!meta.anchor && hasNote) {
       const fallbackElement = element && element.isConnected ? element : locateElement(meta.locator);
       meta.anchor = fallbackElement ? buildFallbackAnchor(fallbackElement) : null;
     }
-    if (normalizeNote2(meta.note).trim() || (meta.skillIds?.length ?? 0) > 0) {
+    if (hasNote) {
       ensureElementEditCommentId(meta);
       if (meta.dirtySince === null) {
         meta.dirtySince = Date.now();
@@ -3234,6 +3262,7 @@ function createChangesService(options) {
       meta.classSummaryLines = [];
     }
     pruneIdleMeta(meta.elementKey);
+    notifyCommentEdited(meta);
     notifyEditMetaChanged();
   }
   function getImagesForElement(element) {
@@ -3267,6 +3296,7 @@ function createChangesService(options) {
       meta.classSummaryLines = [];
     }
     pruneIdleMeta(meta.elementKey);
+    notifyCommentEdited(meta);
     notifyEditMetaChanged();
   }
   function recordTweakValuesForElement(element, payload) {
@@ -3305,6 +3335,7 @@ function createChangesService(options) {
       }
     }
     pruneIdleMeta(meta.elementKey);
+    notifyCommentEdited(meta);
     notifyEditMetaChanged();
   }
   function clearRecordedTweakForElement(element) {
@@ -3319,6 +3350,7 @@ function createChangesService(options) {
       meta.anchor = null;
     }
     pruneIdleMeta(meta.elementKey);
+    notifyCommentEdited(meta);
     options.scheduleCacheWrite();
     renderChangeMarkers();
   }
@@ -12201,7 +12233,7 @@ import {
   FileTextOutlined,
   FormatPainterOutlined
 } from "@ant-design/icons";
-import { Input as Input3, Popconfirm } from "antd";
+import { Dropdown, Input as Input3, Popconfirm } from "antd";
 
 // src/ui/prompt-card-position.ts
 function getVisualViewportHeight() {
@@ -15168,20 +15200,55 @@ var PROMPT_PRIMARY_FOCUS_EXEMPT_SELECTOR = [
   "[tabindex]"
 ].join(", ");
 var PARENT_SELECT_INPUT_TOUCHED_ATTR = "data-we-parent-select-input-touched";
+var ANNOTATION_INPUT_MODE_STORAGE_KEY = "axhub-commentary-annotation-input-mode";
+var annotationInputModeFallback = "generate";
+function readAnnotationInputModePreference() {
+  try {
+    const storedMode = globalThis.localStorage?.getItem(ANNOTATION_INPUT_MODE_STORAGE_KEY);
+    if (storedMode === "edit" || storedMode === "generate") {
+      annotationInputModeFallback = storedMode;
+    }
+  } catch {
+  }
+  return annotationInputModeFallback;
+}
+function writeAnnotationInputModePreference(mode) {
+  annotationInputModeFallback = mode;
+  try {
+    globalThis.localStorage?.setItem(ANNOTATION_INPUT_MODE_STORAGE_KEY, mode);
+  } catch {
+  }
+}
 function shouldRestorePromptPrimaryFocusFromTarget(target) {
   if (!(target instanceof Element)) {
     return true;
   }
   return !target.closest(PROMPT_PRIMARY_FOCUS_EXEMPT_SELECTOR);
 }
-function resolvePromptCardNotePlaceholder() {
-  return "\u8F93\u5165\u7ED9 AI \u7684\u9700\u6C42\uFF0C/ \u9009\u62E9\u6280\u80FD";
+var ANNOTATION_GENERATION_PLACEHOLDER = "\u8F93\u5165\u7ED9 AI \u7684\u6807\u6CE8\u9700\u6C42\uFF0C\u8BF4\u660E\u751F\u6210\u8981\u6C42";
+function resolvePromptCardNotePlaceholder(isAnnotationSession) {
+  return isAnnotationSession ? ANNOTATION_GENERATION_PLACEHOLDER : "\u8F93\u5165\u7ED9 AI \u7684\u9700\u6C42\uFF0C/ \u9009\u62E9\u6280\u80FD";
 }
 var ANNOTATION_PANEL_NODE_ID_ATTR2 = "data-axhub-annotation-panel-node-id";
 var ANNOTATION_MARKER_NODE_ID_ATTR2 = "data-axhub-annotation-node-id";
 var ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE = "\u65E0\u6CD5\u51C6\u786E\u5B9A\u4F4D\u6807\u6CE8\u4F4D\u7F6E\uFF0C\u8BE5\u6807\u6CE8\u9700\u8981\u7531 AI \u751F\u6210";
 var ANNOTATION_MARKDOWN_PLACEHOLDER = "\u8F93\u5165\u9700\u6C42\u6807\u6CE8\uFF0C\u652F\u6301 Markdown \u683C\u5F0F\u3002\u8F93\u5165\u540E\u5373\u53EF\u521B\u5EFA\u6807\u6CE8\u8282\u70B9\u3002\u5EFA\u8BAE\u7531 AI \u521B\u5EFA\u6807\u6CE8\uFF0C\u5B9A\u4F4D\u4F1A\u66F4\u51C6\u786E\u3002";
 var DOCUMENT_SOURCE_MARKDOWN_PLACEHOLDER = "\u7F16\u8F91\u6240\u9009\u5185\u5BB9\u5BF9\u5E94\u7684\u539F\u59CB Markdown\u3002\u4FDD\u5B58\u540E\u4F1A\u76F4\u63A5\u66F4\u65B0\u672C\u5730\u6587\u6863\u3002";
+var ANNOTATION_EDITOR_PROMPT_CARD_WIDTH = 320;
+var annotationEditorShellStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  padding: 0
+};
+var annotationEditorInputStyle = {
+  overflow: "hidden",
+  border: `1px solid ${EDITOR_CHROME.borderStrong}`,
+  borderRadius: 12,
+  background: EDITOR_CHROME.surfaceMuted,
+  boxShadow: `inset 0 0 0 1px ${EDITOR_CHROME.surface}`,
+  cursor: "text"
+};
 function isAnnotationPanelTarget(element) {
   if (!element) return false;
   if (element.getAttribute("data-axhub-annotation-panel-target") === "true") {
@@ -15326,6 +15393,7 @@ var PromptCardView = React9.forwardRef(
       onExportSelectionToDesignTool,
       getExportSelectionToDesignToolBlockReason,
       hideExecutionControls = false,
+      hideCurrentElementExecutionAction = false,
       hideContextAppendAction = false,
       enabledSkillIds,
       skillOptions,
@@ -15366,6 +15434,7 @@ var PromptCardView = React9.forwardRef(
       onDeleteCurrentAnnotationNode
     } = props;
     const documentSourceMarkdownEditor = options.annotationMarkdownEditorKind === "document-source";
+    const isAnnotationSession = interactionProfile === "annotation";
     const rootRef = React9.useRef(null);
     const textComposerRef = React9.useRef(null);
     const noteComposerRef = React9.useRef(null);
@@ -15376,7 +15445,13 @@ var PromptCardView = React9.forwardRef(
     const [refreshKey, setRefreshKey] = React9.useState(0);
     const [selectedSkills, setSelectedSkills] = React9.useState([]);
     const [promptDismissed, setPromptDismissed] = React9.useState(false);
-    const [annotationEditorOpen, setAnnotationEditorOpen] = React9.useState(false);
+    const [annotationEditorOpen, setAnnotationEditorOpen] = React9.useState(
+      () => readAnnotationInputModePreference() === "edit"
+    );
+    const setAnnotationInputMode = React9.useCallback((mode) => {
+      writeAnnotationInputModePreference(mode);
+      setAnnotationEditorOpen(mode === "edit");
+    }, []);
     const [runningElementToolId, setRunningElementToolId] = React9.useState(null);
     const [elementToolError, setElementToolError] = React9.useState("");
     const elementTools = options.getElementTools?.(currentTarget) ?? [];
@@ -15403,7 +15478,11 @@ var PromptCardView = React9.forwardRef(
     }, [inlineTextEditing]);
     React9.useEffect(() => {
       setSelectedSkills(
-        deserializePromptCardSkillSelection(savedNoteMeta, enabledSkillIds, skillOptions ?? [])
+        deserializePromptCardSkillSelection(
+          savedNoteMeta,
+          enabledSkillIds,
+          skillOptions ?? []
+        )
       );
       setRunningElementToolId(null);
       setElementToolError("");
@@ -15411,6 +15490,11 @@ var PromptCardView = React9.forwardRef(
     React9.useEffect(() => {
       setPromptDismissed(false);
     }, [currentTarget]);
+    React9.useEffect(() => {
+      if (isAnnotationSession && bubbleStyleEditorOpen) {
+        onBubbleStyleEditorOpenChange(false);
+      }
+    }, [bubbleStyleEditorOpen, isAnnotationSession, onBubbleStyleEditorOpenChange]);
     const onConfirmNoteWithSelectedSkills = React9.useCallback(async () => {
       const payload = buildPromptCardSkillSavePayload(draftNote, selectedSkills);
       await onConfirmNote({ skillIds: payload.skillIds });
@@ -15576,20 +15660,27 @@ var PromptCardView = React9.forwardRef(
       currentTarget && promptPosition && promptCardSize && !toolMinimized && uiMode === "bubble-card" && !promptDismissed
     );
     React9.useEffect(() => {
-      if (promptVisible && uiMode === "bubble-card") return;
-      setSelectedSkills([]);
-      setAnnotationEditorOpen(false);
-    }, [promptVisible, uiMode]);
-    React9.useEffect(() => {
-      if (!canEditAnnotationMarkdown) {
+      if (!promptVisible || uiMode !== "bubble-card") {
+        setSelectedSkills([]);
+      }
+      if (!isAnnotationSession && (!promptVisible || uiMode !== "bubble-card")) {
         setAnnotationEditorOpen(false);
       }
-    }, [canEditAnnotationMarkdown]);
+    }, [isAnnotationSession, promptVisible, uiMode]);
     React9.useEffect(() => {
-      if (bubbleStyleEditorOpen) {
+      if (!isAnnotationSession && !canEditAnnotationMarkdown) {
         setAnnotationEditorOpen(false);
       }
-    }, [bubbleStyleEditorOpen]);
+    }, [canEditAnnotationMarkdown, isAnnotationSession]);
+    React9.useEffect(() => {
+      if (!isAnnotationSession) return;
+      setAnnotationEditorOpen(readAnnotationInputModePreference() === "edit");
+    }, [isAnnotationSession]);
+    React9.useEffect(() => {
+      if (!isAnnotationSession && bubbleStyleEditorOpen) {
+        setAnnotationEditorOpen(false);
+      }
+    }, [bubbleStyleEditorOpen, isAnnotationSession]);
     React9.useEffect(() => {
       if (!hasElementTools || !bubbleStyleEditorOpen) return;
       onBubbleStyleEditorOpenChange(false);
@@ -15793,6 +15884,10 @@ var PromptCardView = React9.forwardRef(
       }),
       [currentTarget, currentTaskTerminal, onDismissSelection]
     );
+    const handlePromptCardClose = React9.useCallback(() => {
+      if (dismissTerminalTaskAndSelection()) return;
+      void saveAndDismissPromptCard().catch(() => void 0);
+    }, [dismissTerminalTaskAndSelection, saveAndDismissPromptCard]);
     const currentTaskSessionHref = currentAgentTask?.sessionUrl ?? (currentAgentTask?.sessionId ? `/session/${currentAgentTask.sessionId}` : "");
     const currentTaskDescription = resolveExternalEditingStatusDescription(
       currentAgentTask,
@@ -15949,6 +16044,7 @@ var PromptCardView = React9.forwardRef(
     const showAnnotationMarkdownEditor = Boolean(
       annotationEditorOpen && showAnnotationMarkdownEditorButton && !bubbleStyleEditorOpen
     );
+    const annotationModeLabel = annotationEditorOpen ? "\u7F16\u8F91" : "\u751F\u6210";
     const annotationManualEditLocatorState = showAnnotationMarkdownEditor ? documentSourceMarkdownEditor ? { disabled: false, message: "" } : getAnnotationManualEditLocatorState(
       currentTarget,
       void 0,
@@ -15958,7 +16054,7 @@ var PromptCardView = React9.forwardRef(
     const annotationManualEditDisabled = annotationManualEditLocatorState.disabled;
     const annotationManualEditMessage = annotationManualEditLocatorState.message;
     const showPromptDesignEditor = Boolean(
-      currentTarget && transactionManager && bubbleStyleEditorOpen && styleDesignEnabled && !isCurrentAnnotationPanelTarget && !textCommentMode
+      currentTarget && transactionManager && bubbleStyleEditorOpen && styleDesignEnabled && !isAnnotationSession && !isCurrentAnnotationPanelTarget && !textCommentMode
     );
     const styleEditorToggleTitle = bubbleStyleEditorOpen ? "\u5173\u95ED\u6837\u5F0F\u7F16\u8F91" : "\u6253\u5F00\u6837\u5F0F\u7F16\u8F91";
     const promptCardSendActionTitle = currentElementPromptAction.title;
@@ -15967,10 +16063,35 @@ var PromptCardView = React9.forwardRef(
     const agentSelectionShortcutHint = agentSelectionShortcutLabels.length > 0 ? `\uFF0C\u957F\u6309 ${agentSelectionShortcutLabels.join(" / ")} \u4E5F\u53EF\u5524\u8D77` : "";
     const agentSelectionActionTitle = currentTaskRunning ? "\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD" : `\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD${agentSelectionShortcutHint}`;
     const showContextAppendExecutionControls = !hideExecutionControls;
-    const notePlaceholder = resolvePromptCardNotePlaceholder();
+    const showPromptCardExecutionActions = !isAnnotationSession || !annotationEditorOpen;
+    const notePlaceholder = resolvePromptCardNotePlaceholder(isAnnotationSession);
     const promptCardCloseActionTitle = resolvePromptCardCloseActionTitle(
       globalThis.navigator?.platform
     );
+    const annotationDeleteAction = !documentSourceMarkdownEditor ? /* @__PURE__ */ jsx8(
+      Popconfirm,
+      {
+        title: "\u5220\u9664\u6807\u6CE8",
+        description: "\u5220\u9664\u540E\u8BE5\u6807\u6CE8\u8282\u70B9\u548C\u9875\u9762\u4E0A\u7684 Marker \u90FD\u4F1A\u6D88\u5931\u3002",
+        okText: "\u5220\u9664",
+        cancelText: "\u53D6\u6D88",
+        okButtonProps: { danger: true },
+        disabled: annotationLoading || annotationSaving || !onDeleteCurrentAnnotationNode,
+        getPopupContainer: resolveRuntimePopupContainer,
+        onConfirm: () => {
+          void onDeleteCurrentAnnotationNode?.();
+        },
+        children: /* @__PURE__ */ jsx8("span", { style: { display: "inline-flex" }, children: /* @__PURE__ */ jsx8(
+          IconActionButton,
+          {
+            title: "\u5220\u9664\u6807\u6CE8",
+            icon: /* @__PURE__ */ jsx8(DeleteOutlined, {}),
+            tone: "dark",
+            disabled: annotationLoading || annotationSaving || !onDeleteCurrentAnnotationNode
+          }
+        ) })
+      }
+    ) : null;
     const promptCardNode = /* @__PURE__ */ jsxs7(
       "div",
       {
@@ -15978,6 +16099,7 @@ var PromptCardView = React9.forwardRef(
         "data-we-selection-lock-root": "true",
         style: {
           ...promptCardStyle,
+          width: isAnnotationSession ? ANNOTATION_EDITOR_PROMPT_CARD_WIDTH : promptCardStyle.width,
           left: promptPosition.left,
           top: promptPosition.top,
           visibility: promptVisible ? "visible" : "hidden",
@@ -16018,155 +16140,249 @@ var PromptCardView = React9.forwardRef(
             .we-runtime-prompt-card__textarea textarea::-webkit-scrollbar {
               display: none;
             }
+
+            [data-we-annotation-markdown-editor="true"]:focus-within {
+              border-color: ${EDITOR_CHROME.accent} !important;
+              box-shadow: 0 0 0 3px ${EDITOR_CHROME.accentSoft};
+            }
           ` }),
-          /* @__PURE__ */ jsxs7("div", { style: { display: "flex", alignItems: "center", gap: 8 }, children: [
-            /* @__PURE__ */ jsxs7("div", { style: { display: "flex", alignItems: "center", gap: 2 }, children: [
-              showContextAppendExecutionControls && agentAvailable ? /* @__PURE__ */ jsx8(
-                IconActionButton,
-                {
-                  title: agentSelectionActionTitle,
-                  icon: /* @__PURE__ */ jsx8(AgentSparkleIcon, {}),
-                  tone: "dark",
-                  disabled: !currentTarget,
-                  onClick: () => {
-                    triggerAgentPromptAction({
-                      currentTarget: promptTarget,
-                      onAppendElementToAgentContext: options.onAppendElementToAgentContext
-                    });
-                  }
-                }
-              ) : null,
-              currentElementPromptAction.visible ? /* @__PURE__ */ jsx8(
-                IconActionButton,
-                {
-                  title: promptCardSendActionTitle,
-                  icon: /* @__PURE__ */ jsx8(CaretRightFilled, {}),
-                  tone: "accent",
-                  loading: currentElementPromptAction.loading,
-                  disabled: currentElementPromptAction.disabled,
-                  onClick: () => {
-                    void handleConfirmSendCurrentElementPrompt();
-                  }
-                }
-              ) : null
-            ] }),
-            /* @__PURE__ */ jsx8("div", { style: { flex: 1 } }),
-            /* @__PURE__ */ jsxs7("div", { style: { display: "flex", alignItems: "center", gap: 2 }, children: [
-              showAnnotationMarkdownEditorButton ? /* @__PURE__ */ jsx8(
-                IconActionButton,
-                {
-                  title: documentSourceMarkdownEditor ? annotationEditorOpen ? "\u5173\u95ED Markdown \u6E90\u7801\u7F16\u8F91" : "Markdown \u6E90\u7801\u7F16\u8F91" : annotationEditorOpen ? "\u5173\u95ED\u6807\u6CE8\u7F16\u8F91" : "\u6807\u6CE8\u7F16\u8F91",
-                  icon: /* @__PURE__ */ jsx8(FileTextOutlined, {}),
-                  tone: annotationEditorOpen ? "accent" : "dark",
-                  disabled: annotationLoading,
-                  onClick: () => {
-                    const nextAnnotationEditorOpen = !annotationEditorOpen;
-                    setAnnotationEditorOpen(nextAnnotationEditorOpen);
-                    if (nextAnnotationEditorOpen && bubbleStyleEditorOpen) {
-                      onBubbleStyleEditorOpenChange(false);
-                    }
-                  }
-                }
-              ) : null,
-              showAnnotationDocumentEditButton ? /* @__PURE__ */ jsx8(
-                IconActionButton,
-                {
-                  title: "\u6587\u6863\u7F16\u8F91",
-                  icon: /* @__PURE__ */ jsx8(FileTextOutlined, {}),
-                  tone: "dark",
-                  onClick: () => {
-                    window.open(annotationDocumentEditUrl, "_blank", "noopener,noreferrer");
-                  }
-                }
-              ) : null,
-              elementTools.map((tool) => {
-                const running = runningElementToolId === tool.id;
-                return /* @__PURE__ */ jsx8("span", { "data-we-element-tool": tool.id, children: /* @__PURE__ */ jsx8(
-                  IconActionButton,
+          /* @__PURE__ */ jsxs7(
+            "div",
+            {
+              "data-we-annotation-session-toolbar": "true",
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 8
+              },
+              children: [
+                /* @__PURE__ */ jsxs7(
+                  "div",
                   {
-                    title: running ? `${tool.label}\uFF08\u6B63\u5728\u6253\u5F00\uFF09` : tool.label,
-                    icon: tool.icon === "document" ? /* @__PURE__ */ jsx8(FileTextOutlined, {}) : /* @__PURE__ */ jsx8(ExportOutlined, {}),
-                    tone: "dark",
-                    loading: running,
-                    disabled: Boolean(tool.disabled || runningElementToolId),
-                    onClick: () => {
-                      void handleElementToolAction(tool);
-                    }
+                    "data-we-prompt-card-tool-actions": "true",
+                    style: { display: "flex", alignItems: "center", gap: 2 },
+                    children: [
+                      isAnnotationSession && showAnnotationMarkdownEditorButton ? /* @__PURE__ */ jsxs7(
+                        "div",
+                        {
+                          "data-we-annotation-mode-tabs": "true",
+                          role: "tablist",
+                          "aria-label": `${annotationModeLabel}\u6807\u6CE8\u7F16\u8F91\u5DF2\u9009`,
+                          style: {
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 1,
+                            padding: 1,
+                            borderRadius: 7,
+                            background: EDITOR_CHROME.surface,
+                            border: `1px solid ${EDITOR_CHROME.border}`
+                          },
+                          children: [
+                            /* @__PURE__ */ jsx8(
+                              "button",
+                              {
+                                type: "button",
+                                role: "tab",
+                                "aria-selected": annotationEditorOpen,
+                                style: {
+                                  border: 0,
+                                  borderRadius: 6,
+                                  background: annotationEditorOpen ? EDITOR_CHROME.surfaceInteractive : "transparent",
+                                  color: annotationEditorOpen ? EDITOR_CHROME.textPrimary : EDITOR_CHROME.textMuted,
+                                  padding: "3px 6px",
+                                  fontSize: 10,
+                                  fontWeight: 500,
+                                  lineHeight: "16px",
+                                  cursor: annotationLoading ? "default" : "pointer"
+                                },
+                                disabled: annotationLoading,
+                                onClick: () => {
+                                  setAnnotationInputMode("edit");
+                                  onBubbleStyleEditorOpenChange(false);
+                                },
+                                children: "\u7F16\u8F91"
+                              }
+                            ),
+                            /* @__PURE__ */ jsx8(
+                              "button",
+                              {
+                                type: "button",
+                                role: "tab",
+                                "aria-selected": !annotationEditorOpen,
+                                style: {
+                                  border: 0,
+                                  borderRadius: 6,
+                                  background: !annotationEditorOpen ? EDITOR_CHROME.surfaceInteractive : "transparent",
+                                  color: !annotationEditorOpen ? EDITOR_CHROME.textPrimary : EDITOR_CHROME.textMuted,
+                                  padding: "3px 6px",
+                                  fontSize: 10,
+                                  fontWeight: 500,
+                                  lineHeight: "16px",
+                                  cursor: annotationLoading ? "default" : "pointer"
+                                },
+                                disabled: annotationLoading,
+                                onClick: () => {
+                                  setAnnotationInputMode("generate");
+                                  onBubbleStyleEditorOpenChange(false);
+                                },
+                                children: "\u751F\u6210"
+                              }
+                            )
+                          ]
+                        }
+                      ) : showAnnotationMarkdownEditorButton ? /* @__PURE__ */ jsx8(
+                        IconActionButton,
+                        {
+                          title: documentSourceMarkdownEditor ? annotationEditorOpen ? "\u5173\u95ED Markdown \u6E90\u7801\u7F16\u8F91" : "Markdown \u6E90\u7801\u7F16\u8F91" : annotationEditorOpen ? "\u5173\u95ED\u6807\u6CE8\u7F16\u8F91" : "\u6807\u6CE8\u7F16\u8F91",
+                          icon: /* @__PURE__ */ jsx8(FileTextOutlined, {}),
+                          tone: annotationEditorOpen ? "accent" : "dark",
+                          disabled: annotationLoading,
+                          onClick: () => {
+                            const nextAnnotationEditorOpen = !annotationEditorOpen;
+                            setAnnotationEditorOpen(nextAnnotationEditorOpen);
+                            if (nextAnnotationEditorOpen && bubbleStyleEditorOpen) {
+                              onBubbleStyleEditorOpenChange(false);
+                            }
+                          }
+                        }
+                      ) : null,
+                      showAnnotationDocumentEditButton ? /* @__PURE__ */ jsx8(
+                        IconActionButton,
+                        {
+                          title: "\u6587\u6863\u7F16\u8F91",
+                          icon: /* @__PURE__ */ jsx8(FileTextOutlined, {}),
+                          tone: "dark",
+                          onClick: () => {
+                            window.open(annotationDocumentEditUrl, "_blank", "noopener,noreferrer");
+                          }
+                        }
+                      ) : null,
+                      elementTools.map((tool) => {
+                        const running = runningElementToolId === tool.id;
+                        return /* @__PURE__ */ jsx8("span", { "data-we-element-tool": tool.id, children: /* @__PURE__ */ jsx8(
+                          IconActionButton,
+                          {
+                            title: running ? `${tool.label}\uFF08\u6B63\u5728\u6253\u5F00\uFF09` : tool.label,
+                            icon: tool.icon === "document" ? /* @__PURE__ */ jsx8(FileTextOutlined, {}) : /* @__PURE__ */ jsx8(ExportOutlined, {}),
+                            tone: "dark",
+                            loading: running,
+                            disabled: Boolean(tool.disabled || runningElementToolId),
+                            onClick: () => {
+                              void handleElementToolAction(tool);
+                            }
+                          }
+                        ) }, tool.id);
+                      }),
+                      propertyPanelEnabled && styleDesignEnabled && !hasElementTools && !isAnnotationSession && !textCommentMode && !isCurrentAnnotationPanelTarget ? /* @__PURE__ */ jsx8(
+                        IconActionButton,
+                        {
+                          title: styleEditorToggleTitle,
+                          icon: /* @__PURE__ */ jsx8(FormatPainterOutlined, {}),
+                          tone: bubbleStyleEditorOpen ? "accent" : "dark",
+                          onClick: () => {
+                            const nextBubbleStyleEditorOpen = !bubbleStyleEditorOpen;
+                            onBubbleStyleEditorOpenChange(nextBubbleStyleEditorOpen);
+                            if (nextBubbleStyleEditorOpen) {
+                              setAnnotationEditorOpen(false);
+                            }
+                          }
+                        }
+                      ) : null,
+                      designToolExportAction.visible && !isAnnotationSession && !textCommentMode ? /* @__PURE__ */ jsx8(
+                        IconActionButton,
+                        {
+                          title: designToolExportAction.title,
+                          icon: /* @__PURE__ */ jsx8(ExportOutlined, {}),
+                          tone: "dark",
+                          disabled: designToolExportAction.disabled,
+                          onClick: () => {
+                            triggerDesignToolExportAction({
+                              tool: designAdjustmentTool,
+                              currentTarget: promptTarget,
+                              onExportSelectionToDesignTool
+                            });
+                          }
+                        }
+                      ) : null
+                    ]
                   }
-                ) }, tool.id);
-              }),
-              propertyPanelEnabled && styleDesignEnabled && !hasElementTools && !textCommentMode && !isCurrentAnnotationPanelTarget ? /* @__PURE__ */ jsx8(
-                IconActionButton,
-                {
-                  title: styleEditorToggleTitle,
-                  icon: /* @__PURE__ */ jsx8(FormatPainterOutlined, {}),
-                  tone: bubbleStyleEditorOpen ? "accent" : "dark",
-                  onClick: () => {
-                    const nextBubbleStyleEditorOpen = !bubbleStyleEditorOpen;
-                    onBubbleStyleEditorOpenChange(nextBubbleStyleEditorOpen);
-                    if (nextBubbleStyleEditorOpen) {
-                      setAnnotationEditorOpen(false);
-                    }
-                  }
-                }
-              ) : null,
-              designToolExportAction.visible && !textCommentMode ? /* @__PURE__ */ jsx8(
-                IconActionButton,
-                {
-                  title: designToolExportAction.title,
-                  icon: /* @__PURE__ */ jsx8(ExportOutlined, {}),
-                  tone: "dark",
-                  disabled: designToolExportAction.disabled,
-                  onClick: () => {
-                    triggerDesignToolExportAction({
-                      tool: designAdjustmentTool,
-                      currentTarget: promptTarget,
-                      onExportSelectionToDesignTool
-                    });
-                  }
-                }
-              ) : null,
-              /* @__PURE__ */ jsx8(
-                IconActionButton,
-                {
-                  title: "\u6E05\u7A7A\u6279\u6CE8",
-                  icon: /* @__PURE__ */ jsx8(ClearOutlined, {}),
-                  tone: "dark",
-                  disabled: !currentTarget,
-                  onClick: () => {
-                    clearSelectedSkills();
-                    void onClearCurrentElementEdits();
-                  }
-                }
-              )
-            ] }),
-            /* @__PURE__ */ jsx8(
-              "div",
-              {
-                style: {
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 2,
-                  paddingLeft: 8,
-                  marginLeft: 2,
-                  borderLeft: `1px solid ${EDITOR_CHROME.border}`
-                },
-                children: /* @__PURE__ */ jsx8(
-                  IconActionButton,
+                ),
+                /* @__PURE__ */ jsx8("div", { style: { flex: 1 } }),
+                showPromptCardExecutionActions ? /* @__PURE__ */ jsxs7(
+                  "div",
                   {
-                    title: promptCardCloseActionTitle,
-                    icon: /* @__PURE__ */ jsx8(CloseToolIcon, {}),
-                    tone: "dark",
-                    onClick: () => {
-                      if (dismissTerminalTaskAndSelection()) return;
-                      clearSelectedSkills();
-                      void saveAndDismissPromptCard().catch(() => void 0);
-                    }
+                    "data-we-prompt-card-execution-actions": "true",
+                    style: { display: "flex", alignItems: "center", gap: 2 },
+                    children: [
+                      showContextAppendExecutionControls && agentAvailable ? /* @__PURE__ */ jsx8(
+                        IconActionButton,
+                        {
+                          title: agentSelectionActionTitle,
+                          icon: /* @__PURE__ */ jsx8(AgentSparkleIcon, {}),
+                          tone: "dark",
+                          disabled: !currentTarget,
+                          onClick: () => {
+                            triggerAgentPromptAction({
+                              currentTarget: promptTarget,
+                              onAppendElementToAgentContext: options.onAppendElementToAgentContext
+                            });
+                          }
+                        }
+                      ) : null,
+                      !hideCurrentElementExecutionAction && currentElementPromptAction.visible ? /* @__PURE__ */ jsx8(
+                        IconActionButton,
+                        {
+                          title: promptCardSendActionTitle,
+                          icon: /* @__PURE__ */ jsx8(CaretRightFilled, {}),
+                          tone: "accent",
+                          loading: currentElementPromptAction.loading,
+                          disabled: currentElementPromptAction.disabled,
+                          onClick: () => {
+                            void handleConfirmSendCurrentElementPrompt();
+                          }
+                        }
+                      ) : null,
+                      /* @__PURE__ */ jsx8(
+                        IconActionButton,
+                        {
+                          title: "\u6E05\u7A7A\u6279\u6CE8",
+                          icon: /* @__PURE__ */ jsx8(ClearOutlined, {}),
+                          tone: "dark",
+                          disabled: !currentTarget,
+                          onClick: () => {
+                            clearSelectedSkills();
+                            void onClearCurrentElementEdits();
+                          }
+                        }
+                      )
+                    ]
+                  }
+                ) : null,
+                /* @__PURE__ */ jsx8(
+                  "div",
+                  {
+                    style: {
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 2,
+                      paddingLeft: 8,
+                      marginLeft: 2,
+                      borderLeft: `1px solid ${EDITOR_CHROME.border}`
+                    },
+                    children: /* @__PURE__ */ jsx8(
+                      IconActionButton,
+                      {
+                        title: promptCardCloseActionTitle,
+                        icon: /* @__PURE__ */ jsx8(CloseToolIcon, {}),
+                        tone: "dark",
+                        onClick: handlePromptCardClose
+                      }
+                    )
                   }
                 )
-              }
-            )
-          ] }),
+              ]
+            }
+          ),
           elementToolError ? /* @__PURE__ */ jsx8(
             "div",
             {
@@ -16249,197 +16465,214 @@ var PromptCardView = React9.forwardRef(
                   }
                 ) }) : null,
                 showNoteComposer ? /* @__PURE__ */ jsxs7(Fragment4, { children: [
-                  /* @__PURE__ */ jsxs7(
-                    "div",
+                  /* @__PURE__ */ jsx8(
+                    Dropdown,
                     {
-                      style: {
-                        position: "relative",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: selectedSkills.length > 0 ? 6 : 0,
-                        minHeight: selectedSkills.length > 0 ? 64 : 44,
-                        justifyContent: "center",
-                        borderRadius: 12,
-                        background: EDITOR_CHROME.surfaceMuted,
-                        border: `1px solid ${EDITOR_CHROME.borderStrong}`
-                      },
-                      children: [
-                        selectedSkills.length > 0 ? /* @__PURE__ */ jsx8(
-                          "div",
-                          {
-                            style: {
-                              display: "flex",
-                              flexWrap: "wrap",
-                              gap: 6,
-                              padding: "8px 8px 0"
-                            },
-                            children: selectedSkills.map((skill) => /* @__PURE__ */ jsxs7(
+                      open: skillMenuOpen,
+                      trigger: [],
+                      placement: "bottomLeft",
+                      autoAdjustOverflow: { adjustX: 1, adjustY: 1 },
+                      destroyOnHidden: true,
+                      getPopupContainer: resolveRuntimePopupContainer,
+                      styles: { root: { zIndex: POPUP_LAYER_Z_INDEX + 40 } },
+                      popupRender: () => /* @__PURE__ */ jsx8(
+                        "div",
+                        {
+                          "data-we-selection-lock-root": "true",
+                          "data-we-prompt-card-skill-menu": "true",
+                          style: {
+                            display: "flex",
+                            flexDirection: "column",
+                            maxHeight: "calc(100vh - 24px)",
+                            overflowX: "hidden",
+                            overflowY: "auto",
+                            borderRadius: 10,
+                            background: EDITOR_CHROME.surfaceElevated,
+                            border: `1px solid ${EDITOR_CHROME.borderStrong}`,
+                            boxShadow: EDITOR_CHROME.shadowCompact
+                          },
+                          onPointerDownCapture: () => onSelectionInteractionLockChange(true),
+                          onPointerEnter: () => {
+                            onHoverSelectionSuppressedChange(true);
+                          },
+                          onPointerLeave: () => {
+                            onHoverSelectionSuppressedChange(false);
+                          },
+                          children: filteredSkills.map((skill) => {
+                            const selected = selectedSkills.some(
+                              (selectedSkill) => selectedSkill.id === skill.id
+                            );
+                            return /* @__PURE__ */ jsxs7(
                               "button",
                               {
                                 type: "button",
-                                "data-we-prompt-card-skill-tag": "true",
-                                title: `\u79FB\u9664\u6280\u80FD\uFF1A${skill.label}`,
+                                disabled: selected,
                                 style: {
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 5,
-                                  maxWidth: "100%",
-                                  border: `1px solid ${EDITOR_CHROME.border}`,
-                                  borderRadius: 999,
-                                  background: EDITOR_CHROME.surfaceInteractive,
-                                  color: EDITOR_CHROME.textSecondary,
-                                  padding: "3px 7px",
-                                  fontSize: 11,
-                                  lineHeight: 1.2,
-                                  cursor: "pointer"
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "flex-start",
+                                  gap: 2,
+                                  border: 0,
+                                  background: selected ? EDITOR_CHROME.surfaceInteractive : "transparent",
+                                  color: selected ? EDITOR_CHROME.textMuted : EDITOR_CHROME.textPrimary,
+                                  padding: "8px 10px",
+                                  textAlign: "left",
+                                  cursor: selected ? "default" : "pointer"
                                 },
-                                onClick: () => handleSkillRemove(skill.id),
+                                onMouseDown: (event) => {
+                                  event.preventDefault();
+                                },
+                                onClick: () => {
+                                  if (!selected) {
+                                    handleSkillSelect(skill);
+                                  }
+                                },
                                 children: [
                                   /* @__PURE__ */ jsx8(
                                     "span",
                                     {
                                       style: {
-                                        minWidth: 0,
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        whiteSpace: "nowrap"
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        lineHeight: 1.35
                                       },
                                       children: skill.label
                                     }
                                   ),
-                                  /* @__PURE__ */ jsx8(CloseOutlined2, { style: { fontSize: 9, color: EDITOR_CHROME.textMuted } })
+                                  /* @__PURE__ */ jsx8(
+                                    "span",
+                                    {
+                                      style: {
+                                        fontSize: 11,
+                                        lineHeight: 1.35,
+                                        color: EDITOR_CHROME.textMuted
+                                      },
+                                      children: skill.description
+                                    }
+                                  )
                                 ]
                               },
                               skill.id
-                            ))
-                          }
-                        ) : null,
-                        /* @__PURE__ */ jsx8(
-                          Input3.TextArea,
-                          {
-                            className: "we-runtime-prompt-card__textarea",
-                            value: draftNote,
-                            disabled: !canEditNote,
-                            readOnly: inlineTextEditing,
-                            tabIndex: inlineTextEditing ? -1 : 0,
-                            allowClear: true,
-                            autoSize: { minRows: 1, maxRows: 4 },
-                            placeholder: notePlaceholder,
-                            variant: "borderless",
-                            styles: {
-                              textarea: {
-                                color: EDITOR_CHROME.textPrimary,
-                                background: "transparent",
-                                minHeight: 32,
-                                padding: "6px 10px",
-                                fontSize: 12.5,
-                                lineHeight: 1.55,
-                                caretColor: EDITOR_CHROME.textPrimary
-                              }
-                            },
-                            style: {
-                              borderRadius: 12,
-                              background: "transparent",
-                              borderColor: "transparent",
-                              boxShadow: "none"
-                            },
-                            onChange: (event) => {
-                              onDraftChange(event.target.value);
-                            },
-                            onFocus: (event) => {
-                              if (!inlineTextEditing) return;
-                              event.currentTarget.blur();
-                            },
-                            onPasteCapture: onNotePasteCapture,
-                            onKeyDown: handlePromptKeyDown,
-                            onBlur: (event) => {
-                              const nextTarget = event.relatedTarget;
-                              if (nextTarget instanceof Node && noteComposerRef.current?.contains(nextTarget)) {
-                                return;
-                              }
-                              if (!noteDirty && !selectedSkillsDirty) return;
-                              void onConfirmNoteWithSelectedSkills();
-                            }
-                          }
-                        ),
-                        skillMenuOpen ? /* @__PURE__ */ jsx8(
-                          "div",
-                          {
-                            "data-we-prompt-card-skill-menu": "true",
-                            style: {
-                              position: "absolute",
-                              left: 0,
-                              right: 0,
-                              top: "calc(100% + 6px)",
-                              zIndex: 1,
-                              display: "flex",
-                              flexDirection: "column",
-                              overflow: "hidden",
-                              borderRadius: 10,
-                              background: EDITOR_CHROME.surfaceElevated,
-                              border: `1px solid ${EDITOR_CHROME.borderStrong}`,
-                              boxShadow: EDITOR_CHROME.shadowCompact
-                            },
-                            children: filteredSkills.map((skill) => {
-                              const selected = selectedSkills.some(
-                                (selectedSkill) => selectedSkill.id === skill.id
-                              );
-                              return /* @__PURE__ */ jsxs7(
-                                "button",
-                                {
-                                  type: "button",
-                                  disabled: selected,
-                                  style: {
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "flex-start",
-                                    gap: 2,
-                                    border: 0,
-                                    background: selected ? EDITOR_CHROME.surfaceInteractive : "transparent",
-                                    color: selected ? EDITOR_CHROME.textMuted : EDITOR_CHROME.textPrimary,
-                                    padding: "8px 10px",
-                                    textAlign: "left",
-                                    cursor: selected ? "default" : "pointer"
-                                  },
-                                  onMouseDown: (event) => {
-                                    event.preventDefault();
-                                  },
-                                  onClick: () => {
-                                    if (!selected) {
-                                      handleSkillSelect(skill);
-                                    }
-                                  },
-                                  children: [
-                                    /* @__PURE__ */ jsx8(
-                                      "span",
-                                      {
-                                        style: {
-                                          fontSize: 12,
-                                          fontWeight: 600,
-                                          lineHeight: 1.35
-                                        },
-                                        children: skill.label
-                                      }
-                                    ),
-                                    /* @__PURE__ */ jsx8(
-                                      "span",
-                                      {
-                                        style: {
-                                          fontSize: 11,
-                                          lineHeight: 1.35,
-                                          color: EDITOR_CHROME.textMuted
-                                        },
-                                        children: skill.description
-                                      }
-                                    )
-                                  ]
+                            );
+                          })
+                        }
+                      ),
+                      children: /* @__PURE__ */ jsxs7(
+                        "div",
+                        {
+                          style: {
+                            position: "relative",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: selectedSkills.length > 0 ? 6 : 0,
+                            minHeight: selectedSkills.length > 0 ? 64 : 44,
+                            justifyContent: "center",
+                            borderRadius: 12,
+                            background: EDITOR_CHROME.surfaceMuted,
+                            border: `1px solid ${EDITOR_CHROME.borderStrong}`
+                          },
+                          children: [
+                            selectedSkills.length > 0 ? /* @__PURE__ */ jsx8(
+                              "div",
+                              {
+                                style: {
+                                  display: "flex",
+                                  flexWrap: "wrap",
+                                  gap: 6,
+                                  padding: "8px 8px 0"
                                 },
-                                skill.id
-                              );
-                            })
-                          }
-                        ) : null
-                      ]
+                                children: selectedSkills.map((skill) => /* @__PURE__ */ jsxs7(
+                                  "button",
+                                  {
+                                    type: "button",
+                                    "data-we-prompt-card-skill-tag": "true",
+                                    title: `\u79FB\u9664\u6280\u80FD\uFF1A${skill.label}`,
+                                    style: {
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 5,
+                                      maxWidth: "100%",
+                                      border: `1px solid ${EDITOR_CHROME.border}`,
+                                      borderRadius: 999,
+                                      background: EDITOR_CHROME.surfaceInteractive,
+                                      color: EDITOR_CHROME.textSecondary,
+                                      padding: "3px 7px",
+                                      fontSize: 11,
+                                      lineHeight: 1.2,
+                                      cursor: "pointer"
+                                    },
+                                    onClick: () => handleSkillRemove(skill.id),
+                                    children: [
+                                      /* @__PURE__ */ jsx8(
+                                        "span",
+                                        {
+                                          style: {
+                                            minWidth: 0,
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            whiteSpace: "nowrap"
+                                          },
+                                          children: skill.label
+                                        }
+                                      ),
+                                      /* @__PURE__ */ jsx8(CloseOutlined2, { style: { fontSize: 9, color: EDITOR_CHROME.textMuted } })
+                                    ]
+                                  },
+                                  skill.id
+                                ))
+                              }
+                            ) : null,
+                            /* @__PURE__ */ jsx8(
+                              Input3.TextArea,
+                              {
+                                className: "we-runtime-prompt-card__textarea",
+                                value: draftNote,
+                                disabled: !canEditNote,
+                                readOnly: inlineTextEditing,
+                                tabIndex: inlineTextEditing ? -1 : 0,
+                                allowClear: true,
+                                autoSize: { minRows: 1, maxRows: 4 },
+                                placeholder: notePlaceholder,
+                                variant: "borderless",
+                                styles: {
+                                  textarea: {
+                                    color: EDITOR_CHROME.textPrimary,
+                                    background: "transparent",
+                                    minHeight: 32,
+                                    padding: "6px 10px",
+                                    fontSize: 12.5,
+                                    lineHeight: 1.55,
+                                    caretColor: EDITOR_CHROME.textPrimary
+                                  }
+                                },
+                                style: {
+                                  borderRadius: 12,
+                                  background: "transparent",
+                                  borderColor: "transparent",
+                                  boxShadow: "none"
+                                },
+                                onChange: (event) => {
+                                  onDraftChange(event.target.value);
+                                },
+                                onFocus: (event) => {
+                                  if (!inlineTextEditing) return;
+                                  event.currentTarget.blur();
+                                },
+                                onPasteCapture: onNotePasteCapture,
+                                onKeyDown: handlePromptKeyDown,
+                                onBlur: (event) => {
+                                  const nextTarget = event.relatedTarget;
+                                  if (nextTarget instanceof Node && noteComposerRef.current?.contains(nextTarget)) {
+                                    return;
+                                  }
+                                  if (!noteDirty && !selectedSkillsDirty) return;
+                                  void onConfirmNoteWithSelectedSkills();
+                                }
+                              }
+                            )
+                          ]
+                        }
+                      )
                     }
                   ),
                   /* @__PURE__ */ jsx8(
@@ -16456,15 +16689,7 @@ var PromptCardView = React9.forwardRef(
                   "div",
                   {
                     "data-we-prompt-primary-focus-exempt": "true",
-                    style: {
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 6,
-                      padding: "8px 10px",
-                      borderRadius: 12,
-                      background: "rgba(255, 255, 255, 0.04)",
-                      border: `1px solid ${EDITOR_CHROME.border}`
-                    },
+                    style: annotationEditorShellStyle,
                     children: [
                       /* @__PURE__ */ jsxs7("div", { style: { display: "flex", alignItems: "center", gap: 8 }, children: [
                         /* @__PURE__ */ jsx8(
@@ -16481,32 +16706,9 @@ var PromptCardView = React9.forwardRef(
                             children: documentSourceMarkdownEditor ? "Markdown \u6E90\u7801" : "\u9700\u6C42\u6807\u6CE8"
                           }
                         ),
-                        !documentSourceMarkdownEditor ? /* @__PURE__ */ jsx8(
-                          Popconfirm,
-                          {
-                            title: "\u5220\u9664\u6807\u6CE8",
-                            description: "\u5220\u9664\u540E\u8BE5\u6807\u6CE8\u8282\u70B9\u548C\u9875\u9762\u4E0A\u7684 Marker \u90FD\u4F1A\u6D88\u5931\u3002",
-                            okText: "\u5220\u9664",
-                            cancelText: "\u53D6\u6D88",
-                            okButtonProps: { danger: true },
-                            disabled: annotationLoading || annotationSaving || !onDeleteCurrentAnnotationNode,
-                            getPopupContainer: resolveRuntimePopupContainer,
-                            onConfirm: () => {
-                              void onDeleteCurrentAnnotationNode?.();
-                            },
-                            children: /* @__PURE__ */ jsx8("span", { style: { display: "inline-flex" }, children: /* @__PURE__ */ jsx8(
-                              IconActionButton,
-                              {
-                                title: "\u5220\u9664\u6807\u6CE8",
-                                icon: /* @__PURE__ */ jsx8(DeleteOutlined, {}),
-                                tone: "dark",
-                                disabled: annotationLoading || annotationSaving || !onDeleteCurrentAnnotationNode
-                              }
-                            ) })
-                          }
-                        ) : null
+                        annotationDeleteAction
                       ] }),
-                      /* @__PURE__ */ jsx8(
+                      /* @__PURE__ */ jsx8("div", { "data-we-annotation-markdown-editor": "true", style: annotationEditorInputStyle, children: /* @__PURE__ */ jsx8(
                         Input3.TextArea,
                         {
                           className: "we-runtime-prompt-card__textarea",
@@ -16520,14 +16722,13 @@ var PromptCardView = React9.forwardRef(
                               color: EDITOR_CHROME.textPrimary,
                               background: "transparent",
                               minHeight: 96,
-                              padding: "6px 0",
+                              padding: "10px 12px",
                               fontSize: 12,
                               lineHeight: 1.55,
                               caretColor: EDITOR_CHROME.textPrimary
                             }
                           },
                           style: {
-                            borderRadius: 8,
                             background: "transparent",
                             borderColor: "transparent",
                             boxShadow: "none"
@@ -16548,7 +16749,7 @@ var PromptCardView = React9.forwardRef(
                             }
                           }
                         }
-                      )
+                      ) })
                     ]
                   }
                 ) : null,
@@ -16564,7 +16765,7 @@ var PromptCardView = React9.forwardRef(
                     }
                   }
                 ) : null,
-                !bubbleStyleEditorOpen && styleSummaryLines.length > 0 ? /* @__PURE__ */ jsxs7(
+                !isAnnotationSession && !bubbleStyleEditorOpen && styleSummaryLines.length > 0 ? /* @__PURE__ */ jsxs7(
                   "div",
                   {
                     style: {
@@ -16737,6 +16938,8 @@ import {
   DeleteOutlined as DeleteOutlined3,
   CaretRightFilled as CaretRightFilled2,
   ExclamationCircleFilled as ExclamationCircleFilled2,
+  EyeInvisibleOutlined,
+  EyeOutlined,
   FileTextOutlined as FileTextOutlined2,
   FolderOpenOutlined,
   HomeOutlined,
@@ -18573,6 +18776,7 @@ var PropertyPanelView = React13.forwardRef(
     const toolbarMode = props.toolbarMode ?? options.toolbarMode ?? "inline";
     const isHostToolbarMode = toolbarMode === "host";
     const hideExecutionControls = Boolean(options.hideExecutionControls);
+    const hostSurfaceVisibilityControl = options.hostSurfaceVisibilityControl;
     const selectionModeAvailable = interactionProfile !== "text-comment";
     const rootRef = React13.useRef(null);
     const pagePanelRef = React13.useRef(null);
@@ -18602,6 +18806,9 @@ var PropertyPanelView = React13.forwardRef(
       Math.max(0, options.getModifiedElementCount?.() ?? 0)
     );
     const [actionBusy, setActionBusy] = React13.useState(false);
+    const [hostSurfaceVisible, setHostSurfaceVisible] = React13.useState(
+      () => hostSurfaceVisibilityControl?.initialVisible !== false
+    );
     const [markdownSourceEditorOpen, setMarkdownSourceEditorOpen] = React13.useState(
       () => options.getMarkdownSourceEditorOpen?.() === true
     );
@@ -18674,6 +18881,9 @@ var PropertyPanelView = React13.forwardRef(
     React13.useEffect(() => {
       inlineTextEditingRef.current = inlineTextEditing;
     }, [inlineTextEditing]);
+    React13.useEffect(() => {
+      setHostSurfaceVisible(hostSurfaceVisibilityControl?.initialVisible !== false);
+    }, [hostSurfaceVisibilityControl?.initialVisible]);
     React13.useEffect(() => {
       onDismissSelectionRef.current = onDismissSelection;
     }, [onDismissSelection]);
@@ -18905,6 +19115,36 @@ var PropertyPanelView = React13.forwardRef(
         );
       }
     }, [actionBusy, options.htmlFileSaveEnabled, options.onHostToolbarAction, runAction]);
+    const handleToggleHostSurfaceVisibility = React13.useCallback(async () => {
+      if (actionBusy || !hostSurfaceVisibilityControl || !options.onHostToolbarAction) return;
+      const requestedVisible = !hostSurfaceVisible;
+      try {
+        const result = await runAction(
+          () => options.onHostToolbarAction?.({
+            type: "set-host-surface-visibility",
+            visible: requestedVisible
+          })
+        );
+        if (result === false || result === void 0) {
+          throw new Error("\u5F53\u524D\u5BBF\u4E3B\u65E0\u6CD5\u5207\u6362\u7A97\u53E3\u663E\u793A\u72B6\u6001");
+        }
+        const record = result && typeof result === "object" ? result : {};
+        setHostSurfaceVisible(
+          typeof record.visible === "boolean" ? record.visible : requestedVisible
+        );
+      } catch (error) {
+        notifyRuntimeMessage(
+          "error",
+          error instanceof Error ? error.message : "\u7A97\u53E3\u663E\u793A\u72B6\u6001\u5207\u6362\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5"
+        );
+      }
+    }, [
+      actionBusy,
+      hostSurfaceVisibilityControl,
+      hostSurfaceVisible,
+      options.onHostToolbarAction,
+      runAction
+    ]);
     const agentAwake = effectiveVisualState === "awake";
     const wakeAgentForAction = React13.useCallback(async () => {
       if (agentWakeChecking) {
@@ -19734,7 +19974,7 @@ var PropertyPanelView = React13.forwardRef(
         }
       }
     ) : null;
-    const agentExecutionToolbarButton = inlineInterruptVisible ? /* @__PURE__ */ jsx12(
+    const agentExecutionToolbarButton = hideExecutionControls ? null : inlineInterruptVisible ? /* @__PURE__ */ jsx12(
       Popconfirm2,
       {
         title: "\u7EC8\u6B62\u5168\u90E8\u4FEE\u6539",
@@ -19775,6 +20015,20 @@ var PropertyPanelView = React13.forwardRef(
         }
       }
     );
+    const hostSurfaceVisibilityToolbarButton = hostSurfaceVisibilityControl && options.onHostToolbarAction ? /* @__PURE__ */ jsx12(
+      AgentToolbarIconButton,
+      {
+        title: hostSurfaceVisible ? hostSurfaceVisibilityControl.hideTitle || "\u9690\u85CF\u7A97\u53E3" : hostSurfaceVisibilityControl.showTitle || "\u663E\u793A\u7A97\u53E3",
+        ariaLabel: hostSurfaceVisible ? hostSurfaceVisibilityControl.hideTitle || "\u9690\u85CF\u7A97\u53E3" : hostSurfaceVisibilityControl.showTitle || "\u663E\u793A\u7A97\u53E3",
+        icon: hostSurfaceVisible ? /* @__PURE__ */ jsx12(EyeOutlined, {}) : /* @__PURE__ */ jsx12(EyeInvisibleOutlined, {}),
+        awake: agentShellAwake,
+        active: hostSurfaceVisible,
+        disabled: actionBusy,
+        onClick: () => {
+          void handleToggleHostSurfaceVisibility();
+        }
+      }
+    ) : null;
     const handleCopySkillInstallPrompt = React13.useCallback(async () => {
       const text = buildSkillInstallPrompt(options.skillInstallSource);
       try {
@@ -20093,7 +20347,7 @@ var PropertyPanelView = React13.forwardRef(
         }
       )
     };
-    const aiWorkspaceSettingsItem = hideExecutionControls || !options.onHostToolbarAction ? null : {
+    const aiWorkspaceSettingsItem = !options.onHostToolbarAction ? null : {
       key: "ai-workspace",
       label: "AI \u5DE5\u4F5C\u76EE\u5F55",
       action: handleOpenDirectoryPicker,
@@ -20813,7 +21067,7 @@ var PropertyPanelView = React13.forwardRef(
             children: /* @__PURE__ */ jsxs11(Space2, { size: 4, style: { minWidth: 0, flex: "0 0 auto" }, children: [
               selectionModeToolbarButton,
               markdownSourceEditorToolbarButton,
-              agentExecutionToolbarButton,
+              hostSurfaceVisibilityToolbarButton ?? agentExecutionToolbarButton,
               copyToolbarButton,
               propertyPanelToggleButton,
               clearAllEditsToolbarButton,
@@ -22819,7 +23073,7 @@ function normalizeRuntimeUiSettings(settings, interactionProfile) {
   const normalized = applyMobileSettingsOverride(
     applyInteractionProfileToUiSettings(sanitizeWebEditorUiSettings(settings), interactionProfile)
   );
-  if (interactionProfile === "text-comment" || isMobileDevice()) {
+  if (interactionProfile !== "design" || isMobileDevice()) {
     return normalized;
   }
   return {
@@ -23861,6 +24115,9 @@ function WebEditorUiApp(props) {
         agentVisualState,
         hideExecutionControls: Boolean(
           breadcrumbsOptions.hideExecutionControls ?? propertyPanelOptions?.hideExecutionControls
+        ),
+        hideCurrentElementExecutionAction: Boolean(
+          propertyPanelOptions?.hideCurrentElementExecutionAction
         ),
         hideContextAppendAction: Boolean(
           breadcrumbsOptions.hideExecutionControls ?? propertyPanelOptions?.hideExecutionControls
@@ -29643,6 +29900,9 @@ function createLifecycleService(deps) {
   let routeChangeCleanup = null;
   let interactionProfileRestartQueued = false;
   function resolveActiveInteractionProfile() {
+    if (options.interactionProfile === "annotation") {
+      return "annotation";
+    }
     return options.interactionProfile === "text-comment" || state2.uiSettings.documentCommentMode ? "text-comment" : "design";
   }
   function resolveAnnotationHostTarget(element) {
@@ -29711,7 +29971,13 @@ function createLifecycleService(deps) {
     return services.agentBridge.hasReusableConversation();
   }
   function buildSaveRunPromptForAgentElement(element) {
-    return canReuseAgentConversationForElement(element) ? services.summaries.buildAppendSaveRunPromptForElement(element) : services.summaries.buildSaveRunPromptForElement(element);
+    const prompt = canReuseAgentConversationForElement(element) ? services.summaries.buildAppendSaveRunPromptForElement(element) : services.summaries.buildSaveRunPromptForElement(element);
+    return appendImplicitAnnotationSkillToPrompt(
+      prompt,
+      options.interactionProfile === "annotation",
+      options.ui.commentarySkillSettingsConfigured ? options.ui.commentarySelectedSkillIds : void 0,
+      options.ui.commentarySkillOptions
+    );
   }
   function createHostExternalEditingTaskRef() {
     return {
@@ -30868,6 +31134,8 @@ function createLifecycleService(deps) {
           showCopyPromptAction: options.ui.showCopyPromptAction,
           toolbarMode: options.ui.toolbarMode,
           hideExecutionControls: options.ui.hideExecutionControls,
+          hideCurrentElementExecutionAction: options.ui.hideCurrentElementExecutionAction,
+          hostSurfaceVisibilityControl: options.ui.hostSurfaceVisibilityControl,
           aiExecutionConfigSummary: options.ui.aiExecutionConfigSummary,
           aiExecutionConfigConfigured: options.ui.aiExecutionConfigConfigured,
           aiExecutionProvider: options.ui.aiExecutionProvider,
@@ -31288,6 +31556,8 @@ function createLifecycleService(deps) {
           showCopyPromptAction: options.ui.showCopyPromptAction,
           toolbarMode: options.ui.toolbarMode,
           hideExecutionControls: options.ui.hideExecutionControls,
+          hideCurrentElementExecutionAction: options.ui.hideCurrentElementExecutionAction,
+          hostSurfaceVisibilityControl: options.ui.hostSurfaceVisibilityControl,
           aiExecutionConfigSummary: options.ui.aiExecutionConfigSummary,
           aiExecutionConfigConfigured: options.ui.aiExecutionConfigConfigured,
           aiExecutionProvider: options.ui.aiExecutionProvider,
@@ -32141,6 +32411,21 @@ function createPersistenceService(options) {
       comments.filter(isDeletedRecord).map((entry) => normalizeCommentId(entry.id)).filter(Boolean)
     );
     const images = Array.isArray(record.images) ? record.images : [];
+    const normalizedImages = images.filter((image) => {
+      const commentId = normalizeCommentId(image.commentId);
+      if (!normalizeCommentId(image.id) || !commentId || isDeletedRecord(image)) return false;
+      return !deletedCommentIds.has(commentId);
+    });
+    const commentIdsWithImages = new Set(
+      normalizedImages.map((image) => normalizeCommentId(image.commentId)).filter(Boolean)
+    );
+    const normalizedComments = comments.filter((entry) => normalizeCommentId(entry.id) && !isDeletedRecord(entry)).filter((entry) => {
+      const hasSkillSelection = Array.isArray(entry.skillIds) && entry.skillIds.some((skillId) => String(skillId ?? "").trim());
+      if (!hasSkillSelection) return true;
+      return Boolean(
+        String(entry.comment ?? "").trim() || hasPersistedEditPayload(entry) || commentIdsWithImages.has(normalizeCommentId(entry.id))
+      );
+    }).map((entry) => ({ ...entry, ...normalizeCommentState(entry) }));
     return {
       schemaVersion: 3,
       kind: expectedKind,
@@ -32149,12 +32434,8 @@ function createPersistenceService(options) {
         targetPath: String(record.resource?.targetPath ?? "").trim(),
         filePath: String(record.resource?.filePath ?? "").trim()
       },
-      comments: comments.filter((entry) => normalizeCommentId(entry.id) && !isDeletedRecord(entry)).map((entry) => ({ ...entry, ...normalizeCommentState(entry) })),
-      images: images.filter((image) => {
-        const commentId = normalizeCommentId(image.commentId);
-        if (!normalizeCommentId(image.id) || !commentId || isDeletedRecord(image)) return false;
-        return !deletedCommentIds.has(commentId);
-      })
+      comments: normalizedComments,
+      images: normalizedImages
     };
   }
   function mergeAdapterCommentStates(document2) {
@@ -32417,6 +32698,14 @@ function createPersistenceService(options) {
     if (!normalizedElementKey) return null;
     const commentId = state2.editMetaByKey.get(normalizedElementKey)?.commentId;
     return commentId ? commentStateByCommentId.get(commentId)?.state ?? null : null;
+  }
+  function resetCompletedCommentStateForElement(elementKey) {
+    const normalizedElementKey = normalizeElementRecordKey(elementKey);
+    if (!normalizedElementKey) return;
+    const meta = state2.editMetaByKey.get(normalizedElementKey);
+    const commentId = normalizeCommentId(meta?.commentId);
+    if (!commentId || commentStateByCommentId.get(commentId)?.state !== "completed") return;
+    recordCommentTaskState(normalizedElementKey, "idle");
   }
   async function waitForPendingWrites() {
     const storageScope = String(resolvePersistenceScope()?.storageScope ?? "").trim();
@@ -32684,6 +32973,14 @@ function createPersistenceService(options) {
       }
       const commentId = normalizeCommentId(entry.commentId);
       if (!commentId) continue;
+      const entryNote = changes.normalizeNote(entry.note ?? "");
+      const entrySkillIds = normalizePromptCardSkillIds(entry.skillIds ?? []);
+      const documentImages = currentAdapterDocument?.images?.filter(
+        (image) => image.commentId === commentId && isCurrentPageScopedRecord(image)
+      ) ?? [];
+      if (!entryNote.trim() && entrySkillIds.length > 0 && !hasPersistedEditPayload(entry) && documentImages.length === 0) {
+        continue;
+      }
       const entryElementKey = String(entry.elementKey ?? "").trim();
       const isLegacyTextCommentCacheEntry = getInteractionProfile() === "text-comment" && !entryElementKey && Boolean(entry.note) && Boolean(entry.marker) && !entry.textChange && !entry.styleChanges;
       if (isLegacyTextCommentCacheEntry) {
@@ -32710,17 +33007,15 @@ function createPersistenceService(options) {
       meta.locator = entryLocator;
       meta.label = resolvedLabel;
       meta.note = changes.normalizeNote(entry.note ?? meta.note);
-      const entrySkillIds = normalizePromptCardSkillIds(entry.skillIds ?? []);
-      if (entrySkillIds.length > 0) {
+      if (meta.note.trim() && entrySkillIds.length > 0) {
         meta.skillIds = entrySkillIds;
+      } else {
+        delete meta.skillIds;
       }
       meta.anchor = entry.marker ? normalizeMarkerAnchor(entry.marker) ?? meta.anchor : meta.anchor;
       if (entry.marker && Number.isFinite(Number(entry.marker.dirtySince))) {
         meta.dirtySince = Number(entry.marker.dirtySince);
       }
-      const documentImages = currentAdapterDocument?.images?.filter(
-        (image) => image.commentId === commentId && isCurrentPageScopedRecord(image)
-      ) ?? [];
       if (documentImages.length > 0) {
         const hydratedImages = documentImages.filter((image) => typeof image.data === "string" && image.data.trim()).map((image) => ({
           id: String(image.id ?? "").trim() || `image-${meta.images.length + 1}`,
@@ -32992,6 +33287,7 @@ function createPersistenceService(options) {
     pruneExpiredAgentTaskStates,
     recordCommentTaskState,
     getCommentTaskState,
+    resetCompletedCommentStateForElement,
     waitForPendingWrites,
     listEditingConversationTasks,
     transitionConversationTaskTerminal,
@@ -35050,6 +35346,9 @@ function createCommentary(options = {}) {
     scheduleCacheWrite: () => persistence?.scheduleWrite(),
     persistMarkerVisibility: (visible) => persistence?.setMarkerVisibility(visible),
     getCommentTaskState: (elementKey) => persistence?.getCommentTaskState?.(elementKey) ?? null,
+    onCommentEdited: (elementKey) => {
+      persistence?.resetCompletedCommentStateForElement(elementKey);
+    },
     onSelectMarkedElement: (element, anchor) => {
       if (!element.isConnected) return;
       state2.eventController?.setMode("selecting");

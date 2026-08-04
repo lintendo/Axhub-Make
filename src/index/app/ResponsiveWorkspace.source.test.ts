@@ -15,15 +15,16 @@ describe('responsive workspace styles', () => {
     expect(styles).toContain('.mobile-layout {\n    display: none !important;\n}');
   });
 
-  it('uses a compact hover-capable sidebar shell below the desktop breakpoint', () => {
+  it('uses the same collapsed floating sidebar shell at every desktop width', () => {
     const styles = readStyles();
 
-    expect(styles).toContain('@media (max-width: 1024px) and (hover: hover) and (pointer: fine)');
+    expect(styles).not.toContain('@media (max-width: 1024px) and (hover: hover) and (pointer: fine)');
     expect(styles).toContain('flex-basis: 0 !important;');
     expect(styles).toContain('width: 0 !important;');
     expect(styles).toContain('width: 240px;');
     expect(styles).toContain('position: absolute;');
-    expect(styles).toContain('.ax-sidebar-shell.is-compact-open .ax-sidebar-content');
+    expect(styles).toContain('.ax-sidebar-shell.is-collapsed.is-preview-open .ax-sidebar-content');
+    expect(styles).toContain('top: 48px;');
     expect(styles).toContain('pointer-events: auto;');
     expect(styles).toContain('visibility: hidden;');
     expect(styles).toContain('visibility: visible;');

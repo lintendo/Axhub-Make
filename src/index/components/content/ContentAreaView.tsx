@@ -99,11 +99,13 @@ import {
 } from '../../services/documentTemplates';
 import { generateTemplateImportPrompt, type TemplateLibraryPromptItem } from '../../utils/templateImportPrompts';
 import { getUserFriendlyUploadErrorMessage } from '../../utils/uploadErrors';
+import { copyToClipboard } from '../../utils/clipboard';
 import { resolveMarkdownPreviewIframeUrl } from '../../utils/markdownPreview';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { ResourceStartPromptGrid, type ResourceStartPromptCard } from './ResourceStartPromptGrid';
 import { applyResourceStartImageSize } from './resourceStartPromptSelection';
 import { ThemeStartPromptGrid, type ThemeStartPromptCard } from './ThemeStartPromptGrid';
+import { buildStartGuidePrompt } from './startGuidePrompt';
 
 const ExcalidrawCanvas = React.lazy(() => lazyWithRetry(() => import('./ExcalidrawCanvas')));
 
@@ -594,6 +596,7 @@ interface ContentAreaProps {
     handleChangePreviewScaleMode: (mode: PreviewScaleMode) => void;
     handleChangeSplitPreviewWidth: (pane: 'primary' | 'secondary', width: number) => void;
     handleChangeSplitPreviewHeight: (pane: 'primary' | 'secondary', height: number) => void;
+    handlePreviewContainerSizeChange: (width: number) => void;
     quickEditActive?: boolean;
     onRunPrototypePanePromptAction?: (pane: 'primary' | 'secondary', action: 'copy-prompt' | 'send-to-agent') => void | Promise<boolean>;
     currentDevice: { id: string; [key: string]: any };
@@ -1447,8 +1450,7 @@ function StartGuide({
         disable_prompt_optimization: imageStartParams.disable_prompt_optimization === true || selectedThemeName !== NO_PROTOTYPE_THEME_VALUE,
         background: imageStartParams.output_format === 'png' ? imageStartParams.background : 'auto',
     }), [imageStartParams, selectedTheme?.name, selectedThemeName]);
-    const buildDocumentStartSettings = (): CanvasDocumentPromptSettings | undefined => {
-        if (activeScene !== 'document') return undefined;
+    const resolveDocumentStartSettings = (): CanvasDocumentPromptSettings | undefined => {
         const selectedHtmlVisualSpecOption = documentFormat === 'html' && documentHtmlVisualSpec
             ? DOCUMENT_HTML_VISUAL_SPEC_OPTIONS.find((option) => option.value === documentHtmlVisualSpec)
             : null;
@@ -1473,6 +1475,10 @@ function StartGuide({
         return Object.keys(nextDocumentStartSettings).length
             ? nextDocumentStartSettings
             : undefined;
+    };
+    const buildDocumentStartSettings = (): CanvasDocumentPromptSettings | undefined => {
+        if (activeScene !== 'document') return undefined;
+        return resolveDocumentStartSettings();
     };
     const buildPrototypeStartSettings = () => ({
         count: prototypeGenerationCount,
@@ -1515,6 +1521,42 @@ function StartGuide({
         if (!trimmedPrompt) return '';
         return buildPlaceholderStartPrompt(trimmedPrompt, 'local-ai-acknowledgement').prompt;
     }, [buildPlaceholderStartPrompt]);
+    const copyStartCardPrompt = async (prompt: string) => {
+        try {
+            await copyToClipboard(prompt);
+            toast.success('提示词已复制到剪贴板');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : '复制提示词失败');
+        }
+    };
+    const copyResourceStartCardPrompt = async (card: ResourceStartPromptCard) => {
+        const settings = card.scene === 'design'
+            ? card.imageSize ? applyResourceStartImageSize(effectiveImageStartParams, card.imageSize) : effectiveImageStartParams
+            : {
+                ...(resolveDocumentStartSettings() || {}),
+                ...(card.prdPlanning ? {
+                    usePrdPlanning: card.prdPlanning === 'enable',
+                } : {}),
+            };
+        const prompt = buildStartGuidePrompt({
+            kind,
+            scene: card.scene,
+            prompt: card.prompt,
+            settings,
+            finalGuide: 'local-ai-acknowledgement',
+        });
+        await copyStartCardPrompt(prompt);
+    };
+    const copyThemeStartCardPrompt = async (card: ThemeStartPromptCard) => {
+        const prompt = buildStartGuidePrompt({
+            kind,
+            scene: 'design',
+            prompt: card.prompt,
+            settings: undefined,
+            finalGuide: 'local-ai-acknowledgement',
+        });
+        await copyStartCardPrompt(prompt);
+    };
     const optimizePlaceholderStartPrompt = async (request: CanvasPromptOptimizationRequest) => {
         if (!resolveAcpPromptClientProvider(normalizePromptClientPreference(preferredPromptClient))) {
             toast.warning('请先在 AI 设置中选择本地 AI Agent');
@@ -1937,6 +1979,7 @@ function StartGuide({
                             ariaLabel="原型起始页 AI 输入"
                             preferredPromptClient={preferredPromptClient}
                             showSelectors
+                            disableEditingWithoutConfiguredAgent
                             workspacePath={assistantProjectPath}
                             draftStorageKey={placeholderStartComposerDraftStorageKey}
                             renderPromptCards={kind === 'resource' ? ({ disabled, selectPrompt }) => (
@@ -1945,6 +1988,7 @@ function StartGuide({
                                     activeScene={activeScene}
                                     disabled={disabled}
                                     selectPrompt={selectPrompt}
+                                    onCopyPrompt={copyResourceStartCardPrompt}
                                     onSceneChange={setActiveScene}
                                     onImageSizeChange={(size) => {
                                         setImageStartParams((current) => applyResourceStartImageSize(current, size));
@@ -1956,6 +2000,7 @@ function StartGuide({
                                     cards={activeThemePromptCards}
                                     disabled={disabled}
                                     selectPrompt={selectPrompt}
+                                    onCopyPrompt={copyThemeStartCardPrompt}
                                 />
                             ) : undefined}
                             onOpenAISettings={onOpenAISettings}
@@ -2109,6 +2154,7 @@ export default function ContentArea({
     handleChangePreviewScaleMode,
     handleChangeSplitPreviewWidth,
     handleChangeSplitPreviewHeight,
+    handlePreviewContainerSizeChange,
     quickEditActive,
     onRunPrototypePanePromptAction,
     currentDevice,
@@ -2191,6 +2237,7 @@ export default function ContentArea({
     onAddCanvasImageToAI,
 }: ContentAreaProps) {
     const [previewContainerSize, setPreviewContainerSize] = useState({ width: 0, height: 0 });
+    const previewContainerSizeRef = useRef(previewContainerSize);
     const [splitPrimaryWidthDraft, setSplitPrimaryWidthDraft] = useState('');
     const [splitPrimaryHeightDraft, setSplitPrimaryHeightDraft] = useState('');
     const [splitSecondaryWidthDraft, setSplitSecondaryWidthDraft] = useState('');
@@ -2242,6 +2289,11 @@ export default function ContentArea({
         ? resolveCanvasFilePath(selectedResourceCanvas, selectedResourceCanvas.name)
         : '';
     const handleSubmitPrototypeStartRequest = async (request: CanvasAiGenerationRequest) => {
+        if (!resolveAcpPromptClientProvider(normalizePromptClientPreference(preferredPromptClient))) {
+            onOpenAISettings?.();
+            toast.warning('请先在 AI 设置中选择本地 AI Agent');
+            return false;
+        }
         const submitCanvasAssistantPrompt = async (submittedRequest: CanvasAiGenerationRequest): Promise<boolean> => {
             const result = await onSubmitCanvasAssistantPrompt?.(submittedRequest);
             return result === true || (typeof result === 'object' && result?.ok === true);
@@ -2346,13 +2398,19 @@ export default function ContentArea({
         }
 
         const updateSize = () => {
-            setPreviewContainerSize((previous) => resolveStablePreviewContainerSize({
+            const previous = previewContainerSizeRef.current;
+            const next = resolveStablePreviewContainerSize({
                 previous,
                 clientWidth: node.clientWidth,
                 clientHeight: node.clientHeight,
-                horizontalInset: 48,
+                horizontalInset: 0,
                 verticalInset: 32,
-            }));
+            });
+            previewContainerSizeRef.current = next;
+            setPreviewContainerSize(next);
+            if (next.width !== previous.width) {
+                handlePreviewContainerSizeChange(next.width);
+            }
         };
 
         updateSize();
@@ -2367,6 +2425,7 @@ export default function ContentArea({
         };
     }, [
         containerRef,
+        handlePreviewContainerSizeChange,
         previewConfig.previewMode,
         previewConfig.singlePreset,
     ]);
@@ -2502,10 +2561,20 @@ export default function ContentArea({
             // Ignore cross-origin or observer setup failures and keep timeout fallback.
         }
 
-        const frameWindow = iframe.contentWindow;
-        if (frameWindow) {
-            frameWindow.addEventListener('resize', measure);
-            cleanupTasks.push(() => frameWindow.removeEventListener('resize', measure));
+        try {
+            const frameWindow = iframe.contentWindow;
+            if (frameWindow) {
+                frameWindow.addEventListener('resize', measure);
+                cleanupTasks.push(() => {
+                    try {
+                        frameWindow.removeEventListener('resize', measure);
+                    } catch {
+                        // Ignore cleanup failures when a preview navigates cross-origin.
+                    }
+                });
+            }
+        } catch {
+            // Keep the timeout measurement fallback; browser guidance belongs to action failures.
         }
 
         measure();
@@ -3059,7 +3128,7 @@ export default function ContentArea({
                         <div className="flex h-full w-full items-center justify-center text-center text-[12px] text-muted-foreground">
                             <div>
                                 <Rocket className="mx-auto mb-3 h-10 w-10 opacity-20" />
-                                <div>当前原型缺少 clientUrl，无法打开预览</div>
+                                <div>{selectedItem.clientUrl ? '当前原型尚未生成可运行页面' : '当前原型缺少 clientUrl，无法打开预览'}</div>
                             </div>
                         </div>
                     ) : selectedPrototypeClientUnavailable ? (

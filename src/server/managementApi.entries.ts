@@ -25,12 +25,13 @@ function prototypeResourceToEntry(projectId: string, resource: ProjectMetadata['
     clientUrl,
     filePath: resource.filePath,
     absoluteFilePath: resource.absoluteFilePath,
+    specFilePath: resource.specFilePath,
     artifacts: resource.artifacts,
     pages: resource.pages,
     defaultPageId: resource.defaultPageId,
     projectId,
     resourceId: resource.id,
-    previewDisabled: !clientUrl,
+    previewDisabled: resource.previewDisabled === true || !clientUrl,
     ...(resource.placeholder === true ? { placeholder: true } : {}),
     ...(resource.placeholderGuide ? { placeholderGuide: resource.placeholderGuide } : {}),
     ...(resource.generationStatus ? { generationStatus: resource.generationStatus } : {}),
@@ -59,6 +60,7 @@ export function handleEntriesCompatibilityApi(
     context.metadata,
     context.project.root,
     options.runtimeOrigin,
+    req,
   );
   sendJson(res, projectMetadataToEntries(context.project.id, metadata));
   return true;

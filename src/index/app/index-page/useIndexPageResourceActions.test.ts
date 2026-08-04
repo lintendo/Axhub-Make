@@ -17,8 +17,10 @@ describe('useIndexPageResourceActions source', () => {
   it('uses explicit local source paths for prototype filesystem operations', () => {
     const source = readResourceActionsSource();
 
-    expect(source).toContain("import { getExplicitLocalPath, stripIndexFilePath } from '../../utils/localPath';");
-    expect(source).toContain('const localBasePath = getLocalBasePathForItem(item);');
+    expect(source).toContain("import { getExplicitLocalPath, getPrototypeLocalBasePath, stripIndexFilePath } from '../../utils/localPath';");
+    expect(source).toContain('export function getPrototypeBasePathForItem(item: unknown): string');
+    expect((source.match(/getPrototypeBasePathForItem\(item\)/gu) || [])).toHaveLength(6);
+    expect(source).toContain('const localBasePath = getPrototypeBasePathForItem(item);');
     expect(source).toContain('if (!localBasePath)');
     expect(source).toContain('fetch(buildResourceUrl(`/api/prototypes/${encodeURIComponent(item.name)}`)');
     expect(source).toContain('body: JSON.stringify(buildResourceBody({ displayName: trimmedName }))');
@@ -27,6 +29,7 @@ describe('useIndexPageResourceActions source', () => {
     expect(source).toContain('targetPath: buildLocalSiblingPath(localBasePath, newName),');
     expect(source).toContain('const deleteTargetLabel = item.displayName || item.name;');
     expect(source).toContain('getIdeTargetPath={() => localBasePath}');
+    expect(source).toContain('setCurrentVersionItem({ ...item, filePath: localBasePath });');
     expect(source).not.toContain('const sourcePath = `prototypes/${item.name}`;');
     expect(source).not.toContain('sourcePath: `src/${itemTypePath}/${item.name}`');
     expect(source).not.toContain('targetPath: `src/${itemTypePath}/${newName}`');
@@ -364,5 +367,16 @@ describe('useIndexPageResourceActions source', () => {
 
     expect(handlerSource).toContain("messageApi.error(error?.message || '删除失败');");
     expect(handlerSource).not.toContain('return Promise.reject(error);');
+  });
+
+  it('copies document resource paths relative to the project root', () => {
+    const source = readResourceRootSource();
+    const handlerStart = source.indexOf('const handleCopyDocPath = useCallback');
+    const handlerEnd = source.indexOf('const handleDocVersionManagement', handlerStart);
+    const handlerSource = source.slice(handlerStart, handlerEnd);
+
+    expect(handlerSource).toContain('const localPath = getProjectRelativeResourcePathForItem(item);');
+    expect(handlerSource).toContain('await navigator.clipboard.writeText(localPath);');
+    expect(handlerSource).not.toContain('const localPath = getLocalPathForItem(item);');
   });
 });
