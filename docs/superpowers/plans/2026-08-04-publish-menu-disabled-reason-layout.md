@@ -34,19 +34,20 @@ Add a focused test that extracts the export menu and requires the new width, sep
 ```ts
 it('keeps long Figma Make disabled reasons inside an auto-height menu item', () => {
   const source = readSource();
-  const exportMenuSegment = getSourceSegment(
+  const figmaMakeSegment = getSourceSegment(
     source,
-    '<DropdownMenuContent align="end" className="w-72 max-w-[calc(100vw-1rem)] text-sm">',
+    '{showMakeExportEntry ? (',
     '<DropdownMenuSeparator />',
   );
 
-  expect(exportMenuSegment).toContain('<span className="block whitespace-nowrap leading-5">导出 Figma Make</span>');
-  expect(exportMenuSegment).toContain('{makeExportDisabledReason ? (');
-  expect(exportMenuSegment).toContain('{makeExportDisabledReason}');
-  expect(exportMenuSegment).toContain('whitespace-normal text-[11px] leading-4');
-  expect(exportMenuSegment).toContain('shrink-0');
-  expect(exportMenuSegment).not.toContain('h-7');
-  expect(exportMenuSegment).not.toContain('`导出 Figma Make（${makeExportDisabledReason}）`');
+  expect(source).toContain('<DropdownMenuContent align="end" className="w-72 max-w-[calc(100vw-1rem)] text-sm">');
+  expect(figmaMakeSegment).toContain('<span className="block whitespace-nowrap leading-5">导出 Figma Make</span>');
+  expect(figmaMakeSegment).toContain('{makeExportDisabledReason ? (');
+  expect(figmaMakeSegment).toContain('{makeExportDisabledReason}');
+  expect(figmaMakeSegment).toContain('whitespace-normal text-[11px] leading-4');
+  expect(figmaMakeSegment).toContain('shrink-0');
+  expect(figmaMakeSegment).not.toContain('h-7');
+  expect(figmaMakeSegment).not.toContain('`导出 Figma Make（${makeExportDisabledReason}）`');
 });
 ```
 
