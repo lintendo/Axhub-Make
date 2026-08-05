@@ -1,0 +1,103 @@
+name: Axhub Make CI
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  push:
+    branches:
+      - main
+permissions:
+  contents: read
+concurrency:
+  group: axhub-make-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  prepare:
+    name: prepare-ci-matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.classify.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22"
+      - id: classify
+        env:
+          AXHUB_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          AXHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/github/changed-areas.mjs >> "$GITHUB_OUTPUT"
+
+  baseline:
+    name: governance-baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      AXHUB_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      AXHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+        with:
+          version: 10.20.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm github:test
+      - run: pnpm audit:open-source
+      - run: git diff --check "$AXHUB_BASE_SHA...$AXHUB_HEAD_SHA"
+
+  area-checks:
+    name: area-${{ matrix.area }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+        with:
+          version: 10.20.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/github/run-area-check.mjs "${{ matrix.area }}"
+
+  required:
+    name: ci-required
+    if: always()
+    needs:
+      - prepare
+      - baseline
+      - area-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PREPARE_RESULT: ${{ needs.prepare.result }}
+      BASELINE_RESULT: ${{ needs.baseline.result }}
+      AREA_RESULT: ${{ needs.area-checks.result }}
+    steps:
+      - name: Require every CI stage to pass
+        shell: bash
+        run: |
+          test "$PREPARE_RESULT" = success
+          test "$BASELINE_RESULT" = success
+          test "$AREA_RESULT" = success
