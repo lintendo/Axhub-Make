@@ -23,7 +23,7 @@ describe('Axhub Make area checks', () => {
     ]);
     assert.deepEqual(commandsForArea('shared'), [
       { command: 'pnpm', args: ['build'] },
-      { command: 'pnpm', args: ['test', '--maxWorkers=1'] },
+      { command: 'pnpm', args: ['test'] },
     ]);
   });
 
