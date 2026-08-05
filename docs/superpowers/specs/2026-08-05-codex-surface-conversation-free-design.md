@@ -2,7 +2,7 @@
 
 ## 目标
 
-在现有 `@axhub/make` npm 包中增加 Codex 专用页面模式。Codex++ 左侧的 `Axhub Make` 入口打开：
+在现有 `@axhub/make` npm 包中增加 Codex 专用页面模式。无论用户通过 Codex++ 还是官方 Codex 打开的左侧 `Axhub Make` 入口，均打开：
 
 ```text
 http://127.0.0.1:53817/?surface=codex
@@ -92,7 +92,7 @@ interface MakeSurfaceCapabilities {
 
 事件处理不得因为对话不可用而静默失败，也不得自动切回 `standard` 页面。
 
-## Codex++ 启动链路
+## Codex++ 与官方 Codex 启动链路
 
 伴随服务仍启动或复用固定的 Make 服务：
 
@@ -101,13 +101,21 @@ npx --yes --package @axhub/make@<version> axhub-make \
   --host 127.0.0.1 --port 53817 --no-open
 ```
 
-健康检查仍使用固定根源 `http://127.0.0.1:53817`。服务健康后，Codex++ 用户脚本只把内置浏览器打开地址改为：
+两类用户共享同一个固定本地 CDP 端口 `9229` 与同一个 Axhub Companion：
+
+- Codex++ 用户仍直接打开 Codex++；Codex++ 负责使 CDP 端口可用；
+- 只有官方 Codex 的用户运行 `npx -y @axhub/make@latest codex open`；该命令检查端口、以 `--remote-debugging-port=9229` 和受控的 `--remote-allow-origins` 参数启动官方 Codex，并等待 `app://` CDP target 出现；
+- 如果官方 Codex 已按普通方式运行而端口不可用，`codex open` 只提示用户退出该实例后重试，绝不强制结束用户进程。
+
+Companion 连接端口后，对当前 `app://` renderer 执行 `Runtime.evaluate`，并注册 `Page.addScriptToEvaluateOnNewDocument`，使后续 renderer 也获得同一侧边栏入口。它不使用 Codex++ 的 `user_scripts` 目录，不修改 Codex 或 Codex++ 应用文件，也不启动第二个 Codex 进程。
+
+健康检查仍使用固定根源 `http://127.0.0.1:53817`。服务健康后，CDP 注入的侧边栏源只把内置浏览器打开地址设为：
 
 ```text
 http://127.0.0.1:53817/?surface=codex
 ```
 
-用户不需要新命令或新配置。安装、更新、诊断和卸载仍使用：
+安装、更新、诊断和卸载对两类用户相同：
 
 ```bash
 npx -y @axhub/make@latest codex install
@@ -115,14 +123,24 @@ npx -y @axhub/make@latest codex doctor
 npx -y @axhub/make@latest codex uninstall
 ```
 
+日常启动按用户已有客户端选择：
+
+```bash
+# 已安装 Codex++：正常从 Codex++ 启动，无额外命令
+
+# 只有官方 Codex：用这一条替代日常打开 Codex
+npx -y @axhub/make@latest codex open
+```
+
 ## 错误处理与兼容性
 
 - 普通根地址的现有行为必须保持不变，包括对话面板、打开菜单和提示词执行动作；
 - Codex 页面无法初始化某个直接执行工具时，沿用该工具现有的错误提示，不回退到聊天；
-- 已有 Make 服务无论由普通终端还是 Codex++ 启动，都能同时服务两种页面；
+- 已有 Make 服务无论由普通终端、Codex++ 或官方 Codex 启动器触发，都能同时服务两种页面；
 - 页面刷新和项目切换不得丢失 `surface=codex`，Admin UI 内部构造页面 URL 时需要保留 surface 参数；
-- Codex++ 用户脚本只接受固定 loopback origin，并固定追加受控的 `surface=codex` 查询参数；
-- Codex 或 Codex++ 更新导致侧边栏脚本失效时，现有 `codex doctor` 与重新安装流程保持不变。
+- CDP 注入的侧边栏源只接受固定 loopback origin，并固定追加受控的 `surface=codex` 查询参数；
+- Codex 或 Codex++ 更新导致侧边栏脚本失效时，现有 `codex doctor` 与重新安装流程保持不变；
+- `codex doctor` 分别报告 Codex++ 与官方 Codex 默认安装路径，并报告 `9229` 上实际可见的 `app://` target；缺失任一客户端只产生 warning，两个候选都缺失时安装仍可用于自定义路径或随后安装客户端。
 
 ## 测试设计
 
@@ -133,9 +151,10 @@ npx -y @axhub/make@latest codex uninstall
 3. 提示词按钮测试：Codex 页面只有复制动作，没有隐藏在下拉菜单中的执行动作；普通页面行为不变。
 4. 菜单与设置测试：Codex 页面不渲染整个“打开”菜单和聊天专属设置，图片生成与直接执行配置仍存在。
 5. 画布与预览事件测试：对话动作被拒绝或降级复制，直接执行动作继续运行。
-6. Codex++ 用户脚本测试：打开地址必须精确包含 `?surface=codex`，并继续使用 Codex 内置浏览器。
-7. 回归测试：普通根地址的会话功能、现有 Make CLI、`codex install/doctor/uninstall` 与 npm 发布包保持通过。
-8. 浏览器冒烟：分别打开根地址和 `?surface=codex`，验证普通页存在对话入口、Codex 页不存在，并验证至少一项图片或画布直接生成入口仍可见。
+6. CDP 注入测试：当前 renderer 与后续 renderer 均获得同一个入口；打开地址必须精确包含 `?surface=codex`，并继续使用 Codex 内置浏览器。
+7. 官方 Codex 启动器测试：macOS 与 Windows 的候选路径、参数数组、已有 CDP target、普通实例冲突和启动等待均有覆盖。
+8. 回归测试：普通根地址的会话功能、现有 Make CLI、`codex install/open/doctor/uninstall` 与 npm 发布包保持通过。
+9. 浏览器冒烟：分别打开根地址和 `?surface=codex`，验证普通页存在对话入口、Codex 页不存在，并验证至少一项图片或画布直接生成入口仍可见。
 
 ## 非目标
 
@@ -143,15 +162,15 @@ npx -y @axhub/make@latest codex uninstall
 - 不移除直接 AI 执行能力；
 - 不创建 `@axhub/make-codex` 等新 npm 包；
 - 不创建独立 `/codex` 构建入口或第二套静态资源；
-- 不使用 CSS、DOM 删除脚本或 Codex++ 注入逻辑来隐藏 Make 功能；
+- 不使用 CSS 或 DOM 删除脚本来隐藏 Make 功能；CDP 注入仅用于添加 Axhub 侧边栏入口，不用于隐藏 Make 页面功能；
 - 不把 `surface=codex` 当成权限或安全隔离机制；
 - 不清理本次边界之外的历史 AI 文案或未显示代码。
 
 ## 验收标准
 
-- 用户通过 Codex++ 点击 `Axhub Make` 后，Codex 内置浏览器打开 `?surface=codex`；
+- 用户通过 Codex++ 直接启动，或通过 `codex open` 启动官方 Codex，点击 `Axhub Make` 后都在 Codex 内置浏览器打开 `?surface=codex`；
 - Codex 页面没有 Make 对话面板、打开菜单、对话上下文动作或聊天执行动作；
 - Codex 页面仍可看到并使用页面/画布直接执行能力以及复制提示词；
 - 普通根地址的完整 Make 行为没有变化；
 - 普通页面和 Codex 页面可以同时使用同一个本地服务；
-- macOS 与 Windows 安装方式和日常点击流程没有新增步骤。
+- Codex++ 用户的 macOS 与 Windows 日常点击流程没有新增步骤；官方 Codex 用户只需把日常启动动作替换为 `codex open`。
