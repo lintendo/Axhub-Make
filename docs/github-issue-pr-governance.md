@@ -29,7 +29,7 @@ Axhub Runtime 可以继续承担内部开发与同步来源的角色，但公开
 - `main` 没有 branch protection 或 repository ruleset。
 - squash merge、merge commit 和 rebase merge 同时开放，合并后不会自动删除分支。
 - Secret scanning 与 push protection 已启用，Dependabot security updates 未启用。
-- 根目录已有 MIT `LICENSE` 和较完整的中文产品 README。
+- 根目录已有 Apache License 2.0 `LICENSE` 和较完整的中文产品 README。
 - 根 `package.json` 是开发源包，保留 `private: true`，但缺少 `license`、`repository`、`bugs` 和 `homepage` 元数据。
 - 干净 checkout 上 `pnpm install --frozen-lockfile` 成功，`pnpm audit:open-source` 成功。
 - 开源审计禁止提交 `docs/superpowers/`、本地路径、工作缓存和敏感信息，因此治理文档放在 `docs/` 的长期公开位置。
@@ -248,12 +248,12 @@ package.json
 
 要求：
 
-- 保留现有 MIT `LICENSE`，不覆盖。
+- 保留现有 Apache License 2.0 `LICENSE`，不覆盖。
 - README 保持中文产品定位和现有启动说明，只增加贡献、安全与许可证入口。
 - CONTRIBUTING 说明 pnpm 开发环境、分支与 PR、测试、跨平台要求、vendor 提交规则和本地数据禁入规则。
 - CODE_OF_CONDUCT 使用 Contributor Covenant，默认处理渠道为公开 commit 元数据中的 `lintendo@outlook.com`；合并前必须确认该邮箱仍被监控，否则先替换为实际维护渠道。
 - SECURITY 只公开 GitHub Private Vulnerability Reporting，不在普通 Issue 中接收漏洞。
-- 根 `package.json` 保留 `private: true`，只补 MIT license 与 GitHub repository、bugs、homepage 元数据；发布包仍由现有 release 脚本生成。
+- 根 `package.json` 保留 `private: true`，只补 Apache-2.0 license 与 GitHub repository、bugs、homepage 元数据；发布包仍由现有 release 脚本生成。
 - 不为了满足通用模板新增空洞的 ARCHITECTURE、DEPLOYMENT 或 CHANGELOG 文件。
 
 第二批自动化 PR 增加：

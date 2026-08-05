@@ -125,4 +125,4 @@ Make 内置新手教程、100+ 设计规范和 10+ 行业原型。原型完成�
 
 ## License
 
-Axhub Make 使用 [MIT License](LICENSE)。
+Axhub Make 使用 [Apache License 2.0](LICENSE)。

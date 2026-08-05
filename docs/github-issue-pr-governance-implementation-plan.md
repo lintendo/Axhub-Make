@@ -469,9 +469,9 @@ it('links community policies and declares repository metadata', () => {
 
   assert.match(readme, /CONTRIBUTING\.md/u);
   assert.match(readme, /SECURITY\.md/u);
-  assert.match(readme, /MIT License/u);
+  assert.match(readme, /Apache License 2\.0/u);
   assert.equal(packageJson.private, true);
-  assert.equal(packageJson.license, 'MIT');
+  assert.equal(packageJson.license, 'Apache-2.0');
   assert.deepEqual(packageJson.repository, {
     type: 'git',
     url: 'git+https://github.com/lintendo/Axhub-Make.git',
@@ -577,7 +577,7 @@ Append near the end of `README.md`, before any final license-only footer if pres
 
 ## License
 
-Axhub Make 使用 [MIT License](LICENSE)。
+Axhub Make 使用 [Apache License 2.0](LICENSE)。
 ```
 
 - [ ] **Step 6: 补齐 root package metadata，不改变发布逻辑**
@@ -586,7 +586,7 @@ Add these top-level fields to `package.json`; keep `private: true`, all dependen
 
 ```json
 {
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lintendo/Axhub-Make.git"
