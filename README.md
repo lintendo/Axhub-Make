@@ -116,3 +116,13 @@ Make 内置新手教程、100+ 设计规范和 10+ 行业原型。原型完成�
 如果你已经加入过 Axhub 其他用户群，不需要重复添加。
 
 <img src="assets/images/axhub-make-user-group-qrcode.png" alt="Axhub Make 用户群二维码" height="128">
+
+## 参与贡献
+
+提交 Bug、功能建议或代码前，请阅读 [贡献指南](CONTRIBUTING.md)。安全漏洞不要提交公开 Issue，请按照 [安全政策](SECURITY.md) 私密报告。
+
+参与社区时请遵守 [行为准则](CODE_OF_CONDUCT.md)。
+
+## License
+
+Axhub Make 使用 [MIT License](LICENSE)。

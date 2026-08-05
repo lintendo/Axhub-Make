@@ -3,6 +3,15 @@
   "version": "0.6.11",
   "description": "Axhub Make management server and admin UI",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lintendo/Axhub-Make.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lintendo/Axhub-Make/issues"
+  },
+  "homepage": "https://github.com/lintendo/Axhub-Make#readme",
   "type": "module",
   "bin": {
     "make": "./bin/cli.mjs",

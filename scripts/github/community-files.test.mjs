@@ -54,4 +54,37 @@ describe('GitHub community files', () => {
     assert.match(template, /Related issue[\s\S]*Optional/u);
     assert.match(template, /- \[ \]/u);
   });
+
+  it('publishes contribution, conduct, and security policies', () => {
+    const contributing = readText('CONTRIBUTING.md');
+    const conduct = readText('CODE_OF_CONDUCT.md');
+    const security = readText('SECURITY.md');
+
+    assert.match(contributing, /pnpm install/u);
+    assert.match(contributing, /pull request/iu);
+    assert.match(contributing, /vendor\//u);
+    assert.match(conduct, /Contributor Covenant/u);
+    assert.match(conduct, /lintendo@outlook\.com/u);
+    assert.match(security, /security\/advisories\/new/u);
+    assert.match(security, /not.*public issue/iu);
+  });
+
+  it('links community policies and declares repository metadata', () => {
+    const readme = readText('README.md');
+    const packageJson = JSON.parse(readText('package.json'));
+
+    assert.match(readme, /CONTRIBUTING\.md/u);
+    assert.match(readme, /SECURITY\.md/u);
+    assert.match(readme, /MIT License/u);
+    assert.equal(packageJson.private, true);
+    assert.equal(packageJson.license, 'MIT');
+    assert.deepEqual(packageJson.repository, {
+      type: 'git',
+      url: 'git+https://github.com/lintendo/Axhub-Make.git',
+    });
+    assert.deepEqual(packageJson.bugs, {
+      url: 'https://github.com/lintendo/Axhub-Make/issues',
+    });
+    assert.equal(packageJson.homepage, 'https://github.com/lintendo/Axhub-Make#readme');
+  });
 });
