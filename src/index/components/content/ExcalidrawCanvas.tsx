@@ -1233,12 +1233,14 @@ function getCanvasResourceGridPosition(
 
 async function insertCanvasResourceSelections({
     excalidrawAPI,
+    projectId,
     selections,
     canvasPrototypeId,
     viewportRect,
     scheduleExplicitCanvasSave,
 }: {
     excalidrawAPI: ExcalidrawAPI;
+    projectId: string;
     selections: CanvasProjectResourceItemSelection[];
     canvasPrototypeId?: string | null;
     viewportRect?: EmbedViewportRect | null;
@@ -1260,6 +1262,7 @@ async function insertCanvasResourceSelections({
             createEmbeddableFromDrop(
                 excalidrawAPI,
                 payload,
+                projectId,
                 x,
                 y,
                 canvasPrototypeId,
@@ -1377,6 +1380,7 @@ export function createEmbeddableFromDrop(
         embedViewMode?: 'link' | 'preview';
         previewKind?: CanvasDropPreviewKind;
     },
+    projectId: string,
     canvasX: number,
     canvasY: number,
     canvasPrototypeId?: string | null,
@@ -1400,6 +1404,7 @@ export function createEmbeddableFromDrop(
     const isTheme = sourceResourceType === 'theme';
     const resourceType = payload.resourceType || 'preview';
     const previewUrl = resolveCanvasEmbedPreviewUrl({
+        projectId,
         previewUrl: payload.previewUrl,
         resourceType: sourceResourceType || resourceType,
         runtimeOrigin: (window as any).__RUNTIME_ORIGIN__,
@@ -1418,6 +1423,7 @@ export function createEmbeddableFromDrop(
         ? fitEmbedSizeToViewport(getDefaultEmbedSize({ ...payload, embedViewMode: 'preview' }), viewportRect, zoom)
         : { width: embedSize.width, height: embedSize.height };
     const commonCustomData = {
+        projectId,
         title: payload.displayName,
         previewUrl: previewUrl || payload.previewUrl || '',
         openUrl: link,
@@ -2559,6 +2565,7 @@ export default function ExcalidrawCanvas({
         });
         void insertCanvasResourceSelections({
             excalidrawAPI,
+            projectId: activeProjectId,
             selections,
             canvasPrototypeId: getPrototypeIdFromCanvasName(currentNameRef.current),
             viewportRect: canvasContainerRef.current?.getBoundingClientRect(),
@@ -2567,7 +2574,7 @@ export default function ExcalidrawCanvas({
             console.warn('[Axhub Canvas] 添加项目资源到画布失败:', error);
             toast.error('添加资源到画布失败');
         });
-    }, [excalidrawAPI, projectResourceItems, projectResourceTrees, scheduleExplicitCanvasSave]);
+    }, [activeProjectId, excalidrawAPI, projectResourceItems, projectResourceTrees, scheduleExplicitCanvasSave]);
 
     const executeCanvasBridgeCommand = useCallback(async (command: CanvasCommandName, payload: any = {}) => {
         if (!excalidrawAPI) {

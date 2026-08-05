@@ -859,9 +859,19 @@ describe('ExcalidrawCanvas source', () => {
     const payloadStart = source.indexOf('function buildCanvasResourcePayloadFromPickerSelection');
     const payloadEnd = source.indexOf('function getCanvasResourcePayloadSize', payloadStart);
     const payloadSource = source.slice(payloadStart, payloadEnd);
+    const insertStart = source.indexOf('async function insertCanvasResourceSelections');
+    const insertEnd = source.indexOf('function resolveEmbeddableResourceType', insertStart);
+    const insertSource = source.slice(insertStart, insertEnd);
+    const applyStart = source.indexOf('const handleApplyProjectResources = useCallback');
+    const applyEnd = source.indexOf('const executeCanvasBridgeCommand', applyStart);
+    const applySource = source.slice(applyStart, applyEnd);
 
     expect(payloadSource).toContain('function buildCanvasResourcePayloadFromPickerSelection(selection: CanvasProjectResourceItemSelection, projectId: string)');
     expect(payloadSource.match(/projectId,/g)).toHaveLength(3);
-    expect(source).toContain('.map((selection) => buildCanvasResourcePayloadFromPickerSelection(selection, projectId))');
+    expect(insertSource).toContain('projectId,');
+    expect(insertSource).toContain('projectId: string;');
+    expect(insertSource).toContain('.map((selection) => buildCanvasResourcePayloadFromPickerSelection(selection, projectId))');
+    expect(insertSource).toContain('createEmbeddableFromDrop(\n                excalidrawAPI,\n                payload,\n                projectId,');
+    expect(applySource).toContain('projectId: activeProjectId,');
   });
 });

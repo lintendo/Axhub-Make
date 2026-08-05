@@ -83,6 +83,25 @@ AI 生成或新建资源节点默认使用 `customData.embedViewMode: "preview"`
 
 主题节点与原型/文档节点使用相同的 `embeddable` 结构，`resourceType` 为 `theme`，`previewKind` 通常为 `web` 或 `none`。
 
+新建主题节点示例：
+
+```json
+{
+  "type": "embeddable",
+  "link": "/?projectId=<project-id>&theme=<theme-id>&sidebar=collapsed",
+  "customData": {
+    "type": "axhub-theme",
+    "projectId": "<project-id>",
+    "title": "主题标题",
+    "openUrl": "/?projectId=<project-id>&theme=<theme-id>&sidebar=collapsed",
+    "previewKind": "web",
+    "resourceType": "theme",
+    "resourceId": "<theme-id>",
+    "embedViewMode": "preview"
+  }
+}
+```
+
 ## Drawio 节点
 
 Drawio 节点是图片元素。`files[fileId].dataURL` 保存带 Drawio XML 的 SVG 预览，`customData.type` 固定为 `axhub-drawio`。

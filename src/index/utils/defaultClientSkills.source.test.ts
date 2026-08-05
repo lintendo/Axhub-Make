@@ -172,6 +172,9 @@ describe('default client skills', () => {
       expect(nodesReference).toContain('"projectId": "<project-id>"');
       expect(nodesReference).toContain('projectId=<project-id>&p=');
       expect(nodesReference).toContain('projectId=<project-id>&doc=');
+      expect(nodesReference).toContain('projectId=<project-id>&theme=');
+      expect(nodesReference).toContain('"type": "axhub-theme"');
+      expect(nodesReference).toContain('"resourceType": "theme"');
     }
   });
 
