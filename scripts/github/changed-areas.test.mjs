@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+
+import { classifyChangedPaths, matrixForAreas, parseNameStatus } from './changed-areas.mjs';
+
+describe('Axhub Make changed areas', () => {
+  it('classifies public repository paths without Runtime workspace names', () => {
+    assert.deepEqual(classifyChangedPaths(['README.md']), ['docs']);
+    assert.deepEqual(classifyChangedPaths(['src/server/http.ts']), ['server']);
+    assert.deepEqual(classifyChangedPaths(['src/index/app/IndexPage.tsx']), ['admin']);
+    assert.deepEqual(classifyChangedPaths(['client/src/main.tsx']), ['client']);
+    assert.deepEqual(classifyChangedPaths(['scripts/release-make.mjs']), ['release']);
+    assert.deepEqual(classifyChangedPaths(['vendor/axhub-commentary/dist/index.js']), ['shared']);
+    assert.deepEqual(classifyChangedPaths(['package.json']), ['release', 'shared']);
+  });
+
+  it('uses conservative shared checks for unknown code paths', () => {
+    assert.deepEqual(classifyChangedPaths(['future-runtime/entry.ts']), ['shared']);
+  });
+
+  it('keeps both sides of rename records', () => {
+    const paths = parseNameStatus('R100\0src/server/old.ts\0src/index/new.tsx\0');
+    assert.deepEqual(paths, ['src/server/old.ts', 'src/index/new.tsx']);
+    assert.deepEqual(classifyChangedPaths(paths), ['admin', 'server']);
+  });
+
+  it('returns a deterministic GitHub matrix', () => {
+    assert.deepEqual(matrixForAreas(['server', 'docs']), {
+      include: [{ area: 'docs' }, { area: 'server' }],
+    });
+  });
+});
