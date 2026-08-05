@@ -52,9 +52,11 @@ Issues 不能立即裸开。顺序为：
 
 1. 合并 Issue Forms 和社区文档。
 2. 创建表单引用的新增标签。
-3. 启用 GitHub Private Vulnerability Reporting。
-4. 启用 GitHub Issues。
-5. 用维护者测试 Issue 验证表单、默认标签和链接后关闭测试 Issue。
+3. 启用 Dependabot vulnerability alerts，并确认读取接口返回 HTTP 204。
+4. 启用 GitHub Private Vulnerability Reporting。
+5. 启用 GitHub Issues。
+6. 启用 Dependabot security updates，但保持自动合并关闭。
+7. 用维护者测试 Issue 验证表单、默认标签和链接后关闭测试 Issue。
 
 这样可以避免用户在模板和安全入口尚未就绪时提交无结构或包含敏感信息的内容。
 
@@ -276,6 +278,7 @@ scripts/github/
 ### 8.1 社区基础 PR 合并后
 
 - 创建新增标签。
+- 启用 Dependabot vulnerability alerts；这是 security updates 的前置条件，未启用时配置 automated security fixes 会返回 HTTP 422。
 - 启用 Private Vulnerability Reporting。
 - 启用 Issues。
 - 保持 Discussions 关闭，先使用 FAQ 和用户群承担一般使用咨询。
@@ -349,7 +352,8 @@ scripts/github/
 
 - 仓库内文件通过 revert PR 回退。
 - 标签只增加，不删除已有标签。
-- GitHub 设置修改前后保存 JSON 快照，必要时按快照恢复。
+- GitHub 设置修改前后保存 Issues、Private Vulnerability Reporting、vulnerability alerts、automated security fixes 和标签快照；`GET /vulnerability-alerts` 返回 HTTP 204 表示启用，HTTP 404 表示关闭或当前不可用。
+- 外部设置验证失败时，只回退变更前快照证明为关闭、且本次实际启用的能力；安全入口按 automated security fixes、Issues、Private Vulnerability Reporting、vulnerability alerts 的逆序条件回退。
 - 若 branch protection 配错，先恢复到已验证快照，不用 force push 绕过。
 
 ## 11. 非目标

@@ -749,6 +749,8 @@ mkdir -p .local/github-governance
 gh api repos/lintendo/Axhub-Make > .local/github-governance/community-settings-before.json
 gh repo view lintendo/Axhub-Make --json nameWithOwner,visibility,defaultBranchRef,hasIssuesEnabled,url
 gh api repos/lintendo/Axhub-Make/private-vulnerability-reporting
+gh api --include repos/lintendo/Axhub-Make/vulnerability-alerts
+gh api repos/lintendo/Axhub-Make/automated-security-fixes
 gh label list --repo lintendo/Axhub-Make --limit 100
 ```
 
@@ -758,6 +760,7 @@ Expected before mutation:
 - visibility is `PUBLIC`.
 - default branch is `main`.
 - the merged `.github/ISSUE_TEMPLATE/` files are present on `main`.
+- Issues、Private Vulnerability Reporting、vulnerability alerts、automated security fixes 和完整标签状态均已记录；vulnerability alerts 的 HTTP 204 表示启用，HTTP 404 表示关闭或当前不可用。
 
 Record the complete output in the execution transcript. Ask for explicit confirmation before Step 2.
 
@@ -786,17 +789,19 @@ gh label create "status: blocked" --repo lintendo/Axhub-Make --color 5319E7 --de
 
 Expected: only missing labels are added; default labels are unchanged.
 
-- [ ] **Step 3: 启用私密漏洞报告、Issues 和安全更新**
+- [ ] **Step 3: 启用 vulnerability alerts、私密漏洞报告、Issues 和安全更新**
 
 Run:
 
 ```bash
+gh api --method PUT repos/lintendo/Axhub-Make/vulnerability-alerts
+gh api --include repos/lintendo/Axhub-Make/vulnerability-alerts
 gh api --method PUT repos/lintendo/Axhub-Make/private-vulnerability-reporting
 gh api --method PATCH repos/lintendo/Axhub-Make -F has_issues=true
 gh api --method PUT repos/lintendo/Axhub-Make/automated-security-fixes
 ```
 
-These commands must not enable auto-merge, publish a release, or change repository visibility.
+The vulnerability-alert read-back must return HTTP 204 before enabling automated security fixes; HTTP 404 means alerts are disabled or unavailable and execution must stop. Without this prerequisite, GitHub returns HTTP 422 when configuring automated security fixes. These commands must not enable auto-merge or Discussions, publish a release, change merge methods or repository visibility, or alter program behavior.
 
 - [ ] **Step 4: 读取验证外部状态**
 
@@ -805,18 +810,20 @@ Run:
 ```bash
 gh repo view lintendo/Axhub-Make --json visibility,hasIssuesEnabled,defaultBranchRef
 gh api repos/lintendo/Axhub-Make/private-vulnerability-reporting
+gh api --include repos/lintendo/Axhub-Make/vulnerability-alerts
 gh api repos/lintendo/Axhub-Make/automated-security-fixes
 gh label list --repo lintendo/Axhub-Make --limit 100
 ```
 
-Expected: public visibility remains unchanged; Issues and private vulnerability reporting are enabled; all planned labels exist.
+Expected: public visibility and default branch remain unchanged; Issues and private vulnerability reporting are enabled; vulnerability alerts return HTTP 204; automated security fixes are enabled and not paused; all planned labels exist. Auto-merge, Discussions, merge methods, releases and program behavior remain unchanged.
 
-If verification fails, stop before creating the tracking Issue. For each switch that the Step 1 snapshot proved was disabled and Step 3 enabled, revert only that switch with the corresponding command:
+If verification fails, stop before creating the tracking Issue. In reverse order, revert only each capability that the Step 1 snapshot proved was disabled and Step 3 actually enabled:
 
 ```bash
 gh api --method DELETE repos/lintendo/Axhub-Make/automated-security-fixes
 gh api --method PATCH repos/lintendo/Axhub-Make -F has_issues=false
 gh api --method DELETE repos/lintendo/Axhub-Make/private-vulnerability-reporting
+gh api --method DELETE repos/lintendo/Axhub-Make/vulnerability-alerts
 ```
 
 Do not disable a capability that was already enabled before this task. Newly added labels may remain because they do not affect program execution; if they must be removed, first compare them with the recorded pre-change label list and request explicit approval.
