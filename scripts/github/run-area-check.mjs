@@ -21,7 +21,7 @@ const commandPlans = Object.freeze({
   ],
   shared: [
     { command: 'pnpm', args: ['build'] },
-    { command: 'pnpm', args: ['test'] },
+    { command: 'pnpm', args: ['test', '--maxWorkers=1'] },
   ],
 });
 
