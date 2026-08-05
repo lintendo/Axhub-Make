@@ -1131,7 +1131,7 @@ function resolveCanvasResourceDocPreviewKind(item: ItemData): CanvasDropPreviewK
     return 'none';
 }
 
-function buildCanvasResourcePayloadFromPickerSelection(selection: CanvasProjectResourceItemSelection): CanvasResourcePayload | null {
+function buildCanvasResourcePayloadFromPickerSelection(selection: CanvasProjectResourceItemSelection, projectId: string): CanvasResourcePayload | null {
     const { item, tab } = selection;
     const resourceId = item.resourceId || item.name;
     const displayName = item.displayName || item.name;
@@ -1152,6 +1152,7 @@ function buildCanvasResourcePayloadFromPickerSelection(selection: CanvasProjectR
             openUrl: buildResourceDeepLinkUrl({
                 resourceType: 'doc',
                 resourceId,
+                projectId,
                 collapseSidebar: true,
             }),
         };
@@ -1171,6 +1172,7 @@ function buildCanvasResourcePayloadFromPickerSelection(selection: CanvasProjectR
             openUrl: buildResourceDeepLinkUrl({
                 resourceType: 'theme',
                 resourceId,
+                projectId,
                 collapseSidebar: true,
             }),
         };
@@ -1189,6 +1191,7 @@ function buildCanvasResourcePayloadFromPickerSelection(selection: CanvasProjectR
         openUrl: buildResourceDeepLinkUrl({
             resourceType: 'prototype',
             resourceId,
+            projectId,
             view: 'demo',
             collapseSidebar: true,
         }),
@@ -1242,7 +1245,7 @@ async function insertCanvasResourceSelections({
     scheduleExplicitCanvasSave: () => void;
 }) {
     const payloads = selections
-        .map(buildCanvasResourcePayloadFromPickerSelection)
+        .map((selection) => buildCanvasResourcePayloadFromPickerSelection(selection, projectId))
         .filter((payload): payload is CanvasResourcePayload => Boolean(payload));
     if (payloads.length === 0) return;
 

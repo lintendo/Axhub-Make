@@ -853,4 +853,15 @@ describe('ExcalidrawCanvas source', () => {
     expect(source).toContain('createCanvasCommandRectElement(targetRect, \'focus-rect\')');
     expect(source).toContain('CANVAS_COMMAND_UPDATE_ALLOWED_FIELDS');
   });
+
+  it('creates project-scoped deep links for newly inserted resource nodes', () => {
+    const source = readSource();
+    const payloadStart = source.indexOf('function buildCanvasResourcePayloadFromPickerSelection');
+    const payloadEnd = source.indexOf('function getCanvasResourcePayloadSize', payloadStart);
+    const payloadSource = source.slice(payloadStart, payloadEnd);
+
+    expect(payloadSource).toContain('function buildCanvasResourcePayloadFromPickerSelection(selection: CanvasProjectResourceItemSelection, projectId: string)');
+    expect(payloadSource.match(/projectId,/g)).toHaveLength(3);
+    expect(source).toContain('.map((selection) => buildCanvasResourcePayloadFromPickerSelection(selection, projectId))');
+  });
 });
