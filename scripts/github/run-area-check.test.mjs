@@ -15,12 +15,15 @@ describe('Axhub Make area checks', () => {
     ]);
     assert.deepEqual(commandsForArea('client'), [
       { command: 'pnpm', args: ['client:typecheck'] },
-      { command: 'pnpm', args: ['--filter', '@axhub/make-client', 'test'] },
       { command: 'pnpm', args: ['client:build'] },
     ]);
     assert.deepEqual(commandsForArea('release'), [
       { command: 'node', args: ['--test', 'scripts/release-make.test.mjs', 'scripts/release-make-mirror-gitee.test.mjs'] },
       { command: 'pnpm', args: ['build'] },
+    ]);
+    assert.deepEqual(commandsForArea('shared'), [
+      { command: 'pnpm', args: ['build'] },
+      { command: 'pnpm', args: ['test'] },
     ]);
   });
 

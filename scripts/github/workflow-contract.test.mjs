@@ -14,6 +14,7 @@ describe('GitHub workflow security contract', () => {
       assert.equal(workflow.on.pull_request_target, undefined);
       assert.deepEqual(workflow.permissions, { contents: 'read' });
     }
+    assert.ok(policy.on.pull_request.types.includes('converted_to_draft'));
     assert.equal(policy.jobs.policy.name, 'pr-policy');
     assert.equal(ci.jobs.required.name, 'ci-required');
   });

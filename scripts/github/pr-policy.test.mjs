@@ -1,13 +1,30 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, it } from 'node:test';
 
 import {
+  runFromEvent,
   validatePrBody,
   validatePrTitle,
   validatePullRequest,
 } from './pr-policy.mjs';
 
 const validBody = `## Summary\nAdds governance.\n\n## Motivation\nKeeps reviews consistent.\n\n## Scope\nGitHub only.\n\n## Validation\nTests pass.\n\n## Platform coverage\nNot applicable.\n\n## Risk and rollback\nRevert the PR.\n`;
+
+function runWithTemporaryEvent(pullRequest) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-pr-policy-'));
+  const eventPath = path.join(directory, 'event.json');
+  const previousExitCode = process.exitCode;
+  try {
+    fs.writeFileSync(eventPath, JSON.stringify({ pull_request: pullRequest }));
+    return runFromEvent(eventPath);
+  } finally {
+    process.exitCode = previousExitCode;
+    fs.rmSync(directory, { force: true, recursive: true });
+  }
+}
 
 describe('PR policy', () => {
   it('accepts conventional titles with optional lowercase scopes', () => {
@@ -32,5 +49,21 @@ describe('PR policy', () => {
       validatePrBody(validBody.replace('## Platform coverage', '## Other'), { draft: false }).join('\n'),
       /Platform coverage/u,
     );
+  });
+
+  it('reads a ready pull request event with a CRLF body', () => {
+    assert.deepEqual(runWithTemporaryEvent({
+      title: 'ci: validate pull request event',
+      body: validBody.replaceAll('\n', '\r\n'),
+      draft: false,
+    }), []);
+  });
+
+  it('reads a Draft pull request event without requiring a structured body', () => {
+    assert.deepEqual(runWithTemporaryEvent({
+      title: 'ci: validate draft pull request event',
+      body: 'Work in progress.',
+      draft: true,
+    }), []);
   });
 });

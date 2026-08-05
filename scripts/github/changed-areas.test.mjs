@@ -24,6 +24,27 @@ describe('Axhub Make changed areas', () => {
     assert.deepEqual(classifyChangedPaths(paths), ['admin', 'server']);
   });
 
+  it('keeps the path from deletion records', () => {
+    assert.deepEqual(parseNameStatus('D\0client/src/removed.tsx\0'), [
+      'client/src/removed.tsx',
+    ]);
+  });
+
+  it('keeps both sides of copy records', () => {
+    assert.deepEqual(
+      parseNameStatus('C100\0src/server/source.ts\0src/index/copied.tsx\0'),
+      ['src/server/source.ts', 'src/index/copied.tsx'],
+    );
+  });
+
+  it('rejects malformed or truncated records', () => {
+    assert.throws(() => parseNameStatus('M\0'), /Malformed git name-status record: M/u);
+    assert.throws(
+      () => parseNameStatus('C100\0src/server/source.ts\0'),
+      /Malformed git name-status record: C100/u,
+    );
+  });
+
   it('returns a deterministic GitHub matrix', () => {
     assert.deepEqual(matrixForAreas(['server', 'docs']), {
       include: [{ area: 'docs' }, { area: 'server' }],

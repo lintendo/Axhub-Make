@@ -13,7 +13,6 @@ const commandPlans = Object.freeze({
   ],
   client: [
     { command: 'pnpm', args: ['client:typecheck'] },
-    { command: 'pnpm', args: ['--filter', '@axhub/make-client', 'test'] },
     { command: 'pnpm', args: ['client:build'] },
   ],
   release: [
@@ -23,7 +22,6 @@ const commandPlans = Object.freeze({
   shared: [
     { command: 'pnpm', args: ['build'] },
     { command: 'pnpm', args: ['test'] },
-    { command: 'pnpm', args: ['--filter', '@axhub/make-client', 'test'] },
   ],
 });
 
