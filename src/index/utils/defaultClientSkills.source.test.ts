@@ -159,6 +159,22 @@ describe('default client skills', () => {
     }
   });
 
+  it('requires project scope on newly created project resource nodes', () => {
+    const skillRoots = [
+      '.agents/skills/canvas-workspace',
+      '.claude/skills/canvas-workspace',
+    ];
+
+    for (const root of skillRoots) {
+      const nodesReference = readClientFile(`${root}/references/axhub-nodes.md`);
+
+      expect(nodesReference).toContain('新建项目内嵌入节点必须同时写入');
+      expect(nodesReference).toContain('"projectId": "<project-id>"');
+      expect(nodesReference).toContain('projectId=<project-id>&p=');
+      expect(nodesReference).toContain('projectId=<project-id>&doc=');
+    }
+  });
+
   it('bundles the Write PRD skill with Axhub resource and template rules', () => {
     const skillRoots = [
       '.agents/skills/write-prd',

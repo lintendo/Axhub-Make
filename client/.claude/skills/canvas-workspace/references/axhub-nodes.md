@@ -9,6 +9,7 @@ Axhub 画布节点本质上是标准 Excalidraw 元素，Axhub 扩展信息存�
 | `customData.title` | 面向用户的节点标题 |
 | `customData.previewUrl` | 预览模式中渲染的 URL |
 | `customData.openUrl` | 节点操作中打开的 URL |
+| `customData.projectId` | 节点所属的 Make 项目 ID |
 | `customData.previewKind` | 渲染类型，例如 `web`、`doc`、`image`、`none` |
 | `customData.resourceType` | 资源类型：`prototype`、`doc` 或 `theme` |
 | `customData.resourceId` | 项目 metadata 中的资源 id 或名称 |
@@ -17,6 +18,8 @@ Axhub 画布节点本质上是标准 Excalidraw 元素，Axhub 扩展信息存�
 | `customData.screenshotUrl` | 运行时已捕获的持久化预览截图 URL |
 | `customData.annotation` | 元素批注文本 |
 | `customData.annotationUpdatedAt` | 批注更新时间，ISO 8601 格式 |
+
+新建项目内嵌入节点必须同时写入 `customData.projectId`。元素 `link`、`customData.previewUrl` 或 `customData.openUrl` 只要使用 Make 管理端相对路由或 `/api/` 路径，就必须携带与 `customData.projectId` 相同的 `projectId` query 参数；不要依赖打开节点时再补参数。
 
 ## 嵌入资源节点
 
@@ -33,11 +36,12 @@ AI 生成或新建资源节点默认使用 `customData.embedViewMode: "preview"`
 ```json
 {
   "type": "embeddable",
-  "link": "/?resourceType=prototype&resourceId=<prototype-id>&view=demo&sidebar=collapsed",
+  "link": "/?projectId=<project-id>&p=<prototype-id>&sidebar=collapsed",
   "customData": {
+    "projectId": "<project-id>",
     "title": "原型标题",
     "previewUrl": "http://localhost:<port>/prototypes/<prototype-id>",
-    "openUrl": "/?resourceType=prototype&resourceId=<prototype-id>&view=demo&sidebar=collapsed",
+    "openUrl": "/?projectId=<project-id>&p=<prototype-id>&sidebar=collapsed",
     "previewKind": "web",
     "resourceType": "prototype",
     "resourceId": "<prototype-id>",
@@ -56,11 +60,13 @@ AI 生成或新建资源节点默认使用 `customData.embedViewMode: "preview"`
 ```json
 {
   "type": "embeddable",
-  "link": "/api/markdown-file?path=<encoded-path>",
+  "link": "/api/markdown-file?path=<encoded-path>&projectId=<project-id>",
   "customData": {
     "type": "axhub-doc",
+    "projectId": "<project-id>",
     "title": "文档标题",
-    "previewUrl": "/api/markdown-file?path=<encoded-path>",
+    "previewUrl": "/api/markdown-file?path=<encoded-path>&projectId=<project-id>",
+    "openUrl": "/?projectId=<project-id>&doc=<doc-id>&sidebar=collapsed",
     "previewKind": "doc",
     "resourceType": "doc",
     "resourceId": "<doc-id>",
