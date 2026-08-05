@@ -1,7 +1,7 @@
 # Axhub Make GitHub Issue 与 PR 治理设计
 
 - 日期：2026-08-05
-- 状态：待用户复核
+- 状态：已批准，待实施
 - 目标仓库：`lintendo/Axhub-Make`
 
 ## 1. 范围
