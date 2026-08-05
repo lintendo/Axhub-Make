@@ -221,6 +221,8 @@ CI 只按 Axhub Make 自己的结构分类：
 
 独立 client test suite 当前不进入 required CI：它在未改动的 standalone `main` 基线上已有 4 个失败文件和 7 个失败断言，若直接设为 required 会让无关 PR 永久失败。这是明确记录的暂缓项，不代表这些测试已经通过或被永久移除；基线债务修复并转绿后，必须把 `pnpm --filter @axhub/make-client test` 恢复到 required CI。
 
+`shared` 完成全量构建后以 `pnpm test --maxWorkers=1` 运行根测试。测试范围和断言不变；这是 CI 调度层的隔离措施，用于避免多个测试文件同时写入同一个全局 admin-server 状态文件，而不是改动应用的运行时并发配置。
+
 ### 6.3 CI 结构
 
 `.github/workflows/ci.yml` 始终启动，并使用 Node.js 22 与仓库开发所需的 pnpm：

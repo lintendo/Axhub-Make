@@ -1226,7 +1226,7 @@ describe('Axhub Make area checks', () => {
     ]);
     assert.deepEqual(commandsForArea('shared'), [
       { command: 'pnpm', args: ['build'] },
-      { command: 'pnpm', args: ['test'] },
+      { command: 'pnpm', args: ['test', '--maxWorkers=1'] },
     ]);
   });
 
@@ -1684,7 +1684,7 @@ git status --short
 Expected:
 
 - all commands exit 0;
-- `shared` runs only root `pnpm build` and root `pnpm test`;
+- `shared` runs root `pnpm build` and root `pnpm test --maxWorkers=1`; the CI-only worker limit isolates tests that share a global admin-server state file without reducing their coverage;
 - `client` runs only `pnpm client:typecheck` and `pnpm client:build`;
 - the standalone `pnpm --filter @axhub/make-client test` suite is not claimed as passing or required while unchanged `main` still has 4 failing files and 7 failing assertions; restore it to required CI once that baseline is green;
 - shared/client/release checks do not publish or contact production;
