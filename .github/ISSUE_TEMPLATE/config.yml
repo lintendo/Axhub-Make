@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Usage and frequently asked questions
+    url: https://github.com/lintendo/Axhub-Make/blob/main/docs/faq.md
+    about: Check setup and usage guidance before opening a bug report.
+  - name: Report a security vulnerability
+    url: https://github.com/lintendo/Axhub-Make/security/advisories/new
+    about: Send vulnerabilities privately. Do not open a public issue.

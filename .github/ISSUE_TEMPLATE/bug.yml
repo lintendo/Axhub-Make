@@ -1,0 +1,98 @@
+name: Bug report
+description: Report a reproducible problem in Axhub Make
+title: "bug: "
+labels:
+  - bug
+  - "status: needs-triage"
+body:
+  - type: markdown
+    attributes:
+      value: Before submitting, remove tokens, account data, private URLs, and local absolute paths.
+  - type: input
+    id: version
+    attributes:
+      label: Axhub Make version
+      description: Run npx -y @axhub/make@latest --version or copy the version shown by Make.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Installation or CLI
+        - Admin UI
+        - Server or API
+        - Client template
+        - Agent integration
+        - Import or export
+        - Annotation or review
+        - Documentation
+        - Release
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 15.6, Windows 11, or Linux distribution
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version
+      placeholder: Output of node --version
+    validations:
+      required: true
+  - type: dropdown
+    id: entry
+    attributes:
+      label: Start entry
+      options:
+        - npx
+        - Codex++ sidebar
+        - Local development
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: agent
+    attributes:
+      label: Agent, browser, or editor
+      description: Include the relevant product and version, or write Not applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or visual evidence
+      description: Redact secrets, account data, private URLs, and local absolute paths.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues for duplicates.
+          required: true
+        - label: I removed secrets and private data from this report.
+          required: true

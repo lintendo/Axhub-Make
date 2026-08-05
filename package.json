@@ -33,6 +33,7 @@
   ],
   "scripts": {
     "audit:open-source": "node scripts/open-source-audit.mjs",
+    "github:community:test": "node --test scripts/open-source-audit.test.mjs scripts/github/community-files.test.mjs",
     "vendor:sync": "node scripts/sync-vendor-package.mjs",
     "dev": "pnpm --filter @axhub/make-client dev",
     "server:dev": "pnpm vendor:sync && AXHUB_ONLINE_BASE_URL=${AXHUB_ONLINE_BASE_URL:-https://axhub.im} tsx watch --ignore './src/index/**' --ignore './dist/**' --ignore './vendor/**' --ignore './src/dev-template/**' --ignore './src/spec-template/**' --ignore './src/canvas-template/**' --ignore './src/html-template/**' --ignore './*.timestamp-*' src/server/cli.ts -- --dev",
@@ -160,7 +161,8 @@
     "subset-font": "^2.5.0",
     "tailwindcss": "^4.1.18",
     "vite": "5.4.21",
-    "vitest": "4.0.16"
+    "vitest": "4.0.16",
+    "yaml": "2.9.0"
   },
   "pnpm": {
     "overrides": {
