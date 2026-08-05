@@ -957,7 +957,7 @@ describe('make-server HTTP server', () => {
         adminRoot: path.join(projectRoot, 'missing-admin'),
         registryPath,
       })).rejects.toMatchObject({ code: 'EADDRINUSE' });
-      expect(fs.existsSync(getAdminServerInfoPath(projectRoot))).toBe(true);
+      expect(fs.existsSync(getAdminServerInfoPath(projectRoot, { homeDir: registryHome }))).toBe(true);
 
       const health = await fetch(`${first.origin}/api/health`).then((response) => response.json());
       expect(health).toMatchObject({
