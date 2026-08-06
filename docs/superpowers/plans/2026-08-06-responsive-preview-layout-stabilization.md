@@ -14,6 +14,8 @@
 - Preserve `device` URL behavior and all manual device modes.
 - Use `annotation-sidebar` and `review-panel`, never a shared lock boolean.
 - Final iframe layout uses actual preview width and height.
+- Keep responsive defaults, explicit user pins, and temporary system-collapse overrides separate.
+- Tie review stabilization to the same rendered-panel predicate as `PresentationArea`.
 - Preserve unrelated worktree changes. Implementation files already contain prerequisite user edits, so leave them unstaged unless an isolated commit would remain coherent.
 
 ---
@@ -221,7 +223,7 @@ Expected: FAIL on new lifecycle assertions.
 
 ```ts
 if (!collapsed) startPreviewLayoutStabilization('annotation-sidebar');
-setCollapsed(true);
+setSystemCollapsed(true);
 ```
 
 Use only on system-owned collapse paths. Always call `endPreviewLayoutStabilization('annotation-sidebar')` in editor exit `finally`; ending a missing reason is idempotent.
@@ -230,10 +232,11 @@ Use only on system-owned collapse paths. Always call `endPreviewLayoutStabilizat
 
 ```ts
 useLayoutEffect(() => {
-  if (!reviewPanelOpen) return;
+  const reviewPanelStabilizationActive = reviewPanelOpen && reviewPanelVisible;
+  if (!reviewPanelStabilizationActive) return;
   startPreviewLayoutStabilization('review-panel');
   return () => endPreviewLayoutStabilization('review-panel');
-}, [endPreviewLayoutStabilization, reviewPanelOpen, startPreviewLayoutStabilization]);
+}, [endPreviewLayoutStabilization, reviewPanelStabilizationActive, startPreviewLayoutStabilization]);
 ```
 
 The toggle only changes `reviewPanelOpen`.

@@ -78,6 +78,8 @@ The controller maintains a set of active reasons rather than a shared boolean.
 
 Annotation cleanup must remove `annotation-sidebar` in the same guaranteed exit path that restores the sidebar. Review cleanup must derive `review-panel` directly from the rendered open state so unmounts and resource switches cannot leave a stale reason.
 
+Sidebar ownership is split into three layers: responsive default, explicit user pin, and a temporary system-collapse override used by editor entry. Clearing the system override restores the current responsive/pinned decision instead of pinning the value observed at editor entry. Review stabilization follows the same rendered-panel predicate used by `PresentationArea`, so switching to canvas, a start-draft surface, or a placeholder releases the scope even if the review toggle remains true.
+
 ## External Workspace Measurement
 
 `IndexPageDesktop` is the top-level owner because it already measures the desktop workspace and knows the persistent assistant panel's visibility and width.
