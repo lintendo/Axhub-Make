@@ -11,6 +11,8 @@ describe('Axhub Make changed areas', () => {
     assert.deepEqual(classifyChangedPaths(['client/src/main.tsx']), ['client']);
     assert.deepEqual(classifyChangedPaths(['scripts/release-make.mjs']), ['release']);
     assert.deepEqual(classifyChangedPaths(['vendor/axhub-commentary/dist/index.js']), ['shared']);
+    assert.deepEqual(classifyChangedPaths(['vite.config.ts']), ['shared']);
+    assert.deepEqual(classifyChangedPaths(['vite.axure-export.config.ts']), ['admin']);
     assert.deepEqual(classifyChangedPaths(['vitest.config.ts']), ['shared']);
     assert.deepEqual(classifyChangedPaths(['package.json']), ['release', 'shared']);
   });

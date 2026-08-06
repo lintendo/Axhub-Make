@@ -1108,10 +1108,10 @@ import { pathToFileURL } from 'node:url';
 const mappings = [
   ['docs', /^(?:\.github\/|README\.md$|CONTRIBUTING\.md$|CODE_OF_CONDUCT\.md$|SECURITY\.md$|LICENSE$|docs\/|scripts\/github\/)/u],
   ['server', /^(?:bin\/|src\/server\/|src\/common\/|tsconfig\.node\.json$)/u],
-  ['admin', /^(?:src\/(?:index|components|styles|data|dev-template|spec-template|canvas-template|html-template)\/|vite(?:\.axure-export)?\.config\.ts$|vitest\.config\.ts$)/u],
+  ['admin', /^(?:src\/(?:index|components|styles|data|dev-template|spec-template|canvas-template|html-template)\/|vite\.axure-export\.config\.ts$)/u],
   ['client', /^client\//u],
   ['release', /^(?:scripts\/release-|package\.json$)/u],
-  ['shared', /^(?:vendor\/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|vendor-packages\.config\.json$|tsconfig\.json$)/u],
+  ['shared', /^(?:vendor\/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|vendor-packages\.config\.json$|vite\.config\.ts$|vitest\.config\.ts$|tsconfig\.json$)/u],
 ];
 
 export function parseNameStatus(output) {
@@ -1296,7 +1296,23 @@ const commandPlans = Object.freeze({
   ],
   admin: [
     { command: 'pnpm', args: ['admin:build'] },
-    { command: 'pnpm', args: ['exec', 'vitest', 'run', 'src/index'] },
+    {
+      command: 'pnpm',
+      args: [
+        'exec',
+        'vitest',
+        'run',
+        'src/index',
+        'src/components',
+        'src/styles',
+        'src/data',
+        'src/dev-template',
+        'src/spec-template',
+        'src/canvas-template',
+        'src/html-template',
+        'src/server/vendorPackages.test.ts',
+      ],
+    },
   ],
   client: [
     { command: 'pnpm', args: ['client:typecheck'] },
@@ -1501,6 +1517,7 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+      - edited
   push:
     branches:
       - main
