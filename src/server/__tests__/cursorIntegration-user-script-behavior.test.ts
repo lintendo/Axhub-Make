@@ -218,7 +218,12 @@ describe('Cursor injected launcher behavior', () => {
     expect(harness.entry()?.dataset.axhubState).toBe('starting');
     expect(harness.entryLabel()).toBe('Opening…');
 
-    vi.advanceTimersByTime(5_000);
+    vi.advanceTimersByTime(4_000);
+    await Promise.resolve();
+    expect(harness.entry()?.dataset.axhubState).toBe('starting');
+    expect(harness.entryLabel()).toBe('Opening…');
+
+    vi.advanceTimersByTime(1_000);
     await Promise.resolve();
     await Promise.resolve();
     expect(harness.entry()?.dataset.axhubState).toBe('idle');
