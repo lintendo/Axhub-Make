@@ -1,7 +1,7 @@
 # Axhub Make GitHub Issue 与 PR 治理设计
 
-- 日期：2026-08-05
-- 状态：已批准，待实施
+- 日期：2026-08-06
+- 状态：已实施，试运行中
 - 目标仓库：`lintendo/Axhub-Make`
 
 ## 1. 范围
@@ -308,6 +308,18 @@ scripts/github/
 - 管理员遵守规则；紧急绕过必须补 Issue 或 PR 说明。
 
 保护规则只能在检查名称实际出现在测试 PR 后启用，避免配置不存在的 required check 导致主分支锁死。
+
+### 8.3 实施记录
+
+截至 2026-08-06，前三个阶段已经部署：
+
+- 社区文件、Issue Forms、PR 模板、贡献与安全政策已合并，Issues、私密漏洞报告和 Dependabot 安全能力已启用。
+- PR 标题/描述策略与路径感知 CI 已合并；主分支的稳定 required checks 为 `pr-policy` 和 `ci-required`。
+- 仓库只允许 squash merge，合并后自动删除分支。
+- `main` 要求所有变更通过 PR、分支保持最新、解决 review conversation，管理员同样受规则约束；force push 与分支删除已禁止，单维护者阶段 required approvals 保持为 0。
+- 独立 client test suite 的既有红色基线由 [Issue #6](https://github.com/lintendo/Axhub-Make/issues/6) 跟踪，转绿前不伪装成 required check。
+
+阶段 3 使用一项只修改本文档的低风险 PR 做端到端验收：PR 在 required checks 完成前必须保持 blocked，完成后只能 squash merge，并由仓库自动删除来源分支。阶段 4 按两周或 3 至 5 个真实 Issue/PR 的先到条件复盘。
 
 ## 9. 上线顺序
 
