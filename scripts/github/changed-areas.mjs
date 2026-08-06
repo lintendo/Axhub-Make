@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 const mappings = [
   ['docs', /^(?:\.github\/|README\.md$|CONTRIBUTING\.md$|CODE_OF_CONDUCT\.md$|SECURITY\.md$|LICENSE$|docs\/|scripts\/github\/)/u],
   ['server', /^(?:bin\/|src\/server\/|src\/common\/|tsconfig\.node\.json$)/u],
-  ['admin', /^(?:src\/(?:index|components|styles|data|dev-template|spec-template|canvas-template|html-template)\/|vite\.axure-export\.config\.ts$)/u],
+  ['admin', /^(?:src\/server\/vendorPackages\.test\.ts$|src\/(?:index|components|styles|data|dev-template|spec-template|canvas-template|html-template)\/|vite\.axure-export\.config\.ts$)/u],
   ['client', /^client\//u],
   ['release', /^(?:scripts\/release-|package\.json$)/u],
   ['shared', /^(?:vendor\/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|vendor-packages\.config\.json$|vite\.config\.ts$|vitest\.config\.ts$|tsconfig\.json$)/u],
