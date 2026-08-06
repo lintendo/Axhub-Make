@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import path from 'node:path';
 
 const FIXED_ORIGIN = 'http://127.0.0.1:53817';
 const PACKAGE_SPEC_PATTERN = /^@axhub\/make@\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/u;
@@ -58,6 +59,13 @@ export function spawnMake(config, { spawnImpl = spawn } = {}) {
   }
 
   return new Promise((resolve, reject) => {
+    const nodeDirectory = path.dirname(config.nodePath);
+    const pathKey = Object.keys(process.env).find((key) => key.toLowerCase() === 'path') || 'PATH';
+    const existingPath = process.env[pathKey] || '';
+    const env = {
+      ...process.env,
+      [pathKey]: [nodeDirectory, existingPath].filter(Boolean).join(path.delimiter),
+    };
     const child = spawnImpl(config.nodePath, [
       config.npxCliPath,
       '--yes',
@@ -70,6 +78,7 @@ export function spawnMake(config, { spawnImpl = spawn } = {}) {
       detached: true,
       stdio: 'ignore',
       windowsHide: true,
+      env,
     });
     child.once('error', reject);
     child.once('spawn', () => {

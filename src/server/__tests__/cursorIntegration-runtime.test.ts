@@ -317,11 +317,31 @@ describe('Cursor Make runtime', () => {
       '--host', '127.0.0.1',
       '--port', '53817',
       '--no-open',
-    ], {
+    ], expect.objectContaining({
       detached: true,
       stdio: 'ignore',
       windowsHide: true,
+      env: expect.any(Object),
+    }));
+  });
+
+  it('adds the recorded Node directory to the child PATH', async () => {
+    const child = new EventEmitter() as EventEmitter & { unref: ReturnType<typeof vi.fn> };
+    child.unref = vi.fn();
+    const spawnImpl = vi.fn(() => {
+      queueMicrotask(() => child.emit('spawn'));
+      return child;
     });
+
+    await spawnMake({
+      ...validConfig,
+      nodePath: '/opt/node/bin/node',
+    }, { spawnImpl });
+
+    const call = spawnImpl.mock.calls[0] as unknown as [string, string[], { env?: NodeJS.ProcessEnv }];
+    const options = call[2];
+    expect(options.env?.PATH?.split(':')[0]).toBe('/opt/node/bin');
+    expect(options.env?.PATH).toContain(process.env.PATH || '');
   });
 
   it('shares one in-flight startup across clicks', async () => {
