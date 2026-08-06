@@ -7,6 +7,8 @@ import { getGlobalMakeStateDir } from './projectCore/index.ts';
 import { DEFAULT_MAKE_SERVER_PORT } from './defaults.ts';
 import { resolveDefaultDiagnosticLogFile, startDiagnosticLog } from './diagnosticLog.ts';
 import { startMakeServer } from './index.ts';
+import { runCodexIntegrationCli } from './codexIntegration/cli.ts';
+import { runCursorIntegrationCli } from './cursorIntegration/cli.ts';
 
 export interface MakeServerCliOptions {
   projectRoot: string;
@@ -213,6 +215,14 @@ export function parseCliArgs(args: string[], cwd = process.cwd()): MakeServerCli
 }
 
 export async function runCli(args = process.argv.slice(2)): Promise<void> {
+  if (args[0] === 'codex') {
+    await runCodexIntegrationCli(args.slice(1));
+    return;
+  }
+  if (args[0] === 'cursor') {
+    await runCursorIntegrationCli(args.slice(1));
+    return;
+  }
   const options = parseCliArgs(args);
   if (options.help) {
     console.log(CLI_USAGE.trimEnd());

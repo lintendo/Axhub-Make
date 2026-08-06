@@ -84,10 +84,12 @@ class FakeElement {
 
 interface HarnessOptions {
   hostError?: string;
+  hostDelayMs?: number;
 }
 
 async function createHarness({
   hostError,
+  hostDelayMs = 0,
 }: HarnessOptions = {}) {
   const source = await fs.readFile(sourceUrl, 'utf8');
   const parent = new FakeElement('div');
@@ -130,11 +132,13 @@ async function createHarness({
     __axhubMakeHostV1: (raw: string) => {
       const request = JSON.parse(raw) as { id: string; action: string };
       hostCalls.push(request);
-      queueMicrotask(() => windowListeners.get('axhub-make:host-response')?.({
+      const respond = () => windowListeners.get('axhub-make:host-response')?.({
         detail: hostError
           ? { id: request.id, ok: false, error: hostError }
           : { id: request.id, ok: true, reused: true },
-      }));
+      });
+      if (hostDelayMs > 0) setTimeout(respond, hostDelayMs);
+      else queueMicrotask(respond);
     },
   } as Record<string, unknown>;
   class FakeMutationObserver {
@@ -198,6 +202,25 @@ describe('Cursor injected launcher behavior', () => {
     expect(harness.entryLabel()).toBe('Open failed');
 
     vi.advanceTimersByTime(3000);
+    expect(harness.entry()?.dataset.axhubState).toBe('idle');
+    expect(harness.entryLabel()).toBe('Axhub Make');
+  });
+
+  it('does not time out while a cold Make startup is still completing', async () => {
+    vi.useFakeTimers();
+    const harness = await createHarness({ hostDelayMs: 25_000 });
+
+    harness.entry()?.click();
+    await Promise.resolve();
+    vi.advanceTimersByTime(20_000);
+    await Promise.resolve();
+
+    expect(harness.entry()?.dataset.axhubState).toBe('starting');
+    expect(harness.entryLabel()).toBe('Opening…');
+
+    vi.advanceTimersByTime(5_000);
+    await Promise.resolve();
+    await Promise.resolve();
     expect(harness.entry()?.dataset.axhubState).toBe('idle');
     expect(harness.entryLabel()).toBe('Axhub Make');
   });

@@ -209,18 +209,18 @@ describe('Cursor integration install lifecycle', () => {
     const fixture = await createPackageFixture();
     const hostRoot = await createTempRoot('axhub-make-cursor-windows-');
     const fileSystem = createMappedWindowsFileSystem(hostRoot);
-    const homeDir = String.raw`C:\Users\demo`;
-    const localAppData = String.raw`C:\Users\demo\AppData\Local`;
+    const homeDir = String.raw`C:\Accounts\demo`;
+    const localAppData = String.raw`C:\Accounts\demo\AppData\Local`;
     const nodePath = String.raw`C:\Program Files\nodejs\node.exe`;
     const npmExecPath = String.raw`C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js`;
     const npxCliPath = String.raw`C:\Program Files\nodejs\node_modules\npm\bin\npx-cli.js`;
-    const cursorExe = String.raw`C:\Users\demo\AppData\Local\Programs\cursor\Cursor.exe`;
+    const cursorExe = String.raw`C:\Accounts\demo\AppData\Local\Programs\cursor\Cursor.exe`;
     for (const filePath of [nodePath, npmExecPath, npxCliPath, cursorExe]) {
       const hostPath = mapWindowsPath(hostRoot, filePath);
       await fs.mkdir(path.dirname(hostPath), { recursive: true });
       await fs.writeFile(hostPath, 'fixture');
     }
-    const codexMarker = mapWindowsPath(hostRoot, String.raw`C:\Users\demo\AppData\Local\Axhub Make\codex-integration\keep.txt`);
+    const codexMarker = mapWindowsPath(hostRoot, String.raw`C:\Accounts\demo\AppData\Local\Axhub Make\codex-integration\keep.txt`);
     await fs.mkdir(path.dirname(codexMarker), { recursive: true });
     await fs.writeFile(codexMarker, 'keep');
     const calls: Array<[string, string[]]> = [];

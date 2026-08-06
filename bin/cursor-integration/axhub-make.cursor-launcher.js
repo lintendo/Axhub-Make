@@ -7,7 +7,7 @@
   const ENTRY_ID = "axhub-make-cursor-entry";
   const BINDING = "__axhubMakeHostV1";
   const RESPONSE_EVENT = "axhub-make:host-response";
-  const REQUEST_TIMEOUT_MS = 20000;
+  const REQUEST_TIMEOUT_MS = 180000;
   const IDE_LABELS = new Set(["ide"]);
 
   const pending = new Map();
