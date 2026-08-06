@@ -32,6 +32,7 @@ Axhub Runtime 可以继续承担内部开发与同步来源的角色，但公开
 - 根目录已有 Apache License 2.0 `LICENSE` 和较完整的中文产品 README。
 - 根 `package.json` 是开发源包，保留 `private: true`，但缺少 `license`、`repository`、`bugs` 和 `homepage` 元数据。
 - 干净 checkout 上 `pnpm install --frozen-lockfile` 成功，`pnpm audit:open-source` 成功。
+- 独立仓库基线上根 `pnpm build`、根 `pnpm test`、`pnpm client:typecheck` 和 release helper tests 成功；`pnpm --filter @axhub/make-client test` 在未改动的 `main` 基线上仍有 4 个失败文件、7 个失败断言。
 - 开源审计禁止提交 `docs/superpowers/`、本地路径、工作缓存和敏感信息，因此治理文档放在 `docs/` 的长期公开位置。
 
 ## 3. 原则
@@ -52,9 +53,11 @@ Issues 不能立即裸开。顺序为：
 
 1. 合并 Issue Forms 和社区文档。
 2. 创建表单引用的新增标签。
-3. 启用 GitHub Private Vulnerability Reporting。
-4. 启用 GitHub Issues。
-5. 用维护者测试 Issue 验证表单、默认标签和链接后关闭测试 Issue。
+3. 启用 Dependabot vulnerability alerts，并确认读取接口返回 HTTP 204。
+4. 启用 GitHub Private Vulnerability Reporting。
+5. 启用 GitHub Issues。
+6. 启用 Dependabot security updates，但保持自动合并关闭。
+7. 用维护者测试 Issue 验证表单、默认标签和链接后关闭测试 Issue。
 
 这样可以避免用户在模板和安全入口尚未就绪时提交无结构或包含敏感信息的内容。
 
@@ -192,7 +195,7 @@ type(scope): summary
 
 ### 6.1 PR policy
 
-`.github/workflows/pr-policy.yml` 在 PR 新建、编辑、同步和转为 Ready 时运行，提供稳定的 `pr-policy` 检查名称：
+`.github/workflows/pr-policy.yml` 在 PR 新建、编辑、同步、重新打开、转为 Ready 或转回 Draft 时运行，提供稳定的 `pr-policy` 检查名称：
 
 - 校验 Conventional PR 标题。
 - 检查非 Draft PR 的关键描述区块存在且非空。
@@ -209,12 +212,14 @@ CI 只按 Axhub Make 自己的结构分类：
 | 社区文件、README、普通 docs | 开源审计、治理脚本测试、空白检查 |
 | `bin/`、`src/server/`、`src/common/`、服务端配置 | server TypeScript、相关 server tests |
 | `src/index/`、Admin Vite 配置 | Admin build、相关 Vitest |
-| `client/`、模板与客户端插件 | client typecheck/build、相关测试 |
-| `vendor/`、根依赖、workspace 或构建配置 | vendor sync、一组保守的跨区域构建与测试 |
+| `client/`、模板与客户端插件 | `pnpm client:typecheck`、`pnpm client:build` |
+| `vendor/`、根依赖、workspace 或构建配置 | 根 `pnpm build`、根 `pnpm test` |
 | `scripts/release-*`、包元数据 | release 脚本测试、开源审计、相关构建 |
 | 未识别代码路径 | 保守升级为跨区域检查，不静默跳过 |
 
 变更分类由一个可测试的 Node.js 数据结构输出 JSON matrix。删除、重命名、多区域改动和根配置变更必须有正式测试。
+
+独立 client test suite 当前不进入 required CI：它在未改动的 standalone `main` 基线上已有 4 个失败文件和 7 个失败断言，若直接设为 required 会让无关 PR 永久失败。这是明确记录的暂缓项，不代表这些测试已经通过或被永久移除；基线债务修复并转绿后，必须把 `pnpm --filter @axhub/make-client test` 恢复到 required CI。
 
 ### 6.3 CI 结构
 
@@ -227,6 +232,8 @@ CI 只按 Axhub Make 自己的结构分类：
 5. 汇总：无论 matrix 是否为空，都输出稳定的 `ci-required` 检查。
 
 所有 job 设置 `timeout-minutes`。第一阶段只使用当前仓库已经可靠的命令；缺少稳定测试的区域要明确报告，不得伪装成已覆盖。
+
+这些仓库内 required workflows 是质量门禁，不是独立安全边界：PR 可以同时修改 workflow 定义和它调用的检查脚本。它们仍保持只读、无 secrets、无发布或部署能力；维护者必须在合并前审查任何 workflow、policy 脚本或 branch-protection 配置变更，不能把 required check 本身描述为绝对防篡改机制。
 
 ## 7. 开源社区文件
 
@@ -276,6 +283,7 @@ scripts/github/
 ### 8.1 社区基础 PR 合并后
 
 - 创建新增标签。
+- 启用 Dependabot vulnerability alerts；这是 security updates 的前置条件，未启用时配置 automated security fixes 会返回 HTTP 422。
 - 启用 Private Vulnerability Reporting。
 - 启用 Issues。
 - 保持 Discussions 关闭，先使用 FAQ 和用户群承担一般使用咨询。
@@ -349,7 +357,8 @@ scripts/github/
 
 - 仓库内文件通过 revert PR 回退。
 - 标签只增加，不删除已有标签。
-- GitHub 设置修改前后保存 JSON 快照，必要时按快照恢复。
+- GitHub 设置修改前后保存 Issues、Private Vulnerability Reporting、vulnerability alerts、automated security fixes 和标签快照；`GET /vulnerability-alerts` 返回 HTTP 204 表示启用，HTTP 404 表示关闭或当前不可用。
+- 外部设置验证失败时，只回退变更前快照证明为关闭、且本次实际启用的能力；安全入口按 automated security fixes、Issues、Private Vulnerability Reporting、vulnerability alerts 的逆序条件回退。
 - 若 branch protection 配错，先恢复到已验证快照，不用 force push 绕过。
 
 ## 11. 非目标

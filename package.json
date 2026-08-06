@@ -43,6 +43,8 @@
   "scripts": {
     "audit:open-source": "node scripts/open-source-audit.mjs",
     "github:community:test": "node --test scripts/open-source-audit.test.mjs scripts/github/community-files.test.mjs",
+    "github:automation:test": "node --test scripts/github/pr-policy.test.mjs scripts/github/changed-areas.test.mjs scripts/github/run-area-check.test.mjs scripts/github/workflow-contract.test.mjs",
+    "github:test": "pnpm github:community:test && pnpm github:automation:test",
     "vendor:sync": "node scripts/sync-vendor-package.mjs",
     "dev": "pnpm --filter @axhub/make-client dev",
     "server:dev": "pnpm vendor:sync && AXHUB_ONLINE_BASE_URL=${AXHUB_ONLINE_BASE_URL:-https://axhub.im} tsx watch --ignore './src/index/**' --ignore './dist/**' --ignore './vendor/**' --ignore './src/dev-template/**' --ignore './src/spec-template/**' --ignore './src/canvas-template/**' --ignore './src/html-template/**' --ignore './*.timestamp-*' src/server/cli.ts -- --dev",
@@ -67,7 +69,7 @@
     "test": "pnpm vendor:sync && AXHUB_MAKE_COVERAGE_SCOPE=all vitest run --coverage",
     "test:watch": "pnpm vendor:sync && vitest",
     "test:coverage": "pnpm vendor:sync && AXHUB_MAKE_COVERAGE_SCOPE=all vitest run --coverage",
-    "server:test": "pnpm vendor:sync && AXHUB_MAKE_COVERAGE_SCOPE=server vitest run --coverage src/server/__tests__",
+    "server:test": "pnpm vendor:sync && AXHUB_MAKE_COVERAGE_SCOPE=server vitest run --coverage --maxWorkers=1 --exclude src/server/vendorPackages.test.ts src/server src/common",
     "server:test:watch": "pnpm vendor:sync && vitest src/server/__tests__",
     "server:test:coverage": "pnpm vendor:sync && AXHUB_MAKE_COVERAGE_SCOPE=server vitest run --coverage src/server/__tests__",
     "server:test:api": "pnpm vendor:sync && AXHUB_MAKE_COVERAGE_SCOPE=server vitest run --coverage src/server/__tests__/projects-*-api.test.ts src/server/__tests__/http.test.ts",

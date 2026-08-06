@@ -4,7 +4,7 @@
 
 **Goal:** 为公开仓库 `lintendo/Axhub-Make` 建立结构化 Issue、统一 PR、只读路径感知 CI 和可回退的主分支保护，同时不改变 Axhub Make 的运行逻辑或发布行为。
 
-**Architecture:** 实施分为两个独立 PR。第一个 PR 只增加社区文件、Issue/PR 模板和开发元数据；合并后才启用 Issues 与私密漏洞报告。第二个 PR 使用仓库内 Node.js 模块完成 PR policy、路径分类和检查命令调度；Actions 只读运行且不持有生产密钥，验证成功后才启用分支保护。
+**Architecture:** 实施分为两个独立 PR。第一个 PR 只增加社区文件、Issue/PR 模板和开发元数据；合并后才启用 Issues 与私密漏洞报告。第二个 PR 使用仓库内 Node.js 模块完成 PR policy、路径分类和检查命令调度；Actions 只读运行且不持有生产密钥，验证成功后才启用分支保护。仓库内 required workflows 是质量门禁而非独立安全边界，因为 PR 可以修改 workflow 定义及其检查脚本。
 
 **Tech Stack:** GitHub Issue Forms、GitHub Actions、Node.js 22、pnpm 10.20.0、Node.js test runner、YAML 2.9.0、GitHub CLI、现有 Axhub Make build/test/release scripts。
 
@@ -16,6 +16,7 @@
 - `vendor/` 保持提交状态；同步检查只能验证差异，不能自动 commit 或 push。
 - Actions 只能使用 `pull_request`/`push`，禁止 `pull_request_target`。
 - Actions 默认 `permissions: contents: read`，不注入生产、发布或 Axhub 云端密钥。
+- 维护者必须在合并前审查 workflow、policy/check 脚本和 branch-protection 配置变更；不得宣称 required workflow 具有绝对防篡改能力。
 - CI 禁止运行正式 publish、正式 release、部署或修改线上数据的命令。
 - 所有外部 Action 固定完整 commit SHA。
 - 单维护者阶段 required approvals 为 0；不得配置无法由当前维护者满足的批准门槛。
@@ -749,6 +750,8 @@ mkdir -p .local/github-governance
 gh api repos/lintendo/Axhub-Make > .local/github-governance/community-settings-before.json
 gh repo view lintendo/Axhub-Make --json nameWithOwner,visibility,defaultBranchRef,hasIssuesEnabled,url
 gh api repos/lintendo/Axhub-Make/private-vulnerability-reporting
+gh api --include repos/lintendo/Axhub-Make/vulnerability-alerts
+gh api repos/lintendo/Axhub-Make/automated-security-fixes
 gh label list --repo lintendo/Axhub-Make --limit 100
 ```
 
@@ -758,6 +761,7 @@ Expected before mutation:
 - visibility is `PUBLIC`.
 - default branch is `main`.
 - the merged `.github/ISSUE_TEMPLATE/` files are present on `main`.
+- Issues、Private Vulnerability Reporting、vulnerability alerts、automated security fixes 和完整标签状态均已记录；vulnerability alerts 的 HTTP 204 表示启用，HTTP 404 表示关闭或当前不可用。
 
 Record the complete output in the execution transcript. Ask for explicit confirmation before Step 2.
 
@@ -786,17 +790,19 @@ gh label create "status: blocked" --repo lintendo/Axhub-Make --color 5319E7 --de
 
 Expected: only missing labels are added; default labels are unchanged.
 
-- [ ] **Step 3: 启用私密漏洞报告、Issues 和安全更新**
+- [ ] **Step 3: 启用 vulnerability alerts、私密漏洞报告、Issues 和安全更新**
 
 Run:
 
 ```bash
+gh api --method PUT repos/lintendo/Axhub-Make/vulnerability-alerts
+gh api --include repos/lintendo/Axhub-Make/vulnerability-alerts
 gh api --method PUT repos/lintendo/Axhub-Make/private-vulnerability-reporting
 gh api --method PATCH repos/lintendo/Axhub-Make -F has_issues=true
 gh api --method PUT repos/lintendo/Axhub-Make/automated-security-fixes
 ```
 
-These commands must not enable auto-merge, publish a release, or change repository visibility.
+The vulnerability-alert read-back must return HTTP 204 before enabling automated security fixes; HTTP 404 means alerts are disabled or unavailable and execution must stop. Without this prerequisite, GitHub returns HTTP 422 when configuring automated security fixes. These commands must not enable auto-merge or Discussions, publish a release, change merge methods or repository visibility, or alter program behavior.
 
 - [ ] **Step 4: 读取验证外部状态**
 
@@ -805,18 +811,20 @@ Run:
 ```bash
 gh repo view lintendo/Axhub-Make --json visibility,hasIssuesEnabled,defaultBranchRef
 gh api repos/lintendo/Axhub-Make/private-vulnerability-reporting
+gh api --include repos/lintendo/Axhub-Make/vulnerability-alerts
 gh api repos/lintendo/Axhub-Make/automated-security-fixes
 gh label list --repo lintendo/Axhub-Make --limit 100
 ```
 
-Expected: public visibility remains unchanged; Issues and private vulnerability reporting are enabled; all planned labels exist.
+Expected: public visibility and default branch remain unchanged; Issues and private vulnerability reporting are enabled; vulnerability alerts return HTTP 204; automated security fixes are enabled and not paused; all planned labels exist. Auto-merge, Discussions, merge methods, releases and program behavior remain unchanged.
 
-If verification fails, stop before creating the tracking Issue. For each switch that the Step 1 snapshot proved was disabled and Step 3 enabled, revert only that switch with the corresponding command:
+If verification fails, stop before creating the tracking Issue. In reverse order, revert only each capability that the Step 1 snapshot proved was disabled and Step 3 actually enabled:
 
 ```bash
 gh api --method DELETE repos/lintendo/Axhub-Make/automated-security-fixes
 gh api --method PATCH repos/lintendo/Axhub-Make -F has_issues=false
 gh api --method DELETE repos/lintendo/Axhub-Make/private-vulnerability-reporting
+gh api --method DELETE repos/lintendo/Axhub-Make/vulnerability-alerts
 ```
 
 Do not disable a capability that was already enabled before this task. Newly added labels may remain because they do not affect program execution; if they must be removed, first compare them with the recorded pre-change label list and request explicit approval.
@@ -864,15 +872,32 @@ Create `scripts/github/pr-policy.test.mjs`:
 
 ```js
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, it } from 'node:test';
 
 import {
+  runFromEvent,
   validatePrBody,
   validatePrTitle,
   validatePullRequest,
 } from './pr-policy.mjs';
 
 const validBody = `## Summary\nAdds governance.\n\n## Motivation\nKeeps reviews consistent.\n\n## Scope\nGitHub only.\n\n## Validation\nTests pass.\n\n## Platform coverage\nNot applicable.\n\n## Risk and rollback\nRevert the PR.\n`;
+
+function runWithTemporaryEvent(pullRequest) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-pr-policy-'));
+  const eventPath = path.join(directory, 'event.json');
+  const previousExitCode = process.exitCode;
+  try {
+    fs.writeFileSync(eventPath, JSON.stringify({ pull_request: pullRequest }));
+    return runFromEvent(eventPath);
+  } finally {
+    process.exitCode = previousExitCode;
+    fs.rmSync(directory, { force: true, recursive: true });
+  }
+}
 
 describe('PR policy', () => {
   it('accepts conventional titles with optional lowercase scopes', () => {
@@ -897,6 +922,22 @@ describe('PR policy', () => {
       validatePrBody(validBody.replace('## Platform coverage', '## Other'), { draft: false }).join('\n'),
       /Platform coverage/u,
     );
+  });
+
+  it('reads a ready pull request event with a CRLF body', () => {
+    assert.deepEqual(runWithTemporaryEvent({
+      title: 'ci: validate pull request event',
+      body: validBody.replaceAll('\n', '\r\n'),
+      draft: false,
+    }), []);
+  });
+
+  it('reads a Draft pull request event without requiring a structured body', () => {
+    assert.deepEqual(runWithTemporaryEvent({
+      title: 'ci: validate draft pull request event',
+      body: 'Work in progress.',
+      draft: true,
+    }), []);
   });
 });
 ```
@@ -1021,6 +1062,27 @@ describe('Axhub Make changed areas', () => {
     assert.deepEqual(classifyChangedPaths(paths), ['admin', 'server']);
   });
 
+  it('keeps the path from deletion records', () => {
+    assert.deepEqual(parseNameStatus('D\0client/src/removed.tsx\0'), [
+      'client/src/removed.tsx',
+    ]);
+  });
+
+  it('keeps both sides of copy records', () => {
+    assert.deepEqual(
+      parseNameStatus('C100\0src/server/source.ts\0src/index/copied.tsx\0'),
+      ['src/server/source.ts', 'src/index/copied.tsx'],
+    );
+  });
+
+  it('rejects malformed or truncated records', () => {
+    assert.throws(() => parseNameStatus('M\0'), /Malformed git name-status record: M/u);
+    assert.throws(
+      () => parseNameStatus('C100\0src/server/source.ts\0'),
+      /Malformed git name-status record: C100/u,
+    );
+  });
+
   it('returns a deterministic GitHub matrix', () => {
     assert.deepEqual(matrixForAreas(['server', 'docs']), {
       include: [{ area: 'docs' }, { area: 'server' }],
@@ -1046,10 +1108,10 @@ import { pathToFileURL } from 'node:url';
 const mappings = [
   ['docs', /^(?:\.github\/|README\.md$|CONTRIBUTING\.md$|CODE_OF_CONDUCT\.md$|SECURITY\.md$|LICENSE$|docs\/|scripts\/github\/)/u],
   ['server', /^(?:bin\/|src\/server\/|src\/common\/|tsconfig\.node\.json$)/u],
-  ['admin', /^(?:src\/(?:index|components|styles|data|dev-template|spec-template|canvas-template|html-template)\/|vite(?:\.axure-export)?\.config\.ts$|vitest\.config\.ts$)/u],
+  ['admin', /^(?:src\/(?:index|components|styles|data|dev-template|spec-template|canvas-template|html-template)\/|vite\.axure-export\.config\.ts$)/u],
   ['client', /^client\//u],
   ['release', /^(?:scripts\/release-|package\.json$)/u],
-  ['shared', /^(?:vendor\/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|vendor-packages\.config\.json$|tsconfig\.json$)/u],
+  ['shared', /^(?:vendor\/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|vendor-packages\.config\.json$|vite\.config\.ts$|vitest\.config\.ts$|tsconfig\.json$)/u],
 ];
 
 export function parseNameStatus(output) {
@@ -1156,12 +1218,15 @@ describe('Axhub Make area checks', () => {
     ]);
     assert.deepEqual(commandsForArea('client'), [
       { command: 'pnpm', args: ['client:typecheck'] },
-      { command: 'pnpm', args: ['--filter', '@axhub/make-client', 'test'] },
       { command: 'pnpm', args: ['client:build'] },
     ]);
     assert.deepEqual(commandsForArea('release'), [
       { command: 'node', args: ['--test', 'scripts/release-make.test.mjs', 'scripts/release-make-mirror-gitee.test.mjs'] },
       { command: 'pnpm', args: ['build'] },
+    ]);
+    assert.deepEqual(commandsForArea('shared'), [
+      { command: 'pnpm', args: ['build'] },
+      { command: 'pnpm', args: ['test'] },
     ]);
   });
 
@@ -1231,11 +1296,26 @@ const commandPlans = Object.freeze({
   ],
   admin: [
     { command: 'pnpm', args: ['admin:build'] },
-    { command: 'pnpm', args: ['exec', 'vitest', 'run', 'src/index'] },
+    {
+      command: 'pnpm',
+      args: [
+        'exec',
+        'vitest',
+        'run',
+        'src/index',
+        'src/components',
+        'src/styles',
+        'src/data',
+        'src/dev-template',
+        'src/spec-template',
+        'src/canvas-template',
+        'src/html-template',
+        'src/server/vendorPackages.test.ts',
+      ],
+    },
   ],
   client: [
     { command: 'pnpm', args: ['client:typecheck'] },
-    { command: 'pnpm', args: ['--filter', '@axhub/make-client', 'test'] },
     { command: 'pnpm', args: ['client:build'] },
   ],
   release: [
@@ -1245,7 +1325,6 @@ const commandPlans = Object.freeze({
   shared: [
     { command: 'pnpm', args: ['build'] },
     { command: 'pnpm', args: ['test'] },
-    { command: 'pnpm', args: ['--filter', '@axhub/make-client', 'test'] },
   ],
 });
 
@@ -1292,6 +1371,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 ```
 
 The final `git diff --exit-code -- .` detects writes from vendor or generation checks. The script reports the dirty tree as a failure and never commits, pushes, publishes, or deploys anything.
+
+The standalone client test suite is deliberately deferred from required CI because unchanged `main` currently has 4 failing files and 7 failing assertions in that suite. This is baseline debt, not a passing check or a permanent exemption: restore `pnpm --filter @axhub/make-client test` to the client/shared required plans as soon as its standalone baseline is green. Client typecheck/build and root build/test remain required.
 
 - [ ] **Step 4: 运行测试并提交**
 
@@ -1346,6 +1427,7 @@ describe('GitHub workflow security contract', () => {
       assert.equal(workflow.on.pull_request_target, undefined);
       assert.deepEqual(workflow.permissions, { contents: 'read' });
     }
+    assert.ok(policy.on.pull_request.types.includes('converted_to_draft'));
     assert.equal(policy.jobs.policy.name, 'pr-policy');
     assert.equal(ci.jobs.required.name, 'ci-required');
   });
@@ -1399,6 +1481,7 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+      - converted_to_draft
 permissions:
   contents: read
 concurrency:
@@ -1434,6 +1517,7 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+      - edited
   push:
     branches:
       - main
@@ -1556,6 +1640,8 @@ Create `scripts/github/branch-protection.json` so the later external mutation us
 
 The required summary only inspects upstream job results. No job references `secrets`, publishes packages, creates releases, deploys, commits, pushes, or writes repository state.
 
+These repository-defined checks are quality guardrails, not an independent security boundary. A PR can modify the workflow definition and the scripts it executes, so the maintainer must inspect changes to workflows, policy/check scripts, and branch-protection input before merge. Keep the workflows read-only and secret-free; do not replace this review boundary with `pull_request_target`, write permissions, required approvals, or a partial base-checkout workaround that still leaves the workflow definition PR-controlled.
+
 - [ ] **Step 5: 运行 workflow 合约和全部治理测试**
 
 Run:
@@ -1615,6 +1701,9 @@ git status --short
 Expected:
 
 - all commands exit 0;
+- `shared` runs only root `pnpm build` and root `pnpm test`;
+- `client` runs only `pnpm client:typecheck` and `pnpm client:build`;
+- the standalone `pnpm --filter @axhub/make-client test` suite is not claimed as passing or required while unchanged `main` still has 4 failing files and 7 failing assertions; restore it to required CI once that baseline is green;
 - shared/client/release checks do not publish or contact production;
 - vendor sync leaves the tracked tree clean;
 - status is clean after committed changes.
@@ -1647,6 +1736,7 @@ GitHub policy modules, their tests, two read-only workflows, and versioned branc
 - `node scripts/github/run-area-check.mjs client` - passed
 - `node scripts/github/run-area-check.mjs release` - passed
 - `git diff --check origin/main...HEAD` - passed
+- Standalone client tests are deferred from required CI because unchanged `main` currently has 4 failing files and 7 failing assertions; they were not reported as passing and must return to required CI after the baseline is green.
 
 ## Platform coverage
 
@@ -1654,7 +1744,7 @@ GitHub-hosted Ubuntu is covered by Actions. Command execution uses argument arra
 
 ## Risk and rollback
 
-The workflows are read-only, receive no secrets, and never publish, release, deploy, commit, or push. A false positive can block a PR after branch protection is enabled; revert this PR or temporarily remove only the affected required check to roll back.
+The workflows are read-only, receive no secrets, and never publish, release, deploy, commit, or push. They are quality guardrails rather than an independent security boundary because this PR can change workflow definitions and check scripts; the maintainer must review those changes before merge. A false positive can block a PR after branch protection is enabled; revert this PR or temporarily remove only the affected required check to roll back.
 
 ## Vendor and release impact
 
@@ -1698,6 +1788,7 @@ Expected on GitHub:
 - `ci-required` appears and reflects baseline plus matrix jobs.
 - no job has write permission or access to repository secrets.
 - no release, package publication, deployment, or auto-commit occurs.
+- the maintainer reviews all workflow, policy/check script, and branch-protection changes before merge instead of treating required checks as tamper-proof.
 
 - [ ] **Step 5: Negative verification**
 
@@ -1870,7 +1961,7 @@ Do not add Project、stale bot、Dependabot auto-merge、release automation、CO
 - [ ] `pnpm install --frozen-lockfile` passes.
 - [ ] `pnpm github:test` passes.
 - [ ] `pnpm audit:open-source` passes.
-- [ ] Required existing build/test commands pass for every scheduled area.
+- [ ] Required commands pass for every scheduled area; client requires typecheck/build and shared requires root build/test, while the known-red standalone client tests remain explicitly deferred until their baseline is green.
 - [ ] Workflows have `contents: read`, no `pull_request_target`, no secret access, and no publish/release command.
 - [ ] Issue Forms render after Issues are enabled.
 - [ ] Private vulnerability reporting is enabled before public Issues accept security reports.
