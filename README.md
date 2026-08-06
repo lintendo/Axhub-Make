@@ -17,7 +17,7 @@
 
 ## 直接启动
 
-在你的项目目录里运行：
+运行：
 
 ```
 npx -y @axhub/make@latest
@@ -25,12 +25,68 @@ npx -y @axhub/make@latest
 
 启动后会自动打开管理页面。如果没有打开，复制终端里显示的地址到浏览器。
 
+## 加到 Codex++ 侧边栏
+
+适用于已经安装 Node.js 22+、Codex 和 [Codex++](https://github.com/BigPizzaV3/CodexPlusPlus) 的 macOS / Windows 用户。
+
+第一次安装或更新：
+
+1. 完全退出 Codex。Windows 还需要确认系统托盘里的 Codex 已退出。
+2. 在 Terminal、PowerShell 或 Windows Terminal 运行：
+
+```
+npx -y @axhub/make@latest codex install
+```
+
+3. 通过 `Codex++` 启动器重新打开 Codex。
+4. 点击 Codex 左侧的 `Axhub Make`。
+
+以后日常使用不需要再运行命令。通过 Codex++ 打开 Codex，然后点击左侧 `Axhub Make` 即可；Make 会在需要时自动启动，并在 Codex 内置浏览器中打开。这个入口不创建 AI 任务，也不需要 MCP。
+
+安装器在 macOS 使用当前用户的 LaunchAgent，在 Windows 使用当前用户的 Task Scheduler，不需要管理员权限。检查安装状态或卸载：
+
+```
+npx -y @axhub/make@latest codex doctor
+npx -y @axhub/make@latest codex uninstall
+```
+
+Codex++ 依赖 Codex 的页面结构和本地 CDP 接口。Codex 或 Codex++ 更新后如果入口消失，先完全退出 Codex，重新运行 `codex install`，再通过 Codex++ 启动。
+
+## 加到 Cursor Agents
+
+适用于已经安装 Node.js 22+ 和 Cursor 的 macOS / Windows 用户。这个方案与 Codex++ 可以同时安装，二者使用独立的文件、后台服务和 CDP 端口。
+
+第一次安装或更新只需要运行一次：
+
+```
+npx -y @axhub/make@latest cursor install
+```
+
+安装完成后，完全退出正在运行的 Cursor，再通过下面的命令启动：
+
+```
+npx -y @axhub/make@latest cursor open
+```
+
+打开 Cursor Agents 后点击 `Axhub Make`。Make 会在需要时自动启动，然后以 `surface=codex` 专属模式打开在 Cursor 自己的原生内置浏览器标签中；不会创建 AI 对话或任务，也不需要 MCP，不会打开系统外部浏览器。再次点击会复用并聚焦同一个 Axhub Make 浏览器标签。
+
+Cursor 的 CDP 参数只能在应用启动时生效，因此以后需要这个入口的 Cursor 会话也要先完全退出普通 Cursor，再通过 `cursor open` 启动。安装器不会修改 Cursor 应用包或替换系统快捷方式。
+
+检查状态或卸载：
+
+```
+npx -y @axhub/make@latest cursor doctor
+npx -y @axhub/make@latest cursor uninstall
+```
+
+安装器在 macOS 使用当前用户的 LaunchAgent，在 Windows 使用当前用户的 Task Scheduler。它只通过本地 CDP 使用 Cursor Agents 的原生 Browser WebView：首次点击时如有需要会自动创建，后续点击直接复用；不安装 Cursor 扩展，也不需要管理员权限。
+
 ## 让 AI 帮你启动
 
 把下面这段发给你的 AI Agent，让它读取启动说明，然后帮你检查环境、启动 Make，并创建一个以后可以直接双击运行的桌面脚本：
 
 ```
-请读取这个文档，并按里面的要求在当前项目目录启动 Axhub Make：
+请读取这个文档，并按里面的要求启动 Axhub Make：
 
 https://raw.githubusercontent.com/lintendo/Axhub-Make/main/docs/start-axhub-make-with-ai.md
 ```
