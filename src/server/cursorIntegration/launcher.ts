@@ -3,6 +3,12 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 
 import {
+  buildDesktopClientGracefulQuit,
+  buildDesktopClientProcessProbe,
+  type DesktopIntegrationInspection,
+  waitForDesktopClientExit,
+} from '../desktopClientLifecycle.ts';
+import {
   type CursorIntegrationPaths,
   resolveCursorIntegrationPaths,
 } from './paths.ts';
@@ -23,12 +29,14 @@ export interface CursorCdpTarget {
 }
 
 export type CursorProcessLauncher = (command: string, args: string[]) => Promise<void>;
+export type CursorProcessRunner = (command: string, args: string[]) => Promise<{ stdout: string; stderr: string }>;
 
 export interface CursorLauncherContext {
   platform?: NodeJS.Platform | string;
   homeDir?: string;
   env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
   fileSystem?: CursorLauncherFileSystem;
+  run?: CursorProcessRunner;
   launch?: CursorProcessLauncher;
   probeTargets?: (debugPort: number) => Promise<CursorCdpTarget[]>;
   isCursorRunning?: (platform: 'darwin' | 'win32') => Promise<boolean>;
@@ -70,6 +78,22 @@ function defaultLaunch(command: string, args: string[]): Promise<void> {
   });
 }
 
+function defaultRun(command: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    execFile(command, args, {
+      encoding: 'utf8',
+      shell: false,
+      windowsHide: true,
+    }, (error, stdout, stderr) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve({ stdout: String(stdout || ''), stderr: String(stderr || '') });
+    });
+  });
+}
+
 async function defaultProbeTargets(debugPort: number): Promise<CursorCdpTarget[]> {
   const response = await fetch(`http://127.0.0.1:${debugPort}/json`, {
     cache: 'no-store',
@@ -80,20 +104,19 @@ async function defaultProbeTargets(debugPort: number): Promise<CursorCdpTarget[]
   return Array.isArray(body) ? body as CursorCdpTarget[] : [];
 }
 
-async function defaultIsCursorRunning(platform: 'darwin' | 'win32'): Promise<boolean> {
-  const command = platform === 'darwin' ? 'pgrep' : 'tasklist.exe';
-  const args = platform === 'darwin'
-    ? ['-x', 'Cursor']
-    : ['/FI', 'IMAGENAME eq Cursor.exe', '/NH'];
-  return new Promise((resolve) => {
-    execFile(command, args, { encoding: 'utf8', windowsHide: true }, (error, stdout) => {
-      if (platform === 'darwin') {
-        resolve(!error && Boolean(String(stdout || '').trim()));
-        return;
-      }
-      resolve(!error && /\bCursor\.exe\b/iu.test(String(stdout || '')));
-    });
-  });
+async function defaultIsCursorRunning(
+  platform: 'darwin' | 'win32',
+  run: CursorProcessRunner,
+): Promise<boolean> {
+  const probe = buildDesktopClientProcessProbe('cursor', platform);
+  try {
+    const { stdout } = await run(probe.command, probe.args);
+    return platform === 'darwin'
+      ? Boolean(stdout.trim())
+      : /\bCursor\.exe\b/iu.test(stdout);
+  } catch {
+    return false;
+  }
 }
 
 export function isCursorWorkbenchTarget(target: CursorCdpTarget): boolean {
@@ -123,6 +146,18 @@ async function firstExistingPath(
   return null;
 }
 
+async function allPathsExist(
+  fileSystem: CursorLauncherFileSystem,
+  candidates: string[],
+): Promise<boolean> {
+  try {
+    await Promise.all(candidates.map((candidate) => fileSystem.access(candidate)));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function resolvePaths(context: CursorLauncherContext): CursorIntegrationPaths {
   return resolveCursorIntegrationPaths({
     platform: context.platform || process.platform,
@@ -150,35 +185,84 @@ async function waitForCursorTarget(options: {
   );
 }
 
+export async function inspectCursorIntegration(
+  context: CursorLauncherContext = {},
+): Promise<DesktopIntegrationInspection> {
+  const paths = resolvePaths(context);
+  const fileSystem = context.fileSystem || defaultFileSystem;
+  const run = context.run || defaultRun;
+  const probeTargets = context.probeTargets || defaultProbeTargets;
+  const isCursorRunning = context.isCursorRunning
+    || ((platform: 'darwin' | 'win32') => defaultIsCursorRunning(platform, run));
+
+  let ready = false;
+  try {
+    ready = hasCursorWorkbenchTarget(await probeTargets(CURSOR_DEBUG_PORT));
+  } catch {
+    // An unreachable CDP endpoint means the integration is not ready.
+  }
+  const running = await isCursorRunning(paths.platform);
+  const appPath = await firstExistingPath(fileSystem, paths.cursorAppCandidates) || '';
+  const integrationInstalled = await allPathsExist(fileSystem, [
+    paths.configFile,
+    paths.companionFile,
+    paths.launcherSourceFile,
+  ]);
+
+  return {
+    platform: paths.platform,
+    ready,
+    running,
+    installed: Boolean(appPath),
+    integrationInstalled,
+    appPath,
+  };
+}
+
+export async function closeCursorIntegrationGracefully(
+  context: CursorLauncherContext = {},
+): Promise<void> {
+  const paths = resolvePaths(context);
+  const run = context.run || defaultRun;
+  const isCursorRunning = context.isCursorRunning
+    || ((platform: 'darwin' | 'win32') => defaultIsCursorRunning(platform, run));
+  const quit = buildDesktopClientGracefulQuit('cursor', paths.platform);
+
+  await run(quit.command, quit.args);
+  const exited = await waitForDesktopClientExit({
+    isRunning: () => isCursorRunning(paths.platform),
+    wait: context.wait || defaultWait,
+    maxAttempts: context.maxAttempts ?? 20,
+    retryDelayMs: context.retryDelayMs ?? 1000,
+  });
+  if (!exited) {
+    throw new Error('Cursor 未能自动退出，请手动退出后重试。');
+  }
+}
+
 export async function openCursorIntegration(
   context: CursorLauncherContext = {},
 ): Promise<OpenCursorIntegrationResult> {
-  const paths = resolvePaths(context);
-  const fileSystem = context.fileSystem || defaultFileSystem;
+  const inspection = await inspectCursorIntegration(context);
   const probeTargets = context.probeTargets || defaultProbeTargets;
-  const isCursorRunning = context.isCursorRunning || defaultIsCursorRunning;
   const launch = context.launch || defaultLaunch;
   const wait = context.wait || defaultWait;
   const maxAttempts = context.maxAttempts ?? 20;
   const retryDelayMs = context.retryDelayMs ?? 1000;
 
-  try {
-    if (hasCursorWorkbenchTarget(await probeTargets(CURSOR_DEBUG_PORT))) {
-      return { launched: false, reused: true, appPath: '' };
-    }
-  } catch {
-    // Treat an unreachable loopback endpoint as a normal pre-launch state.
+  if (inspection.ready) {
+    return { launched: false, reused: true, appPath: inspection.appPath };
   }
-
-  if (await isCursorRunning(paths.platform)) {
+  if (inspection.running) {
     throw new Error(
       'Cursor is already running without Axhub CDP. Quit Cursor completely, then run npx -y @axhub/make@latest cursor open again.',
     );
   }
-
-  const appPath = await firstExistingPath(fileSystem, paths.cursorAppCandidates);
-  if (!appPath) {
+  if (!inspection.installed) {
     throw new Error('Cursor was not found in a standard installation location. Install Cursor first.');
+  }
+  if (!inspection.integrationInstalled) {
+    throw new Error('The Axhub Cursor integration is not installed. Run cursor install first.');
   }
 
   const cdpArgs = [
@@ -186,12 +270,12 @@ export async function openCursorIntegration(
     `--remote-debugging-port=${CURSOR_DEBUG_PORT}`,
     `--remote-allow-origins=${CURSOR_REMOTE_ALLOW_ORIGINS}`,
   ];
-  if (paths.platform === 'darwin') {
-    await launch('open', ['-n', appPath, '--args', ...cdpArgs]);
+  if (inspection.platform === 'darwin') {
+    await launch('open', ['-n', inspection.appPath, '--args', ...cdpArgs]);
   } else {
-    await launch(appPath, cdpArgs);
+    await launch(inspection.appPath, cdpArgs);
   }
 
   await waitForCursorTarget({ probeTargets, wait, maxAttempts, retryDelayMs });
-  return { launched: true, reused: false, appPath };
+  return { launched: true, reused: false, appPath: inspection.appPath };
 }

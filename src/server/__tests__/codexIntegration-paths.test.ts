@@ -27,6 +27,10 @@ describe('Codex integration paths', () => {
         '/Applications/Codex++.app',
         path.posix.join(homeDir, 'Applications/Codex++.app'),
       ],
+      chatgptCandidates: [
+        '/Applications/ChatGPT.app',
+        path.posix.join(homeDir, 'Applications/ChatGPT.app'),
+      ],
       codexCandidates: [
         '/Applications/Codex.app',
         path.posix.join(homeDir, 'Applications/Codex.app'),
@@ -56,6 +60,9 @@ describe('Codex integration paths', () => {
       stderrLog: path.win32.join(localAppData, 'Axhub Make', 'codex-integration', 'logs', 'companion.error.log'),
       codexPlusCandidates: [
         path.win32.join(localAppData, 'Programs', 'Codex++', 'codex-plus-plus.exe'),
+      ],
+      chatgptCandidates: [
+        path.win32.join(localAppData, 'Programs', 'ChatGPT', 'ChatGPT.exe'),
       ],
       codexCandidates: [
         path.win32.join(localAppData, 'Programs', 'Codex', 'Codex.exe'),

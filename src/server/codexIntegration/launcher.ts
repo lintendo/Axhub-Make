@@ -3,6 +3,12 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 
 import {
+  buildDesktopClientGracefulQuit,
+  buildDesktopClientProcessProbe,
+  type DesktopIntegrationInspection,
+  waitForDesktopClientExit,
+} from '../desktopClientLifecycle.ts';
+import {
   type CodexIntegrationPaths,
   resolveCodexIntegrationPaths,
 } from './paths.ts';
@@ -73,7 +79,11 @@ function defaultLaunch(command: string, args: string[]): Promise<void> {
 
 function defaultRun(command: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    execFile(command, args, { encoding: 'utf8', windowsHide: true }, (error, stdout, stderr) => {
+    execFile(command, args, {
+      encoding: 'utf8',
+      shell: false,
+      windowsHide: true,
+    }, (error, stdout, stderr) => {
       if (error) {
         reject(error);
         return;
@@ -93,20 +103,19 @@ async function defaultProbeTargets(debugPort: number): Promise<CodexCdpTarget[]>
   return Array.isArray(body) ? body as CodexCdpTarget[] : [];
 }
 
-async function defaultIsCodexRunning(platform: 'darwin' | 'win32'): Promise<boolean> {
-  const command = platform === 'darwin' ? 'pgrep' : 'tasklist.exe';
-  const args = platform === 'darwin'
-    ? ['-x', 'Codex']
-    : ['/FI', 'IMAGENAME eq Codex.exe', '/NH'];
-  return new Promise((resolve) => {
-    execFile(command, args, { encoding: 'utf8', windowsHide: true }, (error, stdout) => {
-      if (platform === 'darwin') {
-        resolve(!error && Boolean(String(stdout || '').trim()));
-        return;
-      }
-      resolve(!error && /\bCodex\.exe\b/iu.test(String(stdout || '')));
-    });
-  });
+async function defaultIsCodexRunning(
+  platform: 'darwin' | 'win32',
+  run: CodexProcessRunner,
+): Promise<boolean> {
+  const probe = buildDesktopClientProcessProbe('chatgpt', platform);
+  try {
+    const { stdout } = await run(probe.command, probe.args);
+    return platform === 'darwin'
+      ? Boolean(stdout.trim())
+      : /\b(?:ChatGPT|Codex)\b/iu.test(stdout);
+  } catch {
+    return false;
+  }
 }
 
 function hasAppTarget(targets: CodexCdpTarget[]): boolean {
@@ -130,6 +139,18 @@ async function firstExistingPath(
     }
   }
   return null;
+}
+
+async function allPathsExist(
+  fileSystem: CodexLauncherFileSystem,
+  candidates: string[],
+): Promise<boolean> {
+  try {
+    await Promise.all(candidates.map((candidate) => fileSystem.access(candidate)));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function resolvePaths(context: CodexLauncherContext): CodexIntegrationPaths {
@@ -162,45 +183,97 @@ async function waitForAppTarget({
   throw new Error('Official Codex did not expose an Axhub CDP target within 20 seconds. Quit Codex completely and run axhub-make codex open again.');
 }
 
+export async function inspectCodexIntegration(
+  context: CodexLauncherContext = {},
+): Promise<DesktopIntegrationInspection> {
+  const paths = resolvePaths(context);
+  const fileSystem = context.fileSystem || defaultFileSystem;
+  const run = context.run || defaultRun;
+  const probeTargets = context.probeTargets || defaultProbeTargets;
+  const isCodexRunning = context.isCodexRunning
+    || ((platform: 'darwin' | 'win32') => defaultIsCodexRunning(platform, run));
+
+  let ready = false;
+  try {
+    ready = hasAppTarget(await probeTargets(CODEX_DEBUG_PORT));
+  } catch {
+    // An unreachable CDP endpoint means the integration is not ready.
+  }
+  const running = await isCodexRunning(paths.platform);
+  const appPath = await firstExistingPath(fileSystem, [
+    ...paths.chatgptCandidates,
+    ...paths.codexCandidates,
+  ]) || '';
+  const integrationInstalled = await allPathsExist(fileSystem, [
+    paths.configFile,
+    paths.companionFile,
+    paths.sidebarSourceFile,
+  ]);
+
+  return {
+    platform: paths.platform,
+    ready,
+    running,
+    installed: Boolean(appPath),
+    integrationInstalled,
+    appPath,
+  };
+}
+
+export async function closeCodexIntegrationGracefully(
+  context: CodexLauncherContext = {},
+): Promise<void> {
+  const paths = resolvePaths(context);
+  const run = context.run || defaultRun;
+  const isCodexRunning = context.isCodexRunning
+    || ((platform: 'darwin' | 'win32') => defaultIsCodexRunning(platform, run));
+  const quit = buildDesktopClientGracefulQuit('chatgpt', paths.platform);
+
+  await run(quit.command, quit.args);
+  const exited = await waitForDesktopClientExit({
+    isRunning: () => isCodexRunning(paths.platform),
+    wait: context.wait || wait,
+    maxAttempts: context.maxAttempts ?? 20,
+    retryDelayMs: context.retryDelayMs ?? 1000,
+  });
+  if (!exited) {
+    throw new Error('ChatGPT 未能自动退出，请手动退出后重试。');
+  }
+}
+
 export async function openCodexIntegration(
   context: CodexLauncherContext = {},
 ): Promise<OpenCodexIntegrationResult> {
-  const paths = resolvePaths(context);
-  const fileSystem = context.fileSystem || defaultFileSystem;
+  const inspection = await inspectCodexIntegration(context);
   const probeTargets = context.probeTargets || defaultProbeTargets;
-  const isCodexRunning = context.isCodexRunning || defaultIsCodexRunning;
   const launch = context.launch || defaultLaunch;
   const waitFor = context.wait || wait;
   const maxAttempts = context.maxAttempts ?? 20;
   const retryDelayMs = context.retryDelayMs ?? 1000;
 
-  try {
-    if (hasAppTarget(await probeTargets(CODEX_DEBUG_PORT))) {
-      return { launched: false, reused: true, appPath: '' };
-    }
-  } catch {
-    // Treat an unreachable endpoint as a normal pre-launch state.
+  if (inspection.ready) {
+    return { launched: false, reused: true, appPath: inspection.appPath };
   }
-
-  if (await isCodexRunning(paths.platform)) {
-    throw new Error('Codex is already running without Axhub CDP. Quit Codex completely, then run axhub-make codex open again.');
+  if (inspection.running) {
+    throw new Error('ChatGPT is already running without Axhub CDP.');
   }
-
-  const appPath = await firstExistingPath(fileSystem, paths.codexCandidates);
-  if (!appPath) {
-    throw new Error('Official Codex was not found in its default install location. Open Codex++ instead or install Codex first.');
+  if (!inspection.installed) {
+    throw new Error('ChatGPT was not found in a supported installation location.');
+  }
+  if (!inspection.integrationInstalled) {
+    throw new Error('The Axhub ChatGPT integration is not installed. Run codex install first.');
   }
 
   const cdpArgs = [
     `--remote-debugging-port=${CODEX_DEBUG_PORT}`,
     `--remote-allow-origins=${CODEX_REMOTE_ALLOW_ORIGINS}`,
   ];
-  if (paths.platform === 'darwin') {
-    await launch('open', ['-n', appPath, '--args', ...cdpArgs]);
+  if (inspection.platform === 'darwin') {
+    await launch('open', ['-n', inspection.appPath, '--args', ...cdpArgs]);
   } else {
-    await launch(appPath, cdpArgs);
+    await launch(inspection.appPath, cdpArgs);
   }
 
   await waitForAppTarget({ probeTargets, waitFor, maxAttempts, retryDelayMs });
-  return { launched: true, reused: false, appPath };
+  return { launched: true, reused: false, appPath: inspection.appPath };
 }
