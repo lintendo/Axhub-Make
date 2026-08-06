@@ -90,15 +90,15 @@ export function parseDismissedStorageValue(value: string | null): boolean {
     return value === '1' || value === 'true';
 }
 
-type AssistantAutoOpenDismissedStorage = Pick<Storage, 'getItem' | 'setItem'>;
+type AssistantAutoOpenStorage = Pick<Storage, 'getItem' | 'setItem'>;
 type AssistantAutoOpenPanelMode = 'general-ai' | 'image-ai';
 
-function getLocalStorage(): AssistantAutoOpenDismissedStorage | null {
+function getAssistantAutoOpenStorage(): AssistantAutoOpenStorage | null {
     if (typeof window === 'undefined') {
         return null;
     }
     try {
-        return window.localStorage;
+        return window.sessionStorage;
     } catch {
         return null;
     }
@@ -138,7 +138,7 @@ export function buildAssistantAutoOpenPanelModeStorageKey(
 
 export function getAssistantAutoOpenDismissed(
     storageKey: string,
-    storage: AssistantAutoOpenDismissedStorage | null = getLocalStorage(),
+    storage: AssistantAutoOpenStorage | null = getAssistantAutoOpenStorage(),
 ): boolean {
     if (!storage) {
         return true;
@@ -157,7 +157,7 @@ export function getAssistantAutoOpenDismissed(
 export function setAssistantAutoOpenDismissed(
     storageKey: string,
     dismissed: boolean,
-    storage: AssistantAutoOpenDismissedStorage | null = getLocalStorage(),
+    storage: AssistantAutoOpenStorage | null = getAssistantAutoOpenStorage(),
 ) {
     if (!storage) {
         return;
@@ -171,7 +171,7 @@ export function setAssistantAutoOpenDismissed(
 
 export function getAssistantAutoOpenPanelMode(
     storageKey: string,
-    storage: AssistantAutoOpenDismissedStorage | null = getLocalStorage(),
+    storage: AssistantAutoOpenStorage | null = getAssistantAutoOpenStorage(),
 ): AssistantAutoOpenPanelMode {
     if (!storage) {
         return 'general-ai';
@@ -187,7 +187,7 @@ export function getAssistantAutoOpenPanelMode(
 export function setAssistantAutoOpenPanelMode(
     storageKey: string,
     mode: AssistantAutoOpenPanelMode,
-    storage: AssistantAutoOpenDismissedStorage | null = getLocalStorage(),
+    storage: AssistantAutoOpenStorage | null = getAssistantAutoOpenStorage(),
 ) {
     if (!storage) {
         return;

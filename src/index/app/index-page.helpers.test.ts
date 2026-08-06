@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
     buildAssistantAutoOpenPanelModeStorageKey,
@@ -25,6 +25,39 @@ describe('index page helpers', () => {
         expect(formatThrownError({ error: 'Session annotation-1 failed', status: 500 })).toBe('Session annotation-1 failed；status=500');
         expect(formatThrownError({ detail: { message: 'provider unavailable' } })).toBe('provider unavailable');
         expect(formatThrownError({})).toBe('未知错误');
+    });
+
+    it('uses browser-tab session storage for assistant auto-open state by default', () => {
+        const sessionValues = new Map<string, string>();
+        const localValues = new Map<string, string>();
+        const createStorage = (values: Map<string, string>) => ({
+            getItem: (key: string) => values.get(key) ?? null,
+            setItem: (key: string, value: string) => {
+                values.set(key, value);
+            },
+        });
+
+        vi.stubGlobal('window', {
+            location: { origin: 'http://make.local' },
+            sessionStorage: createStorage(sessionValues),
+            localStorage: createStorage(localValues),
+        });
+
+        try {
+            const dismissedKey = buildAssistantAutoOpenDismissedStorageKey('make-project');
+            const panelModeKey = buildAssistantAutoOpenPanelModeStorageKey('make-project');
+
+            setAssistantAutoOpenDismissed(dismissedKey, true);
+            setAssistantAutoOpenPanelMode(panelModeKey, 'image-ai');
+
+            expect(sessionValues.get(dismissedKey)).toBe('1');
+            expect(sessionValues.get(panelModeKey)).toBe('image-ai');
+            expect(localValues.size).toBe(0);
+            expect(getAssistantAutoOpenDismissed(dismissedKey)).toBe(true);
+            expect(getAssistantAutoOpenPanelMode(panelModeKey)).toBe('image-ai');
+        } finally {
+            vi.unstubAllGlobals();
+        }
     });
 
     it('keeps assistant auto-open enabled by default and stores real closes project-wide', () => {
