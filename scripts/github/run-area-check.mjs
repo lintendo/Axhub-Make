@@ -9,7 +9,22 @@ const commandPlans = Object.freeze({
   ],
   admin: [
     { command: 'pnpm', args: ['admin:build'] },
-    { command: 'pnpm', args: ['exec', 'vitest', 'run', 'src/index'] },
+    {
+      command: 'pnpm',
+      args: [
+        'exec',
+        'vitest',
+        'run',
+        'src/index',
+        'src/components',
+        'src/styles',
+        'src/data',
+        'src/dev-template',
+        'src/spec-template',
+        'src/canvas-template',
+        'src/html-template',
+      ],
+    },
   ],
   client: [
     { command: 'pnpm', args: ['client:typecheck'] },
