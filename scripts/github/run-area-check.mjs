@@ -23,6 +23,7 @@ const commandPlans = Object.freeze({
         'src/spec-template',
         'src/canvas-template',
         'src/html-template',
+        'src/server/vendorPackages.test.ts',
       ],
     },
   ],

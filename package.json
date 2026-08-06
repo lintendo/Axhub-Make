@@ -69,7 +69,7 @@
     "test": "pnpm vendor:sync && AXHUB_MAKE_COVERAGE_SCOPE=all vitest run --coverage",
     "test:watch": "pnpm vendor:sync && vitest",
     "test:coverage": "pnpm vendor:sync && AXHUB_MAKE_COVERAGE_SCOPE=all vitest run --coverage",
-    "server:test": "pnpm vendor:sync && AXHUB_MAKE_COVERAGE_SCOPE=server vitest run --coverage --maxWorkers=1 src/server src/common",
+    "server:test": "pnpm vendor:sync && AXHUB_MAKE_COVERAGE_SCOPE=server vitest run --coverage --maxWorkers=1 --exclude src/server/vendorPackages.test.ts src/server src/common",
     "server:test:watch": "pnpm vendor:sync && vitest src/server/__tests__",
     "server:test:coverage": "pnpm vendor:sync && AXHUB_MAKE_COVERAGE_SCOPE=server vitest run --coverage src/server/__tests__",
     "server:test:api": "pnpm vendor:sync && AXHUB_MAKE_COVERAGE_SCOPE=server vitest run --coverage src/server/__tests__/projects-*-api.test.ts src/server/__tests__/http.test.ts",

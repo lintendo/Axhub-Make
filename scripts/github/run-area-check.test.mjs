@@ -34,6 +34,7 @@ describe('Axhub Make area checks', () => {
           'src/spec-template',
           'src/canvas-template',
           'src/html-template',
+          'src/server/vendorPackages.test.ts',
         ],
       },
     ]);
@@ -51,7 +52,7 @@ describe('Axhub Make area checks', () => {
     const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
     assert.match(
       packageJson.scripts['server:test'],
-      /vitest run --coverage --maxWorkers=1 src\/server src\/common$/u,
+      /vitest run --coverage --maxWorkers=1 --exclude src\/server\/vendorPackages\.test\.ts src\/server src\/common$/u,
     );
   });
 
