@@ -132,7 +132,7 @@ Where the command is inline prose, keep it inline with backticks. Remove wording
 Run:
 
 ```bash
-rg -n 'pnpm (run )?admin:dev|pnpm exec vite|pnpm vite' README.md package.json docs/superpowers/plans/2026-08-01-start-guide-ai-setup-and-card-copy.md docs/superpowers/plans/2026-08-02-responsive-sidebar-device-preview-url.md docs/superpowers/plans/2026-08-04-ai-purpose-settings.md docs/superpowers/plans/2026-08-04-publish-menu-disabled-reason-layout.md docs/superpowers/plans/2026-08-04-start-guide-responsive-layout.md docs/superpowers/plans/2026-08-07-annotation-sidebar-manual-override.md
+rg -n 'pnpm (run )?admin:dev|pnpm exec vite( |$)|pnpm vite( |$)' README.md package.json docs/superpowers/plans/2026-08-01-start-guide-ai-setup-and-card-copy.md docs/superpowers/plans/2026-08-02-responsive-sidebar-device-preview-url.md docs/superpowers/plans/2026-08-04-ai-purpose-settings.md docs/superpowers/plans/2026-08-04-publish-menu-disabled-reason-layout.md docs/superpowers/plans/2026-08-04-start-guide-responsive-layout.md docs/superpowers/plans/2026-08-07-annotation-sidebar-manual-override.md
 ```
 
 Expected: no matches.
