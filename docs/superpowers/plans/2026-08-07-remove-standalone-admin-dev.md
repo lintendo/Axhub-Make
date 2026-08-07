@@ -28,7 +28,7 @@
 
 **Interfaces:**
 - Consumes: the real `apps/axhub-make/package.json` manifest.
-- Produces: a package-script contract where `scripts['server:dev']` exists, `scripts['admin:dev']` is absent, and `scripts['admin:build']` remains available.
+- Produces: a package-script contract where `scripts['server:dev']` exists without POSIX-only environment assignment syntax, `scripts['admin:dev']` is absent, and `scripts['admin:build']` remains available.
 
 - [ ] **Step 1: Write the failing package-script contract test**
 
@@ -47,7 +47,9 @@ describe('Make development entry points', () => {
   it('exposes only the integrated management development server', () => {
     const packageJson = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8'));
 
-    expect(packageJson.scripts?.['server:dev']).toContain('src/server/cli.ts -- --dev');
+    const serverDev = packageJson.scripts?.['server:dev'];
+
+    expect(serverDev).toContain('src/server/cli.ts -- --dev');
     expect(packageJson.scripts).not.toHaveProperty('admin:dev');
     expect(packageJson.scripts?.['admin:build']).toContain('vite build');
   });
@@ -83,6 +85,39 @@ pnpm exec vitest run src/server/__tests__/development-entrypoints.test.ts
 ```
 
 Expected: one test file passes with one passing test and zero failures.
+
+- [ ] **Step 5: Add the cross-platform replacement assertion and verify RED**
+
+Add this assertion immediately after the `server:dev` entry-point assertion:
+
+```ts
+expect(serverDev).not.toContain('AXHUB_ONLINE_BASE_URL=');
+```
+
+Run the focused test again. Expected: FAIL because the current script contains the POSIX-only `AXHUB_ONLINE_BASE_URL=${AXHUB_ONLINE_BASE_URL:-https://axhub.im}` assignment.
+
+- [ ] **Step 6: Remove the shell-specific default assignment and verify GREEN**
+
+Change only the start of `scripts['server:dev']` from:
+
+```text
+pnpm vendor:sync && AXHUB_ONLINE_BASE_URL=${AXHUB_ONLINE_BASE_URL:-https://axhub.im} tsx watch
+```
+
+to:
+
+```text
+pnpm vendor:sync && tsx watch
+```
+
+Update `src/server/vendorPackages.test.ts` to assert that `server:dev` does not contain `AXHUB_ONLINE_BASE_URL=`. Run:
+
+```bash
+pnpm exec vitest run src/server/__tests__/development-entrypoints.test.ts
+pnpm exec vitest run src/server/vendorPackages.test.ts -t 'uses vendored packages from make-server config instead of workspace paths'
+```
+
+Expected: both focused commands pass. The server runtime continues to honor an explicitly inherited environment value and supplies `https://axhub.im` when it is absent.
 
 ---
 

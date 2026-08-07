@@ -15,11 +15,12 @@ The supported development entry point is `server:dev`. It runs the Make server i
 The change will:
 
 1. Remove the `admin:dev` script from `apps/axhub-make/package.json`.
-2. Keep `admin:build`; production admin builds remain supported and unchanged.
-3. Add app-level README guidance that browser verification must use `pnpm server:dev -- --host 127.0.0.1 --no-open` and must not launch standalone Vite.
-4. Replace existing `admin:dev` instructions in app implementation plans with the integrated command.
-5. Add a package-script contract test proving `admin:dev` is absent and `server:dev` remains available.
-6. Stop only the currently verified standalone process tree after rechecking its PID, command, working directory, and listening port.
+2. Remove the POSIX-only environment-variable assignment from `server:dev`; the runtime already reads an explicit `AXHUB_ONLINE_BASE_URL` value and defaults to `https://axhub.im` when it is absent, so behavior remains the same on macOS and becomes executable on Windows.
+3. Keep `admin:build`; production admin builds remain supported and unchanged.
+4. Add app-level README guidance that browser verification must use `pnpm server:dev -- --host 127.0.0.1 --no-open` and must not launch standalone Vite.
+5. Replace existing `admin:dev` instructions in app implementation plans with the integrated command.
+6. Add a package-script contract test proving `admin:dev` is absent, `server:dev` remains available and cross-platform, and `admin:build` remains available.
+7. Stop only the currently verified standalone process tree after rechecking its PID, command, working directory, and listening port.
 
 No compatibility alias will be retained. Running `pnpm admin:dev` must fail instead of silently starting a different service. Direct Vite build behavior and the development redirect plugin are outside this change because the supported command surface, documentation, and regression contract are sufficient to remove the accidental entry point without changing build routing.
 
@@ -33,9 +34,10 @@ The implementation will not start a replacement long-running server automaticall
 
 Use TDD for the package-script contract:
 
-1. Add a test that reads the real package manifest and expects `scripts['admin:dev']` to be absent while `scripts['server:dev']` is present.
+1. Add a test that reads the real package manifest and expects `scripts['admin:dev']` to be absent, `scripts['server:dev']` to be present without a shell-specific environment assignment, and `scripts['admin:build']` to remain available.
 2. Run it and confirm it fails because `admin:dev` still exists.
-3. Remove the script and run the focused test again.
+3. Remove the standalone script and run the focused test again.
+4. Add the cross-platform assertion, confirm it fails on the POSIX-only assignment, remove that assignment, and rerun the focused manifest tests.
 
 Final verification will also:
 
@@ -49,5 +51,6 @@ Final verification will also:
 - No changes to `admin:build` or release builds.
 - No changes to Make client preview commands.
 - No changes to runtime port selection or port-occupancy logic.
+- No change to the Axhub online service URL default or explicit environment-variable override semantics.
 - No unrelated cleanup of existing worktree changes.
 - No automatic commit of implementation files that overlap existing user work.
