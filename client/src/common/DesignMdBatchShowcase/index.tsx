@@ -309,7 +309,7 @@ function FittedSampleText({
         const availableWidth = container.clientWidth;
         const textWidth = text.scrollWidth;
         const nextScale = availableWidth > 0 && textWidth > 0
-          ? Math.min(1, availableWidth / textWidth)
+          ? Math.min(1, (availableWidth - 4) / textWidth)
           : 1;
         setFitScale(current => (Math.abs(current - nextScale) < 0.005 ? current : nextScale));
       });

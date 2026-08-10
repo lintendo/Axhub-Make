@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { createThemeShowcaseConfig } from '../src/common/DesignMdBatchShowcase/createThemeShowcaseConfig';
@@ -78,5 +81,15 @@ describe('createThemeShowcaseConfig', () => {
       panels: [],
       previewImages: [],
     });
+  });
+
+  it('shares the ChatGPT showcase class between theme metadata and the React consumer', () => {
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../src/themes/chatgpt-mobile/implementations/react/index.tsx'),
+      'utf8',
+    );
+
+    expect(themeData.display.showcaseClassName).toBe('chatgpt-theme');
+    expect(source).toContain('className={themeData.display.showcaseClassName}');
   });
 });

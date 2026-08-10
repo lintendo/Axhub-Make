@@ -205,6 +205,7 @@
   "display": {
     "brand": "ChatGPT 主题",
     "brandAlias": "ChatGPT",
+    "showcaseClassName": "chatgpt-theme",
     "description": "ChatGPT 的后 2024 单色主题，以白色文档画布、黑色圆形发送按钮、轻灰用户气泡和克制的蓝色链接为核心。",
     "descriptionEn": "Post-2024 ChatGPT monochrome theme with a white document canvas, black circular send action, soft user bubbles, and restrained blue links.",
     "variant": "mobile-product",

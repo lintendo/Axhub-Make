@@ -20,7 +20,7 @@ const config = createThemeShowcaseConfig({
 });
 
 const Component: React.FC = () => (
-  <DesignMdBatchShowcase className="chatgpt-theme" config={config} />
+  <DesignMdBatchShowcase className={themeData.display.showcaseClassName} config={config} />
 );
 
 export default Component;

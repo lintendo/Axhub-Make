@@ -955,6 +955,10 @@
     grid-template-columns: 1fr;
   }
 
+  .dmb-type-wide .dmb-type-sample {
+    font-size: 44px;
+  }
+
   .dmb-sheet-head h1 {
     font-size: 32px;
   }
