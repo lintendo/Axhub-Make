@@ -218,6 +218,10 @@
   border-radius: 0;
 }
 
+.dmb-preview-local-preview img {
+  object-fit: contain;
+}
+
 .dmb-preview iframe {
   width: 100%;
   height: 100%;

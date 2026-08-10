@@ -51,4 +51,20 @@ describe('DesignMdBatchShowcase mobile product preview', () => {
 
     expect(html).not.toContain('dmb-mobile-screenshot-gallery');
   });
+
+  it('falls back to the ordinary preview when a mobile theme has no product screenshots', () => {
+    const html = renderToStaticMarkup(
+      <DesignMdBatchShowcase
+        config={{
+          ...sharedConfig,
+          variant: 'mobile-product',
+          previewImages: [{ type: 'local-preview', url: '/cover.svg' }],
+        }}
+      />,
+    );
+
+    expect(html).not.toContain('dmb-mobile-screenshot-gallery');
+    expect(html).toContain('class="dmb-preview dmb-preview-local-preview"');
+    expect(html).toContain('src="/cover.svg"');
+  });
 });

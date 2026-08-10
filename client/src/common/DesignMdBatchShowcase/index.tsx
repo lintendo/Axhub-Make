@@ -381,7 +381,7 @@ function PreviewFigure({ config, onOpen }: { config: BatchShowcaseConfig; onOpen
   }
 
   return (
-    <button className="dmb-preview" type="button" onClick={() => onOpen(primaryImage.url)} aria-label={`Open ${imageLabel} preview`}>
+    <button className={`dmb-preview dmb-preview-${primaryImage.type}`} type="button" onClick={() => onOpen(primaryImage.url)} aria-label={`Open ${imageLabel} preview`}>
       <span className="dmb-preview-canvas">
         <img src={primaryImage.url} alt={`${imageLabel} ${primaryImage.type} preview`} loading="lazy" />
       </span>
@@ -760,6 +760,8 @@ export function DesignMdBatchShowcase({ config, tabs = [], className = '' }: Des
   const palette = normalizePalette(config.palette);
   const hasResourceTabs = tabs.length > 0;
   const activeTab = tabs.find(tab => activeTabId === tab.id);
+  const hasMobileProductScreenshots = config.variant === 'mobile-product'
+    && config.previewImages.some(image => image.type === 'product-screenshot');
 
   const sheetHead = (
     <div className="dmb-sheet-head">
@@ -778,8 +780,9 @@ export function DesignMdBatchShowcase({ config, tabs = [], className = '' }: Des
 
   const overviewContent = (
     <>
-      <MobileScreenshotGallery config={config} onOpen={setZoomImage} />
-      {config.variant === 'mobile-product' ? null : <PreviewFigure config={config} onOpen={setZoomImage} />}
+      {hasMobileProductScreenshots
+        ? <MobileScreenshotGallery config={config} onOpen={setZoomImage} />
+        : <PreviewFigure config={config} onOpen={setZoomImage} />}
 
       <div className="dmb-overview-meta">
         <div className="dmb-description">
