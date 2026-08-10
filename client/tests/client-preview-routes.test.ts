@@ -24,6 +24,14 @@ function writeFile(filePath: string, content: string) {
   fs.writeFileSync(filePath, content, 'utf8');
 }
 
+function writeKnowledgeTheme(projectRoot: string, id: string) {
+  const themeRoot = path.join(projectRoot, 'src/themes', id);
+  writeFile(path.join(themeRoot, 'DESIGN.md'), `# ${id}\n`);
+  writeFile(path.join(themeRoot, 'theme.json'), JSON.stringify({ identity: { slug: id } }));
+  writeFile(path.join(themeRoot, 'assets/tokens.json'), '{"palette":["#fff"]}\n');
+  writeFile(path.join(themeRoot, 'preview.html'), `<!doctype html><title>${id}</title>\n`);
+}
+
 function createFixtureProject() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'make-project-preview-route-'));
   tempRoots.push(root);
@@ -1231,7 +1239,7 @@ describe('client preview routes', () => {
   it('serves source preview HTML assets without Vite dev script injection', async () => {
     const projectRoot = createFixtureProject();
     const previewHtml = '<!doctype html><html><head><title>xAI</title></head><body><h1>Source Preview</h1></body></html>\n';
-    writeFile(path.join(projectRoot, 'src/themes/xai/index.tsx'), 'export default function Theme() { return null; }\n');
+    writeKnowledgeTheme(projectRoot, 'xai');
     writeFile(path.join(projectRoot, 'src/themes/xai/assets/preview.html'), previewHtml);
     process.chdir(projectRoot);
     const server = await createPreviewViteServer(projectRoot);
@@ -1249,10 +1257,46 @@ describe('client preview routes', () => {
     expect(html).not.toContain('/@react-refresh');
   });
 
+  it('serves a theme knowledge preview without requiring a root React entry', async () => {
+    const projectRoot = createFixtureProject();
+    const themeRoot = path.join(projectRoot, 'src/themes/demo');
+    const previewHtml = '<!doctype html><html><body><h1>Token Preview</h1><img src="assets/cover.svg"></body></html>\n';
+    writeFile(path.join(themeRoot, 'DESIGN.md'), '# Demo\n');
+    writeFile(path.join(themeRoot, 'theme.json'), '{"identity":{"slug":"demo"}}\n');
+    writeFile(path.join(themeRoot, 'assets/tokens.json'), '{"palette":["#fff"]}\n');
+    writeFile(path.join(themeRoot, 'assets/cover.svg'), '<svg/>\n');
+    writeFile(path.join(themeRoot, 'preview.html'), previewHtml);
+    process.chdir(projectRoot);
+    const server = await createPreviewViteServer(projectRoot);
+    const origin = await listenPreviewViteServer(server);
+
+    const response = await fetch(`${origin}/themes/demo`);
+    const html = await response.text();
+    const cover = await fetch(`${origin}/themes/demo/assets/cover.svg`);
+
+    expect(response.status).toBe(200);
+    expect(response.url).toBe(`${origin}/themes/demo/preview.html`);
+    expect(html).toBe(previewHtml);
+    expect(html).not.toContain('/@vite/client');
+    expect(cover.status).toBe(200);
+  });
+
+  it('keeps prototype discovery on its root React entry contract', async () => {
+    const projectRoot = createFixtureProject();
+    writeFile(path.join(projectRoot, 'src/prototypes/no-entry/preview.html'), '<!doctype html>not a prototype entry');
+    process.chdir(projectRoot);
+    const server = await createPreviewViteServer(projectRoot);
+    const origin = await listenPreviewViteServer(server);
+
+    const response = await fetch(`${origin}/prototypes/no-entry`, { redirect: 'manual' });
+
+    expect(response.status).toBe(404);
+  });
+
   it('serves nested index HTML assets without treating them as preview entry routes', async () => {
     const projectRoot = createFixtureProject();
     const assetHtml = '<!doctype html><html><body><h1>Nested HTML Asset</h1></body></html>\n';
-    writeFile(path.join(projectRoot, 'src/themes/xai/index.tsx'), 'export default function Theme() { return null; }\n');
+    writeKnowledgeTheme(projectRoot, 'xai');
     writeFile(path.join(projectRoot, 'src/themes/xai/assets/index.html'), assetHtml);
     process.chdir(projectRoot);
     const server = await createPreviewViteServer(projectRoot);

@@ -4,7 +4,7 @@ Kami is a document-first desktop/web system for one-pagers, white papers, resume
 
 ## Evidence and Source Record
 
-- **Observed — local source paths:** `index.tsx`, `style.css`, `components/*.tsx`, `templates/*.tsx`, and `assets/kami-demo-tesla.png` in this theme directory are the evidence set for this specification.
+- **Observed — local source paths:** `implementations/react/index.tsx`, `implementations/react/style.css`, `implementations/react/components/*.tsx`, `implementations/react/templates/*.tsx`, and `assets/kami-demo-tesla.png` in this theme directory are the evidence set for this specification.
 - **Observed — implementation:** the React preview exposes Design, Components, and Templates tabs and uses a local screenshot rather than a remote runtime dependency.
 - **Pinned upstream commit:** not applicable; this is repository-authored theme code, not a pinned upstream migration.
 - **License:** repository-authored code is covered by the repository root `LICENSE` (MIT). The local demo image has no separate provenance record.
@@ -25,7 +25,7 @@ Use these semantic roles exactly:
 | rule | `#e4d5bd` | dividers and table rules |
 | gilded | `#b88746` | rare editorial accent, never body copy |
 
-**Observed:** these values are declared by `style.css` and the preview configuration. The current component shadow is `0 14px 36px rgba(31, 58, 95, 0.10)`; the larger page-preview shadow is `0 18px 48px rgba(31, 58, 95, 0.12)`.
+**Observed:** these values are declared by `implementations/react/style.css` and the preview configuration. The current component shadow is `0 14px 36px rgba(31, 58, 95, 0.10)`; the larger page-preview shadow is `0 18px 48px rgba(31, 58, 95, 0.12)`.
 
 ## Typography
 

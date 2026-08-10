@@ -130,7 +130,10 @@ describe('retained PC theme portfolio quality contract', () => {
     expectNonEmptyRecord(theme.display?.spacing, `${slug}: display.spacing`);
     expectNonEmptyRecord(theme.display?.radius, `${slug}: display.radius`);
 
-    const runtimeRadiusSource = [readThemeFile(slug, 'index.tsx'), readThemeFile(slug, 'style.css')].join('\n');
+    const runtimeRadiusSource = [
+      readThemeFile(slug, 'implementations/react/index.tsx'),
+      readThemeFile(slug, 'implementations/react/style.css'),
+    ].join('\n');
     expect(hasGenericExtremeRuntimeRadius(runtimeRadiusSource), `${slug}: generic runtime extreme radius`).toBe(false);
   });
 

@@ -16,7 +16,7 @@ describe('figma theme radius tokens', () => {
   it('keeps generated theme metadata and CSS aligned with the Design.md radius scale', () => {
     const themeJson = readJson(path.join(figmaThemeDir, 'theme.json'));
     const assetTokens = readJson(path.join(figmaThemeDir, 'assets/tokens.json'));
-    const styleCss = fs.readFileSync(path.join(figmaThemeDir, 'style.css'), 'utf8');
+    const styleCss = fs.readFileSync(path.join(figmaThemeDir, 'implementations/react/style.css'), 'utf8');
 
     const expectedRadius = {
       control: '8px',

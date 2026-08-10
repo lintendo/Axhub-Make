@@ -45,11 +45,8 @@
     },
     "cover": null,
     "previewHtml": {
-      "type": "local-preview",
-      "path": "assets/cover.svg",
-      "publicPath": "assets/cover.svg",
-      "importPath": "./assets/cover.svg?url",
-      "sourcePath": "assets/cover.svg"
+      "type": "theme-token-html",
+      "path": "preview.html"
     },
     "productScreenshots": [
       {
@@ -297,6 +294,12 @@
       "actual": 3,
       "lastRegressionAt": null,
       "errors": []
+    }
+  },
+  "implementations": {
+    "react": {
+      "entryPath": "implementations/react/index.tsx",
+      "stylePath": "implementations/react/style.css"
     }
   }
 }

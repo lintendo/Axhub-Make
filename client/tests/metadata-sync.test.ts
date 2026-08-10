@@ -14,6 +14,19 @@ function writeFile(filePath: string, content: string) {
   fs.writeFileSync(filePath, content, 'utf8');
 }
 
+function writeTheme(root: string, id: string, title = id, withReact = false) {
+  const themeRoot = path.join(root, 'src/themes', id);
+  writeFile(path.join(themeRoot, 'DESIGN.md'), `# ${title}\n`);
+  writeFile(path.join(themeRoot, 'theme.json'), JSON.stringify({
+    identity: { slug: id, titleEn: title },
+    assets: { previewHtml: { type: 'theme-token-html', path: 'preview.html' } },
+    ...(withReact ? { implementations: { react: { entryPath: 'implementations/react/index.tsx' } } } : {}),
+  }));
+  writeFile(path.join(themeRoot, 'assets/tokens.json'), '{"palette":["#fff"]}\n');
+  writeFile(path.join(themeRoot, 'preview.html'), `<!doctype html><title>${title}</title>\n`);
+  if (withReact) writeFile(path.join(themeRoot, 'implementations/react/index.tsx'), 'export default function Theme() { return null; }\n');
+}
+
 function createFixtureProject() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'make-project-metadata-'));
 
@@ -22,8 +35,7 @@ function createFixtureProject() {
   writeFile(path.join(root, 'src/prototypes/express-home/index.tsx'), 'export default function ExpressHome() { return null; }\n');
   writeFile(path.join(root, 'src/components/legacy-button/index.tsx'), 'export default function LegacyButton() { return null; }\n');
   writeFile(path.join(root, 'src/resources/project-overview.md'), '# Project Overview\n');
-  writeFile(path.join(root, 'src/themes/antd-new/index.tsx'), 'export default function Theme() { return null; }\n');
-  writeFile(path.join(root, 'src/themes/antd-new/designToken.json'), '{"name":"antd-new"}\n');
+  writeTheme(root, 'antd-new');
   writeFile(path.join(root, '.axhub/make/artifacts/axure/ref-app-home/manifest.json'), '{}\n');
   writeFile(path.join(root, '.axhub/make/artifacts/figma/ref-app-home/canvas.fig'), 'fig\n');
   writeFile(path.join(root, '.axhub/make/artifacts/figma/ref-app-home/meta.json'), '{"file_name":"Fitness Home"}\n');
@@ -139,6 +151,8 @@ describe('make-project metadata sync', () => {
     expect(theme).toMatchObject({
       clientUrl: '/themes/antd-new',
       sourcePath: 'src/themes/antd-new',
+      previewMode: 'staticHtml',
+      previewPath: 'src/themes/antd-new/preview.html',
     });
     expect(JSON.stringify(metadata)).not.toContain(projectRoot);
     expect(JSON.stringify(metadata)).not.toContain('localhost:51720');
@@ -531,10 +545,7 @@ export default function EditedPrototype() {
   it('sorts design-md themes by getdesign.md download counts before unknown themes', () => {
     const projectRoot = createFixtureProject();
     for (const themeName of ['vercel', 'linear', 'apple', 'unknown-theme', 'cal-com', 'opencode']) {
-      writeFile(
-        path.join(projectRoot, `src/themes/${themeName}/index.tsx`),
-        `/**\n * @name ${themeName}\n */\nexport default function Theme() { return null; }\n`,
-      );
+      writeTheme(projectRoot, themeName);
     }
 
     const metadata = buildMakeProjectMetadata(projectRoot, {
@@ -570,14 +581,8 @@ export default function EditedPrototype() {
 
   it('uses brand-only titles for generated design-md theme resources', () => {
     const projectRoot = createFixtureProject();
-    writeFile(
-      path.join(projectRoot, 'src/themes/orderful/index.tsx'),
-      '/**\n * @name Orderful 主题 - Orderful\n */\nexport default function Theme() { return null; }\n',
-    );
-    writeFile(
-      path.join(projectRoot, 'src/themes/figma/index.tsx'),
-      '/**\n * @name Figma 主题 - Figma\n */\nexport default function Theme() { return null; }\n',
-    );
+    writeTheme(projectRoot, 'orderful', 'Orderful', true);
+    writeTheme(projectRoot, 'figma', 'Figma');
 
     const metadata = buildMakeProjectMetadata(projectRoot, {
       clientOrigin: 'http://localhost:51720',
@@ -589,6 +594,10 @@ export default function EditedPrototype() {
     expect(metadata.resources.themes.find((item: any) => item.id === 'figma')).toMatchObject({
       title: 'Figma',
     });
+    expect(metadata.resources.themes.find((item: any) => item.id === 'orderful')).toMatchObject({
+      reactEntryPath: 'src/themes/orderful/implementations/react/index.tsx',
+    });
+    expect(metadata.resources.themes.find((item: any) => item.id === 'figma')).not.toHaveProperty('reactEntryPath');
   });
 
   it('uses the make client marker project identity when present', () => {

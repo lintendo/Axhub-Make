@@ -10,8 +10,8 @@
       "DESIGN.md",
       "theme.json",
       "assets/tokens.json",
-      "index.tsx",
-      "style.css",
+      "implementations/react/index.tsx",
+      "implementations/react/style.css",
       "tw.css",
       "assets/source-preview.jpg"
     ],
@@ -109,11 +109,8 @@
       "sourcePath": "assets/cover.jpg"
     },
     "previewHtml": {
-      "type": "local-preview",
-      "path": "assets/source-preview.jpg",
-      "publicPath": "assets/source-preview.jpg",
-      "importPath": "./assets/source-preview.jpg?url",
-      "sourcePath": "assets/source-preview.jpg"
+      "type": "theme-token-html",
+      "path": "preview.html"
     }
   },
   "tokens": {
@@ -319,5 +316,11 @@
     "collectionErrors": [
       "Blocking license gap: retained external visual/font assets have no local license evidence; keep this client theme and exclude unresolved assets from redistribution claims."
     ]
+  },
+  "implementations": {
+    "react": {
+      "entryPath": "implementations/react/index.tsx",
+      "stylePath": "implementations/react/style.css"
+    }
   }
 }

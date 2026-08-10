@@ -5,7 +5,7 @@ Use this theme for a high-energy game and entertainment storefront on the web. I
 ## Evidence and Source Record
 
 - **Observed — source URL:** `https://styles.refero.design/style/3792d0ca-6c74-4667-a64d-76efe9f87076`; source image URL is retained in `theme.json`.
-- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `style.css`, and `index.tsx`.
+- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `implementations/react/style.css`, and `implementations/react/index.tsx`.
 - **Observed — screenshot:** Microsoft/Xbox utility navigation sits above a full-bleed Call of Duty hero. The hero uses black/photographic contrast, a large white title, bright green game-pass CTA, secondary text action, carousel marks, and a lower green icon discovery band.
 - **Pinned upstream commit:** not applicable; this is a Refero image/metadata reference rather than Git-imported code.
 - **License:** no screenshot, game art, brand, or font license is stored locally. Treat assets as internal visual references until rights are verified.

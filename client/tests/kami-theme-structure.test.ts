@@ -15,14 +15,14 @@ function readThemeFile(relativePath: string) {
 describe('Kami theme resource entry structure', () => {
   it('ships a theme-local components and templates example without global resource expansion', () => {
     const expectedFiles = [
-      'index.tsx',
-      'style.css',
+      'implementations/react/index.tsx',
+      'implementations/react/style.css',
       'DESIGN.md',
-      'components/PaperButton.tsx',
-      'components/EditorialCard.tsx',
-      'components/SpecTable.tsx',
-      'templates/OnePagerTemplate.tsx',
-      'templates/LongDocTemplate.tsx',
+      'implementations/react/components/PaperButton.tsx',
+      'implementations/react/components/EditorialCard.tsx',
+      'implementations/react/components/SpecTable.tsx',
+      'implementations/react/templates/OnePagerTemplate.tsx',
+      'implementations/react/templates/LongDocTemplate.tsx',
       'assets/kami-demo-tesla.png',
     ];
 
@@ -30,7 +30,7 @@ describe('Kami theme resource entry structure', () => {
       expect(fs.existsSync(path.join(themeRoot, relativePath)), relativePath).toBe(true);
     }
 
-    const indexSource = readThemeFile('index.tsx');
+    const indexSource = readThemeFile('implementations/react/index.tsx');
     expect(indexSource).toContain('@name Kami 紙主题');
     expect(indexSource).toContain('DesignMdBatchShowcase');
     expect(indexSource).toContain('BatchShowcaseConfig');
@@ -43,7 +43,7 @@ describe('Kami theme resource entry structure', () => {
     expect(indexSource).toContain("from './templates/LongDocTemplate'");
     expect(indexSource).toContain("label: '组件'");
     expect(indexSource).toContain("label: '模板'");
-    expect(indexSource).toContain("from './assets/kami-demo-tesla.png?url'");
+    expect(indexSource).toContain("from '../../assets/kami-demo-tesla.png?url'");
     expect(indexSource).not.toContain('<span>src/themes/kami/components/</span>');
     expect(indexSource).not.toContain('<span>src/themes/kami/templates/</span>');
     expect(indexSource).not.toContain('className="kami-theme"');
@@ -55,13 +55,13 @@ describe('Kami theme resource entry structure', () => {
       expect(source, relativePath).toContain('export default');
     }
 
-    const styleSource = readThemeFile('style.css');
+    const styleSource = readThemeFile('implementations/react/style.css');
     expect(styleSource).toContain('--kami-paper');
     expect(styleSource).toContain('--kami-ink-blue');
     expect(styleSource).toContain('font-family');
 
     const designSource = readThemeFile('DESIGN.md');
-    expect(designSource).toContain('**Observed — local source paths:** `index.tsx`, `style.css`, `components/*.tsx`, `templates/*.tsx`');
+    expect(designSource).toContain('**Observed — local source paths:** `implementations/react/index.tsx`, `implementations/react/style.css`, `implementations/react/components/*.tsx`, `implementations/react/templates/*.tsx`');
     expect(designSource).toContain('This is one responsive React/Web theme, not a mobile-theme fork.');
     for (const section of ['## Colors', '## Typography', '## Components', '## Layout', '## Responsive', "## Do's and Don'ts", '## Known Gaps']) {
       expect(designSource).toContain(section);

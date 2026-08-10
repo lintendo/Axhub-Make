@@ -69,11 +69,8 @@
       "sourcePath": "assets/cover.jpg"
     },
     "previewHtml": {
-      "type": "local-preview",
-      "path": "assets/source-preview.jpg",
-      "publicPath": "assets/source-preview.jpg",
-      "importPath": "./assets/source-preview.jpg?url",
-      "sourcePath": "assets/source-preview.jpg"
+      "type": "theme-token-html",
+      "path": "preview.html"
     }
   },
   "tokens": {
@@ -226,5 +223,11 @@
   "status": {
     "displayPage": "todo",
     "collectionErrors": []
+  },
+  "implementations": {
+    "react": {
+      "entryPath": "implementations/react/index.tsx",
+      "stylePath": "implementations/react/style.css"
+    }
   }
 }

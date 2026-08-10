@@ -20,7 +20,7 @@ describe('generated theme source wiring', () => {
 
     for (const themeName of themeDirs()) {
       const themeJsonPath = path.join(themesRoot, themeName, 'theme.json');
-      const indexPath = path.join(themesRoot, themeName, 'index.tsx');
+      const indexPath = path.join(themesRoot, themeName, 'implementations/react/index.tsx');
       if (!fs.existsSync(themeJsonPath) || !fs.existsSync(indexPath)) continue;
 
       const themeJson = JSON.parse(fs.readFileSync(themeJsonPath, 'utf8'));

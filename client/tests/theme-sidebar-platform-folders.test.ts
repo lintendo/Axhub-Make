@@ -71,7 +71,8 @@ describe('theme sidebar platform folders', () => {
 
     const actualThemeKeys = fs.readdirSync(themesRoot, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
-      .filter((entry) => fs.existsSync(path.join(themesRoot, entry.name, 'index.tsx')))
+      .filter((entry) => ['theme.json', 'DESIGN.md', 'assets/tokens.json', 'preview.html']
+        .every((relativePath) => fs.existsSync(path.join(themesRoot, entry.name, ...relativePath.split('/')))))
       .map((entry) => `themes/${entry.name}`)
       .sort();
     const treeItemKeys = collectItemKeys(sidebar.themesTree);
@@ -88,7 +89,8 @@ describe('theme sidebar platform folders', () => {
   it('keeps runtime and release seed theme indexes complete', () => {
     const actualThemeIds = fs.readdirSync(themesRoot, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
-      .filter((entry) => fs.existsSync(path.join(themesRoot, entry.name, 'index.tsx')))
+      .filter((entry) => ['theme.json', 'DESIGN.md', 'assets/tokens.json', 'preview.html']
+        .every((relativePath) => fs.existsSync(path.join(themesRoot, entry.name, ...relativePath.split('/')))))
       .map((entry) => entry.name)
       .sort();
 

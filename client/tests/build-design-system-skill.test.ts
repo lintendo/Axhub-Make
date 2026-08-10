@@ -156,7 +156,7 @@ describe('build-design-system skill', () => {
   it('preserves the complete existing theme output and acceptance contract', () => {
     const contract = read(agentRoot, 'references/theme-output-contract.md');
 
-    for (const output of ['DESIGN.md', 'theme.json', 'assets/tokens.json', 'style.css', 'tw.css', 'index.tsx']) {
+    for (const output of ['DESIGN.md', 'theme.json', 'assets/tokens.json', 'preview.html', 'tw.css', 'implementations/react/index.tsx']) {
       expect(contract).toContain(output);
     }
     for (const section of [

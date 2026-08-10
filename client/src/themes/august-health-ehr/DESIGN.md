@@ -5,7 +5,7 @@ Use this theme for calm, information-rich healthcare and senior-living workflows
 ## Evidence and Source Record
 
 - **Observed — source URL:** `https://styles.refero.design/style/81bd6ad6-b02b-4fb3-a600-91ecf8324171`; official-site reference: `https://www.augusthealth.com/`.
-- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/official-homepage.webp`, `assets/cover.webp`, `style.css`, and `index.tsx` in this theme directory.
+- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/official-homepage.webp`, `assets/cover.webp`, `implementations/react/style.css`, and `implementations/react/index.tsx` in this theme directory.
 - **Observed — screenshot:** the retained desktop capture shows a deep-violet section, restrained centered lead text, three horizontally structured color bands, fine connector marks, and a curved light lower edge.
 - **Pinned upstream commit:** not applicable; Refero and the official website are URL/image references, not a Git-pinned code migration.
 - **License:** no source-asset license is recorded in local metadata. Keep the screenshot as an internal design reference and verify rights before redistribution.

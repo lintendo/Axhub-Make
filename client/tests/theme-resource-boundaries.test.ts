@@ -171,7 +171,7 @@ describe('theme resource boundaries', () => {
 
   it('keeps every local theme resource reference inside its own theme directory', () => {
     for (const themeDir of listThemeDirs()) {
-      const indexPath = path.join(themeDir, 'index.tsx');
+      const indexPath = path.join(themeDir, 'implementations/react/index.tsx');
       if (fs.existsSync(indexPath)) {
         for (const reference of collectUrlImportReferences(fs.readFileSync(indexPath, 'utf8'))) {
           assertThemeLocalResource({
@@ -183,8 +183,11 @@ describe('theme resource boundaries', () => {
         }
       }
 
-      const stylePath = path.join(themeDir, 'style.css');
-      if (fs.existsSync(stylePath)) {
+      const themeJsonPath = path.join(themeDir, 'theme.json');
+      const themeJson = fs.existsSync(themeJsonPath) ? JSON.parse(fs.readFileSync(themeJsonPath, 'utf8')) : null;
+      const styleRelativePath = themeJson?.implementations?.react?.stylePath;
+      const stylePath = typeof styleRelativePath === 'string' ? path.join(themeDir, styleRelativePath) : '';
+      if (stylePath && fs.existsSync(stylePath)) {
         for (const reference of collectCssResourceReferences(fs.readFileSync(stylePath, 'utf8'))) {
           assertThemeLocalResource({
             themeDir,
@@ -195,9 +198,7 @@ describe('theme resource boundaries', () => {
         }
       }
 
-      const themeJsonPath = path.join(themeDir, 'theme.json');
       if (fs.existsSync(themeJsonPath)) {
-        const themeJson = JSON.parse(fs.readFileSync(themeJsonPath, 'utf8'));
         for (const reference of collectThemeJsonResourceReferences(themeJson)) {
           assertThemeLocalResource({
             themeDir,

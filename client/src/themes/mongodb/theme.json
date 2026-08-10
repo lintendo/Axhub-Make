@@ -49,11 +49,12 @@
     },
     "cover": null,
     "previewHtml": {
-      "type": "local-preview",
-      "path": "assets/official-homepage.webp",
-      "publicPath": "assets/official-homepage.webp",
-      "importPath": "./assets/official-homepage.webp?url",
-      "sourcePath": "assets/official-homepage.webp"
+      "type": "theme-token-html",
+      "path": "preview.html"
+    },
+    "sourcePreviewHtml": {
+      "type": "source-preview-html",
+      "path": "assets/source-preview.html"
     }
   },
   "tokens": {
@@ -299,5 +300,11 @@
   "status": {
     "displayPage": "done",
     "collectionErrors": []
+  },
+  "implementations": {
+    "react": {
+      "entryPath": "implementations/react/index.tsx",
+      "stylePath": "implementations/react/style.css"
+    }
   }
 }

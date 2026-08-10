@@ -5,7 +5,7 @@ Use this theme for a precise AI/audio product page: near-white canvas, decisive 
 ## Evidence and Source Record
 
 - **Observed — source URLs:** `https://styles.refero.design/style/031056ff-7af1-46db-8daa-115f731c5d26` and official-site reference `https://elevenlabs.io/`.
-- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `assets/official-homepage.webp`, `assets/preview.html`, `style.css`, and `index.tsx`.
+- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `assets/official-homepage.webp`, `assets/source-preview.html`, `implementations/react/style.css`, and `implementations/react/index.tsx`.
 - **Observed — screenshot:** a fine black wordmark/nav sits above a two-column headline, black actions, and a pale product panel containing tabs, gradient audio spheres, a centered play control, and a compact mode rail.
 - **Pinned upstream commit:** not applicable; retained sources are URLs/captures rather than Git code.
 - **License:** no screenshot, brand, or font license is recorded in local metadata. Verify rights before redistribution.

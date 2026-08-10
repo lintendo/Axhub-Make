@@ -45,11 +45,8 @@
     },
     "cover": null,
     "previewHtml": {
-      "type": "local-preview",
-      "path": "assets/cover.svg",
-      "publicPath": "assets/cover.svg",
-      "importPath": "./assets/cover.svg?url",
-      "sourcePath": "assets/cover.svg"
+      "type": "theme-token-html",
+      "path": "preview.html"
     },
     "productScreenshots": [
       {
@@ -117,7 +114,9 @@
   "tokens": {
     "appearance": {
       "defaultMode": "dark",
-      "supportedModes": ["dark"],
+      "supportedModes": [
+        "dark"
+      ],
       "source": "design-md"
     },
     "palette": [
@@ -140,7 +139,16 @@
       "body": "Netflix Sans",
       "primary": "Netflix Sans",
       "mono": "ui-monospace",
-      "fallback": ["-apple-system", "BlinkMacSystemFont", "SF Pro Display", "Graphik", "Helvetica Neue", "Helvetica", "Arial", "sans-serif"],
+      "fallback": [
+        "-apple-system",
+        "BlinkMacSystemFont",
+        "SF Pro Display",
+        "Graphik",
+        "Helvetica Neue",
+        "Helvetica",
+        "Arial",
+        "sans-serif"
+      ],
       "hints": [
         "Netflix Sans",
         "Netflix Sans",
@@ -153,12 +161,30 @@
       "preview": "4px",
       "pill": "500px",
       "circle": "50%",
-      "scale": ["0px", "4px", "8px", "12px", "500px", "50%"],
+      "scale": [
+        "0px",
+        "4px",
+        "8px",
+        "12px",
+        "500px",
+        "50%"
+      ],
       "source": "design-md"
     },
     "spacing": {
       "base": "4px",
-      "scale": ["4px", "8px", "12px", "16px", "20px", "24px", "32px", "48px", "56px", "64px"],
+      "scale": [
+        "4px",
+        "8px",
+        "12px",
+        "16px",
+        "20px",
+        "24px",
+        "32px",
+        "48px",
+        "56px",
+        "64px"
+      ],
       "source": "design-md"
     }
   },
@@ -340,12 +366,30 @@
       "preview": "4px",
       "pill": "500px",
       "circle": "50%",
-      "scale": ["0px", "4px", "8px", "12px", "500px", "50%"],
+      "scale": [
+        "0px",
+        "4px",
+        "8px",
+        "12px",
+        "500px",
+        "50%"
+      ],
       "source": "design-md"
     },
     "spacing": {
       "base": "4px",
-      "scale": ["4px", "8px", "12px", "16px", "20px", "24px", "32px", "48px", "56px", "64px"],
+      "scale": [
+        "4px",
+        "8px",
+        "12px",
+        "16px",
+        "20px",
+        "24px",
+        "32px",
+        "48px",
+        "56px",
+        "64px"
+      ],
       "source": "design-md"
     }
   },
@@ -359,6 +403,12 @@
       "actual": 3,
       "lastRegressionAt": null,
       "errors": []
+    }
+  },
+  "implementations": {
+    "react": {
+      "entryPath": "implementations/react/index.tsx",
+      "stylePath": "implementations/react/style.css"
     }
   }
 }

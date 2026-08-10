@@ -5,7 +5,7 @@ Use this theme for supportive wellbeing and care-navigation experiences. It pair
 ## Evidence and Source Record
 
 - **Observed — source URL:** `https://styles.refero.design/style/035a098b-5a27-48a3-8a3a-c68a698e3eab`; source image URL is retained in `theme.json`.
-- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `style.css`, and `index.tsx`.
+- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `implementations/react/style.css`, and `implementations/react/index.tsx`.
 - **Observed — screenshot:** a thin yellow promotion strip and white navigation lead to a centered "Sleep better" message. Two large soft cream cards split meditation content and therapy/care content, with colorful supporting image clusters and compact black/blue actions.
 - **Pinned upstream commit:** not applicable; sources are Refero capture/metadata, not Git-imported code.
 - **License:** no source image, illustration, brand, or typeface license is recorded locally. Use retained assets as internal references only until rights are confirmed.

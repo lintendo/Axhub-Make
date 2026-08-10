@@ -5,7 +5,7 @@ Use this theme for playful, progress-oriented learning experiences on the web. T
 ## Evidence and Source Record
 
 - **Observed — source URL:** `https://styles.refero.design/style/95b472c5-fc07-46a8-a11f-c5432e290fcd`; source image URL is recorded in `theme.json`.
-- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `style.css`, and `index.tsx`.
+- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `implementations/react/style.css`, and `implementations/react/index.tsx`.
 - **Observed — screenshot:** a sparse top bar frames a centered two-part hero (character group and onboarding copy), a bright green primary action, a light outlined secondary action, and a bottom language rail.
 - **Pinned upstream commit:** not applicable; this is a Refero image/metadata reference, not imported Git code.
 - **License:** no brand-asset or screenshot license is recorded locally. Use as internal visual reference unless redistribution rights are established.

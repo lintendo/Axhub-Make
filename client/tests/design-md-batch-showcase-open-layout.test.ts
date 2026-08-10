@@ -15,7 +15,7 @@ function cssValue(rule: string, property: string) {
 
 describe('DesignMdBatchShowcase open layout', () => {
   const baseCss = read('src/common/DesignMdBatchShowcase/base.css');
-  const appleCss = read('src/themes/apple/style.css');
+  const appleCss = read('src/themes/apple/implementations/react/style.css');
 
   it('does not frame the whole showcase as a bordered card', () => {
     const sheetRule = baseCss.match(/\.dmb-sheet\s*\{[^}]+\}/)?.[0] ?? '';

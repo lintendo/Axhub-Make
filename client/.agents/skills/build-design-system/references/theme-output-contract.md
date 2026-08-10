@@ -5,7 +5,7 @@
 ## 核心原则
 
 - `DESIGN.md` 是主题事实源：品牌定位、设计原则、色彩、字体、圆角、间距、边框、阴影、组件规则和禁用做法，均优先按它判断。
-- `theme.json` 是运行时与管理端消费的结构化摘要；`assets/tokens.json` 是轻量 token 快照；`style.css` 是演示页可见样式。三者必须与 `DESIGN.md` 保持一致。
+- `theme.json` 是运行时与管理端消费的结构化摘要；`assets/tokens.json` 是唯一 canonical token 快照；根级 `preview.html` 是默认资料预览。三者必须与 `DESIGN.md` 保持一致。
 - 用户当前明确修改意图优先；附件、截图和链接只按 `references/source-handlers.md` 的证据优先级处理。若明确要求与 `DESIGN.md` 冲突，先更新 `DESIGN.md`，再同步派生文件。
 - 不根据截图、元数据或自动推断结果覆盖明确写在 `DESIGN.md` 中的规则；只能在 `DESIGN.md` 缺失信息时补充合理假设，并在文档或交付说明中写清楚。
 - 主题代码、CSS 和 `theme.json` 中的本地资源引用必须使用主题内相对路径，禁止根路径、本机绝对路径或 `../` 逃逸到其他目录。
@@ -13,13 +13,14 @@
 
 ## 标准参考主题
 
-当前标准参考主题是 `src/themes/linear/`。新建或重做主题时，参考它的目录结构、`theme.json` 字段组织、`index.tsx` 接入方式和预览资源引用方式。
+当前标准参考主题是 `src/themes/linear/`。新建或重做主题时，参考它的目录结构、`theme.json` 字段组织、根级 `preview.html` 和可选 React 实现的资源引用方式。
 
 参考范围：
 
-- `index.tsx`：引入 `./style.css`、读取 `./theme.json`、将 `display` 映射为 `DesignMdBatchShowcase` 配置，并静态 import 本地预览资源。
+- `preview.html`：默认入口，直接内嵌从 `theme.json` 与 `assets/tokens.json` 提取的数据，可通过 `file://` 或静态服务打开。
+- `implementations/react/index.tsx`：可选增强实现；读取 `../../theme.json` 并静态 import 主题内资源，不参与主题发现。
 - `theme.json`：包含 `schemaVersion`、`source`、`identity`、`tags`、`assets`、`tokens`、`previewImages`、`display`。
-- `style.css`：以 `@import "tailwindcss";` 开头，在 `.dmb-page` 中写入 `--dmb-*` CSS Variables。
+- `implementations/react/style.css`：React 实现专用样式，以 `@import "tailwindcss";` 开头，在 `.dmb-page` 中写入 `--dmb-*` CSS Variables。
 - `assets/`：至少包含 `tokens.json` 和一个稳定预览图，例如 `official-homepage.webp`、`cover.webp` 或 `source-preview.webp`。
 
 不要复制参考主题的品牌内容、视觉风格、文案或临时生成注释。新主题必须用自己的 `DESIGN.md` 派生真实 token、展示字段和预览资源。
@@ -66,10 +67,13 @@ src/themes/<theme-key>/
 ├── theme.json             # 必需，结构化主题元数据与展示配置
 ├── assets/
 │   ├── tokens.json        # 必需，轻量 token 快照
-│   └── ...                # 预览图、官网截图、字体、preview.html 等主题私有资源
-├── style.css              # 必需，主题演示页样式变量
+│   └── ...                # 预览图、官网截图、字体、source-preview.html 等主题私有资源
+├── preview.html           # 必需，独立 HTML 默认资料预览
 ├── tw.css                 # 必需，Tailwind v4 主题片段或最小可用片段
-└── index.tsx              # 必需，主题演示页入口，必须 export default Component
+└── implementations/
+    └── react/             # 可选 React 增强实现，不作为主题主入口
+        ├── style.css
+        └── index.tsx
 ```
 
 ## `DESIGN.md` 编写规范
@@ -106,7 +110,7 @@ src/themes/<theme-key>/
 - 至少包含 `palette`、`typography`；若 `DESIGN.md` 提供圆角、间距、边框或阴影，也应保留对应字段。
 - 与 `theme.json.tokens` 保持一致，不额外发明另一套命名或语义。
 
-`style.css` 用于让演示页真实体现主题：
+`implementations/react/style.css` 用于让可选 React 实现真实体现主题：
 
 - 必须 `@import "tailwindcss";`。
 - 使用 `.dmb-page` 写入 `--dmb-*` CSS Variables，包括 accent、link、muted、background、font、radius、spacing、border 等可见变量。
@@ -119,11 +123,13 @@ src/themes/<theme-key>/
 
 ## 演示页规范
 
-`index.tsx` 是主题预览入口，必须：
+根级 `preview.html` 是主题默认入口，必须独立展示品牌、标签、token、来源、使用建议和 `DESIGN.md` 链接，不依赖 React、Vite、远程脚本或运行时 JSON fetch。
+
+`implementations/react/index.tsx` 是可选增强入口，存在时必须：
 
 - `export default Component`。
-- 引入 `./style.css`，读取 `./theme.json`，并把 `display` 配置传入 `DesignMdBatchShowcase`。
-- 通过静态 import 引入本地预览资源，例如 `./assets/official-homepage.webp?url`。
+- 引入 `./style.css`，读取 `../../theme.json`，并把 `display` 配置传入 `DesignMdBatchShowcase`。
+- 通过静态 import 引入本地预览资源，例如 `../../assets/official-homepage.webp?url`。
 - 展示颜色、字体、圆角、间距、边框/阴影、使用建议和典型场景。
 - 不展示内部采集过程、脚本状态、TODO、占位文案或无关营销内容。
 
@@ -131,10 +137,10 @@ src/themes/<theme-key>/
 
 ## 更新工作流
 
-1. 先读用户要求、当前主题 `DESIGN.md`、`theme.json`、`assets/tokens.json`、`style.css`、`tw.css`、`index.tsx` 和相关资源。
+1. 先读用户要求、当前主题 `DESIGN.md`、`theme.json`、`assets/tokens.json`、`preview.html`、`tw.css`、可选 `implementations/react/` 和相关资源。
 2. 判断冲突：用户明确修改意图优先；否则以 `DESIGN.md` 为准，修正派生文件。
 3. 修改事实源：新增或修正设计规则时先改 `DESIGN.md`。
-4. 同步派生：更新 `theme.json.tokens/display`、`assets/tokens.json`、`style.css`、`tw.css` 和预览资源引用。
+4. 同步派生：更新 `theme.json.tokens/display`、`assets/tokens.json`、根级 `preview.html`、`tw.css` 和可选 React 实现。
 5. 检查一致性：主色是否来自 `DESIGN.md`，字体角色是否完整，圆角/间距/边框/阴影是否没有丢失，使用建议是否非泛化。
 6. 查找和导入：优先从 `getdesign.md` 和 `styles.refero.design` 定位主题，再用 `collect`、`generate`、`review` 三个脚本串起导入流程。
 7. 来源采集：仅在用户提供来源或现有证据不足时读取 `references/source-handlers.md`，把登记后的采集结果作为 `DESIGN.md` 的证据来源。

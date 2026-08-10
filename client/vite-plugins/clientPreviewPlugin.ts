@@ -192,11 +192,21 @@ function isSafePathPart(part: string): boolean {
   return Boolean(part) && !part.includes('/') && !part.includes('\\') && !part.includes('\0');
 }
 
+function hasKnowledgeThemeEntry(resourceDir: string): boolean {
+  return [
+    'DESIGN.md',
+    'theme.json',
+    'assets/tokens.json',
+    'preview.html',
+  ].every(relativePath => fs.existsSync(path.join(resourceDir, ...relativePath.split('/'))));
+}
+
 function hasPreviewEntry(projectRoot: string, type: ResourceType, nameParts: string[]): boolean {
   if (!PREVIEW_TYPES.has(type) || nameParts.length === 0 || nameParts.some((part) => !isSafePathPart(part) || part === '..')) {
     return false;
   }
   const resourceDir = path.resolve(projectRoot, 'src', type, ...nameParts);
+  if (type === 'themes') return hasKnowledgeThemeEntry(resourceDir);
   return fs.existsSync(path.join(resourceDir, 'index.tsx'))
     || fs.existsSync(path.join(resourceDir, 'index.ts'));
 }
@@ -242,10 +252,7 @@ function normalizeRoute(
     for (let splitIndex = 2; splitIndex < parts.length; splitIndex += 1) {
       const candidateNameParts = parts.slice(1, splitIndex);
       const candidateResourceDir = path.resolve(resourceRoot, ...candidateNameParts);
-      if (
-        fs.existsSync(path.join(candidateResourceDir, 'index.tsx'))
-        || fs.existsSync(path.join(candidateResourceDir, 'index.ts'))
-      ) {
+      if (hasPreviewEntry(projectRoot, type, candidateNameParts)) {
         resolvedNameParts = candidateNameParts;
         resolvedAssetParts = parts.slice(splitIndex);
         break;
@@ -527,6 +534,26 @@ interface PreviewSource {
 function createDefaultPreviewSource(projectRoot: string, route: { type: ResourceType; name: string }): PreviewSource {
   const resourceDir = path.resolve(projectRoot, 'src', route.type, route.name);
   const routePath = createRawRoutePath(route.type, route.name);
+  if (route.type === 'themes') {
+    const theme = (() => {
+      try {
+        return JSON.parse(fs.readFileSync(path.join(resourceDir, 'theme.json'), 'utf8'));
+      } catch {
+        return null;
+      }
+    })();
+    const declaredStyle = String(theme?.implementations?.react?.stylePath || '').replace(/\\/gu, '/');
+    const styleRelativePath = /^implementations\/react\/[^/]+\.css$/u.test(declaredStyle)
+      ? declaredStyle
+      : 'implementations/react/style.css';
+    return {
+      resourceDir,
+      entryPath: path.join(resourceDir, 'implementations', 'react', 'index.tsx'),
+      importPath: `${routePath}/implementations/react/index.tsx`,
+      stylePath: path.join(resourceDir, ...styleRelativePath.split('/')),
+      styleHref: `${routePath}/${styleRelativePath}`,
+    };
+  }
   return {
     resourceDir,
     entryPath: path.join(resourceDir, 'index.tsx'),
@@ -1233,10 +1260,6 @@ export function clientPreviewPlugin(): Plugin {
           }
           const previewSource = gitVersionPreviewSource || resolvePreviewSource(projectRoot, route, req.url);
           const entryPath = previewSource.entryPath;
-          if (!fs.existsSync(entryPath)) {
-            next();
-            return;
-          }
 
           if (route.assetPath) {
             if (isViteAssetModuleRequest(req.url)) {
@@ -1260,6 +1283,24 @@ export function clientPreviewPlugin(): Plugin {
             if (assetPath && sendPreviewFile(res, assetPath)) {
               return;
             }
+            next();
+            return;
+          }
+
+          const wantsReactTheme = route.type === 'themes'
+            && getSearchParamFromRequestUrl(req.url, 'implementation') === 'react';
+          const knowledgePreviewPath = route.type === 'themes'
+            ? path.join(previewSource.resourceDir, 'preview.html')
+            : '';
+          if (route.action === 'preview' && route.type === 'themes' && !wantsReactTheme && fs.existsSync(knowledgePreviewPath)) {
+            if (await handleClientLanAccess(req, res, projectRoot)) return;
+            res.statusCode = 302;
+            res.setHeader('Location', `${createRoutePath(route.type, route.name)}/preview.html`);
+            res.end();
+            return;
+          }
+
+          if (!fs.existsSync(entryPath)) {
             next();
             return;
           }

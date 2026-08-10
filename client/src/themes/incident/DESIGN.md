@@ -5,7 +5,7 @@ Use this theme for transparent operational status and incident communication. It
 ## Evidence and Source Record
 
 - **Observed — source URL:** `https://styles.refero.design/style/d9a60077-619a-4cb7-95ed-0c428c2b51ed`; source image URL is retained in `theme.json`.
-- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `style.css`, and `index.tsx`.
+- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `implementations/react/style.css`, and `implementations/react/index.tsx`.
 - **Observed — screenshot:** a status page identifies a region, presents a large pale-red issue panel with alert icon and plain-language impact, exposes Website/App tabs, and lists update timing in a simple table-like chronology.
 - **Pinned upstream commit:** not applicable; it is a Refero visual reference rather than a Git migration.
 - **License:** no source screenshot, brand, or font license is recorded locally. Treat it as internal reference material until rights are established.

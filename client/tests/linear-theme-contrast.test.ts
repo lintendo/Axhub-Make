@@ -34,7 +34,7 @@ function rule(css: string, selector: string) {
 
 describe('Linear theme contrast', () => {
   const baseCss = read('src/common/DesignMdBatchShowcase/base.css');
-  const linearCss = read('src/themes/linear/style.css');
+  const linearCss = read('src/themes/linear/implementations/react/style.css');
 
   it('keeps the dark showcase header readable on Linear canvas', () => {
     const canvas = cssVar(linearCss, '--dmb-bg');

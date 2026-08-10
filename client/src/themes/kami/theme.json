@@ -10,10 +10,10 @@
       "DESIGN.md",
       "theme.json",
       "assets/tokens.json",
-      "index.tsx",
-      "style.css",
-      "components/",
-      "templates/",
+      "implementations/react/index.tsx",
+      "implementations/react/style.css",
+      "implementations/react/components/",
+      "implementations/react/templates/",
       "assets/kami-demo-tesla.png"
     ],
     "pinnedCommit": {
@@ -87,11 +87,8 @@
       "licenseStatus": "unresolved; internal reference only; excluded from redistribution claims"
     },
     "previewHtml": {
-      "type": "local-preview",
-      "path": "assets/kami-demo-tesla.png",
-      "publicPath": "assets/kami-demo-tesla.png",
-      "importPath": "./assets/kami-demo-tesla.png?url",
-      "sourcePath": "assets/kami-demo-tesla.png"
+      "type": "theme-token-html",
+      "path": "preview.html"
     }
   },
   "tokens": {
@@ -275,5 +272,11 @@
     "collectionErrors": [
       "Blocking license gap: retained external visual/font assets have no local license evidence; keep this client theme and exclude unresolved assets from redistribution claims."
     ]
+  },
+  "implementations": {
+    "react": {
+      "entryPath": "implementations/react/index.tsx",
+      "stylePath": "implementations/react/style.css"
+    }
   }
 }

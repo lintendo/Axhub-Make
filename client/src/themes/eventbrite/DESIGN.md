@@ -5,7 +5,7 @@ Use this theme for event discovery on the web: an efficient search-led header, a
 ## Evidence and Source Record
 
 - **Observed — source URL:** `https://styles.refero.design/style/1fa0d9da-966f-4d43-9775-e156bec3a3b3`; the source image URL is recorded in `theme.json`.
-- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `style.css`, and `index.tsx`.
+- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `implementations/react/style.css`, and `implementations/react/index.tsx`.
 - **Observed — screenshot:** a dense desktop header combines the Eventbrite mark, event/location search, utility links, and account actions; a large photo hero includes overlaid editorial type and a high-contrast CTA; round category controls and a location feed follow.
 - **Pinned upstream commit:** not applicable; this is a Refero capture/metadata reference, not Git-imported code.
 - **License:** no screenshot, photography, brand, or font license is recorded locally. Treat assets as internal references until rights are verified.

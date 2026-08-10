@@ -5,7 +5,7 @@ Use this theme for an agent-native software-development product on the web. It i
 ## Evidence and Source Record
 
 - **Observed — source URL:** `https://styles.refero.design/style/13d6fc89-eba2-4724-ac37-20f4f2e5efec`; source image URL is retained in `theme.json`.
-- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `style.css`, and `index.tsx`.
+- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `implementations/react/style.css`, and `implementations/react/index.tsx`.
 - **Observed — screenshot:** the desktop page has a fine black nav, large two-line monospace headline, a small command/demo block, black outlined utility controls, and an overwhelmingly pale field with minimal decoration.
 - **Pinned upstream commit:** not applicable; this is a Refero image/metadata reference, not imported Git code.
 - **License:** no source image, brand, or font license is recorded locally. Retain it as an internal reference pending rights verification.

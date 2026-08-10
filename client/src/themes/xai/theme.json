@@ -50,11 +50,12 @@
     },
     "cover": null,
     "previewHtml": {
+      "type": "theme-token-html",
+      "path": "preview.html"
+    },
+    "sourcePreviewHtml": {
       "type": "source-preview-html",
-      "path": "assets/preview.html",
-      "publicPath": "assets/preview.html",
-      "importPath": "./assets/preview.html?url",
-      "sourcePath": "assets/preview.html"
+      "path": "assets/source-preview.html"
     }
   },
   "tokens": {
@@ -112,7 +113,7 @@
   "previewImages": [
     {
       "type": "source-preview-html",
-      "path": "assets/preview.html"
+      "path": "assets/source-preview.html"
     }
   ],
   "display": {
@@ -258,7 +259,7 @@
     "previewImages": [
       {
         "type": "source-preview-html",
-        "path": "assets/preview.html"
+        "path": "assets/source-preview.html"
       }
     ],
     "panels": [
@@ -317,5 +318,11 @@
   "status": {
     "displayPage": "doing",
     "collectionErrors": []
+  },
+  "implementations": {
+    "react": {
+      "entryPath": "implementations/react/index.tsx",
+      "stylePath": "implementations/react/style.css"
+    }
   }
 }

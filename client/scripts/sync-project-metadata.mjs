@@ -550,17 +550,35 @@ function collectThemes(projectRoot, clientOrigin) {
     if (!fs.existsSync(root)) continue;
     for (const entry of fs.readdirSync(root, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       if (!entry.isDirectory()) continue;
-      const indexFile = path.join(root, entry.name, 'index.tsx');
-      if (!fs.existsSync(indexFile)) continue;
-      const tokenPath = path.join(root, entry.name, 'designToken.json');
+      const themeRoot = path.join(root, entry.name);
+      const designPath = path.join(themeRoot, 'DESIGN.md');
+      const themePath = path.join(themeRoot, 'theme.json');
+      const tokenPath = path.join(themeRoot, 'assets', 'tokens.json');
+      const previewPath = path.join(themeRoot, 'preview.html');
+      if (![designPath, themePath, tokenPath, previewPath].every(filePath => fs.existsSync(filePath))) continue;
+      const theme = readJson(themePath);
+      if (!theme || theme.identity?.slug !== entry.name) continue;
+      const declaredReactEntry = stringValue(theme.implementations?.react?.entryPath);
+      const reactEntryPath = declaredReactEntry && !path.isAbsolute(declaredReactEntry)
+        && !toPosix(declaredReactEntry).split('/').some(part => !part || part === '.' || part === '..')
+        ? path.resolve(themeRoot, declaredReactEntry)
+        : '';
       const getdesignStats = getThemeStats(entry.name);
-      const rawTitle = readDisplayName(indexFile, titleFromTokenFile(tokenPath, entry.name));
+      const rawTitle = stringValue(theme.identity?.titleZh)
+        || stringValue(theme.identity?.titleEn)
+        || stringValue(theme.identity?.brand)
+        || entry.name;
       items.push({
         id: entry.name,
         name: entry.name,
         title: normalizeThemeResourceTitle(rawTitle, entry.name),
         clientUrl: createResourceClientUrl(clientOrigin, 'themes', entry.name),
-        sourcePath: toPosix(path.relative(projectRoot, path.join(root, entry.name))),
+        sourcePath: toPosix(path.relative(projectRoot, themeRoot)),
+        previewMode: 'staticHtml',
+        previewPath: toPosix(path.relative(projectRoot, previewPath)),
+        ...(reactEntryPath && fs.existsSync(reactEntryPath)
+          ? { reactEntryPath: toPosix(path.relative(projectRoot, reactEntryPath)) }
+          : {}),
         updatedAt: DETERMINISTIC_UPDATED_AT,
         ...(getdesignStats
           ? {

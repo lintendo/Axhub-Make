@@ -34,7 +34,7 @@ function rule(css: string, selector: string) {
 
 describe('Framer theme contrast', () => {
   const baseCss = read('src/common/DesignMdBatchShowcase/base.css');
-  const framerCss = read('src/themes/framer/style.css');
+  const framerCss = read('src/themes/framer/implementations/react/style.css');
 
   it('defines readable page text tokens on the dark Framer canvas', () => {
     const canvas = cssVar(framerCss, '--dmb-bg');

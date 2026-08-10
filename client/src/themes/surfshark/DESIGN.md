@@ -5,7 +5,7 @@ Use this theme for a bold consumer security offer: a dark charcoal hero, a brigh
 ## Evidence and Source Record
 
 - **Observed — source URL:** `https://styles.refero.design/style/4fc7a535-3c99-4ffe-8365-7d025d33274e`; source image URL is retained in `theme.json`.
-- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `style.css`, and `index.tsx`.
+- **Observed — local source paths:** `theme.json`, `assets/tokens.json`, `assets/source-preview.jpg`, `assets/cover.jpg`, `implementations/react/style.css`, and `implementations/react/index.tsx`.
 - **Observed — screenshot:** a yellow promotion strip sits above a compact white nav; the main dark hero places a large VPN offer and checklist left of a turquoise sculptural cake-like product illustration, with a pink CTA and small guarantee note.
 - **Pinned upstream commit:** not applicable; source is a Refero capture/metadata reference, not imported Git code.
 - **License:** no screenshot, illustration, brand, or font license is retained locally. Use only as internal reference until rights are confirmed.
