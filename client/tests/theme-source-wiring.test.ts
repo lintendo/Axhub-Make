@@ -27,7 +27,10 @@ describe('generated theme source wiring', () => {
       if (!themeJson.source) continue;
 
       const source = fs.readFileSync(indexPath, 'utf8');
-      if (!source.includes('source: themeData.source')) {
+      const passesSourceDirectly = source.includes('source: themeData.source');
+      const passesThemeThroughSharedAdapter = source.includes('createThemeShowcaseConfig')
+        && source.includes('theme: themeData');
+      if (!passesSourceDirectly && !passesThemeThroughSharedAdapter) {
         missing.push(themeName);
       }
     }

@@ -4,6 +4,8 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import { getHeaderLinks, type BatchShowcaseSourceLinks } from './headerLinks';
 
+export { createThemeShowcaseConfig } from './createThemeShowcaseConfig';
+
 type TypographyFontRole = 'display' | 'body' | 'mono';
 
 export type MobilePreviewPattern =
