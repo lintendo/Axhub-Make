@@ -2,7 +2,7 @@
 
 ## 权威资料
 
-读取 `../../../src/resources/data-visualization-style-reference/visualization-style-prompts.md`。它是内置 8 套风格、参考图和完整提示词的唯一来源；不要在本 Skill 复制完整提示词。
+读取 `../../../../src/resources/data-visualization-style-reference/visualization-style-prompts.md`。它是内置 8 套风格、参考图和完整提示词的唯一来源；不要在本 Skill 复制完整提示词。
 
 ## 输入优先级
 

@@ -81,9 +81,10 @@ describe('generate-data-cockpit-prototype skill', () => {
     ]) {
       expect(styleAlignment).toContain(required);
     }
-    expect(styleAlignment).toContain(
-      '../../../src/resources/data-visualization-style-reference/visualization-style-prompts.md',
-    );
+    const stylePromptRelativePath =
+      '../../../../src/resources/data-visualization-style-reference/visualization-style-prompts.md';
+    expect(styleAlignment).toContain(stylePromptRelativePath);
+    expect(fs.existsSync(path.resolve(agentsRoot, 'references', stylePromptRelativePath))).toBe(true);
     expect(styleAlignment).toContain('不静默回退到 `DESIGN.md`');
 
     const selectionIndex = skill.indexOf('用户明确选中图片');
