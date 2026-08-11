@@ -1,0 +1,4 @@
+interface:
+  display_name: "生成数据驾驶舱原型"
+  short_description: "生成候选大屏图，并将用户选中图片还原为可运行 React 原型"
+  default_prompt: "使用 $generate-data-cockpit-prototype 生成数据可视化大屏候选图，并在我确认后继续还原为可运行原型。"
