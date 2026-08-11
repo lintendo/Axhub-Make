@@ -257,11 +257,15 @@ du -ch client/src/resources/data-visualization-style-reference/assets/4k/*.webp
 
 Expected: eight `WEBP 3840x2160` rows and an aggregate near 12–16 MB.
 
-- [ ] **Step 5: Update Markdown references and remove obsolete package files**
+- [ ] **Step 5: Build temporary visual comparison sheets**
+
+Create fit-to-window and 100% crop comparisons under an ignored `.local/` directory while both source PNG and encoded WebP files are present. Compare every pair, checking gradients, small text blocks, thin borders, bloom, glass, PBR texture, and natural terrain.
+
+- [ ] **Step 6: Update Markdown references and remove obsolete package files**
 
 Change only the eight encoded 4K links from `.png` to `.webp`. Search the client tree for old references; when none remain, remove the exact eight 4K PNG files and both `.DS_Store` files.
 
-- [ ] **Step 6: Run the focused test and verify GREEN**
+- [ ] **Step 7: Run the focused test and verify GREEN**
 
 Run:
 
@@ -271,7 +275,7 @@ pnpm exec vitest --run tests/data-cockpit-prototype-skill.test.ts
 
 Expected: PASS for the eight-file, reference, mirror, and size contracts.
 
-- [ ] **Step 7: Commit the optimized assets**
+- [ ] **Step 8: Commit the optimized assets**
 
 ```bash
 git add client/tests/data-cockpit-prototype-skill.test.ts client/src/resources/data-visualization-style-reference
@@ -304,9 +308,9 @@ Use this request:
 
 Expected: it treats the reference and explicit layout/colors as authoritative, uses built-in prompts only to fill missing structure, and does not force three unrelated built-in styles.
 
-- [ ] **Step 3: Build temporary visual comparison sheets**
+- [ ] **Step 3: Review the saved visual comparison sheets**
 
-Create fit-to-window and 100% crop comparisons under an ignored `.local/` directory. Compare every PNG source against its WebP before source deletion, checking gradients, small text blocks, thin borders, bloom, glass, PBR texture, and natural terrain.
+Review the comparison sheets created before source deletion and confirm that all eight pairs preserve the style-selection cues.
 
 - [ ] **Step 4: Run complete verification**
 
