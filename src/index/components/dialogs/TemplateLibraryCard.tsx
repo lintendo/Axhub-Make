@@ -26,6 +26,7 @@ interface TemplateLibraryCardProps {
     importing?: boolean;
     directImportDisabled?: boolean;
     directImportTooltip?: string;
+    directImportLabel?: string;
     compact?: boolean;
     onPreview?: (template: TemplateLibraryCardItem) => void;
     onCopyPrompt?: (template: TemplateLibraryCardItem) => void;
@@ -38,6 +39,7 @@ export default function TemplateLibraryCard({
     importing = false,
     directImportDisabled = false,
     directImportTooltip = '',
+    directImportLabel = '直接导入',
     compact = false,
     onPreview,
     onCopyPrompt,
@@ -161,7 +163,7 @@ export default function TemplateLibraryCard({
                                                     disabled={directImportDisabled}
                                                 >
                                                     {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                                                    直接导入
+                                                    {directImportLabel}
                                                 </Button>
                                             </span>
                                         </TooltipTrigger>

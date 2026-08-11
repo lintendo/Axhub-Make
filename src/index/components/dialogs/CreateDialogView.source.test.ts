@@ -175,6 +175,14 @@ describe('CreateDialogView online template library source', () => {
         expect(source).not.toContain('directDisabled = Boolean(template.previewUrl)');
     });
 
+    it('allows each library to choose its direct import button label', () => {
+        const cardSource = readTemplateLibraryCardSource();
+
+        expect(cardSource).toContain('directImportLabel?: string;');
+        expect(cardSource).toContain("directImportLabel = '直接导入'");
+        expect(cardSource).toContain('{directImportLabel}');
+    });
+
     it('keeps template cover failures as a silent gray placeholder', () => {
         const cardSource = readTemplateLibraryCardSource();
 
