@@ -98,7 +98,14 @@ describe('generate-data-cockpit-prototype skill', () => {
     const skill = read(agentsRoot, 'SKILL.md');
     const styleAlignment = read(agentsRoot, 'references/style-alignment.md');
 
-    expect(skill).toContain('rules/requirements-alignment-guide.md');
+    expect(skill).not.toContain('rules/requirements-alignment-guide.md');
+    expect(skill).not.toContain('rules/prototype-development-guide.md');
+    expect(skill).not.toContain('## 使用边界');
+    expect(skill).not.toContain('用户已经提供本地截图且只要还原时，直接使用 `screenshot-to-prototype`');
+    expect(skill).toContain('数据大屏相关任务始终先由本 Skill 判断入口');
+    expect(skill).toContain('完整目标大屏截图');
+    expect(skill).toContain('跳过候选图生成');
+    expect(skill).toContain('直接冻结为选中图片');
     expect(skill).toContain('ui-image-generation');
     expect(skill).toContain('explore-options');
     expect(skill).toContain('用户指定数量');
@@ -108,9 +115,9 @@ describe('generate-data-cockpit-prototype skill', () => {
     expect(skill).toContain('跳过 `DESIGN.md`');
     expect(skill).toContain('[style-alignment.md](references/style-alignment.md)');
     expect(skill).not.toContain('用户确认一个现有 `DESIGN.md`');
-    expect(skill).toContain('不得用于纠正选中图片');
-    expect(skill).toContain('图片确认前不创建或更新主规格');
-    expect(skill).toContain('图片确认前不创建需求 Brief');
+    expect(skill).toContain('不使用前期需求纠正选中图片');
+    expect(skill).toContain('图片冻结前不创建或更新主规格');
+    expect(skill).toContain('不创建需求 Brief');
     expect(skill).not.toContain('generation-brief.json');
     expect(skill).not.toContain('cockpit-brief.json');
 
@@ -132,10 +139,12 @@ describe('generate-data-cockpit-prototype skill', () => {
     expect(styleAlignment).toContain(stylePromptRelativePath);
     expect(fs.existsSync(path.resolve(agentsRoot, 'references', stylePromptRelativePath))).toBe(true);
     expect(styleAlignment).toContain('不静默回退到 `DESIGN.md`');
+    expect(styleAlignment).toContain('八套风格只用于候选图提示词');
+    expect(styleAlignment).toContain('后续还原不再按风格案例分类素材');
 
-    const selectionIndex = skill.indexOf('用户明确选中图片');
-    const specIndex = skill.indexOf('创建或更新 HTML 主规格');
-    const reactIndex = skill.indexOf('进入 React 实现');
+    const selectionIndex = skill.indexOf('### 3. 冻结选中图片');
+    const specIndex = skill.indexOf('### 4. 由规格子代理实际实现主规格');
+    const reactIndex = skill.indexOf('### 5. 由实现子代理制作 React 原型');
     expect(selectionIndex).toBeGreaterThan(-1);
     expect(specIndex).toBeGreaterThan(selectionIndex);
     expect(reactIndex).toBeGreaterThan(specIndex);
@@ -157,8 +166,8 @@ describe('generate-data-cockpit-prototype skill', () => {
     expect(skill).toContain('验收子代理');
     expect(skill).toContain('不同的干净子代理');
     expect(combined).toContain('fork_turns: "none"');
-    expect(skill).toContain('环境没有子代理');
-    expect(skill).toContain('新开对话');
+    expect(handoffs).toContain('无子代理环境');
+    expect(handoffs).toContain('新开对话');
     expect(skill).toContain('screenshot-to-prototype');
     expect(skill).toContain('用户明确确认当前 HTML 主规格后');
     expect(skill).toContain('提供完整 Make 服务规格评审链接并结束当前回合');
@@ -174,12 +183,35 @@ describe('generate-data-cockpit-prototype skill', () => {
     expect(handoffs).toContain('确认后的 `.spec/spec.html`');
     expect(handoffs).toContain('旧规格中的目标画面视觉内容失效');
     expect(handoffs).toContain('本 Skill 的主文档 `SKILL.md`');
-    expect(handoffs).toContain('本 Skill 的全部引用文档');
+    expect(handoffs).not.toContain('本 Skill 的全部引用文档');
+    expect(handoffs).not.toContain('industry-scenes.md');
+    expect(handoffs).not.toContain('style-alignment.md');
     expect(handoffs).toContain('与 `screenshot-to-prototype` 重叠时，以本 Skill 为准');
+    expect(handoffs).toContain('完整执行 `screenshot-to-prototype`');
+    for (const reconstructionArtifact of [
+      'prepare-reconstruction-source.mjs',
+      'elements.json',
+      'reconstruction-manifest.json',
+      'first-pass.html',
+      '脚本直出、尚未 AI 评审',
+      '不得等待用户确认',
+      'AI 对比评审',
+      'preview_capture',
+    ]) {
+      expect(handoffs).toContain(reconstructionArtifact);
+    }
     expect(skill).toContain('按 [subagent-handoffs.md]');
     expect(skill).not.toContain('本 Skill 的全部引用文档');
     expect(handoffs).toContain('相同 viewport');
     expect(combined).toContain('用户最新明确修改');
+
+    const specStage = skill.slice(skill.indexOf('### 4.'), skill.indexOf('### 5.'));
+    const reactStage = skill.slice(skill.indexOf('### 5.'), skill.indexOf('### 6.'));
+    expect(specStage).toContain('[visual-routing.md](references/visual-routing.md)');
+    expect(specStage).toContain('严格执行 `screenshot-to-prototype`');
+    expect(specStage).toContain('实际实现');
+    expect(reactStage).not.toContain('[visual-routing.md](references/visual-routing.md)');
+    expect(reactStage).toContain('不重新选择视觉风格、素材方案或技术路线');
   });
 
   it('routes industry scenes, charts, maps, 3D assets and animation without baking data into images', () => {
@@ -213,6 +245,42 @@ describe('generate-data-cockpit-prototype skill', () => {
     expect(routing).toContain('多角度参考图');
     expect(routing).toContain('不得降级为背景图');
     expect(routing).toContain('用户确认');
+
+    for (const commonElement of [
+      '场景基底',
+      '中央主视觉',
+      'UI 框架',
+      '数据内容',
+      '标注与状态',
+      '装饰与特效',
+      '图标与媒体',
+    ]) {
+      expect(routing).toContain(commonElement);
+    }
+    for (const frameworkType of [
+      '大屏主标题框架',
+      '模块标题框架',
+      '面板框架',
+      '图表框架',
+      '指标框架',
+      '表格与列表框架',
+      '主视觉框架',
+    ]) {
+      expect(routing).toContain(frameworkType);
+    }
+    expect(routing).toContain('框架承担信息分区、层级或内容承载');
+    expect(routing).toContain('图表框架不包含真实图表');
+    expect(routing).toContain('视觉元素实现清单');
+    expect(routing).toContain('不记录素材来源');
+    expect(routing).toContain('最终实现方式');
+    expect(routing).not.toContain('源文件或数据源');
+    expect(routing).not.toContain('负责人');
+    expect(routing).not.toContain('素材对照表');
+    expect(routing).not.toContain('模型来源顺序');
+    expect(routing).not.toContain('用户提供或项目已有');
+    expect(routing).not.toContain('合法模型库');
+    expect(routing).not.toContain('电影科幻 FUI');
+    expect(routing).not.toContain('八套风格');
   });
 
   it('ships eight compressed 4K WebP style references within the package budget', () => {

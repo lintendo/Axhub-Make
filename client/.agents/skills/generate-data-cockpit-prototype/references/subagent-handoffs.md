@@ -1,10 +1,10 @@
 # 子代理交接协议
 
-各阶段使用不同的干净子代理。Codex 创建子代理时必须设置 `fork_turns: "none"`；其他运行时使用等价的无历史继承机制。为避免早期设想干扰选图后的还原，不传递原始对话，不传递前期需求对齐内容，也不要求子代理推断用户为什么选择该图片。
+各阶段使用不同的干净子代理。Codex 创建子代理时必须设置 `fork_turns: "none"`；其他运行时使用等价的无历史继承机制。为避免早期设想干扰选图后的还原，不传递原始对话，也不传递前期需求对齐内容，不要求子代理推断用户为什么选择该图片。
 
 ## 通用输入
 
-- client 根目录、projectId、prototypeId、原型绝对目录 `<client-root>/src/prototypes/<prototype-id>`，本 Skill 根目录，以及适用的 `AGENTS.md` 与规则路径。
+- client 根目录、projectId、prototypeId、原型绝对目录 `<client-root>/src/prototypes/<prototype-id>` 和本 Skill 根目录。
 - 选中图片本地路径 `<prototype-root>/.spec/reference/selected-source.png`、图片尺寸和 SHA-256。
 - 当前 Make 服务 origin；规格链接必须使用完整格式 `<make-origin>/?projectId=<project-id>&p=<prototype-id>&spec=1`，并替换、编码实际值。
 - 选图后整理的已确认非视觉运行约束；只包含图片无法表达但仍有效的数据、地图、3D、交互、动画、性能、权限和验收条件。
@@ -17,12 +17,27 @@
 
 ## 规格子代理
 
-输入：通用输入和净化后的项目上下文。必须实际读取本 Skill 的主文档 `SKILL.md`、本 Skill 的全部引用文档（`industry-scenes.md`、`visual-routing.md`、`subagent-handoffs.md`）及 `screenshot-to-prototype`，不得只接收摘要；与 `screenshot-to-prototype` 重叠时，以本 Skill 为准。
+输入：通用输入和净化后的项目上下文。必须实际读取本 Skill 的主文档 `SKILL.md`、`visual-routing.md` 及 `screenshot-to-prototype`，不得只接收摘要；与 `screenshot-to-prototype` 重叠时，以本 Skill 为准。
+
+规格子代理必须以选中图片为源图，逐项完整执行 `screenshot-to-prototype` 的 10 步流程和门槛，不能跳过脚本和结构化中间产物直接自由编写主规格。以下是驾驶舱任务中的执行映射，不替代其中任何一步：
+
+1. 运行 `prepare-reconstruction-source.mjs` 生成源图摘要。
+2. 完成 OCR 与结构化视觉分析，生成带稳定 ID 的 `elements.json`；按 `visual-routing.md` 的常用视觉元素分类拆分画面。
+3. 处理需要提取、重建或生成的框架、场景、主视觉、装饰、图标和媒体，并完成素材审计。
+4. 使用指定脚本生成并校验 `reconstruction-manifest.json`。
+5. 确定性生成 `first-pass.html`，渲染阶段不调用模型。
+6. 首版生成后立即发出可访问链接并标明“脚本直出、尚未 AI 评审”；不得结束任务，也不得等待用户确认。
+7. 自动进行 AI 对比评审；修正结构化数据、素材与样式后重新执行素材、Manifest 和首版流程，直到达到可评审质量。
+8. 将最终视觉按源图 viewport 1:1 实际实现到 `.spec/spec.html`，完成视觉元素实现清单及技术路线；使用 `preview_capture` 对比并展示原图与 HTML 结果。
+9. 最终回复提供完整 Make 服务规格评审链接、待确认事项和轻量偏差说明，然后停止当前回合。
+10. 只有用户明确确认最终 HTML 主规格后，才由主流程另启实现子代理进入 React 阶段。
+
+八套风格提示词不进入本阶段；选中图片已经取代所有候选风格，元素只按图片事实和通用类别拆分。
 
 输出：
 
-- `.spec/spec.html`：相同 viewport 的可评审视觉稿、结构、真实文本、交互状态和验收口径。
-- 素材对照表与图表/地图/3D/动画技术路由。
+- `.spec/spec.html`：相同 viewport 的实际视觉实现、结构、真实文本、数据内容、交互状态和验收口径。
+- 视觉元素实现清单与图表/地图/3D/动画技术路由；不记录素材来源，只记录最终实现方式和必要产物路径。
 - 参考图对比截图、完整 Make 服务规格评审链接和待用户决策项。
 
 完成后停止，不创建 React 页面，不替用户确认规格。
@@ -31,7 +46,7 @@
 
 输入：通用输入、用户确认后的 `.spec/spec.html`、现有源码和项目开发规则。
 
-输出：可运行 React 原型、所需素材、依赖变更、规格状态同步与验证结果。不得重新解释早期需求；发现规格冲突或需要可见降级时停止并回交规格阶段。
+输出：可运行 React 原型、依赖变更、规格状态同步与验证结果。严格复用主规格确认的结构、素材产物、组件拆分和技术路线，不重新解释早期需求，也不重新选择视觉或素材方案；发现规格冲突或需要可见降级时停止并回交规格阶段。
 
 ## 验收子代理
 
