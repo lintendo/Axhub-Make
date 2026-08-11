@@ -31,6 +31,42 @@ function listRelativeFiles(root: string, relativeDirectory = ''): string[] {
     .sort();
 }
 
+function readUint24LE(bytes: Buffer, offset: number): number {
+  return bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16);
+}
+
+function readWebPDimensions(bytes: Buffer): { width: number; height: number } {
+  for (let chunkOffset = 12; chunkOffset + 8 <= bytes.length;) {
+    const chunkType = bytes.subarray(chunkOffset, chunkOffset + 4).toString('ascii');
+    const chunkSize = bytes.readUInt32LE(chunkOffset + 4);
+    const dataOffset = chunkOffset + 8;
+
+    if (chunkType === 'VP8 ') {
+      return {
+        width: bytes.readUInt16LE(dataOffset + 6) & 0x3fff,
+        height: bytes.readUInt16LE(dataOffset + 8) & 0x3fff,
+      };
+    }
+    if (chunkType === 'VP8L') {
+      const packed = bytes.readUInt32LE(dataOffset + 1);
+      return {
+        width: (packed & 0x3fff) + 1,
+        height: ((packed >>> 14) & 0x3fff) + 1,
+      };
+    }
+    if (chunkType === 'VP8X') {
+      return {
+        width: readUint24LE(bytes, dataOffset + 4) + 1,
+        height: readUint24LE(bytes, dataOffset + 7) + 1,
+      };
+    }
+
+    chunkOffset = dataOffset + chunkSize + (chunkSize % 2);
+  }
+
+  throw new Error('WebP image chunk not found');
+}
+
 describe('generate-data-cockpit-prototype skill', () => {
   it('ships matching skill packages with a narrow trigger', () => {
     for (const relativePath of relativeFiles) {
@@ -200,6 +236,10 @@ describe('generate-data-cockpit-prototype skill', () => {
       const bytes = fs.readFileSync(path.join(fourKRoot, fileName));
       expect(bytes.subarray(0, 4).toString('ascii'), `${fileName} RIFF header`).toBe('RIFF');
       expect(bytes.subarray(8, 12).toString('ascii'), `${fileName} WebP header`).toBe('WEBP');
+      expect(readWebPDimensions(bytes), `${fileName} dimensions`).toEqual({
+        width: 3840,
+        height: 2160,
+      });
       expect(stylePrompts).toContain(`assets%2F4k%2F${fileName}`);
     }
 

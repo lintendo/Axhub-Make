@@ -319,8 +319,8 @@ Run:
 
 ```bash
 pnpm exec vitest --run tests/data-cockpit-prototype-skill.test.ts tests/client-skill-mirroring.test.ts
-python /Users/jianzhoulin/.codex/skills/.system/skill-creator/scripts/quick_validate.py client/.agents/skills/generate-data-cockpit-prototype
-python /Users/jianzhoulin/.codex/skills/.system/skill-creator/scripts/quick_validate.py client/.claude/skills/generate-data-cockpit-prototype
+python3 "$CODEX_HOME/skills/.system/skill-creator/scripts/quick_validate.py" client/.agents/skills/generate-data-cockpit-prototype
+python3 "$CODEX_HOME/skills/.system/skill-creator/scripts/quick_validate.py" client/.claude/skills/generate-data-cockpit-prototype
 git diff --check HEAD~3..HEAD
 ```
 
