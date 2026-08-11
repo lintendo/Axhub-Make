@@ -21,6 +21,16 @@ function read(root: string, relativePath: string): string {
   return fs.readFileSync(path.join(root, relativePath), 'utf8');
 }
 
+function listRelativeFiles(root: string, relativeDirectory = ''): string[] {
+  return fs
+    .readdirSync(path.join(root, relativeDirectory), { withFileTypes: true })
+    .flatMap((entry) => {
+      const relativePath = path.posix.join(relativeDirectory, entry.name);
+      return entry.isDirectory() ? listRelativeFiles(root, relativePath) : [relativePath];
+    })
+    .sort();
+}
+
 describe('generate-data-cockpit-prototype skill', () => {
   it('ships matching skill packages with a narrow trigger', () => {
     for (const relativePath of relativeFiles) {
@@ -202,5 +212,17 @@ describe('generate-data-cockpit-prototype skill', () => {
       0,
     );
     expect(totalBytes).toBeLessThanOrEqual(16 * 1024 * 1024);
+
+    const templateManifest = JSON.parse(
+      fs.readFileSync(path.join(clientRoot, 'template-manifest.json'), 'utf8'),
+    );
+    const publishedResources = new Set<string>(templateManifest.resources.files);
+    const styleResourcePrefix = 'src/resources/data-visualization-style-reference';
+    for (const relativePath of listRelativeFiles(styleRoot)) {
+      expect(
+        publishedResources.has(`${styleResourcePrefix}/${relativePath}`),
+        `${relativePath} missing from client template package`,
+      ).toBe(true);
+    }
   });
 });

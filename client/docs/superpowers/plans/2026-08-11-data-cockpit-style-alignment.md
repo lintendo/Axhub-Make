@@ -70,7 +70,7 @@ for (const required of [
   expect(styleAlignment).toContain(required);
 }
 expect(styleAlignment).toContain(
-  '../../../src/resources/data-visualization-style-reference/visualization-style-prompts.md',
+  '../../../../src/resources/data-visualization-style-reference/visualization-style-prompts.md',
 );
 expect(styleAlignment).toContain('不静默回退到 `DESIGN.md`');
 ```
@@ -127,7 +127,7 @@ Write `references/style-alignment.md` with these concrete sections:
 
 ## 权威资料
 
-读取 `../../../src/resources/data-visualization-style-reference/visualization-style-prompts.md`。它是 8 套风格、参考图和完整提示词的唯一来源；不要在本 Skill 复制完整提示词。
+读取 `../../../../src/resources/data-visualization-style-reference/visualization-style-prompts.md`。它是 8 套风格、参考图和完整提示词的唯一来源；不要在本 Skill 复制完整提示词。
 
 ## 输入优先级
 
@@ -186,6 +186,7 @@ git commit -m "feat: align cockpit generation with built-in styles"
 
 **Files:**
 - Modify: `client/tests/data-cockpit-prototype-skill.test.ts`
+- Modify: `client/template-manifest.json`
 - Modify: `client/src/resources/data-visualization-style-reference/visualization-style-prompts.md`
 - Create: `client/src/resources/data-visualization-style-reference/assets/4k/01-cinematic-fui-4k.webp`
 - Create: `client/src/resources/data-visualization-style-reference/assets/4k/02-holographic-lattice-4k.webp`
