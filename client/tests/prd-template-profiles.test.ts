@@ -10,90 +10,80 @@ const agentWritePrdPath = path.join(clientRoot, '.agents/skills/write-prd/SKILL.
 const claudeWritePrdPath = path.join(clientRoot, '.claude/skills/write-prd/SKILL.md');
 const agentPlanPrdsPath = path.join(clientRoot, '.agents/skills/plan-prds/SKILL.md');
 const claudePlanPrdsPath = path.join(clientRoot, '.claude/skills/plan-prds/SKILL.md');
+const templateManifestPath = path.join(clientRoot, 'template-manifest.json');
 
 function readTemplate(fileName: string): string {
   return fs.readFileSync(path.join(templatesRoot, fileName), 'utf8');
 }
 
 describe('PRD template profiles', () => {
-  it('keeps the default PRD template lightweight while supporting business-model links', () => {
+  it('ships one scalable built-in PRD template', () => {
     const template = readTemplate('prd-template.md');
+    const comprehensivePath = path.join(templatesRoot, 'prd-comprehensive-template.md');
 
+    expect(fs.existsSync(comprehensivePath)).toBe(false);
     expect(template).toMatch(/^# PRD 模板$/mu);
-    expect(template).toContain('## 核心对象与数据模型');
-    expect(template).toContain('业务对象、关键字段、对象关系和必要状态');
-    expect(template).toContain('保留与当前 PRD 相关的摘要');
-    expect(template).toContain('相对链接');
-    expect(template).toContain('不展开数据库、接口或代码结构');
-  });
-
-  it('ships one comprehensive PRD entry with optional linked-document guidance', () => {
-    const templatePath = path.join(templatesRoot, 'prd-comprehensive-template.md');
-
-    expect(fs.existsSync(templatePath)).toBe(true);
-    const template = fs.readFileSync(templatePath, 'utf8');
-    for (const heading of [
-      '# 完善型 PRD 模板',
-      '## 文档目录与关联文档',
+    expect(template).toContain('标题标有“（可选）”的章节按需使用，其余章节默认保留。');
+    expect(template.match(/^## .+$/gmu)).toEqual([
+      '## 文档目录与关联文档（可选）',
       '## 背景与问题',
       '## 目标与成功标准',
       '## 用户、角色与场景',
-      '## 范围、能力与信息架构',
-      '## 数据模型',
+      '## 范围',
+      '## 用户故事',
+      '## 能力与信息架构（可选）',
+      '## 数据模型（可选）',
       '## 业务规则',
-      '## 权限与作用范围',
+      '## 权限与作用范围（可选）',
       '## 状态、异常与边界',
       '## 字段、内容与交互要求',
-      '## 非功能要求',
+      '## 非功能要求（可选）',
       '## 验收标准与来源追溯',
-      '## 风险、依赖与开放问题',
-    ]) {
-      expect(template).toContain(heading);
-    }
-    expect(template).toContain('./models/domain-model.md');
-    expect(template).toContain('按需');
-    expect(template).toContain('不是固定生成清单');
-    expect(template).toContain('主 PRD 保留与当前需求相关的结论摘要');
+      '## 风险与依赖（可选）',
+      '## 开放问题',
+    ]);
+    expect(template).toContain('不要从页面表现推断数据库表、API Schema、外键或权限算法');
+    expect(template).toContain('不补造指标');
+    expect(template).toContain('来源编号、用户决策、原型或已有文档');
   });
 
-  it('keeps write-prd focused on writing from one selected template', () => {
+  it('publishes only the unified built-in PRD template', () => {
+    const manifest = JSON.parse(fs.readFileSync(templateManifestPath, 'utf8')) as {
+      resources: { files: string[] };
+    };
+    const unifiedEntries = manifest.resources.files.filter(
+      (filePath) => filePath === 'src/resources/templates/prd-template.md',
+    );
+
+    expect(unifiedEntries).toHaveLength(1);
+    expect(manifest.resources.files).not.toContain('src/resources/templates/prd-comprehensive-template.md');
+  });
+
+  it('keeps write-prd focused on the unified or explicitly supplied template', () => {
     const agentSkill = fs.readFileSync(agentWritePrdPath, 'utf8');
     const claudeSkill = fs.readFileSync(claudeWritePrdPath, 'utf8');
 
     expect(agentSkill).toBe(claudeSkill);
-    expect(agentSkill).toContain('根据选定的模板入口文件编写 PRD');
+    expect(agentSkill).toContain('统一内置模板');
     expect(agentSkill).toContain('src/resources/templates/prd-template.md');
     expect(agentSkill).toContain('允许用户或项目指定其他模板文件');
-    expect(agentSkill).toContain('按任务给出的目标路径写入');
-    expect(agentSkill).toContain('允许用户或项目指定其他存储位置');
-    expect(agentSkill).not.toContain('plan-prds');
-    expect(agentSkill).not.toContain('任务级模板覆盖');
-    expect(agentSkill).not.toContain('计划默认模板');
-    expect(agentSkill).not.toContain('入口优先级');
-    expect(agentSkill).not.toContain('模板文件不存在或不可读');
-    expect(agentSkill).not.toContain('参考目录');
-    expect(agentSkill).not.toContain('## 默认结构');
-    expect(agentSkill).not.toContain('src/resources/<topic>-prd.md');
+    expect(agentSkill).not.toContain('prd-comprehensive-template.md');
   });
 
-  it('selects one plan-level PRD template with explicit task overrides', () => {
+  it('uses the unified template without built-in profile selection', () => {
     const agentSkill = fs.readFileSync(agentPlanPrdsPath, 'utf8');
     const claudeSkill = fs.readFileSync(claudePlanPrdsPath, 'utf8');
 
     expect(agentSkill).toBe(claudeSkill);
-    expect(agentSkill).toContain('#### 确认 PRD 模板');
-    expect(agentSkill).not.toContain('#### 5.1 确认 PRD 模板');
+    expect(agentSkill).toContain('#### 记录 PRD 模板');
     expect(agentSkill).toContain('src/resources/templates/prd-template.md');
-    expect(agentSkill).toContain('src/resources/templates/prd-comprehensive-template.md');
-    expect(agentSkill).toContain('用户自定义模板');
-    expect(agentSkill).toContain('用户已指定模板时直接采用；未指定时确认一次并给出推荐');
-    expect(agentSkill).toContain('同一计划默认共用一个模板，用户明确指定时可覆盖单个任务');
-    expect(agentSkill).toContain('目标路径、来源集合和选定模板');
-    expect(agentSkill).toContain('- PRD 模板。');
-    expect(agentSkill).not.toContain('当前规划执行上下文');
-    expect(agentSkill).not.toContain('`PLAN.md` 的结构或任务字段');
-    expect(agentSkill).not.toContain('缺少原对话上下文');
-    expect(agentSkill).not.toContain('任务级模板覆盖优先于计划默认模板');
-    expect(agentSkill).not.toContain('不得仅因某篇文档内容较多');
+    expect(agentSkill).toContain('用户明确指定其他模板时直接采用');
+    expect(agentSkill).toContain('用户明确指定时可覆盖单个任务');
+    expect(agentSkill).toContain(
+      '已有计划仍引用 `src/resources/templates/prd-comprehensive-template.md` 时改为统一模板',
+    );
+    expect(agentSkill).not.toContain('确认 PRD 模板');
+    expect(agentSkill).not.toContain('轻量 PRD');
+    expect(agentSkill).not.toContain('完善型 PRD');
   });
 });

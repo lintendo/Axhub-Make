@@ -87,15 +87,11 @@ src/resources/prd/
 
 ### 5. 建立产品入口和计划
 
-#### 确认 PRD 模板
+#### 记录 PRD 模板
 
-用户已指定模板时直接采用；未指定时确认一次并给出推荐：
+未指定模板时统一使用 `src/resources/templates/prd-template.md`。用户明确指定其他模板时直接采用；同一计划默认共用一个模板，用户明确指定时可覆盖单个任务。
 
-- 轻量 PRD：`src/resources/templates/prd-template.md`。
-- 完善型 PRD：`src/resources/templates/prd-comprehensive-template.md`。
-- 用户自定义模板：用户提供的文件。
-
-同一计划默认共用一个模板，用户明确指定时可覆盖单个任务。
+已有计划仍引用 `src/resources/templates/prd-comprehensive-template.md` 时改为统一模板；其他有效的自定义模板保持不变。
 
 通过采集门禁或取得用户接受已列补采项/真实阻塞的明确决定后，创建或更新 `PROJECT.md` 和 `PLAN.md`。`PROJECT.md` 只写产品定位、用户、核心场景、范围、产品事实、开放问题、PRD 目录和产品决策，不写采集过程或任务状态。
 

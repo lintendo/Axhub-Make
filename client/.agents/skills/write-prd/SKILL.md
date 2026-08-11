@@ -19,7 +19,7 @@ description: Use when the user explicitly asks to write, draft, create, update, 
 
 ## 模板
 
-根据选定的模板入口文件编写 PRD，遵循其中的章节、字段和表达要求。未指定时使用默认模板 `src/resources/templates/prd-template.md`；允许用户或项目指定其他模板文件，已经明确时直接采用。
+根据选定的模板入口文件编写 PRD，遵循其中的章节、字段和表达要求。未指定时使用统一内置模板 `src/resources/templates/prd-template.md`；允许用户或项目指定其他模板文件，已经明确时直接采用。
 
 PRD 只写产品决策、用户体验、范围、业务模型、规则和验收。不要堆易过期的代码片段或实现清单。
 
