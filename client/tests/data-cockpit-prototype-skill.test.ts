@@ -167,4 +167,39 @@ describe('generate-data-cockpit-prototype skill', () => {
     expect(routing).toContain('不得降级为背景图');
     expect(routing).toContain('用户确认');
   });
+
+  it('ships eight compressed 4K WebP style references within the package budget', () => {
+    const styleRoot = path.join(clientRoot, 'src/resources/data-visualization-style-reference');
+    const stylePrompts = fs.readFileSync(path.join(styleRoot, 'visualization-style-prompts.md'), 'utf8');
+    const fourKRoot = path.join(styleRoot, 'assets/4k');
+    const fourKFiles = fs.readdirSync(fourKRoot).filter((name) => !name.startsWith('.')).sort();
+    const expectedWebPFiles = [
+      '01-cinematic-fui-4k.webp',
+      '02-holographic-lattice-4k.webp',
+      '03-enterprise-blue-ioc-4k.webp',
+      '04-photoreal-digital-twin-4k.webp',
+      '05-bright-natural-gis-4k.webp',
+      '06-new-chinese-oriental-4k.webp',
+      '07-minimal-glass-saas-4k.webp',
+      '08-data-decision-bi-4k.webp',
+    ];
+
+    expect(fourKFiles).toEqual(expectedWebPFiles);
+    for (const fileName of expectedWebPFiles) {
+      const bytes = fs.readFileSync(path.join(fourKRoot, fileName));
+      expect(bytes.subarray(0, 4).toString('ascii'), `${fileName} RIFF header`).toBe('RIFF');
+      expect(bytes.subarray(8, 12).toString('ascii'), `${fileName} WebP header`).toBe('WEBP');
+      expect(stylePrompts).toContain(`assets%2F4k%2F${fileName}`);
+    }
+
+    expect(stylePrompts).not.toContain('-4k.png');
+    expect(fs.existsSync(path.join(styleRoot, '.DS_Store'))).toBe(false);
+    expect(fs.existsSync(path.join(styleRoot, 'assets/.DS_Store'))).toBe(false);
+
+    const totalBytes = expectedWebPFiles.reduce(
+      (total, fileName) => total + fs.statSync(path.join(fourKRoot, fileName)).size,
+      0,
+    );
+    expect(totalBytes).toBeLessThanOrEqual(16 * 1024 * 1024);
+  });
 });
