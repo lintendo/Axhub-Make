@@ -23,22 +23,26 @@
 
 1. 运行 `prepare-reconstruction-source.mjs` 生成源图摘要。
 2. 完成 OCR 与结构化视觉分析，生成带稳定 ID 的 `elements.json`；按 `visual-routing.md` 的常用视觉元素分类拆分画面。
-3. 处理需要提取、重建或生成的框架、场景、主视觉、装饰、图标和媒体，并完成素材审计。
+3. 按 `screenshot-to-prototype` 继续生成既有 `asset-audit.json`，用于位图候选的透明度和尺寸审计；另生成 `visual-audit.json`，覆盖 `elements.json` 中全部可见元素，包括 HTML/CSS、SVG、地图、3D、图片和媒体，不能因为不是位图或 `assetAction: none` 就排除。两者职责不同，不得混用。
 4. 使用指定脚本生成并校验 `reconstruction-manifest.json`。
 5. 确定性生成 `first-pass.html`，渲染阶段不调用模型。
 6. 首版生成后立即发出可访问链接并标明“脚本直出、尚未 AI 评审”；不得结束任务，也不得等待用户确认。
-7. 自动进行 AI 对比评审；修正结构化数据、素材与样式后重新执行素材、Manifest 和首版流程，直到达到可评审质量。
+7. 自动进行 AI 对比评审；按元素 ID 逐元素对比源图区域和当前渲染，修正结构化数据、素材与样式后重新执行素材、Manifest 和首版流程，直到达到可评审质量。每条 finding 必须记录 `elementId`、严重度和解决状态。
 8. 将最终视觉按源图 viewport 1:1 实际实现到 `.spec/spec.html`，完成视觉元素实现清单及技术路线；使用 `preview_capture` 对比并展示原图与 HTML 结果。
-9. 最终回复提供完整 Make 服务规格评审链接、待确认事项和轻量偏差说明，然后停止当前回合。
+9. 生成 `final-acceptance.json`；状态必须为 `passed`，每条 `knownDeviations` 必须记录 `elementId` 和严重度。最终回复提供完整 Make 服务规格评审链接、待确认事项和轻量偏差说明，然后停止当前回合。
 10. 只有用户明确确认最终 HTML 主规格后，才由主流程另启实现子代理进入 React 阶段。
+
+`visual-audit.json` 使用 `schemaVersion: 1`，每个元素逐项记录 `elementId`、`implementation`、`component` 或 `outputPath`、`selectedRoute`、`implementedRoute`、`implementationType`、源图和最终渲染证据图片及区域坐标、`status`、`fidelity`、`deviation`、`routeStatus` 和 `deferredStage`。证据图片路径相对 `visual-audit.json`，必须是按该元素 `sourceBBox` / `targetBBox` 裁切的真实、可解码且含可见内容的 PNG，尺寸与 bbox 完全一致；核心视觉证据不得是单色，源图和渲染证据不能是相同占位图。`implementedRoute` 必须等于 `selectedRoute`，路线和实现类型不得包含 approximate、placeholder 或 deferred，`routeStatus` 必须为 `implemented`，`deferredStage` 必须为空。
+
+交付前从 Skill 根目录运行 `node scripts/validate-visual-audit.mjs --elements <elements.json> --visual-audit <visual-audit.json> --review <ai-review.json> --acceptance <final-acceptance.json>`；若当前目录是 client，则脚本路径使用 `.agents/skills/generate-data-cockpit-prototype/scripts/validate-visual-audit.mjs`。只有退出码为 0 才能继续。中央主视觉、地图/3D、主标题框架和主要数据模块属于核心视觉；任一核心视觉仍有中等或高偏差、缺少验证记录、使用占位/近似实现，或把已经选定的正式路线推迟到 React 时，主规格不得交付；`final-acceptance.json` 也不能标记为 `passed-with-known-deviations`。应继续修正；缺少必要数据或能力时停止并请求用户决策。
 
 八套风格提示词不进入本阶段；选中图片已经取代所有候选风格，元素只按图片事实和通用类别拆分。
 
 输出：
 
 - `.spec/spec.html`：相同 viewport 的实际视觉实现、结构、真实文本、数据内容、交互状态和验收口径。
-- 视觉元素实现清单与图表/地图/3D/动画技术路由；不记录素材来源，只记录最终实现方式和必要产物路径。
-- 参考图对比截图、完整 Make 服务规格评审链接和待用户决策项。
+- 视觉元素实现清单、既有位图 `asset-audit.json`、全量 `visual-audit.json` 与图表/地图/3D/动画技术路由；不记录素材来源，只记录最终实现方式和必要产物路径。
+- 逐元素对比证据、完整 Make 服务规格评审链接和待用户决策项。
 
 完成后停止，不创建 React 页面，不替用户确认规格。
 
