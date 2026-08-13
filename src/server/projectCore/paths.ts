@@ -16,6 +16,7 @@ export const PROJECT_EXPORTS_RELATIVE_DIR = path.join(MAKE_STATE_DIR, 'exports')
 export const PROJECT_EDIT_HISTORY_RELATIVE_DIR = path.join(MAKE_STATE_DIR, 'edit-history');
 export const GLOBAL_PROJECTS_REGISTRY_FILE_NAME = 'projects.json';
 export const GLOBAL_SERVER_CONFIG_FILE_NAME = 'server.config.json';
+export const GLOBAL_MAKE_SERVICE_LOG_FILE_NAME = 'make-service.log';
 
 export function resolveProjectRoot(projectRoot: string): string {
   return path.resolve(projectRoot);
@@ -36,6 +37,10 @@ export function getProjectRegistryPath(homeDir?: string): string {
 
 export function getGlobalServerConfigPath(homeDir?: string): string {
   return path.join(getGlobalMakeStateDir(homeDir), GLOBAL_SERVER_CONFIG_FILE_NAME);
+}
+
+export function getGlobalMakeServiceLogPath(homeDir?: string): string {
+  return path.join(getGlobalMakeStateDir(homeDir), GLOBAL_MAKE_SERVICE_LOG_FILE_NAME);
 }
 
 export function getConfigPath(projectRoot: string): string {
