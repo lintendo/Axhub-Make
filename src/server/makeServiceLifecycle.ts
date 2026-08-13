@@ -369,7 +369,7 @@ export async function stopMakeService(
   }
   if (current.status === 'stale') {
     if (recorded.info && isSamePath(recorded.info.projectRoot, recorded.projectRoot) && !dependencies.isProcessAlive(recorded.info.pid)) {
-      removeRecord(recorded.infoPath, dependencies);
+      removeMatchingRecord(options, recorded.info, dependencies);
       return { ok: true, code: 'make-stopped', message: 'Removed a stopped Axhub Make server record.' };
     }
     return {

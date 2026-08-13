@@ -111,6 +111,27 @@ describe('Make Admin service stop', () => {
     expect(dependencies.kill).not.toHaveBeenCalled();
   });
 
+  it('does not remove a replacement record while cleaning up a dead service', async () => {
+    const replacementInfo = {
+      ...matchingInfo,
+      pid: matchingInfo.pid + 1,
+      startedAt: '2026-08-14T00:01:00.000Z',
+    };
+    const dependencies = createDependencies({
+      readServerInfo: vi.fn()
+        .mockReturnValueOnce(matchingInfo)
+        .mockReturnValueOnce(matchingInfo)
+        .mockReturnValueOnce(replacementInfo),
+      isProcessAlive: vi.fn(() => false),
+    });
+
+    await expect(stopMakeService({ homeDir }, dependencies)).resolves.toMatchObject({
+      ok: true,
+      code: 'make-stopped',
+    });
+    expect(dependencies.unlinkSync).not.toHaveBeenCalled();
+  });
+
   it('gracefully signals a re-verified matching POSIX service', async () => {
     const alive = vi.fn()
       .mockReturnValueOnce(true)
