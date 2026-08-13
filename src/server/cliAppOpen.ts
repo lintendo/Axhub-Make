@@ -137,13 +137,34 @@ function lockMatches(lockPath: string, expected: AppOpenLockRecord): boolean {
     && current.token === expected.token;
 }
 
-function removeLock(lockPath: string, expected: AppOpenLockRecord): void {
-  if (!lockMatches(lockPath, expected)) return;
+function quarantineLock(lockPath: string, expected: AppOpenLockRecord): string | null {
+  const quarantinePath = `${lockPath}.${expected.token || `${expected.pid}-${expected.acquiredAt}`}.quarantine`;
   try {
-    fs.unlinkSync(lockPath);
+    fs.renameSync(lockPath, quarantinePath);
+  } catch (error: any) {
+    if (String(error?.code || '') === 'ENOENT') return null;
+    throw error;
+  }
+  if (lockMatches(quarantinePath, expected)) return quarantinePath;
+  try {
+    fs.renameSync(quarantinePath, lockPath);
+  } catch (error: any) {
+    if (String(error?.code || '') !== 'EEXIST') throw error;
+  }
+  return null;
+}
+
+function removeClaimedLock(quarantinePath: string): void {
+  try {
+    fs.unlinkSync(quarantinePath);
   } catch (error: any) {
     if (String(error?.code || '') !== 'ENOENT') throw error;
   }
+}
+
+function removeLock(lockPath: string, expected: AppOpenLockRecord): void {
+  const quarantinePath = quarantineLock(lockPath, expected);
+  if (quarantinePath) removeClaimedLock(quarantinePath);
 }
 
 async function acquireAppLock(
@@ -174,7 +195,8 @@ async function acquireAppLock(
 
     const owner = readLockRecord(lockPath);
     if (owner && !dependencies.isProcessAlive(owner.pid)) {
-      removeLock(lockPath, owner);
+      const quarantinePath = quarantineLock(lockPath, owner);
+      if (quarantinePath) removeClaimedLock(quarantinePath);
       continue;
     }
     if (waitedMs >= timeoutMs) return null;

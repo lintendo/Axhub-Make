@@ -368,4 +368,77 @@ describe('CLI App open controller', () => {
     expect(sleep).toHaveBeenCalledTimes(2);
     expect(fs.existsSync(lockPath)).toBe(true);
   });
+
+  it('does not let a losing stale-owner recovery unlink a contender lock', async () => {
+    const stateDirectory = createStateDirectory();
+    const lockPath = path.join(stateDirectory, 'app-open-cursor.lock');
+    fs.mkdirSync(stateDirectory, { recursive: true });
+    fs.writeFileSync(lockPath, JSON.stringify({
+      pid: 81236,
+      acquiredAt: 100,
+      token: 'dead-owner',
+    }));
+    const originalRenameSync = fs.renameSync;
+    const originalUnlinkSync = fs.unlinkSync;
+    let second: Promise<Awaited<ReturnType<typeof openMakeCliApp>>> | undefined;
+    let activeOpens = 0;
+    let maxActiveOpens = 0;
+    const dependencies = createDependencies(stateDirectory, {
+      isProcessAlive: vi.fn((pid) => pid === process.pid),
+      pid: process.pid,
+      now: vi.fn(() => 200),
+      openMakeAgentSurface: vi.fn(async () => {
+        activeOpens += 1;
+        maxActiveOpens = Math.max(maxActiveOpens, activeOpens);
+        await Promise.resolve();
+        activeOpens -= 1;
+        return {
+          ok: true,
+          code: 'surface-activated',
+          message: 'opened',
+          host: 'cursor' as const,
+          entryId: 'axhub-make',
+          reusedHost: true,
+          startedCommand: false,
+        };
+      }),
+    });
+    const startSecond = () => {
+      if (second) return;
+      second = openMakeCliApp({
+        app: 'cursor',
+        makeOrigin: 'http://127.0.0.1:53817',
+        lockTimeoutMs: 20,
+        lockPollIntervalMs: 1,
+      }, dependencies);
+    };
+    const renameSync = vi.spyOn(fs, 'renameSync').mockImplementation((source, destination) => {
+      const result = originalRenameSync(source, destination);
+      if (String(source) === lockPath) startSecond();
+      return result;
+    });
+    const unlinkSync = vi.spyOn(fs, 'unlinkSync').mockImplementation((target) => {
+      if (String(target) === lockPath) startSecond();
+      return originalUnlinkSync(target);
+    });
+
+    try {
+      const first = openMakeCliApp({
+        app: 'cursor',
+        makeOrigin: 'http://127.0.0.1:53817',
+        lockTimeoutMs: 20,
+        lockPollIntervalMs: 1,
+      }, dependencies);
+      expect(second).toBeDefined();
+      await expect(Promise.all([first, second!])).resolves.toEqual([
+        expect.objectContaining({ ok: true, code: 'surface-opened' }),
+        expect.objectContaining({ ok: true, code: 'surface-opened' }),
+      ]);
+      expect(maxActiveOpens).toBe(1);
+      expect(fs.readdirSync(stateDirectory)).toEqual([]);
+    } finally {
+      renameSync.mockRestore();
+      unlinkSync.mockRestore();
+    }
+  });
 });
