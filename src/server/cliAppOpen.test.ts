@@ -344,6 +344,29 @@ describe('CLI App open controller', () => {
     expect(fs.readdirSync(stateDirectory)).toEqual([]);
   });
 
+  it('recovers a dead contender claim before canonical acquisition', async () => {
+    const stateDirectory = createStateDirectory();
+    fs.mkdirSync(stateDirectory, { recursive: true });
+    fs.writeFileSync(
+      path.join(stateDirectory, 'app-open-cursor.claim.1.81234.stale-owner.lock'),
+      JSON.stringify({ pid: 81234, acquiredAt: 100, token: 'stale-owner', ticket: 1 }),
+    );
+    const dependencies = createDependencies(stateDirectory, {
+      isProcessAlive: vi.fn((pid) => pid === process.pid),
+      pid: process.pid,
+      now: vi.fn(() => 200),
+    });
+
+    await expect(openMakeCliApp({
+      app: 'cursor',
+      makeOrigin: 'http://127.0.0.1:53817',
+      lockTimeoutMs: 20,
+      lockPollIntervalMs: 1,
+    }, dependencies)).resolves.toMatchObject({ ok: true, code: 'surface-opened' });
+    expect(dependencies.isProcessAlive).toHaveBeenCalledWith(81234);
+    expect(fs.readdirSync(stateDirectory)).toEqual([]);
+  });
+
   it('bounds waiting for a lock whose owner is still alive', async () => {
     const stateDirectory = createStateDirectory();
     fs.mkdirSync(stateDirectory, { recursive: true });
@@ -367,6 +390,33 @@ describe('CLI App open controller', () => {
     }, dependencies)).resolves.toMatchObject({ ok: false, code: 'app-open-lock-timeout' });
     expect(sleep).toHaveBeenCalledTimes(2);
     expect(fs.existsSync(lockPath)).toBe(true);
+  });
+
+  it('does not bypass a live owner stranded in a quarantine lock', async () => {
+    const stateDirectory = createStateDirectory();
+    fs.mkdirSync(stateDirectory, { recursive: true });
+    const quarantinePath = path.join(
+      stateDirectory,
+      'app-open-cursor.lock.dead-owner.quarantine',
+    );
+    fs.writeFileSync(quarantinePath, JSON.stringify({
+      pid: 81236,
+      acquiredAt: 200,
+      token: 'live-owner',
+    }));
+    const dependencies = createDependencies(stateDirectory, {
+      isProcessAlive: vi.fn(() => true),
+      sleep: vi.fn(async () => {}),
+    });
+
+    await expect(openMakeCliApp({
+      app: 'cursor',
+      makeOrigin: 'http://127.0.0.1:53817',
+      lockTimeoutMs: 2,
+      lockPollIntervalMs: 1,
+    }, dependencies)).resolves.toMatchObject({ ok: false, code: 'app-open-lock-timeout' });
+    expect(dependencies.openMakeAgentSurface).not.toHaveBeenCalled();
+    expect(fs.existsSync(quarantinePath)).toBe(true);
   });
 
   it('does not let a losing stale-owner recovery unlink a contender lock', async () => {
@@ -429,7 +479,7 @@ describe('CLI App open controller', () => {
         lockTimeoutMs: 20,
         lockPollIntervalMs: 1,
       }, dependencies);
-      expect(second).toBeDefined();
+      await vi.waitFor(() => expect(second).toBeDefined());
       await expect(Promise.all([first, second!])).resolves.toEqual([
         expect.objectContaining({ ok: true, code: 'surface-opened' }),
         expect.objectContaining({ ok: true, code: 'surface-opened' }),
@@ -437,6 +487,95 @@ describe('CLI App open controller', () => {
       expect(maxActiveOpens).toBe(1);
       expect(fs.readdirSync(stateDirectory)).toEqual([]);
     } finally {
+      renameSync.mockRestore();
+      unlinkSync.mockRestore();
+    }
+  });
+
+  it('does not let a delayed stale claimant bypass a newer canonical lock', async () => {
+    const stateDirectory = createStateDirectory();
+    const lockPath = path.join(stateDirectory, 'app-open-cursor.lock');
+    fs.mkdirSync(stateDirectory, { recursive: true });
+    fs.writeFileSync(lockPath, JSON.stringify({
+      pid: 81237,
+      acquiredAt: 100,
+      token: 'dead-owner',
+    }));
+    const originalReadFileSync = fs.readFileSync;
+    const originalRenameSync = fs.renameSync;
+    const originalUnlinkSync = fs.unlinkSync;
+    let canonicalReads = 0;
+    let staleQuarantines = 0;
+    let second: Promise<Awaited<ReturnType<typeof openMakeCliApp>>> | undefined;
+    let third: Promise<Awaited<ReturnType<typeof openMakeCliApp>>> | undefined;
+    let activeOpens = 0;
+    let maxActiveOpens = 0;
+    let releaseOpens!: () => void;
+    const opensMayFinish = new Promise<void>((resolve) => {
+      releaseOpens = resolve;
+    });
+    const dependencies = createDependencies(stateDirectory, {
+      isProcessAlive: vi.fn((pid) => pid === process.pid),
+      pid: process.pid,
+      now: vi.fn(() => 200),
+      openMakeAgentSurface: vi.fn(async () => {
+        activeOpens += 1;
+        maxActiveOpens = Math.max(maxActiveOpens, activeOpens);
+        await opensMayFinish;
+        activeOpens -= 1;
+        return {
+          ok: true,
+          code: 'surface-activated',
+          message: 'opened',
+          host: 'cursor' as const,
+          entryId: 'axhub-make',
+          reusedHost: true,
+          startedCommand: false,
+        };
+      }),
+    });
+    const open = () => openMakeCliApp({
+      app: 'cursor',
+      makeOrigin: 'http://127.0.0.1:53817',
+      lockTimeoutMs: 50,
+      lockPollIntervalMs: 1,
+    }, dependencies);
+    const readFileSync = vi.spyOn(fs, 'readFileSync').mockImplementation((target, options) => {
+      const result = originalReadFileSync(target, options as never);
+      if (String(target) === lockPath && canonicalReads++ === 0) second = open();
+      return result;
+    });
+    const renameSync = vi.spyOn(fs, 'renameSync').mockImplementation((source, destination) => {
+      const result = originalRenameSync(source, destination);
+      if (String(source) === lockPath && String(destination).endsWith('.dead-owner.quarantine')) {
+        staleQuarantines += 1;
+        if (staleQuarantines === 2) third = open();
+      }
+      return result;
+    });
+    const unlinkSync = vi.spyOn(fs, 'unlinkSync').mockImplementation((target) => {
+      const result = originalUnlinkSync(target);
+      if (String(target) === lockPath && !third) third = open();
+      return result;
+    });
+
+    try {
+      const first = open();
+      await vi.waitFor(() => expect(second).toBeDefined());
+      await vi.waitFor(() => expect(third).toBeDefined());
+      await vi.waitFor(() => expect(activeOpens).toBeGreaterThanOrEqual(1));
+      await Promise.resolve();
+      releaseOpens();
+      await expect(Promise.all([first, second!, third!])).resolves.toEqual([
+        expect.objectContaining({ ok: true, code: 'surface-opened' }),
+        expect.objectContaining({ ok: true, code: 'surface-opened' }),
+        expect.objectContaining({ ok: true, code: 'surface-opened' }),
+      ]);
+      expect(maxActiveOpens).toBe(1);
+      expect(fs.readdirSync(stateDirectory)).toEqual([]);
+    } finally {
+      releaseOpens();
+      readFileSync.mockRestore();
       renameSync.mockRestore();
       unlinkSync.mockRestore();
     }

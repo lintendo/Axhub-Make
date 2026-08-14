@@ -90,6 +90,25 @@ interface AppOpenLockRecord {
   token: string;
 }
 
+interface AppOpenGateEntry {
+  entryPath: string;
+  pid: number;
+  token: string;
+  ticket: number | null;
+}
+
+interface AppOpenWaitBudget {
+  timeoutMs: number;
+  pollIntervalMs: number;
+  waitedMs: number;
+}
+
+interface AcquiredAppLock {
+  lockPath: string;
+  record: AppOpenLockRecord;
+  gatePath: string;
+}
+
 function resolveDependencies(dependencies: MakeCliAppOpenDependencies = {}): ResolvedDependencies {
   return {
     inspectMakeAgentSurfaceHost,
@@ -137,72 +156,191 @@ function lockMatches(lockPath: string, expected: AppOpenLockRecord): boolean {
     && current.token === expected.token;
 }
 
-function quarantineLock(lockPath: string, expected: AppOpenLockRecord): string | null {
-  const quarantinePath = `${lockPath}.${expected.token || `${expected.pid}-${expected.acquiredAt}`}.quarantine`;
+function unlinkLockFile(lockPath: string): void {
   try {
-    fs.renameSync(lockPath, quarantinePath);
-  } catch (error: any) {
-    if (String(error?.code || '') === 'ENOENT') return null;
-    throw error;
-  }
-  if (lockMatches(quarantinePath, expected)) return quarantinePath;
-  try {
-    fs.renameSync(quarantinePath, lockPath);
-  } catch (error: any) {
-    if (String(error?.code || '') !== 'EEXIST') throw error;
-  }
-  return null;
-}
-
-function removeClaimedLock(quarantinePath: string): void {
-  try {
-    fs.unlinkSync(quarantinePath);
+    fs.unlinkSync(lockPath);
   } catch (error: any) {
     if (String(error?.code || '') !== 'ENOENT') throw error;
   }
 }
 
-function removeLock(lockPath: string, expected: AppOpenLockRecord): void {
-  const quarantinePath = quarantineLock(lockPath, expected);
-  if (quarantinePath) removeClaimedLock(quarantinePath);
+function listAppOpenGateEntries(stateDirectory: string, app: MakeCliAppId): AppOpenGateEntry[] {
+  const prefix = `app-open-${app}.`;
+  const entries: AppOpenGateEntry[] = [];
+  for (const fileName of fs.readdirSync(stateDirectory)) {
+    if (!fileName.startsWith(prefix) || !fileName.endsWith('.lock')) continue;
+    const parts = fileName.slice(prefix.length, -'.lock'.length).split('.');
+    if (parts[0] === 'choosing' && parts.length === 3) {
+      const pid = Number(parts[1]);
+      if (Number.isInteger(pid) && pid > 0 && parts[2]) {
+        entries.push({
+          entryPath: path.join(stateDirectory, fileName),
+          pid,
+          token: parts[2],
+          ticket: null,
+        });
+      }
+      continue;
+    }
+    if (parts[0] === 'claim' && parts.length === 4) {
+      const ticket = Number(parts[1]);
+      const pid = Number(parts[2]);
+      if (Number.isSafeInteger(ticket) && ticket > 0 && Number.isInteger(pid) && pid > 0 && parts[3]) {
+        entries.push({
+          entryPath: path.join(stateDirectory, fileName),
+          pid,
+          token: parts[3],
+          ticket,
+        });
+      }
+    }
+  }
+  return entries;
+}
+
+function createAppOpenGateClaim(
+  stateDirectory: string,
+  app: MakeCliAppId,
+  dependencies: ResolvedDependencies,
+): { entry: AppOpenGateEntry; record: AppOpenLockRecord } {
+  const acquiredAt = dependencies.now();
+  const record: AppOpenLockRecord = {
+    pid: dependencies.pid,
+    acquiredAt,
+    token: `${dependencies.pid}-${acquiredAt}-${Math.random().toString(36).slice(2)}`,
+  };
+  const choosingPath = path.join(
+    stateDirectory,
+    `app-open-${app}.choosing.${record.pid}.${record.token}.lock`,
+  );
+  fs.writeFileSync(choosingPath, JSON.stringify(record), { encoding: 'utf8', flag: 'wx' });
+  try {
+    const ticket = listAppOpenGateEntries(stateDirectory, app).reduce(
+      (maximum, entry) => Math.max(maximum, entry.ticket ?? 0),
+      0,
+    ) + 1;
+    const entryPath = path.join(
+      stateDirectory,
+      `app-open-${app}.claim.${ticket}.${record.pid}.${record.token}.lock`,
+    );
+    fs.writeFileSync(entryPath, JSON.stringify({ ...record, ticket }), { encoding: 'utf8', flag: 'wx' });
+    return {
+      entry: { entryPath, pid: record.pid, token: record.token, ticket },
+      record,
+    };
+  } finally {
+    unlinkLockFile(choosingPath);
+  }
+}
+
+async function waitForAppOpenPoll(
+  budget: AppOpenWaitBudget,
+  dependencies: ResolvedDependencies,
+): Promise<boolean> {
+  if (budget.waitedMs >= budget.timeoutMs) return false;
+  const delayMs = Math.min(budget.pollIntervalMs, budget.timeoutMs - budget.waitedMs);
+  await dependencies.sleep(delayMs);
+  budget.waitedMs += delayMs;
+  return true;
+}
+
+async function acquireAppOpenGate(
+  stateDirectory: string,
+  app: MakeCliAppId,
+  budget: AppOpenWaitBudget,
+  dependencies: ResolvedDependencies,
+): Promise<{ entry: AppOpenGateEntry; record: AppOpenLockRecord } | null> {
+  const claim = createAppOpenGateClaim(stateDirectory, app, dependencies);
+  while (true) {
+    let blocked = false;
+    for (const entry of listAppOpenGateEntries(stateDirectory, app)) {
+      if (entry.entryPath === claim.entry.entryPath) continue;
+      if (!dependencies.isProcessAlive(entry.pid)) {
+        unlinkLockFile(entry.entryPath);
+        continue;
+      }
+      if (entry.ticket === null
+        || entry.ticket < claim.entry.ticket!
+        || (entry.ticket === claim.entry.ticket && entry.token < claim.entry.token)) {
+        blocked = true;
+      }
+    }
+    if (!blocked) return claim;
+    if (!await waitForAppOpenPoll(budget, dependencies)) {
+      unlinkLockFile(claim.entry.entryPath);
+      return null;
+    }
+  }
+}
+
+function listQuarantineLocks(stateDirectory: string, app: MakeCliAppId): string[] {
+  const prefix = `app-open-${app}.lock.`;
+  return fs.readdirSync(stateDirectory)
+    .filter((fileName) => fileName.startsWith(prefix) && fileName.endsWith('.quarantine'))
+    .map((fileName) => path.join(stateDirectory, fileName));
+}
+
+function hasLiveQuarantineLock(
+  stateDirectory: string,
+  app: MakeCliAppId,
+  dependencies: ResolvedDependencies,
+): boolean {
+  let hasLiveOwner = false;
+  for (const quarantinePath of listQuarantineLocks(stateDirectory, app)) {
+    const owner = readLockRecord(quarantinePath);
+    if (!owner || dependencies.isProcessAlive(owner.pid)) {
+      hasLiveOwner = true;
+      continue;
+    }
+    if (lockMatches(quarantinePath, owner)) unlinkLockFile(quarantinePath);
+  }
+  return hasLiveOwner;
+}
+
+function removeCanonicalLock(lockPath: string, expected: AppOpenLockRecord): void {
+  if (lockMatches(lockPath, expected)) unlinkLockFile(lockPath);
 }
 
 async function acquireAppLock(
   app: MakeCliAppId,
   options: MakeCliAppOpenOptions,
   dependencies: ResolvedDependencies,
-): Promise<{ lockPath: string; record: AppOpenLockRecord } | null> {
+): Promise<AcquiredAppLock | null> {
   const stateDirectory = dependencies.getGlobalMakeStateDir(options.homeDir);
   fs.mkdirSync(stateDirectory, { recursive: true });
   const lockPath = path.join(stateDirectory, `app-open-${app}.lock`);
-  const timeoutMs = Math.max(0, options.lockTimeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS);
-  const pollIntervalMs = Math.max(1, options.lockPollIntervalMs ?? DEFAULT_LOCK_POLL_INTERVAL_MS);
-  let waitedMs = 0;
+  const budget: AppOpenWaitBudget = {
+    timeoutMs: Math.max(0, options.lockTimeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS),
+    pollIntervalMs: Math.max(1, options.lockPollIntervalMs ?? DEFAULT_LOCK_POLL_INTERVAL_MS),
+    waitedMs: 0,
+  };
+  const gate = await acquireAppOpenGate(stateDirectory, app, budget, dependencies);
+  if (!gate) return null;
 
-  while (true) {
-    const acquiredAt = dependencies.now();
-    const record: AppOpenLockRecord = {
-      pid: dependencies.pid,
-      acquiredAt,
-      token: `${dependencies.pid}-${acquiredAt}-${Math.random().toString(36).slice(2)}`,
-    };
-    try {
-      fs.writeFileSync(lockPath, JSON.stringify(record), { encoding: 'utf8', flag: 'wx' });
-      return { lockPath, record };
-    } catch (error: any) {
-      if (String(error?.code || '') !== 'EEXIST') throw error;
-    }
+  try {
+    while (true) {
+      if (hasLiveQuarantineLock(stateDirectory, app, dependencies)) {
+        if (!await waitForAppOpenPoll(budget, dependencies)) return null;
+        continue;
+      }
+      try {
+        fs.writeFileSync(lockPath, JSON.stringify(gate.record), { encoding: 'utf8', flag: 'wx' });
+        return { lockPath, record: gate.record, gatePath: gate.entry.entryPath };
+      } catch (error: any) {
+        if (String(error?.code || '') !== 'EEXIST') throw error;
+      }
 
-    const owner = readLockRecord(lockPath);
-    if (owner && !dependencies.isProcessAlive(owner.pid)) {
-      const quarantinePath = quarantineLock(lockPath, owner);
-      if (quarantinePath) removeClaimedLock(quarantinePath);
-      continue;
+      const owner = readLockRecord(lockPath);
+      if (owner && !dependencies.isProcessAlive(owner.pid)) {
+        // The gate admits only one contender here, so this ownership check and unlink
+        // cannot race another contender replacing the canonical lock.
+        removeCanonicalLock(lockPath, owner);
+        continue;
+      }
+      if (!await waitForAppOpenPoll(budget, dependencies)) return null;
     }
-    if (waitedMs >= timeoutMs) return null;
-    const delayMs = Math.min(pollIntervalMs, timeoutMs - waitedMs);
-    await dependencies.sleep(delayMs);
-    waitedMs += delayMs;
+  } finally {
+    if (!lockMatches(lockPath, gate.record)) unlinkLockFile(gate.entry.entryPath);
   }
 }
 
@@ -356,6 +494,10 @@ export async function openMakeCliApp(
   try {
     return await openMakeCliAppWithLock(app, provider, options, dependencies);
   } finally {
-    removeLock(lock.lockPath, lock.record);
+    try {
+      removeCanonicalLock(lock.lockPath, lock.record);
+    } finally {
+      unlinkLockFile(lock.gatePath);
+    }
   }
 }
