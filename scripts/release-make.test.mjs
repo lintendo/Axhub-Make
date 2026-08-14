@@ -1011,34 +1011,6 @@ describe('release make artifact helpers', () => {
     assert.match(source, /process\.exitCode = handleCliError\(error\)/u);
   });
 
-  it('copies every Cursor integration runtime file into npm staging', () => {
-    const root = createTempRoot('axhub-release-cursor-integration-');
-    const sourceDir = path.join(root, 'source');
-    const packageDir = path.join(root, 'npm-package');
-    const expectedFiles = [
-      'companion.mjs',
-      'cdp-session.mjs',
-      'host-protocol.mjs',
-      'make-runtime.mjs',
-      'axhub-make.cursor-launcher.js',
-    ];
-    for (const fileName of expectedFiles) {
-      writeFile(path.join(sourceDir, fileName), `asset:${fileName}\n`);
-    }
-
-    const copied = releaseMake.copyCursorIntegrationRuntimeToNpmPackage({
-      sourceDir,
-      packageDir,
-    });
-
-    assert.deepEqual(copied, expectedFiles);
-    for (const fileName of expectedFiles) {
-      assert.equal(
-        fs.readFileSync(path.join(packageDir, 'bin', 'cursor-integration', fileName), 'utf8'),
-        `asset:${fileName}\n`,
-      );
-    }
-  });
 
   it('rejects staged npm packages that are not self-contained npx artifacts', () => {
     const root = createTempRoot('axhub-release-make-guard-');
@@ -1055,11 +1027,6 @@ describe('release make artifact helpers', () => {
       files: [
         { path: 'package.json', size: 400, mode: 0o644 },
         { path: 'bin/cli.mjs', size: 180, mode: 0o755 },
-        { path: 'bin/cursor-integration/companion.mjs', size: 100, mode: 0o644 },
-        { path: 'bin/cursor-integration/cdp-session.mjs', size: 100, mode: 0o644 },
-        { path: 'bin/cursor-integration/host-protocol.mjs', size: 100, mode: 0o644 },
-        { path: 'bin/cursor-integration/make-runtime.mjs', size: 100, mode: 0o644 },
-        { path: 'bin/cursor-integration/axhub-make.cursor-launcher.js', size: 100, mode: 0o644 },
         { path: 'dist/server/cli.mjs', size: 1000, mode: 0o644 },
         { path: 'dist/server/converters/ai-studio-converter.mjs', size: 100, mode: 0o644 },
         { path: 'dist/server/converters/axure-html-converter.mjs', size: 100, mode: 0o644 },
@@ -1162,6 +1129,7 @@ describe('release make artifact helpers', () => {
       'assets/auto-debug-client.js',
       'assets/images/make-demo-prd-annotation.png',
       'bin/codex-integration/companion.mjs',
+      'bin/cursor-integration/companion.mjs',
       'dist/admin/images/make-demo-prd-annotation.png',
     ]) {
       assert.throws(

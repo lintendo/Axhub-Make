@@ -21,7 +21,6 @@ const npmPackageDistDir = path.join(npmPackageDir, 'dist');
 const npmPackageServerDir = path.join(npmPackageDistDir, 'server');
 const npmPackageServerConvertersDir = path.join(npmPackageServerDir, 'converters');
 const npmPackageScriptsDir = path.join(npmPackageDir, 'scripts');
-const cursorIntegrationSourceDir = path.join(makeServerRoot, 'bin/cursor-integration');
 const binDir = path.join(releaseRoot, 'bin');
 const artifactsDir = path.join(releaseRoot, 'artifacts');
 const tmpDir = path.join(releaseRoot, 'tmp');
@@ -79,13 +78,6 @@ const requiredNpmBin = {
   'axhub-make': './bin/cli.mjs',
   'make-server': './bin/cli.mjs',
 };
-export const cursorIntegrationRuntimeFiles = [
-  'companion.mjs',
-  'cdp-session.mjs',
-  'host-protocol.mjs',
-  'make-runtime.mjs',
-  'axhub-make.cursor-launcher.js',
-];
 const disallowedDependencyFields = [
   'dependencies',
   'devDependencies',
@@ -95,7 +87,6 @@ const disallowedDependencyFields = [
 const requiredNpmPackageFiles = [
   'package.json',
   'bin/cli.mjs',
-  ...cursorIntegrationRuntimeFiles.map((fileName) => `bin/cursor-integration/${fileName}`),
   'dist/server/cli.mjs',
   'dist/server/converters/ai-studio-converter.mjs',
   'dist/server/converters/axure-html-converter.mjs',
@@ -128,6 +119,7 @@ const disallowedNpmPackagePathPatterns = [
   /^README\.md$/u,
   /^assets(?:\/|$)/u,
   /^bin\/codex-integration(?:\/|$)/u,
+  /^bin\/cursor-integration(?:\/|$)/u,
   /^dist\/admin\/images(?:\/|$)/u,
 ];
 const textLikeArtifactExtensions = new Set([
@@ -1493,23 +1485,11 @@ function createNpmPackage(sourcePackage, canvasFigSyncScriptPath = bundledCanvas
   fs.mkdirSync(npmPackageDir, { recursive: true });
   writeJson(path.join(npmPackageDir, 'package.json'), createPublishPackageJson(sourcePackage));
   writeNpmBin();
-  copyCursorIntegrationRuntimeToNpmPackage();
   copyDir(releaseAdminDir, path.join(npmPackageDistDir, 'admin'));
   copyOpenCodeWebUiToNpmPackage();
   copyFile(canvasFigSyncScriptPath, path.join(npmPackageScriptsDir, 'canvas-fig-sync.mjs'), 0o755);
   buildServerBundle();
   copyServerConverters();
-}
-
-export function copyCursorIntegrationRuntimeToNpmPackage({
-  sourceDir = cursorIntegrationSourceDir,
-  packageDir = npmPackageDir,
-} = {}) {
-  const destinationDir = path.join(packageDir, 'bin', 'cursor-integration');
-  for (const fileName of cursorIntegrationRuntimeFiles) {
-    copyFile(path.join(sourceDir, fileName), path.join(destinationDir, fileName), 0o644);
-  }
-  return [...cursorIntegrationRuntimeFiles];
 }
 
 function packNpmPackage() {
