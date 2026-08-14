@@ -326,11 +326,29 @@ describe('make-server CLI args', () => {
       encoding: 'utf8',
       env: { ...process.env, AXHUB_MAKE_DISABLE_AUTO_RUN: '1' },
     });
+    const invalidJson = spawnProcessSync(process.execPath, [
+      '--import',
+      'tsx',
+      binPath,
+      'open',
+      'unknown',
+      '--json',
+    ], {
+      encoding: 'utf8',
+      env: { ...process.env, AXHUB_MAKE_DISABLE_AUTO_RUN: '1' },
+    });
 
     expect(help.status).toBe(0);
     expect(help.stdout).toContain('axhub-make open <app> [options]');
     expect(invalid.status).toBe(2);
     expect(invalid.stderr).toContain('Unsupported App ID: unknown');
+    expect(invalidJson.status).toBe(2);
+    expect(invalidJson.stderr).toBe('');
+    expect(JSON.parse(invalidJson.stdout)).toMatchObject({
+      ok: false,
+      code: 'unsupported-app',
+      message: 'Unsupported App ID: unknown',
+    });
   });
 
   it('opens the admin page in the default browser after starting the server', async () => {

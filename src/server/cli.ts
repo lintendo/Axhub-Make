@@ -49,10 +49,12 @@ export interface MakeCliOptions extends MakeServerCliOptions {
 
 export class CliUsageError extends Error {
   readonly exitCode = 2;
+  readonly code: string;
 
-  constructor(message: string) {
+  constructor(message: string, code = 'invalid-usage') {
     super(message);
     this.name = 'CliUsageError';
+    this.code = code;
   }
 }
 
@@ -105,7 +107,11 @@ Options:
   -h, --help                 Show this help message.
 `;
 
-export function openBrowser(url: string, platform = process.platform): void {
+export function openBrowser(
+  url: string,
+  platform = process.platform,
+  warn: (message: string) => void = (message) => console.warn(message),
+): void {
   const command = platform === 'darwin'
     ? 'open'
     : platform === 'win32'
@@ -119,11 +125,11 @@ export function openBrowser(url: string, platform = process.platform): void {
       stdio: 'ignore',
     });
     child.on?.('error', () => {
-      console.warn(`Unable to open browser automatically. Open ${url} manually.`);
+      warn(`Unable to open browser automatically. Open ${url} manually.`);
     });
     child.unref?.();
   } catch {
-    console.warn(`Unable to open browser automatically. Open ${url} manually.`);
+    warn(`Unable to open browser automatically. Open ${url} manually.`);
   }
 }
 
@@ -215,7 +221,7 @@ export function parseCliArgs(args: string[], cwd = process.cwd()): MakeCliOption
     }
     const normalized = normalizeMakeCliAppId(value);
     if (!normalized) {
-      throw new CliUsageError(`Unsupported App ID: ${value}`);
+      throw new CliUsageError(`Unsupported App ID: ${value}`, 'unsupported-app');
     }
     app = normalized;
     cursor += 1;
@@ -358,6 +364,7 @@ function serverStartOptions(options: MakeCliOptions) {
     ...(options.runtimeOrigin ? { runtimeOrigin: options.runtimeOrigin } : {}),
     ...(options.adminRoot ? { adminRoot: options.adminRoot } : {}),
     ...(options.devMode ? { devMode: true } : {}),
+    ...(options.json ? { quiet: true } : {}),
     ...(options.open === false ? { open: false } : {}),
     ...(options.logFile ? { logFile: options.logFile } : {}),
     ...(options.axhubOnlineBaseUrl ? { axhubOnlineBaseUrl: options.axhubOnlineBaseUrl } : {}),
@@ -543,7 +550,7 @@ export async function runCli(
   }
 
   if (options.open !== false) {
-    dependencies.openBrowser(origin);
+    dependencies.openBrowser(origin, process.platform, options.json ? () => {} : undefined);
   }
 
   if (options.command === 'open' && options.app) {
@@ -571,6 +578,21 @@ export async function runCli(
   return 0;
 }
 
+export function handleCliError(error: unknown, args = process.argv.slice(2)): number {
+  const usageError = error instanceof CliUsageError;
+  const message = error instanceof Error ? error.message : String(error);
+  if (args.includes('--json')) {
+    console.log(JSON.stringify({
+      ok: false,
+      code: usageError ? error.code : 'unexpected-error',
+      message,
+    }));
+  } else {
+    console.error(error instanceof Error ? error.stack || error.message : error);
+  }
+  return usageError ? error.exitCode : 1;
+}
+
 export function isCliEntrypoint(argvPath = process.argv[1] || '', moduleUrl = import.meta.url): boolean {
   return path.resolve(argvPath) === fileURLToPath(moduleUrl);
 }
@@ -589,7 +611,6 @@ if (shouldAutoRunCli()) {
       process.exitCode = exitCode;
     })
     .catch((error) => {
-      console.error(error?.stack || error?.message || error);
-      process.exitCode = error instanceof CliUsageError ? error.exitCode : 1;
+      process.exitCode = handleCliError(error);
     });
 }

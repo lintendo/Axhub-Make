@@ -19,6 +19,7 @@ import {
   checkMakeStateHealth,
   createServerConfigStore,
   createProjectRegistry,
+  getServerInfoFilePath,
   getGlobalMakeStateDir,
   type AxhubServerInfo,
   type MakeStateHealthResult,
@@ -69,6 +70,7 @@ export interface StartMakeServerOptions {
   registryPath?: string;
   serverInfoHomeDir?: string;
   devMode?: boolean;
+  quiet?: boolean;
   logFile?: string;
   diagnosticLog?: DiagnosticLog;
   axhubOnlineBaseUrl?: string;
@@ -81,6 +83,34 @@ export interface RunningMakeServer {
   host: string;
   origin: string;
   close: () => Promise<void>;
+}
+
+function isSameServerInfo(left: AxhubServerInfo, right: AxhubServerInfo): boolean {
+  return left.pid === right.pid
+    && left.port === right.port
+    && left.host === right.host
+    && left.origin === right.origin
+    && left.startedAt === right.startedAt
+    && left.timestamp === right.timestamp
+    && resolveComparableProjectRoot(left.projectRoot) === resolveComparableProjectRoot(right.projectRoot);
+}
+
+function removeMatchingAdminServerInfo(
+  projectRoot: string,
+  expected: AxhubServerInfo,
+  homeDir?: string,
+): void {
+  const recorded = readServerInfo(projectRoot, 'admin', { homeDir });
+  if (!recorded || !isSameServerInfo(recorded, expected)) {
+    return;
+  }
+  try {
+    fs.unlinkSync(getServerInfoFilePath(projectRoot, 'admin', { homeDir }));
+  } catch (error: any) {
+    if (String(error?.code || '') !== 'ENOENT') {
+      throw error;
+    }
+  }
 }
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
@@ -379,7 +409,9 @@ export async function startMakeServer(options: StartMakeServerOptions): Promise<
         const { createViteDevMiddleware } = await import('./viteDevServer.ts');
         const middleware = await createViteDevMiddleware(server, makeServerRoot);
         viteMiddleware = middleware;
-        console.log('Vite HMR middleware attached (frontend hot reload enabled)');
+        if (!options.quiet) {
+          console.log('Vite HMR middleware attached (frontend hot reload enabled)');
+        }
         return middleware;
       })().catch((error) => {
         viteMiddlewarePromise = null;
@@ -670,7 +702,7 @@ export async function startMakeServer(options: StartMakeServerOptions): Promise<
     }
   }
 
-  if (lanHost !== 'localhost') {
+  if (lanHost !== 'localhost' && !options.quiet) {
     console.log(`Axhub Make network URL: http://${lanHost}:${actualPort}`);
   }
 
@@ -693,6 +725,9 @@ export async function startMakeServer(options: StartMakeServerOptions): Promise<
         server.closeIdleConnections?.();
         server.closeAllConnections?.();
       });
+      if (adminServerInfo) {
+        removeMatchingAdminServerInfo(projectRoot, adminServerInfo, serverInfoHomeDir);
+      }
     },
   };
 }
