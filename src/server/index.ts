@@ -59,6 +59,7 @@ import {
 } from './runtimeProxy.ts';
 import type { ViteDevMiddleware } from './viteDevServer.ts';
 import type { DiagnosticLog } from './diagnosticLog.ts';
+import { removeOwnedServerInfoFile } from './serverInfoRecord.ts';
 
 export interface StartMakeServerOptions {
   projectRoot: string;
@@ -83,34 +84,6 @@ export interface RunningMakeServer {
   host: string;
   origin: string;
   close: () => Promise<void>;
-}
-
-function isSameServerInfo(left: AxhubServerInfo, right: AxhubServerInfo): boolean {
-  return left.pid === right.pid
-    && left.port === right.port
-    && left.host === right.host
-    && left.origin === right.origin
-    && left.startedAt === right.startedAt
-    && left.timestamp === right.timestamp
-    && resolveComparableProjectRoot(left.projectRoot) === resolveComparableProjectRoot(right.projectRoot);
-}
-
-function removeMatchingAdminServerInfo(
-  projectRoot: string,
-  expected: AxhubServerInfo,
-  homeDir?: string,
-): void {
-  const recorded = readServerInfo(projectRoot, 'admin', { homeDir });
-  if (!recorded || !isSameServerInfo(recorded, expected)) {
-    return;
-  }
-  try {
-    fs.unlinkSync(getServerInfoFilePath(projectRoot, 'admin', { homeDir }));
-  } catch (error: any) {
-    if (String(error?.code || '') !== 'ENOENT') {
-      throw error;
-    }
-  }
 }
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
@@ -726,7 +699,10 @@ export async function startMakeServer(options: StartMakeServerOptions): Promise<
         server.closeAllConnections?.();
       });
       if (adminServerInfo) {
-        removeMatchingAdminServerInfo(projectRoot, adminServerInfo, serverInfoHomeDir);
+        removeOwnedServerInfoFile(
+          getServerInfoFilePath(projectRoot, 'admin', { homeDir: serverInfoHomeDir }),
+          adminServerInfo,
+        );
       }
     },
   };
