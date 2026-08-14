@@ -21,7 +21,6 @@ const npmPackageDistDir = path.join(npmPackageDir, 'dist');
 const npmPackageServerDir = path.join(npmPackageDistDir, 'server');
 const npmPackageServerConvertersDir = path.join(npmPackageServerDir, 'converters');
 const npmPackageScriptsDir = path.join(npmPackageDir, 'scripts');
-const codexIntegrationSourceDir = path.join(makeServerRoot, 'bin/codex-integration');
 const cursorIntegrationSourceDir = path.join(makeServerRoot, 'bin/cursor-integration');
 const binDir = path.join(releaseRoot, 'bin');
 const artifactsDir = path.join(releaseRoot, 'artifacts');
@@ -80,13 +79,6 @@ const requiredNpmBin = {
   'axhub-make': './bin/cli.mjs',
   'make-server': './bin/cli.mjs',
 };
-export const codexIntegrationRuntimeFiles = [
-  'companion.mjs',
-  'cdp-session.mjs',
-  'host-protocol.mjs',
-  'make-runtime.mjs',
-  'axhub-make.sidebar.js',
-];
 export const cursorIntegrationRuntimeFiles = [
   'companion.mjs',
   'cdp-session.mjs',
@@ -103,7 +95,6 @@ const disallowedDependencyFields = [
 const requiredNpmPackageFiles = [
   'package.json',
   'bin/cli.mjs',
-  ...codexIntegrationRuntimeFiles.map((fileName) => `bin/codex-integration/${fileName}`),
   ...cursorIntegrationRuntimeFiles.map((fileName) => `bin/cursor-integration/${fileName}`),
   'dist/server/cli.mjs',
   'dist/server/converters/ai-studio-converter.mjs',
@@ -136,6 +127,7 @@ const disallowedNpmPackagePathPatterns = [
   /\.timestamp-[^/]+$/u,
   /^README\.md$/u,
   /^assets(?:\/|$)/u,
+  /^bin\/codex-integration(?:\/|$)/u,
   /^dist\/admin\/images(?:\/|$)/u,
 ];
 const textLikeArtifactExtensions = new Set([
@@ -1345,17 +1337,27 @@ export function assertNpmPackageShape({ dryRunInfo, packageDir }) {
   assertNoLocalMachinePathsInDirectory(packageDir, 'npm package');
 }
 
+export function createCliEntrypointSource(cliImportPath, options = {}) {
+  const importStatement = options.dynamicImport
+    ? `const { handleCliError, runCli } = await import(${JSON.stringify(cliImportPath)});`
+    : `import { handleCliError, runCli } from ${JSON.stringify(cliImportPath)};`;
+  return `${options.disableAutoRun ? "process.env.AXHUB_MAKE_DISABLE_AUTO_RUN = '1';\n" : ''}${importStatement}
+
+runCli()
+  .then((exitCode) => {
+    process.exitCode = exitCode;
+  })
+  .catch((error) => {
+    process.exitCode = handleCliError(error);
+  });
+`;
+}
+
 function writeNpmBin() {
   const binPath = path.join(npmPackageDir, 'bin/cli.mjs');
   const content = `#!/usr/bin/env node
 
-import { runCli } from '../dist/server/cli.mjs';
-
-runCli().catch((error) => {
-  console.error(error?.stack || error?.message || error);
-  process.exitCode = 1;
-});
-`;
+${createCliEntrypointSource('../dist/server/cli.mjs')}`;
   fs.mkdirSync(path.dirname(binPath), { recursive: true });
   fs.writeFileSync(binPath, content, 'utf8');
   fs.chmodSync(binPath, 0o755);
@@ -1402,14 +1404,10 @@ function createBunEntrypoint() {
   const entryPath = path.join(tmpDir, 'bun-cli-entry.mjs');
   const cliPath = path.join(makeServerRoot, 'src/server/cli.ts');
   fs.mkdirSync(path.dirname(entryPath), { recursive: true });
-  fs.writeFileSync(entryPath, `process.env.AXHUB_MAKE_DISABLE_AUTO_RUN = '1';
-const { runCli } = await import(${JSON.stringify(cliPath)});
-
-runCli().catch((error) => {
-  console.error(error?.stack || error?.message || error);
-  process.exitCode = 1;
-});
-`, 'utf8');
+  fs.writeFileSync(entryPath, createCliEntrypointSource(cliPath, {
+    disableAutoRun: true,
+    dynamicImport: true,
+  }), 'utf8');
   return entryPath;
 }
 
@@ -1495,24 +1493,12 @@ function createNpmPackage(sourcePackage, canvasFigSyncScriptPath = bundledCanvas
   fs.mkdirSync(npmPackageDir, { recursive: true });
   writeJson(path.join(npmPackageDir, 'package.json'), createPublishPackageJson(sourcePackage));
   writeNpmBin();
-  copyCodexIntegrationRuntimeToNpmPackage();
   copyCursorIntegrationRuntimeToNpmPackage();
   copyDir(releaseAdminDir, path.join(npmPackageDistDir, 'admin'));
   copyOpenCodeWebUiToNpmPackage();
   copyFile(canvasFigSyncScriptPath, path.join(npmPackageScriptsDir, 'canvas-fig-sync.mjs'), 0o755);
   buildServerBundle();
   copyServerConverters();
-}
-
-export function copyCodexIntegrationRuntimeToNpmPackage({
-  sourceDir = codexIntegrationSourceDir,
-  packageDir = npmPackageDir,
-} = {}) {
-  const destinationDir = path.join(packageDir, 'bin', 'codex-integration');
-  for (const fileName of codexIntegrationRuntimeFiles) {
-    copyFile(path.join(sourceDir, fileName), path.join(destinationDir, fileName), 0o644);
-  }
-  return [...codexIntegrationRuntimeFiles];
 }
 
 export function copyCursorIntegrationRuntimeToNpmPackage({

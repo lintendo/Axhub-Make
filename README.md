@@ -25,61 +25,36 @@ npx -y @axhub/make@latest
 
 启动后会自动打开管理页面。如果没有打开，复制终端里显示的地址到浏览器。
 
-## 加到 Codex++ 侧边栏
+## CLI 启动与打开 AI 应用
 
-适用于已经安装 Node.js 22+、Codex 和 [Codex++](https://github.com/BigPizzaV3/CodexPlusPlus) 的 macOS / Windows 用户。
+默认命令在当前终端前台启动 Make 并打开管理页面。需要命令完成后继续在后台运行时，使用：
 
-第一次安装或更新：
-
-1. 完全退出 Codex。Windows 还需要确认系统托盘里的 Codex 已退出。
-2. 在 Terminal、PowerShell 或 Windows Terminal 运行：
-
-```
-npx -y @axhub/make@latest codex install
+```bash
+npx -y @axhub/make@latest --background
 ```
 
-3. 通过 `Codex++` 启动器重新打开 Codex。
-4. 点击 Codex 左侧的 `Axhub Make`。
+`open` 会启动或复用 Make，再打开指定 AI 应用、注入 Axhub Make 入口并立即激活：
 
-以后日常使用不需要再运行命令。通过 Codex++ 打开 Codex，然后点击左侧 `Axhub Make` 即可；Make 会在需要时自动启动，并在 Codex 内置浏览器中打开。这个入口不创建 AI 任务，也不需要 MCP。
-
-安装器在 macOS 使用当前用户的 LaunchAgent，在 Windows 使用当前用户的 Task Scheduler，不需要管理员权限。检查安装状态或卸载：
-
-```
-npx -y @axhub/make@latest codex doctor
-npx -y @axhub/make@latest codex uninstall
+```bash
+npx -y @axhub/make@latest open codex
+npx -y @axhub/make@latest open cursor
+npx -y @axhub/make@latest open workbuddy
+npx -y @axhub/make@latest open traework
+npx -y @axhub/make@latest open qoderwork
 ```
 
-Codex++ 依赖 Codex 的页面结构和本地 CDP 接口。Codex 或 Codex++ 更新后如果入口消失，先完全退出 Codex，重新运行 `codex install`，再通过 Codex++ 启动。
+这五个 App ID 是固定值。加上 `--background` 可让新建的 Make 服务在后台运行；`--no-open` 只禁止系统浏览器打开管理页面，不影响 AI 应用里的入口激活。
 
-## 加到 Cursor Agents
+如果目标应用已经运行但没有可用的调试端点，交互式终端会先请求重启确认。自动化或非交互环境可以显式传入 `--restart`，Make 只会请求应用正常退出，不会静默强制结束进程。`--app-path <path>` 可为本次调用指定应用路径，不会持久化。
 
-适用于已经安装 Node.js 22+ 和 Cursor 的 macOS / Windows 用户。这个方案与 Codex++ 可以同时安装，二者使用独立的文件、后台服务和 CDP 端口。
+查看或停止当前用户的 Make Admin 服务：
 
-第一次安装或更新只需要运行一次：
-
-```
-npx -y @axhub/make@latest cursor install
-```
-
-安装完成后，完全退出正在运行的 Cursor，再通过下面的命令启动：
-
-```
-npx -y @axhub/make@latest cursor open
+```bash
+npx -y @axhub/make@latest status
+npx -y @axhub/make@latest stop
 ```
 
-打开 Cursor Agents 后点击 `Axhub Make`。Make 会在需要时自动启动，然后以 `surface=codex` 专属模式打开在 Cursor 自己的原生内置浏览器标签中；不会创建 AI 对话或任务，也不需要 MCP，不会打开系统外部浏览器。再次点击会复用并聚焦同一个 Axhub Make 浏览器标签。
-
-Cursor 的 CDP 参数只能在应用启动时生效，因此以后需要这个入口的 Cursor 会话也要先完全退出普通 Cursor，再通过 `cursor open` 启动。安装器不会修改 Cursor 应用包或替换系统快捷方式。
-
-检查状态或卸载：
-
-```
-npx -y @axhub/make@latest cursor doctor
-npx -y @axhub/make@latest cursor uninstall
-```
-
-安装器在 macOS 使用当前用户的 LaunchAgent，在 Windows 使用当前用户的 Task Scheduler。它只通过本地 CDP 使用 Cursor Agents 的原生 Browser WebView：首次点击时如有需要会自动创建，后续点击直接复用；不安装 Cursor 扩展，也不需要管理员权限。
+这套 `open` 流程是一次性启动与注入，不安装扩展、常驻 companion、LaunchAgent 或 Windows 计划任务。重复调用会更新并激活已有入口。
 
 ## 让 AI 帮你启动
 

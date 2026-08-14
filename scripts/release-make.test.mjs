@@ -1003,33 +1003,12 @@ describe('release make artifact helpers', () => {
     }
   });
 
-  it('copies every Codex++ integration runtime file into npm staging', () => {
-    const root = createTempRoot('axhub-release-codex-integration-');
-    const sourceDir = path.join(root, 'source');
-    const packageDir = path.join(root, 'npm-package');
-    const expectedFiles = [
-      'companion.mjs',
-      'cdp-session.mjs',
-      'host-protocol.mjs',
-      'make-runtime.mjs',
-      'axhub-make.sidebar.js',
-    ];
-    for (const fileName of expectedFiles) {
-      writeFile(path.join(sourceDir, fileName), `asset:${fileName}\n`);
-    }
+  it('generates release entrypoints that preserve CLI result and usage exit codes', () => {
+    const source = releaseMake.createCliEntrypointSource('../dist/server/cli.mjs');
 
-    const copied = releaseMake.copyCodexIntegrationRuntimeToNpmPackage({
-      sourceDir,
-      packageDir,
-    });
-
-    assert.deepEqual(copied, expectedFiles);
-    for (const fileName of expectedFiles) {
-      assert.equal(
-        fs.readFileSync(path.join(packageDir, 'bin', 'codex-integration', fileName), 'utf8'),
-        `asset:${fileName}\n`,
-      );
-    }
+    assert.match(source, /import \{ handleCliError, runCli \}/u);
+    assert.match(source, /\.then\(\(exitCode\)/u);
+    assert.match(source, /process\.exitCode = handleCliError\(error\)/u);
   });
 
   it('copies every Cursor integration runtime file into npm staging', () => {
@@ -1076,11 +1055,6 @@ describe('release make artifact helpers', () => {
       files: [
         { path: 'package.json', size: 400, mode: 0o644 },
         { path: 'bin/cli.mjs', size: 180, mode: 0o755 },
-        { path: 'bin/codex-integration/companion.mjs', size: 100, mode: 0o644 },
-        { path: 'bin/codex-integration/cdp-session.mjs', size: 100, mode: 0o644 },
-        { path: 'bin/codex-integration/host-protocol.mjs', size: 100, mode: 0o644 },
-        { path: 'bin/codex-integration/make-runtime.mjs', size: 100, mode: 0o644 },
-        { path: 'bin/codex-integration/axhub-make.sidebar.js', size: 100, mode: 0o644 },
         { path: 'bin/cursor-integration/companion.mjs', size: 100, mode: 0o644 },
         { path: 'bin/cursor-integration/cdp-session.mjs', size: 100, mode: 0o644 },
         { path: 'bin/cursor-integration/host-protocol.mjs', size: 100, mode: 0o644 },
@@ -1187,6 +1161,7 @@ describe('release make artifact helpers', () => {
       'README.md',
       'assets/auto-debug-client.js',
       'assets/images/make-demo-prd-annotation.png',
+      'bin/codex-integration/companion.mjs',
       'dist/admin/images/make-demo-prd-annotation.png',
     ]) {
       assert.throws(
