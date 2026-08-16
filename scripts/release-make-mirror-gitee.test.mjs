@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
@@ -24,18 +25,26 @@ function writeFile(filePath, content) {
 function createFixture(options = {}) {
   const root = createTempRoot('axhub-gitee-mirror-');
   const assetPath = path.join(root, 'artifacts', 'axhub-make-client-template.zip');
-  writeFile(assetPath, 'zip payload');
+  const zipBytes = Buffer.isBuffer(options.zipBytes)
+    ? options.zipBytes
+    : Buffer.from(options.zipBytes || 'zip payload', 'utf8');
+  writeFile(assetPath, zipBytes);
+  const zipSha256 = options.zipSha256 || crypto.createHash('sha256').update(zipBytes).digest('hex');
+  const sourceCommit = options.sourceCommit || 'b'.repeat(40);
   const latestManifestPath = path.join(root, 'artifacts', 'axhub-make-client-template.latest.json');
+  let latestManifestBytes = null;
   if (options.includeLatestManifest !== false) {
-    writeFile(latestManifestPath, '{"schemaVersion":1}\n');
+    latestManifestBytes = Buffer.from(`${JSON.stringify({ schemaVersion: 1, sha256: zipSha256 })}\n`, 'utf8');
+    writeFile(latestManifestPath, latestManifestBytes);
   }
   const manifestPath = path.join(root, 'manifest.json');
   const manifest = {
     templateVersion: '1.2.3-beta.4',
     tagName: 'make-client-template-v1.2.3-beta.4',
+    sourceCommit,
     templateZip: {
       path: assetPath,
-      sha256: 'a'.repeat(64),
+      sha256: zipSha256,
       githubReleaseAssetName: 'axhub-make-client-template.zip',
       primaryUrl: 'https://github.com/lintendo/Axhub-Make/releases/download/make-client-template-v1.2.3-beta.4/axhub-make-client-template.zip',
       mirrorUrl: 'https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-v1.2.3-beta.4/axhub-make-client-template.zip',
@@ -49,7 +58,16 @@ function createFixture(options = {}) {
     };
   }
   writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  return { root, assetPath, latestManifestPath, manifestPath };
+  return {
+    root,
+    assetPath,
+    latestManifestPath,
+    manifestPath,
+    sourceCommit,
+    zipBytes,
+    zipSha256,
+    latestManifestBytes,
+  };
 }
 
 function createFetchMock(handlers) {
@@ -101,10 +119,26 @@ describe('gitee make release mirror helper', () => {
     );
   });
 
+  it('rejects a local template ZIP whose bytes do not match the prepared manifest', async () => {
+    const { manifestPath } = createFixture({ zipSha256: 'a'.repeat(64) });
+
+    await assert.rejects(
+      () => mirrorGitee.runGiteeMirrorRelease({
+        argv: ['--manifest', manifestPath, '--dry-run'],
+        env: {},
+        fetchImpl: async () => {
+          throw new Error('local integrity validation must run before fetch');
+        },
+        logger: { log: () => {} },
+      }),
+      /SHA-256/u,
+    );
+  });
+
   it('creates the versioned release and replaces an existing latest manifest', async () => {
     const token = 'test-token';
     const logs = [];
-    const { manifestPath } = createFixture();
+    const { manifestPath, sourceCommit, zipBytes, latestManifestBytes } = createFixture();
     const fetchImpl = createFetchMock([
       (url) => {
         if (url.includes('/releases/tags/make-client-template-v1.2.3-beta.4')) {
@@ -123,10 +157,11 @@ describe('gitee make release mirror helper', () => {
           assert.equal(init.body.get('name'), 'Axhub Make Client Template 1.2.3-beta.4');
           assert.equal(init.body.get('body'), 'Axhub Make client template 1.2.3-beta.4 mirror release.');
           assert.equal(init.body.get('prerelease'), 'true');
-          assert.equal(init.body.get('target_commitish'), 'main');
+          assert.equal(init.body.get('target_commitish'), sourceCommit);
           return new Response(JSON.stringify({
             id: 42,
             tag_name: tagName,
+            target_commitish: sourceCommit,
           }), { status: 201 });
         }
         return null;
@@ -163,12 +198,14 @@ describe('gitee make release mirror helper', () => {
       },
       (url, init) => {
         if (url === 'https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-v1.2.3-beta.4/axhub-make-client-template.zip') {
-          assert.equal(init.method, 'HEAD');
-          return new Response(null, { status: 200, headers: { 'content-length': '11' } });
+          assert.equal(init.method, 'GET');
+          assert.equal(init.cache, 'no-store');
+          return new Response(zipBytes, { status: 200 });
         }
         if (url === 'https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-latest/axhub-make-client-template.latest.json') {
-          assert.equal(init.method, 'HEAD');
-          return new Response(null, { status: 200, headers: { 'content-length': '20' } });
+          assert.equal(init.method, 'GET');
+          assert.equal(init.cache, 'no-store');
+          return new Response(latestManifestBytes, { status: 200 });
         }
         return null;
       },
@@ -189,13 +226,90 @@ describe('gitee make release mirror helper', () => {
     assert.equal(logs.join('\n').includes(token), false);
   });
 
-  it('skips an existing template attachment unless replace is requested', async () => {
+  it('uploads and verifies the ZIP and latest manifest bytes frozen by local validation', async () => {
     const token = 'test-token';
-    const { manifestPath } = createFixture({ includeLatestManifest: false });
+    const {
+      assetPath,
+      latestManifestPath,
+      manifestPath,
+      sourceCommit,
+      zipBytes,
+      latestManifestBytes,
+    } = createFixture();
     const fetchImpl = createFetchMock([
       (url) => {
         if (url.includes('/releases/tags/make-client-template-v1.2.3-beta.4')) {
-          return new Response(JSON.stringify({ id: 42, tag_name: 'make-client-template-v1.2.3-beta.4' }), { status: 200 });
+          fs.writeFileSync(assetPath, 'replacement ZIP bytes', 'utf8');
+          fs.writeFileSync(latestManifestPath, 'replacement latest manifest bytes', 'utf8');
+          return new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 });
+        }
+        if (url.includes('/releases/tags/make-client-template-latest')) {
+          return new Response(JSON.stringify({ id: 43, tag_name: 'make-client-template-latest' }), { status: 200 });
+        }
+        return null;
+      },
+      (url, init) => {
+        if (url.endsWith('/api/v5/repos/axhub/Axhub-Make/releases') && init.method === 'POST') {
+          return new Response(JSON.stringify({
+            id: 42,
+            tag_name: 'make-client-template-v1.2.3-beta.4',
+            target_commitish: sourceCommit,
+          }), { status: 201 });
+        }
+        return null;
+      },
+      (url) => {
+        if (url.includes('/releases/42/attach_files') || url.includes('/releases/43/attach_files')) {
+          return new Response(JSON.stringify([]), { status: 200 });
+        }
+        return null;
+      },
+      async (url, init) => {
+        if (url.endsWith('/releases/42/attach_files') && init.method === 'POST') {
+          const uploadedBytes = Buffer.from(await init.body.get('file').arrayBuffer());
+          assert.deepEqual(uploadedBytes, zipBytes);
+          return new Response(JSON.stringify({ id: 7, name: 'axhub-make-client-template.zip' }), { status: 201 });
+        }
+        if (url.endsWith('/releases/43/attach_files') && init.method === 'POST') {
+          const uploadedBytes = Buffer.from(await init.body.get('file').arrayBuffer());
+          assert.deepEqual(uploadedBytes, latestManifestBytes);
+          return new Response(JSON.stringify({ id: 8, name: 'axhub-make-client-template.latest.json' }), { status: 201 });
+        }
+        return null;
+      },
+      (url) => {
+        if (url === 'https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-v1.2.3-beta.4/axhub-make-client-template.zip') {
+          return new Response(zipBytes, { status: 200 });
+        }
+        if (url === 'https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-latest/axhub-make-client-template.latest.json') {
+          return new Response(latestManifestBytes, { status: 200 });
+        }
+        return null;
+      },
+    ]);
+
+    const result = await mirrorGitee.runGiteeMirrorRelease({
+      argv: ['--manifest', manifestPath, '--confirm-publish'],
+      env: { GITEE_TOKEN: token },
+      fetchImpl,
+      logger: { log: () => {} },
+    });
+
+    assert.equal(result.verified, true);
+    assert.equal(result.latestManifest.verified, true);
+  });
+
+  it('skips an existing template attachment unless replace is requested', async () => {
+    const token = 'test-token';
+    const { manifestPath, sourceCommit, zipBytes } = createFixture({ includeLatestManifest: false });
+    const fetchImpl = createFetchMock([
+      (url) => {
+        if (url.includes('/releases/tags/make-client-template-v1.2.3-beta.4')) {
+          return new Response(JSON.stringify({
+            id: 42,
+            tag_name: 'make-client-template-v1.2.3-beta.4',
+            target_commitish: sourceCommit,
+          }), { status: 200 });
         }
         return null;
       },
@@ -207,7 +321,7 @@ describe('gitee make release mirror helper', () => {
       },
       (url) => {
         if (url === 'https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-v1.2.3-beta.4/axhub-make-client-template.zip') {
-          return new Response(null, { status: 200 });
+          return new Response(zipBytes, { status: 200 });
         }
         return null;
       },
@@ -222,6 +336,88 @@ describe('gitee make release mirror helper', () => {
 
     assert.equal(result.uploaded, false);
     assert.equal(fetchImpl.calls.some((call) => call.init.method === 'POST'), false);
+  });
+
+  it('rejects stale bytes from an existing versioned Gitee ZIP', async () => {
+    const token = 'test-token';
+    const { manifestPath, sourceCommit } = createFixture();
+    const fetchImpl = createFetchMock([
+      (url) => {
+        if (url.includes('/releases/tags/make-client-template-v1.2.3-beta.4')) {
+          return new Response(JSON.stringify({
+            id: 42,
+            tag_name: 'make-client-template-v1.2.3-beta.4',
+            target_commitish: sourceCommit,
+          }), { status: 200 });
+        }
+        return null;
+      },
+      (url) => {
+        if (url.includes('/releases/42/attach_files')) {
+          return new Response(JSON.stringify([{ id: 7, name: 'axhub-make-client-template.zip' }]), { status: 200 });
+        }
+        return null;
+      },
+      (url) => {
+        if (url === 'https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-v1.2.3-beta.4/axhub-make-client-template.zip') {
+          return new Response('stale ZIP payload', { status: 200 });
+        }
+        return null;
+      },
+    ]);
+
+    await assert.rejects(
+      () => mirrorGitee.runGiteeMirrorRelease({
+        argv: ['--manifest', manifestPath, '--confirm-publish'],
+        env: { GITEE_TOKEN: token },
+        fetchImpl,
+        logger: { log: () => {} },
+      }),
+      /SHA-256/u,
+    );
+    assert.equal(fetchImpl.calls.some((call) => call.init.method === 'DELETE'), false);
+    assert.equal(fetchImpl.calls.some((call) => call.url.includes('make-client-template-latest')), false);
+  });
+
+  it('rejects an existing versioned Gitee release with a different target commit', async () => {
+    const token = 'test-token';
+    const { manifestPath, zipBytes } = createFixture();
+    const fetchImpl = createFetchMock([
+      (url) => {
+        if (url.includes('/releases/tags/make-client-template-v1.2.3-beta.4')) {
+          return new Response(JSON.stringify({
+            id: 42,
+            tag_name: 'make-client-template-v1.2.3-beta.4',
+            target_commitish: 'c'.repeat(40),
+          }), { status: 200 });
+        }
+        return null;
+      },
+      (url) => {
+        if (url.includes('/releases/42/attach_files')) {
+          return new Response(JSON.stringify([{ id: 7, name: 'axhub-make-client-template.zip' }]), { status: 200 });
+        }
+        return null;
+      },
+      (url) => {
+        if (url === 'https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-v1.2.3-beta.4/axhub-make-client-template.zip') {
+          return new Response(zipBytes, { status: 200 });
+        }
+        return null;
+      },
+    ]);
+
+    await assert.rejects(
+      () => mirrorGitee.runGiteeMirrorRelease({
+        argv: ['--manifest', manifestPath, '--confirm-publish'],
+        env: { GITEE_TOKEN: token },
+        fetchImpl,
+        logger: { log: () => {} },
+      }),
+      /target commit/u,
+    );
+    assert.equal(fetchImpl.calls.some((call) => call.url.includes('/attach_files')), false);
+    assert.equal(fetchImpl.calls.some((call) => call.url.includes('make-client-template-latest')), false);
   });
 
   it('prints a dry run without requiring or leaking a token', async () => {
@@ -240,6 +436,32 @@ describe('gitee make release mirror helper', () => {
     assert.equal(result.dryRun, true);
     assert.match(logs.join('\n'), /axhub\/Axhub-Make/u);
     assert.match(logs.join('\n'), /axhub-make-client-template\.zip/u);
+  });
+
+  it('binds the Gitee target to the prepared source commit', async () => {
+    const { manifestPath, sourceCommit } = createFixture();
+
+    const result = await mirrorGitee.runGiteeMirrorRelease({
+      argv: ['--manifest', manifestPath, '--dry-run'],
+      env: {},
+      fetchImpl: async () => {
+        throw new Error('dry-run should not call fetch');
+      },
+      logger: { log: () => {} },
+    });
+    assert.equal(result.targetCommitish, sourceCommit);
+
+    await assert.rejects(
+      () => mirrorGitee.runGiteeMirrorRelease({
+        argv: ['--manifest', manifestPath, '--target', 'main', '--dry-run'],
+        env: {},
+        fetchImpl: async () => {
+          throw new Error('target validation must run before fetch');
+        },
+        logger: { log: () => {} },
+      }),
+      /target/u,
+    );
   });
 
   it('requires explicit human confirmation before publishing to Gitee', async () => {
