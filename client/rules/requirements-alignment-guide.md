@@ -65,7 +65,7 @@ Make 管理端默认使用 `http://localhost:53817/`；`check-app-ready` 返回 
 
 整理当前项目候选时优先读取主题 `theme.json`，用 `tags.*`、`display.distributionTags`、`identity.title*/description*` 和 `display.variant` 做检索与候选说明；用 `identity.slug` 和 `assets.designMd.path` 校验目录与 `DESIGN.md` 路径。不自行新建 `DESIGN.md`。
 
-当前项目本地候选提供基于实际 `serverUrl` 的完整 Make 主题深链和 `DESIGN.md` 路径；Design Knowledge 候选使用检索结果提供的链接。
+当前项目本地候选必须提供完整的 Make 主题深链，格式为 `http://localhost:53817/?projectId=<project-id>&theme=<theme-key>`，并标出对应 `DESIGN.md` 路径；Design Knowledge 候选使用检索结果提供的链接。
 
 `DESIGN.md` 确定后，用户零散提出的颜色、字体、布局、动效、组件形态等需求，都作为基于该设计基底的调整处理，不另起一套视觉系统。
 

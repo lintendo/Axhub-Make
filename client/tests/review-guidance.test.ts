@@ -78,6 +78,10 @@ describe('client workflow guidance', () => {
     expect(designSection).not.toContain('只有用户明确要求线上检索时才访问线上源');
     expect(designSection).toContain('从这些已有候选中选择设计基底不得触发 `$build-design-system`');
     expect(designSection).toContain('只有用户明确要求创建或修改主题时才使用它');
+    expect(designSection).toContain('http://localhost:53817/?projectId=<project-id>&theme=<theme-key>');
+    expect(designSection).toContain('并标出对应 `DESIGN.md` 路径');
+    expect(designSection).toContain('Design Knowledge 候选使用检索结果提供的链接');
+    expect(designSection).not.toContain('serverUrl');
     expect(designSection).not.toContain('$design-system-search');
   });
 
