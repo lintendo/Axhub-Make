@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import zlib from 'node:zlib';
 import { unzipSync, zipSync } from 'fflate';
 
@@ -1165,6 +1166,7 @@ export function createTemplateZipMetadata({
 
 export function createMakeClientTemplateLatestManifest({
   templateVersion,
+  sourceCommit,
   releaseNotes,
   zipMetadata,
   sha256,
@@ -1178,6 +1180,9 @@ export function createMakeClientTemplateLatestManifest({
   if (!normalizedReleaseNotes) {
     throw new Error('releaseNotes is required for Make client template latest manifest');
   }
+  if (!/^[a-f0-9]{40}$/u.test(sourceCommit)) {
+    throw new Error('sourceCommit must be a lowercase 40-hex commit for Make client template latest manifest');
+  }
   if (!zipMetadata?.primaryUrl || !zipMetadata?.mirrorUrl) {
     throw new Error('zipMetadata primaryUrl and mirrorUrl are required for Make client template latest manifest');
   }
@@ -1187,6 +1192,7 @@ export function createMakeClientTemplateLatestManifest({
   return {
     schemaVersion: 1,
     version: normalizedTemplateVersion,
+    sourceCommit,
     releaseNotes: normalizedReleaseNotes,
     sha256,
     publishedAt,
@@ -1861,6 +1867,7 @@ function prepareTemplateRelease(options = {}) {
   const latestManifestPath = path.join(templateArtifactsDir, makeClientTemplateLatestManifestName);
   const latestManifest = createMakeClientTemplateLatestManifest({
     templateVersion,
+    sourceCommit,
     releaseNotes,
     zipMetadata: templateMetadata,
     sha256: templateArchive.sha256,
@@ -1883,6 +1890,7 @@ function prepareTemplateRelease(options = {}) {
       path: latestManifestPath,
       name: makeClientTemplateLatestManifestName,
       mirrorUrl: `https://gitee.com/axhub/Axhub-Make/releases/download/${makeClientTemplateLatestManifestGiteeTagName}/${makeClientTemplateLatestManifestName}`,
+      sha256: sha256File(latestManifestPath),
       manifest: latestManifest,
     },
   };
@@ -2276,6 +2284,122 @@ function printTemplateArtifacts(manifest) {
   console.log(`  make client template mirror upload target: ${manifest.templateZip.mirrorUrl}`);
 }
 
+function sha256Bytes(bytes) {
+  return crypto.createHash('sha256').update(bytes).digest('hex');
+}
+
+function readRegularPublishAsset(filePath, label) {
+  if (!filePath || !fs.existsSync(filePath)) {
+    throw new Error(`${label} does not exist: ${filePath || '(none)'}`);
+  }
+  const stat = fs.lstatSync(filePath);
+  if (!stat.isFile() || stat.isSymbolicLink()) {
+    throw new Error(`${label} must be a regular file: ${filePath}`);
+  }
+  return fs.readFileSync(filePath);
+}
+
+function assertLatestTemplateManifestIdentity(latestManifest, manifest) {
+  if (latestManifest?.schemaVersion !== 1) {
+    throw new Error('Template latest manifest schemaVersion must be 1');
+  }
+  if (latestManifest.version !== manifest.templateVersion) {
+    throw new Error(`Template latest manifest version does not match prepared manifest: ${latestManifest.version || '(missing)'} !== ${manifest.templateVersion}`);
+  }
+  if (latestManifest.sourceCommit !== manifest.sourceCommit) {
+    throw new Error(`Template latest manifest sourceCommit does not match prepared manifest: ${latestManifest.sourceCommit || '(missing)'} !== ${manifest.sourceCommit}`);
+  }
+  if (latestManifest.sha256 !== manifest.templateZip.sha256) {
+    throw new Error(`Template latest manifest ZIP SHA-256 does not match prepared manifest: ${latestManifest.sha256 || '(missing)'} !== ${manifest.templateZip.sha256}`);
+  }
+  if (!Array.isArray(latestManifest.sources)) {
+    throw new Error('Template latest manifest sources must be an array');
+  }
+  const expectedSources = [
+    ['github', manifest.templateZip.primaryUrl],
+    ['gitee', manifest.templateZip.mirrorUrl],
+  ];
+  for (const [sourceId, expectedUrl] of expectedSources) {
+    const matches = latestManifest.sources.filter((source) => source?.id === sourceId);
+    if (matches.length !== 1 || matches[0].url !== expectedUrl) {
+      throw new Error(`Template latest manifest ${sourceId} ZIP URL does not match prepared manifest`);
+    }
+    if (matches[0].templateVersion !== manifest.templateVersion) {
+      throw new Error(`Template latest manifest ${sourceId} templateVersion does not match prepared manifest`);
+    }
+  }
+}
+
+export function validateTemplatePublishAssets(manifest, {
+  currentCommit = resolveCleanGitCommit(),
+} = {}) {
+  assertTemplateSourceCommit(manifest, { currentCommit });
+  if (!manifest.templateZip?.path || !/^[a-f0-9]{64}$/u.test(manifest.templateZip.sha256)) {
+    throw new Error('Prepared template manifest is missing templateZip.path or a valid templateZip.sha256');
+  }
+  if (!manifest.templateZip.primaryUrl || !manifest.templateZip.mirrorUrl) {
+    throw new Error('Prepared template manifest is missing template ZIP source URLs');
+  }
+  if (!manifest.latestManifest?.path || !/^[a-f0-9]{64}$/u.test(manifest.latestManifest.sha256)) {
+    throw new Error('Prepared template manifest is missing latestManifest.path or a valid latestManifest.sha256');
+  }
+
+  const zipBytes = readRegularPublishAsset(manifest.templateZip.path, 'Prepared template ZIP');
+  const zipSha256 = sha256Bytes(zipBytes);
+  if (zipSha256 !== manifest.templateZip.sha256) {
+    throw new Error(`Template ZIP SHA-256 does not match prepared manifest: ${zipSha256} !== ${manifest.templateZip.sha256}`);
+  }
+
+  const latestManifestBytes = readRegularPublishAsset(
+    manifest.latestManifest.path,
+    'Prepared template latest manifest',
+  );
+  const latestManifestSha256 = sha256Bytes(latestManifestBytes);
+  if (latestManifestSha256 !== manifest.latestManifest.sha256) {
+    throw new Error(`Template latest manifest SHA-256 does not match prepared manifest: ${latestManifestSha256} !== ${manifest.latestManifest.sha256}`);
+  }
+  let latestManifest;
+  try {
+    latestManifest = JSON.parse(latestManifestBytes.toString('utf8'));
+  } catch {
+    throw new Error(`Template latest manifest JSON is invalid: ${manifest.latestManifest.path}`);
+  }
+  assertLatestTemplateManifestIdentity(latestManifest, manifest);
+  if (!isDeepStrictEqual(latestManifest, manifest.latestManifest.manifest)) {
+    throw new Error('Template latest manifest content does not match the prepared manifest snapshot');
+  }
+
+  return {
+    zipBytes: Buffer.from(zipBytes),
+    latestManifestBytes: Buffer.from(latestManifestBytes),
+  };
+}
+
+function stageTemplatePublishAssets({ zipBytes, latestManifestBytes }) {
+  const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-template-publish-'));
+  try {
+    fs.chmodSync(stagingDir, 0o700);
+    const templateZipPath = path.join(stagingDir, makeClientTemplateZipName);
+    const latestManifestPath = path.join(stagingDir, makeClientTemplateLatestManifestName);
+    fs.writeFileSync(templateZipPath, zipBytes, { flag: 'wx', mode: 0o600 });
+    fs.writeFileSync(latestManifestPath, latestManifestBytes, { flag: 'wx', mode: 0o600 });
+    if (sha256File(templateZipPath) !== sha256Bytes(zipBytes)) {
+      throw new Error('Frozen template ZIP staging verification failed');
+    }
+    if (sha256File(latestManifestPath) !== sha256Bytes(latestManifestBytes)) {
+      throw new Error('Frozen template latest manifest staging verification failed');
+    }
+    return {
+      stagingDir,
+      templateZipPath,
+      latestManifestPath,
+    };
+  } catch (error) {
+    fs.rmSync(stagingDir, { recursive: true, force: true });
+    throw error;
+  }
+}
+
 export function publishCommands(manifest, options) {
   const npmArgs = ['publish', manifest.npmPackageDir, '--access', 'public', '--tag', options.npmTag || 'beta'];
   if (options.otp) {
@@ -2295,7 +2419,7 @@ export function publishCommands(manifest, options) {
   return { npmArgs, releaseArgs };
 }
 
-export function publishTemplateCommands(manifest, options) {
+export function publishTemplateCommands(manifest, options, publishAssets = {}) {
   if (!manifest.templateZip?.path) {
     throw new Error('Template release manifest is missing templateZip.path');
   }
@@ -2306,8 +2430,10 @@ export function publishTemplateCommands(manifest, options) {
     'release',
     'create',
     manifest.tagName,
-    manifest.templateZip.path,
-    ...(manifest.latestManifest?.path ? [manifest.latestManifest.path] : []),
+    publishAssets.templateZipPath || manifest.templateZip.path,
+    ...(manifest.latestManifest?.path
+      ? [publishAssets.latestManifestPath || manifest.latestManifest.path]
+      : []),
     '--repo',
     options.githubRepo,
     '--target',
@@ -2355,27 +2481,38 @@ function runRelease(manifest, options) {
   }
 }
 
-function runTemplateRelease(manifest, options) {
+export function runTemplateRelease(manifest, options, dependencies = {}) {
   if (!options.skipGithub && !options.githubRepo) {
     throw new Error('Missing --github-repo OWNER/REPO for template GitHub Release. Use --skip-github to prepare locally only.');
   }
 
-  const { releaseArgs } = publishTemplateCommands(manifest, options);
-
-  if (options.dryRun) {
-    logStep('Dry-run template release commands');
-    if (!options.skipGithub) console.log(quoteCommand('gh', releaseArgs));
+  if (options.skipGithub) {
     return;
   }
 
-  if (!options.skipGithub) {
-    assertExternalPublishConfirmed(options);
+  const validatedAssets = validateTemplatePublishAssets(manifest, {
+    ...(dependencies.currentCommit ? { currentCommit: dependencies.currentCommit } : {}),
+  });
+
+  if (options.dryRun) {
+    const { releaseArgs } = publishTemplateCommands(manifest, options);
+    logStep('Dry-run template release commands');
+    console.log(quoteCommand('gh', releaseArgs));
+    return;
   }
 
-  if (!options.skipGithub) {
+  const stagedAssets = stageTemplatePublishAssets(validatedAssets);
+  try {
+    const { releaseArgs } = publishTemplateCommands(manifest, options, stagedAssets);
+    const confirmPublishImpl = dependencies.confirmPublishImpl || assertExternalPublishConfirmed;
+    const assertToolImpl = dependencies.assertToolImpl || assertTool;
+    const runImpl = dependencies.runImpl || run;
+    confirmPublishImpl(options);
     logStep(`Creating GitHub Release ${manifest.tagName}`);
-    assertTool('gh');
-    run('gh', releaseArgs);
+    assertToolImpl('gh');
+    runImpl('gh', releaseArgs);
+  } finally {
+    fs.rmSync(stagedAssets.stagingDir, { recursive: true, force: true });
   }
 }
 

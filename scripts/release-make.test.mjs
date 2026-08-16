@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { afterEach, describe, it } from 'node:test';
@@ -52,6 +53,72 @@ function writeMinimalTemplateAssembly(clientRoot, runtimeFiles = ['package.json'
     themesTree: [{ kind: 'item', itemKey: 'themes/example' }],
     themes: ['example'],
   }));
+}
+
+function createTemplatePublishFixture(options = {}) {
+  const root = createTempRoot('axhub-github-template-publish-');
+  const templateVersion = '1.2.3-beta.4';
+  const sourceCommit = 'b'.repeat(40);
+  const zipBytes = Buffer.from('prepared template zip bytes', 'utf8');
+  const zipSha256 = crypto.createHash('sha256').update(zipBytes).digest('hex');
+  const zipPath = path.join(root, 'artifacts', 'axhub-make-client-template.zip');
+  const latestPath = path.join(root, 'artifacts', 'axhub-make-client-template.latest.json');
+  const primaryUrl = `https://github.com/lintendo/Axhub-Make/releases/download/make-client-template-v${templateVersion}/axhub-make-client-template.zip`;
+  const mirrorUrl = `https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-v${templateVersion}/axhub-make-client-template.zip`;
+  const latestManifest = {
+    schemaVersion: 1,
+    version: templateVersion,
+    sourceCommit,
+    releaseNotes: '# Axhub Make Client 1.2.3-beta.4',
+    sha256: zipSha256,
+    publishedAt: '2026-08-16T00:00:00.000Z',
+    sources: [
+      {
+        id: 'github',
+        url: primaryUrl,
+        markerRepository: 'https://github.com/lintendo/Axhub-Make/tree/main/client',
+        templateVersion,
+      },
+      {
+        id: 'gitee',
+        url: mirrorUrl,
+        markerRepository: 'https://gitee.com/axhub/Axhub-Make/tree/main/client',
+        templateVersion,
+      },
+    ],
+    ...(options.latestOverrides || {}),
+  };
+  const latestBytes = Buffer.from(`${JSON.stringify(latestManifest, null, 2)}\n`, 'utf8');
+  const latestSha256 = crypto.createHash('sha256').update(latestBytes).digest('hex');
+  writeFile(zipPath, zipBytes);
+  writeFile(latestPath, latestBytes);
+  const manifest = {
+    templateVersion,
+    tagName: `make-client-template-v${templateVersion}`,
+    sourceCommit,
+    templateZip: {
+      path: zipPath,
+      sha256: zipSha256,
+      githubReleaseAssetName: 'axhub-make-client-template.zip',
+      primaryUrl,
+      mirrorUrl,
+    },
+    latestManifest: {
+      path: latestPath,
+      name: 'axhub-make-client-template.latest.json',
+      mirrorUrl: 'https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-latest/axhub-make-client-template.latest.json',
+      sha256: latestSha256,
+      manifest: latestManifest,
+    },
+  };
+  return {
+    manifest,
+    sourceCommit,
+    zipBytes,
+    zipPath,
+    latestBytes,
+    latestPath,
+  };
 }
 
 function stripTypeImportQueries(source) {
@@ -367,8 +434,10 @@ describe('release make artifact helpers', () => {
   it('creates the online make client template latest manifest from release notes and zip metadata', () => {
     const releaseNotes = '# Axhub Make Client 0.2.0\n\n- 更新官方模板文件。';
     const sha256 = 'a'.repeat(64);
+    const sourceCommit = 'b'.repeat(40);
     const manifest = releaseMake.createMakeClientTemplateLatestManifest({
       templateVersion: '0.2.0',
+      sourceCommit,
       releaseNotes,
       zipMetadata: releaseMake.createTemplateZipMetadata({ templateVersion: '0.2.0' }),
       sha256,
@@ -378,6 +447,7 @@ describe('release make artifact helpers', () => {
     assert.deepEqual(manifest, {
       schemaVersion: 1,
       version: '0.2.0',
+      sourceCommit,
       releaseNotes,
       sha256,
       publishedAt: '2026-07-09T00:00:00.000Z',
@@ -400,11 +470,22 @@ describe('release make artifact helpers', () => {
     assert.throws(
       () => releaseMake.createMakeClientTemplateLatestManifest({
         templateVersion: '0.2.0',
+        sourceCommit,
         releaseNotes,
         zipMetadata: releaseMake.createTemplateZipMetadata({ templateVersion: '0.2.0' }),
         sha256: 'not-a-sha256',
       }),
       /sha256/u,
+    );
+    assert.throws(
+      () => releaseMake.createMakeClientTemplateLatestManifest({
+        templateVersion: '0.2.0',
+        sourceCommit: 'not-a-commit',
+        releaseNotes,
+        zipMetadata: releaseMake.createTemplateZipMetadata({ templateVersion: '0.2.0' }),
+        sha256,
+      }),
+      /sourceCommit/u,
     );
   });
 
@@ -741,6 +822,136 @@ describe('release make artifact helpers', () => {
       }, { githubRepo: 'lintendo/Axhub-Make' }),
       /sourceCommit/u,
     );
+  });
+
+  it('rejects a mutated prepared template zip before confirmation or GitHub mutation', () => {
+    const fixture = createTemplatePublishFixture();
+    const events = [];
+    fs.writeFileSync(fixture.zipPath, 'mutated after prepare', 'utf8');
+
+    assert.throws(
+      () => releaseMake.runTemplateRelease(fixture.manifest, {
+        githubRepo: 'lintendo/Axhub-Make',
+        confirmPublish: true,
+      }, {
+        currentCommit: fixture.sourceCommit,
+        confirmPublishImpl: () => events.push('confirm'),
+        assertToolImpl: () => events.push('tool'),
+        runImpl: () => events.push('gh'),
+      }),
+      /Template ZIP SHA-256 does not match prepared manifest/u,
+    );
+    assert.deepEqual(events, []);
+  });
+
+  it('rejects a mutated template latest manifest before confirmation or GitHub mutation', () => {
+    const fixture = createTemplatePublishFixture();
+    const events = [];
+    fs.writeFileSync(fixture.latestPath, '{"schemaVersion":1,"version":"tampered"}\n', 'utf8');
+
+    assert.throws(
+      () => releaseMake.runTemplateRelease(fixture.manifest, {
+        githubRepo: 'lintendo/Axhub-Make',
+        confirmPublish: true,
+      }, {
+        currentCommit: fixture.sourceCommit,
+        confirmPublishImpl: () => events.push('confirm'),
+        assertToolImpl: () => events.push('tool'),
+        runImpl: () => events.push('gh'),
+      }),
+      /latest manifest SHA-256 does not match prepared manifest/u,
+    );
+    assert.deepEqual(events, []);
+  });
+
+  it('rejects latest manifest identity mismatches before confirmation or GitHub mutation', () => {
+    const cases = [
+      ['version', { version: '9.9.9' }, /version does not match/u],
+      ['source commit', { sourceCommit: 'c'.repeat(40) }, /sourceCommit does not match/u],
+      ['zip hash', { sha256: 'd'.repeat(64) }, /ZIP SHA-256 does not match/u],
+      ['GitHub zip URL', {
+        sources: [
+          {
+            id: 'github',
+            url: 'https://example.invalid/wrong.zip',
+            markerRepository: 'https://github.com/lintendo/Axhub-Make/tree/main/client',
+            templateVersion: '1.2.3-beta.4',
+          },
+          {
+            id: 'gitee',
+            url: 'https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-v1.2.3-beta.4/axhub-make-client-template.zip',
+            markerRepository: 'https://gitee.com/axhub/Axhub-Make/tree/main/client',
+            templateVersion: '1.2.3-beta.4',
+          },
+        ],
+      }, /github ZIP URL does not match/u],
+      ['Gitee zip URL', {
+        sources: [
+          {
+            id: 'github',
+            url: 'https://github.com/lintendo/Axhub-Make/releases/download/make-client-template-v1.2.3-beta.4/axhub-make-client-template.zip',
+            markerRepository: 'https://github.com/lintendo/Axhub-Make/tree/main/client',
+            templateVersion: '1.2.3-beta.4',
+          },
+          {
+            id: 'gitee',
+            url: 'https://example.invalid/wrong.zip',
+            markerRepository: 'https://gitee.com/axhub/Axhub-Make/tree/main/client',
+            templateVersion: '1.2.3-beta.4',
+          },
+        ],
+      }, /gitee ZIP URL does not match/u],
+    ];
+
+    for (const [label, latestOverrides, errorPattern] of cases) {
+      const fixture = createTemplatePublishFixture({ latestOverrides });
+      const events = [];
+      assert.throws(
+        () => releaseMake.runTemplateRelease(fixture.manifest, {
+          githubRepo: 'lintendo/Axhub-Make',
+          confirmPublish: true,
+        }, {
+          currentCommit: fixture.sourceCommit,
+          confirmPublishImpl: () => events.push('confirm'),
+          assertToolImpl: () => events.push('tool'),
+          runImpl: () => events.push('gh'),
+        }),
+        errorPattern,
+        label,
+      );
+      assert.deepEqual(events, [], label);
+    }
+  });
+
+  it('publishes frozen verified asset bytes even if prepared source paths change later', () => {
+    const fixture = createTemplatePublishFixture();
+    const events = [];
+    let stagedPaths = [];
+
+    releaseMake.runTemplateRelease(fixture.manifest, {
+      githubRepo: 'lintendo/Axhub-Make',
+      confirmPublish: true,
+    }, {
+      currentCommit: fixture.sourceCommit,
+      confirmPublishImpl: () => events.push('confirm'),
+      assertToolImpl: () => {
+        events.push('tool');
+        fs.writeFileSync(fixture.zipPath, 'changed after validation', 'utf8');
+        fs.writeFileSync(fixture.latestPath, 'changed after validation', 'utf8');
+      },
+      runImpl: (command, args) => {
+        events.push('gh');
+        assert.equal(command, 'gh');
+        stagedPaths = args.slice(3, 5);
+        assert.notEqual(stagedPaths[0], fixture.zipPath);
+        assert.notEqual(stagedPaths[1], fixture.latestPath);
+        assert.deepEqual(fs.readFileSync(stagedPaths[0]), fixture.zipBytes);
+        assert.deepEqual(fs.readFileSync(stagedPaths[1]), fixture.latestBytes);
+      },
+    });
+
+    assert.deepEqual(events, ['confirm', 'tool', 'gh']);
+    assert(stagedPaths.every((assetPath) => !fs.existsSync(assetPath)));
   });
 
   it('requires explicit human confirmation before external publishing', () => {
