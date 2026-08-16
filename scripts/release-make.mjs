@@ -231,6 +231,49 @@ function run(command, args, options = {}) {
   return result;
 }
 
+export function resolveCleanGitCommit({
+  cwd = repoRoot,
+  spawnSyncImpl = spawnSync,
+} = {}) {
+  const status = spawnSyncImpl('git', ['status', '--porcelain=v1', '--untracked-files=all'], {
+    cwd,
+    encoding: 'utf8',
+  });
+  if (status.error || status.status !== 0) {
+    throw new Error(`Unable to inspect release worktree status: ${status.error?.message || status.stderr || 'git status failed'}`);
+  }
+  if (String(status.stdout || '').trim()) {
+    throw new Error('Client template release preparation requires a clean worktree');
+  }
+  const head = spawnSyncImpl('git', ['rev-parse', 'HEAD'], {
+    cwd,
+    encoding: 'utf8',
+  });
+  if (head.error || head.status !== 0) {
+    throw new Error(`Unable to resolve release source commit: ${head.error?.message || head.stderr || 'git rev-parse failed'}`);
+  }
+  const sourceCommit = String(head.stdout || '').trim();
+  if (!/^[a-f0-9]{40}$/u.test(sourceCommit)) {
+    throw new Error(`Git HEAD is not a 40-hex release source commit: ${sourceCommit || '(empty)'}`);
+  }
+  return sourceCommit;
+}
+
+export function assertTemplateSourceCommit(manifest, {
+  currentCommit = resolveCleanGitCommit(),
+} = {}) {
+  if (!/^[a-f0-9]{40}$/u.test(manifest?.sourceCommit)) {
+    throw new Error('Prepared template manifest is missing a valid sourceCommit');
+  }
+  if (!/^[a-f0-9]{40}$/u.test(currentCommit)) {
+    throw new Error('Current HEAD is not a valid 40-hex commit');
+  }
+  if (manifest.sourceCommit !== currentCommit) {
+    throw new Error(`Prepared template manifest sourceCommit does not match current HEAD: ${manifest.sourceCommit} !== ${currentCommit}`);
+  }
+  return currentCommit;
+}
+
 function assertTool(command, args = ['--version']) {
   run(command, args, { capture: true });
 }
@@ -1804,6 +1847,7 @@ function prepareTemplateRelease(options = {}) {
   if (releaseNotesSync.changed) {
     logStep(`Synced DEFAULT_MAKE_CLIENT_TEMPLATE_RELEASE_NOTES for ${templateVersion}`);
   }
+  const sourceCommit = resolveCleanGitCommit();
 
   fs.rmSync(templateReleaseRoot, { recursive: true, force: true });
   fs.mkdirSync(templateReleaseRoot, { recursive: true });
@@ -1827,6 +1871,7 @@ function prepareTemplateRelease(options = {}) {
     templateVersion,
     releaseNotes,
     tagName: templateMetadata.tagName,
+    sourceCommit,
     preparedAt: new Date().toISOString(),
     templateSourceDir: makeClientTemplateSourceDir,
     templateZip: {
@@ -1886,6 +1931,7 @@ function assertPreparedTemplateManifestCurrent(manifest, options = {}) {
       + `expected ${expectedVersion}. Run pnpm release:make-client-template:prepare.`,
     );
   }
+  assertTemplateSourceCommit(manifest);
   if (!manifest.templateZip?.path || !fs.existsSync(manifest.templateZip.path)) {
     throw new Error(`Prepared template zip is missing: ${manifest.templateZip?.path || '(none)'}`);
   }
@@ -2253,6 +2299,9 @@ export function publishTemplateCommands(manifest, options) {
   if (!manifest.templateZip?.path) {
     throw new Error('Template release manifest is missing templateZip.path');
   }
+  if (!/^[a-f0-9]{40}$/u.test(manifest.sourceCommit)) {
+    throw new Error('Template release manifest is missing a valid sourceCommit');
+  }
   const releaseArgs = [
     'release',
     'create',
@@ -2261,6 +2310,8 @@ export function publishTemplateCommands(manifest, options) {
     ...(manifest.latestManifest?.path ? [manifest.latestManifest.path] : []),
     '--repo',
     options.githubRepo,
+    '--target',
+    manifest.sourceCommit,
     '--title',
     `Axhub Make Client Template ${manifest.templateVersion}`,
     '--generate-notes',

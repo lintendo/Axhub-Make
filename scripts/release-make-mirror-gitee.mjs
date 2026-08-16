@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +10,8 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const defaultManifestPath = path.join(repoRoot, '.release/make-client-template/manifest.json');
 const defaultTokenFile = path.join(repoRoot, '.local/gitee-token');
 const giteeApiBaseUrl = 'https://gitee.com/api/v5';
+const sha256Pattern = /^[a-f0-9]{64}$/u;
+const sourceCommitPattern = /^[a-f0-9]{40}$/u;
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -20,7 +23,7 @@ function printUsage() {
 Options:
   --manifest <path>          Template release manifest path. Defaults to .release/make-client-template/manifest.json.
   --token-file <path>        Local token file. Defaults to .local/gitee-token.
-  --target <commitish>       Gitee release target branch or commit. Defaults to main.
+  --target <commitish>       Must match the prepared source commit exactly.
   --replace                  Delete and re-upload an existing template attachment.
   --dry-run                  Print planned Gitee mirror actions without requiring a token.
   --confirm-publish          Confirm external Gitee publishing after reviewing prepared artifacts.
@@ -35,7 +38,7 @@ function parseArgs(argv = []) {
   const options = {
     manifestPath: defaultManifestPath,
     tokenFile: defaultTokenFile,
-    targetCommitish: 'main',
+    targetCommitish: null,
     replace: false,
     dryRun: false,
     confirmPublish: false,
@@ -109,15 +112,37 @@ export function parseGiteeReleaseDownloadUrl(url) {
 }
 
 function assertManifestHasTemplateZip(manifest, manifestPath) {
-  if (!manifest?.templateZip?.path || !manifest?.templateZip?.mirrorUrl) {
-    throw new Error(`Manifest is missing templateZip.path or templateZip.mirrorUrl: ${manifestPath}`);
+  if (!manifest?.templateZip?.path || !manifest?.templateZip?.mirrorUrl || !sha256Pattern.test(manifest.templateZip.sha256)) {
+    throw new Error(`Manifest is missing templateZip.path, templateZip.mirrorUrl, or templateZip.sha256: ${manifestPath}`);
+  }
+  if (!sourceCommitPattern.test(manifest.sourceCommit)) {
+    throw new Error(`Manifest is missing a valid sourceCommit: ${manifestPath}`);
   }
   if (!fs.existsSync(manifest.templateZip.path)) {
     throw new Error(`Template zip asset does not exist. Run release:make-client-template:prepare first: ${manifest.templateZip.path}`);
   }
+  const zipBytes = fs.readFileSync(manifest.templateZip.path);
+  const zipSha256 = crypto.createHash('sha256').update(zipBytes).digest('hex');
+  if (zipSha256 !== manifest.templateZip.sha256) {
+    throw new Error(`Template ZIP SHA-256 does not match prepared manifest: ${zipSha256} !== ${manifest.templateZip.sha256}`);
+  }
+  let latestManifestBytes = null;
   if (manifest.latestManifest?.path && !fs.existsSync(manifest.latestManifest.path)) {
     throw new Error(`Template latest manifest asset does not exist. Run release:make-client-template:prepare first: ${manifest.latestManifest.path}`);
   }
+  if (manifest.latestManifest?.path) {
+    latestManifestBytes = fs.readFileSync(manifest.latestManifest.path);
+    let latestManifest;
+    try {
+      latestManifest = JSON.parse(latestManifestBytes.toString('utf8'));
+    } catch {
+      throw new Error(`Template latest manifest JSON is invalid: ${manifest.latestManifest.path}`);
+    }
+    if (latestManifest.sha256 !== manifest.templateZip.sha256) {
+      throw new Error('Template latest manifest SHA-256 does not match prepared ZIP');
+    }
+  }
+  return { zipBytes, latestManifestBytes };
 }
 
 async function readGiteeJson(response, context) {
@@ -193,12 +218,11 @@ function attachmentName(attachment) {
   return String(attachment?.name || attachment?.filename || attachment?.file_name || '');
 }
 
-async function uploadAttachment({ fetchImpl, token, owner, repo, releaseId, assetPath, assetName }) {
+async function uploadAttachment({ fetchImpl, token, owner, repo, releaseId, assetBytes, assetName }) {
   const body = new FormData();
   body.set('access_token', token);
-  const bytes = fs.readFileSync(assetPath);
   const contentType = assetName.endsWith('.json') ? 'application/json' : 'application/zip';
-  const blob = new Blob([bytes], { type: contentType });
+  const blob = new Blob([assetBytes], { type: contentType });
   body.set('file', blob, assetName);
   const response = await fetchImpl(`${giteeApiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/releases/${releaseId}/attach_files`, {
     method: 'POST',
@@ -207,18 +231,39 @@ async function uploadAttachment({ fetchImpl, token, owner, repo, releaseId, asse
   return readGiteeJson(response, `Upload Gitee release attachment ${assetName}`);
 }
 
-async function verifyMirrorUrl({ fetchImpl, mirrorUrl }) {
+function sha256Bytes(bytes) {
+  return crypto.createHash('sha256').update(bytes).digest('hex');
+}
+
+async function downloadAndVerifyMirrorAsset({
+  fetchImpl,
+  mirrorUrl,
+  expectedBytes,
+  expectedSha256,
+}) {
   const response = await fetchImpl(mirrorUrl, {
-    method: 'HEAD',
+    method: 'GET',
     redirect: 'follow',
+    cache: 'no-store',
+    headers: {
+      'cache-control': 'no-cache',
+      pragma: 'no-cache',
+    },
   });
   if (!response.ok) {
-    throw new Error(`Verify Gitee mirror URL failed: HTTP ${response.status} ${response.statusText}`);
+    throw new Error(`Download Gitee mirror asset failed: HTTP ${response.status} ${response.statusText}`);
+  }
+  const downloadedBytes = Buffer.from(await response.arrayBuffer());
+  const downloadedSha256 = sha256Bytes(downloadedBytes);
+  if (downloadedSha256 !== expectedSha256) {
+    throw new Error(`Downloaded Gitee mirror SHA-256 does not match expected asset: ${downloadedSha256} !== ${expectedSha256}`);
+  }
+  if (!downloadedBytes.equals(expectedBytes)) {
+    throw new Error('Downloaded Gitee mirror bytes do not match the local asset');
   }
   return {
     ok: true,
-    contentLength: response.headers.get('content-length'),
-    contentType: response.headers.get('content-type'),
+    sha256: downloadedSha256,
   };
 }
 
@@ -230,8 +275,11 @@ async function mirrorGiteeAsset({
   manifest,
   parsedMirror,
   assetPath,
+  assetBytes,
   assetName,
   mirrorUrl,
+  expectedSha256,
+  requireExactTargetCommit = false,
 }) {
   logger.log(`Publishing Gitee mirror: ${parsedMirror.owner}/${parsedMirror.repo} ${parsedMirror.tagName}`);
   logger.log(`  asset: ${assetName}`);
@@ -259,6 +307,10 @@ async function mirrorGiteeAsset({
     logger.log(`  release: created ${parsedMirror.tagName}`);
   } else {
     logger.log(`  release: using existing ${parsedMirror.tagName}`);
+  }
+
+  if (requireExactTargetCommit && release?.target_commitish !== options.targetCommitish) {
+    throw new Error(`Existing Gitee versioned release target commit does not match prepared sourceCommit: ${release?.target_commitish || '(missing)'} !== ${options.targetCommitish}`);
   }
 
   const releaseId = release?.id;
@@ -296,13 +348,18 @@ async function mirrorGiteeAsset({
       owner: parsedMirror.owner,
       repo: parsedMirror.repo,
       releaseId,
-      assetPath,
+      assetBytes,
       assetName,
     });
     logger.log(`  upload: completed ${assetName}`);
   }
 
-  const verified = await verifyMirrorUrl({ fetchImpl, mirrorUrl });
+  const verified = await downloadAndVerifyMirrorAsset({
+    fetchImpl,
+    mirrorUrl,
+    expectedBytes: assetBytes,
+    expectedSha256,
+  });
   logger.log(`  verified: ${mirrorUrl}`);
   return {
     repo: `${parsedMirror.owner}/${parsedMirror.repo}`,
@@ -330,7 +387,12 @@ export async function runGiteeMirrorRelease({
   }
 
   const manifest = readJson(options.manifestPath);
-  assertManifestHasTemplateZip(manifest, options.manifestPath);
+  const localAssets = assertManifestHasTemplateZip(manifest, options.manifestPath);
+  const targetCommitish = options.targetCommitish || manifest.sourceCommit;
+  if (targetCommitish !== manifest.sourceCommit) {
+    throw new Error(`Gitee target must match prepared sourceCommit: ${targetCommitish} !== ${manifest.sourceCommit}`);
+  }
+  const publicationOptions = { ...options, targetCommitish };
   const parsedMirror = parseGiteeReleaseDownloadUrl(manifest.templateZip.mirrorUrl);
   const assetPath = manifest.templateZip.path;
   const assetName = parsedMirror.assetName || path.basename(assetPath);
@@ -340,7 +402,7 @@ export async function runGiteeMirrorRelease({
     assetName,
     assetPath,
     mirrorUrl: manifest.templateZip.mirrorUrl,
-    targetCommitish: options.targetCommitish,
+    targetCommitish,
   };
 
   if (options.dryRun) {
@@ -360,12 +422,15 @@ export async function runGiteeMirrorRelease({
     fetchImpl,
     token,
     logger,
-    options,
+    options: publicationOptions,
     manifest,
     parsedMirror,
     assetPath,
+    assetBytes: localAssets.zipBytes,
     assetName,
     mirrorUrl: plan.mirrorUrl,
+    expectedSha256: manifest.templateZip.sha256,
+    requireExactTargetCommit: true,
   });
 
   let latestManifest = null;
@@ -375,12 +440,15 @@ export async function runGiteeMirrorRelease({
       fetchImpl,
       token,
       logger,
-      options: { ...options, replace: true },
+      options: { ...publicationOptions, replace: true },
       manifest,
       parsedMirror: parsedLatestMirror,
       assetPath: manifest.latestManifest.path,
+      assetBytes: localAssets.latestManifestBytes,
       assetName: parsedLatestMirror.assetName || manifest.latestManifest.name || path.basename(manifest.latestManifest.path),
       mirrorUrl: manifest.latestManifest.mirrorUrl,
+      expectedSha256: sha256Bytes(localAssets.latestManifestBytes),
+      requireExactTargetCommit: false,
     });
   }
 

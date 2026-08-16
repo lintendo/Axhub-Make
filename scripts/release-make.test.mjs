@@ -219,6 +219,56 @@ describe('release make artifact helpers', () => {
     assert.deepEqual(prefixedMetadata, metadata);
   });
 
+  it('binds template releases to a clean exact Git commit', () => {
+    const sourceCommit = 'b'.repeat(40);
+    const calls = [];
+    const spawnSyncImpl = (_command, args) => {
+      calls.push(args);
+      if (args[0] === 'status') {
+        return { status: 0, stdout: '', stderr: '' };
+      }
+      return { status: 0, stdout: `${sourceCommit}\n`, stderr: '' };
+    };
+
+    assert.equal(releaseMake.resolveCleanGitCommit({ spawnSyncImpl }), sourceCommit);
+    assert.deepEqual(calls, [
+      ['status', '--porcelain=v1', '--untracked-files=all'],
+      ['rev-parse', 'HEAD'],
+    ]);
+    assert.equal(
+      releaseMake.assertTemplateSourceCommit({ sourceCommit }, { currentCommit: sourceCommit }),
+      sourceCommit,
+    );
+    assert.throws(
+      () => releaseMake.resolveCleanGitCommit({
+        spawnSyncImpl: (_command, args) => ({
+          status: 0,
+          stdout: args[0] === 'status' ? ' M scripts/release-make.mjs\n' : `${sourceCommit}\n`,
+          stderr: '',
+        }),
+      }),
+      /clean worktree/u,
+    );
+    assert.throws(
+      () => releaseMake.resolveCleanGitCommit({
+        spawnSyncImpl: (_command, args) => ({
+          status: 0,
+          stdout: args[0] === 'status' ? '?? release-candidate.txt\n' : `${sourceCommit}\n`,
+          stderr: '',
+        }),
+      }),
+      /clean worktree/u,
+    );
+    assert.throws(
+      () => releaseMake.assertTemplateSourceCommit({}, { currentCommit: sourceCommit }),
+      /sourceCommit/u,
+    );
+    assert.throws(
+      () => releaseMake.assertTemplateSourceCommit({ sourceCommit }, { currentCommit: 'c'.repeat(40) }),
+      /current HEAD/u,
+    );
+  });
+
   it('syncs the default make client template version from the template package version', () => {
     const root = createTempRoot('axhub-release-template-version-sync-');
     const sourceFile = path.join(root, 'makeClientTemplate.ts');
@@ -653,9 +703,11 @@ describe('release make artifact helpers', () => {
   });
 
   it('builds template-only release commands with the client template zip and latest manifest', () => {
+    const sourceCommit = 'a'.repeat(40);
     const commands = releaseMake.publishTemplateCommands({
       tagName: 'make-client-template-v0.2.0-beta.1',
       templateVersion: '0.2.0-beta.1',
+      sourceCommit,
       templateZip: {
         path: '/tmp/axhub-make-client-template.zip',
       },
@@ -674,10 +726,21 @@ describe('release make artifact helpers', () => {
       '/tmp/axhub-make-client-template.latest.json',
       '--repo',
       'lintendo/Axhub-Make',
+      '--target',
+      sourceCommit,
       '--title',
       'Axhub Make Client Template 0.2.0-beta.1',
       '--generate-notes',
     ]);
+
+    assert.throws(
+      () => releaseMake.publishTemplateCommands({
+        tagName: 'make-client-template-v0.2.0-beta.1',
+        templateVersion: '0.2.0-beta.1',
+        templateZip: { path: '/tmp/axhub-make-client-template.zip' },
+      }, { githubRepo: 'lintendo/Axhub-Make' }),
+      /sourceCommit/u,
+    );
   });
 
   it('requires explicit human confirmation before external publishing', () => {
