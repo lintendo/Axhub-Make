@@ -67,14 +67,11 @@ Make 预览链接统一使用 `http://localhost:53817/`；链接需要项目上�
 
 设计方案阶段负责回答“怎么表达”。进入视觉、主题或明显 UI 改版前，必须先让用户确认一个 `DESIGN.md` 作为设计基底：
 
-1. 如果用户已指定 `DESIGN.md` 或主题，直接采用。
-2. 如果用户未指定，先从项目默认主题、已有同类原型和 `src/themes/` 中整理 3-4 个最匹配候选，让用户选择。
-3. 候选说明只写适用理由、主要风格、取舍和预览链接，不替用户决定最终基底。
-4. 不自行新建 `DESIGN.md`；没有合适候选时，停止并请用户提供设计基底或主题方向。
+- 如果用户已指定 `DESIGN.md` 或主题，直接采用；如果用户未指定，默认推荐 3 个：先从当前项目本地候选（项目默认主题、已有同类原型和 `src/themes/`）中选择；本地不足 3 个时，才使用 `$search-design-system` 从 Design Knowledge 主题库补足。从这些已有候选中选择设计基底不得触发 `$build-design-system`；只有用户明确要求创建或修改主题时才使用它。
 
-整理候选时优先读取主题 `theme.json`，用 `tags.*`、`display.distributionTags`、`identity.title*/description*` 和 `display.variant` 做检索与候选说明；用 `identity.slug` 和 `assets.designMd.path` 校验目录与 `DESIGN.md` 路径。
+整理当前项目候选时优先读取主题 `theme.json`，用 `tags.*`、`display.distributionTags`、`identity.title*/description*` 和 `display.variant` 做检索与候选说明；用 `identity.slug` 和 `assets.designMd.path` 校验目录与 `DESIGN.md` 路径。不自行新建 `DESIGN.md`。
 
-候选必须提供完整的 Make 主题深链，格式为 `http://localhost:53817/?projectId=<project-id>&theme=<theme-key>`，并标出对应 `DESIGN.md` 路径。
+当前项目本地候选提供基于实际 `serverUrl` 的完整 Make 主题深链和 `DESIGN.md` 路径；Design Knowledge 候选使用检索结果提供的链接。
 
 `DESIGN.md` 确定后，用户零散提出的颜色、字体、布局、动效、组件形态等需求，都作为基于该设计基底的调整处理，不另起一套视觉系统。
 

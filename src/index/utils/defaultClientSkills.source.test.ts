@@ -12,6 +12,22 @@ function readSkillDescription(source: string): string {
 }
 
 describe('default client skills', () => {
+  it('bundles search-design-system in both client skill roots', () => {
+    const skillRoots = [
+      '.agents/skills/search-design-system',
+      '.claude/skills/search-design-system',
+    ];
+
+    for (const root of skillRoots) {
+      expect(readClientFile(`${root}/SKILL.md`)).toContain('name: search-design-system');
+      expect(existsSync(resolve(__dirname, '../../../client', `${root}/scripts/cli.mjs`))).toBe(true);
+      expect(existsSync(resolve(__dirname, '../../../client', `${root}/references/query-schema.md`))).toBe(true);
+    }
+
+    expect(existsSync(resolve(__dirname, '../../../client/.agents/skills/design-system-search'))).toBe(false);
+    expect(existsSync(resolve(__dirname, '../../../client/.claude/skills/design-system-search'))).toBe(false);
+  });
+
   it('keeps Drawio as a canvas workspace reference instead of a default project skill', () => {
     const skillRoots = [
       '.agents/skills/canvas-workspace',

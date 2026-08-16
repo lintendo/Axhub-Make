@@ -61,6 +61,18 @@ describe('client workflow guidance', () => {
     expect(alignmentGuide).not.toContain('ASCII Diagram');
   });
 
+  it('uses one concise local-first gate for DESIGN.md recommendations', () => {
+    const alignmentGuide = readRule('requirements-alignment-guide.md');
+    const designSection = alignmentGuide.match(/## 设计方案对齐\n\n([\s\S]*?)\n## /u)?.[1] ?? '';
+
+    expect(designSection).toContain('先从当前项目本地候选（项目默认主题、已有同类原型和 `src/themes/`）中选择');
+    expect(designSection).toContain('本地不足 3 个时，才使用 `$search-design-system` 从 Design Knowledge 主题库补足');
+    expect(designSection).not.toContain('只有用户明确要求线上检索时才访问线上源');
+    expect(designSection).toContain('从这些已有候选中选择设计基底不得触发 `$build-design-system`');
+    expect(designSection).toContain('只有用户明确要求创建或修改主题时才使用它');
+    expect(designSection).not.toContain('$design-system-search');
+  });
+
   it('prefers token-efficient structured text before visual diagrams during alignment', () => {
     const expected = '优先用简短摘要或结构化文字对齐；文字难以表达时再用 ASCII Wireframe/Diagram 或 Mermaid';
 
@@ -98,10 +110,21 @@ describe('client workflow guidance', () => {
     expect(fs.existsSync(path.join(clientRoot, 'rules/theme-source-capture-guide.md'))).toBe(false);
   });
 
-  it('lists discoverable theme and PRD skill routes in every core workflow table', () => {
+  it('separates existing-theme search from explicit theme creation in core guidance', () => {
     for (const guidancePath of ['AGENTS.md', 'CLAUDE.md', 'AGENTS.template.md']) {
       const guidance = readClientFile(guidancePath);
-      expect(guidance).toContain('| 主题、设计系统、设计规范 |');
+      expect(guidance).toContain('先检查当前项目本地候选（项目默认主题、已有同类原型和 `src/themes/`）');
+      expect(guidance).toContain('本地不足 3 个时，再使用 `$search-design-system` 从 Design Knowledge 主题库补足');
+      expect(guidance).not.toContain('只有用户明确要求线上检索时才访问线上源');
+      expect(guidance).toContain('只有用户明确要求创建或修改主题时才使用 `$build-design-system`');
+    }
+  });
+
+  it('lists theme-creation and PRD skill routes in every core workflow table', () => {
+    for (const guidancePath of ['AGENTS.md', 'CLAUDE.md', 'AGENTS.template.md']) {
+      const guidance = readClientFile(guidancePath);
+      expect(guidance).not.toContain('| 选择设计基底 |');
+      expect(guidance).toContain('| 创建或修改主题、设计系统、设计规范 |');
       expect(guidance).toContain('$build-design-system 技能');
       expect(guidance).toContain('| PRD 文档 | `src/resources/` |');
       expect(guidance).toContain('$plan-prds 技能');

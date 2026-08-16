@@ -1,11 +1,13 @@
 ---
 name: build-design-system
-description: Use when an Axhub Make client task asks to create, update, import, extract, derive, or reconstruct a 主题/theme, 设计系统/design system, 视觉规范/visual specification, DESIGN.md, design tokens, or reusable theme assets from product requirements, webpages, Axure resources, Figma designs, screenshots, prototypes, or existing theme files.
+description: Use when an Axhub Make client task explicitly asks to create, update, import, extract, derive, or reconstruct a 主题/theme, 设计系统/design system, 视觉规范/visual specification, DESIGN.md, design tokens, or reusable theme assets from webpages, Axure resources, Figma designs, screenshots, prototypes, or existing theme files; not when selecting an existing design system or theme, which uses $search-design-system.
 ---
 
 # 构建设计系统
 
 把产品要求和设计来源整理成可追溯的 Axhub Make 主题，并在同一次执行中完成规划、主题产物和验收。`DESIGN.md` 始终是视觉事实源；`SOURCES.md` 只保存来源证据，`PLAN.md` 只保存任务和状态。
+
+如果只是从当前项目本地候选或 Design Knowledge 主题库候选中选择已有设计基底，停止本技能并使用 `$search-design-system`。
 
 ## 固定产物
 
