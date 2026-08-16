@@ -54,30 +54,57 @@ const mirrorGitee = {
 
 function createFixture(options = {}) {
   const root = createTempRoot('axhub-gitee-mirror-');
+  const templateVersion = '1.2.3-beta.4';
+  const sourceCommit = options.sourceCommit || 'b'.repeat(40);
   const assetPath = path.join(root, 'artifacts', 'axhub-make-client-template.zip');
   const zipBytes = Buffer.isBuffer(options.zipBytes)
     ? options.zipBytes
     : Buffer.from(options.zipBytes || 'zip payload', 'utf8');
   writeFile(assetPath, zipBytes);
   const zipSha256 = options.zipSha256 || crypto.createHash('sha256').update(zipBytes).digest('hex');
-  const sourceCommit = options.sourceCommit || 'b'.repeat(40);
+  const primaryUrl = `https://github.com/lintendo/Axhub-Make/releases/download/make-client-template-v${templateVersion}/axhub-make-client-template.zip`;
+  const mirrorUrl = `https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-v${templateVersion}/axhub-make-client-template.zip`;
   const latestManifestPath = path.join(root, 'artifacts', 'axhub-make-client-template.latest.json');
   let latestManifestBytes = null;
+  let latestManifest = null;
   if (options.includeLatestManifest !== false) {
-    latestManifestBytes = Buffer.from(`${JSON.stringify({ schemaVersion: 1, sha256: zipSha256 })}\n`, 'utf8');
+    latestManifest = {
+      schemaVersion: 1,
+      version: templateVersion,
+      sourceCommit,
+      releaseNotes: '# Axhub Make Client 1.2.3-beta.4',
+      sha256: zipSha256,
+      publishedAt: '2026-08-16T00:00:00.000Z',
+      sources: [
+        {
+          id: 'github',
+          url: primaryUrl,
+          markerRepository: 'https://github.com/lintendo/Axhub-Make/tree/main/client',
+          templateVersion,
+        },
+        {
+          id: 'gitee',
+          url: mirrorUrl,
+          markerRepository: 'https://gitee.com/axhub/Axhub-Make/tree/main/client',
+          templateVersion,
+        },
+      ],
+      ...(options.latestOverrides || {}),
+    };
+    latestManifestBytes = Buffer.from(`${JSON.stringify(latestManifest, null, 2)}\n`, 'utf8');
     writeFile(latestManifestPath, latestManifestBytes);
   }
   const manifestPath = path.join(root, 'manifest.json');
   const manifest = {
-    templateVersion: '1.2.3-beta.4',
-    tagName: 'make-client-template-v1.2.3-beta.4',
+    templateVersion,
+    tagName: `make-client-template-v${templateVersion}`,
     sourceCommit,
     templateZip: {
       path: assetPath,
       sha256: zipSha256,
       githubReleaseAssetName: 'axhub-make-client-template.zip',
-      primaryUrl: 'https://github.com/lintendo/Axhub-Make/releases/download/make-client-template-v1.2.3-beta.4/axhub-make-client-template.zip',
-      mirrorUrl: 'https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-v1.2.3-beta.4/axhub-make-client-template.zip',
+      primaryUrl,
+      mirrorUrl,
     },
   };
   if (options.includeLatestManifest !== false) {
@@ -85,6 +112,8 @@ function createFixture(options = {}) {
       path: latestManifestPath,
       name: 'axhub-make-client-template.latest.json',
       mirrorUrl: 'https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-latest/axhub-make-client-template.latest.json',
+      sha256: crypto.createHash('sha256').update(latestManifestBytes).digest('hex'),
+      manifest: latestManifest,
     };
   }
   writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
@@ -96,6 +125,7 @@ function createFixture(options = {}) {
     sourceCommit,
     zipBytes,
     zipSha256,
+    latestManifest,
     latestManifestBytes,
   };
 }
@@ -163,6 +193,75 @@ describe('gitee make release mirror helper', () => {
       }),
       /SHA-256/u,
     );
+  });
+
+  it('rejects a replaced latest manifest before confirmation, token resolution, or fetch', async () => {
+    const fixture = createFixture();
+    const replacedLatest = {
+      ...fixture.latestManifest,
+      version: '9.9.9',
+    };
+    fs.writeFileSync(
+      fixture.latestManifestPath,
+      `${JSON.stringify(replacedLatest, null, 2)}\n`,
+      'utf8',
+    );
+    let fetchCalled = false;
+
+    await assert.rejects(
+      () => mirrorGitee.runGiteeMirrorRelease({
+        argv: ['--manifest', fixture.manifestPath],
+        env: {},
+        fetchImpl: async () => {
+          fetchCalled = true;
+          throw new Error('latest validation must run before fetch');
+        },
+        logger: { log: () => {} },
+      }),
+      /latest manifest SHA-256 does not match prepared manifest/u,
+    );
+    assert.equal(fetchCalled, false);
+  });
+
+  it('rejects latest manifest identity mismatches before Gitee dry-run or API access', async () => {
+    const cases = [
+      ['version', (latest) => { latest.version = '9.9.9'; }, /version does not match/u],
+      ['source commit', (latest) => { latest.sourceCommit = 'c'.repeat(40); }, /sourceCommit does not match/u],
+      ['GitHub URL', (latest) => {
+        latest.sources.find((source) => source.id === 'github').url = 'https://example.invalid/wrong.zip';
+      }, /github ZIP URL does not match/u],
+      ['Gitee URL', (latest) => {
+        latest.sources.find((source) => source.id === 'gitee').url = 'https://example.invalid/wrong.zip';
+      }, /gitee ZIP URL does not match/u],
+    ];
+
+    for (const [label, mutateLatest, errorPattern] of cases) {
+      const fixture = createFixture();
+      const latestManifest = structuredClone(fixture.latestManifest);
+      mutateLatest(latestManifest);
+      const latestManifestBytes = Buffer.from(`${JSON.stringify(latestManifest, null, 2)}\n`, 'utf8');
+      fs.writeFileSync(fixture.latestManifestPath, latestManifestBytes);
+      const manifest = JSON.parse(fs.readFileSync(fixture.manifestPath, 'utf8'));
+      manifest.latestManifest.sha256 = crypto.createHash('sha256').update(latestManifestBytes).digest('hex');
+      manifest.latestManifest.manifest = latestManifest;
+      fs.writeFileSync(fixture.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+      let fetchCalled = false;
+
+      await assert.rejects(
+        () => mirrorGitee.runGiteeMirrorRelease({
+          argv: ['--manifest', fixture.manifestPath, '--dry-run'],
+          env: {},
+          fetchImpl: async () => {
+            fetchCalled = true;
+            throw new Error('latest identity validation must run before fetch');
+          },
+          logger: { log: () => {} },
+        }),
+        errorPattern,
+        label,
+      );
+      assert.equal(fetchCalled, false, label);
+    }
   });
 
   it('rejects a dirty worktree before the Gitee dry-run can resolve a token or fetch', async () => {
