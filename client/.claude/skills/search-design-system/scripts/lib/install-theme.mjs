@@ -310,6 +310,7 @@ export async function installTheme({ themeId, platform, projectRoot, snapshotRoo
   const packageHash = record.remoteArtifacts?.packageHash ?? record.artifacts?.packageHash;
   if (!HASH_PATTERN.test(packageHash ?? '')) throw failure('PACKAGE_SOURCE_INVALID', { field: 'packageHash' });
   const { root, themesRoot } = await readProjectThemesRoot(projectRoot);
+  await assertSafeExistingComponents(root, path.join(themesRoot, themeId));
   const sources = [
     ['primary', packageUrl(snapshot.manifest.packageSources?.primary, packagePath)],
     ['fallback', packageUrl(snapshot.manifest.packageSources?.fallback?.base, packagePath)],
