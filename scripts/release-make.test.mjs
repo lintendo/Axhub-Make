@@ -545,6 +545,9 @@ describe('release make artifact helpers', () => {
     const clientPackageJson = JSON.parse(fs.readFileSync(path.resolve('client/package.json'), 'utf8'));
     const runtimeConstants = fs.readFileSync(path.resolve('src/common/makeClientTemplate.ts'), 'utf8');
     const releaseNotes = fs.readFileSync(path.resolve('client/RELEASE_NOTES.md'), 'utf8');
+    const serializedDefaultReleaseNotes = runtimeConstants.match(
+      /^export const DEFAULT_MAKE_CLIENT_TEMPLATE_RELEASE_NOTES = (?<notes>"(?:[^"\\]|\\.)*");$/mu,
+    )?.groups?.notes;
 
     assert.equal(clientPackageJson.version, '0.1.19');
     assert.match(
@@ -556,6 +559,8 @@ describe('release make artifact helpers', () => {
     assert.match(releaseNotes, /223 份.*DESIGN\.md/u);
     assert.match(releaseNotes, /哈希验证.*主源.*Gitee.*固定回退/u);
     assert.match(releaseNotes, /ZIP.*不包含.*本地主题源码/u);
+    assert.ok(serializedDefaultReleaseNotes, 'runtime default release notes must use a serialized string');
+    assert.equal(JSON.parse(serializedDefaultReleaseNotes), releaseNotes.trim());
     assert.equal(clientPackageJson.packageManager, 'pnpm@10.20.0');
     assert.equal(clientPackageJson.dependencies['@axhub/annotation'], '^1.0.18');
     assert.equal(clientPackageJson.dependencies['lucide-react'], '0.562.0');
