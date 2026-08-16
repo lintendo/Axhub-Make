@@ -352,11 +352,10 @@ export default function EditedPrototype() {
     expect(source).toContain("{ key: 'commentarySkill', label: '批注技能' }");
     expect(source).toContain("type CapabilityRequirement = '需要' | '不需要'");
     expect(source).toContain("feature: '添加/编辑批注'");
-    expect(source).toContain("{ feature: '多种批注方式', executionAgent: '不需要', commentarySkill: '不需要' }");
     expect(source).toContain("{ feature: '复制提示词', executionAgent: '不需要', commentarySkill: '不需要' }");
-    expect(source).toContain("feature: '文本编辑'");
-    expect(source).toContain("feature: '样式编辑'");
-    expect(source).toContain("feature: '粘贴图片或文案'");
+    expect(source).toContain("{ feature: '文本和样式编辑', executionAgent: '不需要', commentarySkill: '不需要' }");
+    expect(source).not.toContain("feature: '多种批注方式'");
+    expect(source).not.toContain("feature: '粘贴图片或文案'");
     expect(source).toContain("feature: 'AI 自动读取批注'");
     expect(source).toContain("feature: 'AI 执行'");
     expect(source).toContain("feature: '开启需求标注'");
