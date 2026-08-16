@@ -954,6 +954,128 @@ describe('release make artifact helpers', () => {
     assert(stagedPaths.every((assetPath) => !fs.existsSync(assetPath)));
   });
 
+  it('retries transient publish staging cleanup locks without warning', () => {
+    const fixture = createTemplatePublishFixture();
+    const warnings = [];
+    const sleeps = [];
+    let removalAttempts = 0;
+    let stagingDir = '';
+
+    releaseMake.runTemplateRelease(fixture.manifest, {
+      githubRepo: 'lintendo/Axhub-Make',
+      confirmPublish: true,
+    }, {
+      currentCommit: fixture.sourceCommit,
+      confirmPublishImpl: () => {},
+      assertToolImpl: () => {},
+      runImpl: (_command, args) => {
+        stagingDir = path.dirname(args[3]);
+      },
+      logger: { warn: (message) => warnings.push(String(message)) },
+      cleanupOptions: {
+        maxAttempts: 3,
+        retryDelayMs: 10,
+        sleepImpl: (delayMs) => sleeps.push(delayMs),
+        rmSyncImpl: (targetPath, options) => {
+          removalAttempts += 1;
+          if (removalAttempts < 3) {
+            const error = new Error('temporary lock');
+            error.code = 'EPERM';
+            throw error;
+          }
+          fs.rmSync(targetPath, options);
+        },
+      },
+    });
+
+    assert.equal(removalAttempts, 3);
+    assert.deepEqual(sleeps, [10, 20]);
+    assert.deepEqual(warnings, []);
+    assert.equal(fs.existsSync(stagingDir), false);
+  });
+
+  it('does not report a successful GitHub release as failed when staging cleanup stays locked', () => {
+    const fixture = createTemplatePublishFixture();
+    const warnings = [];
+    let removalAttempts = 0;
+    let stagingDir = '';
+
+    assert.doesNotThrow(() => releaseMake.runTemplateRelease(fixture.manifest, {
+      githubRepo: 'lintendo/Axhub-Make',
+      confirmPublish: true,
+    }, {
+      currentCommit: fixture.sourceCommit,
+      confirmPublishImpl: () => {},
+      assertToolImpl: () => {},
+      runImpl: (_command, args) => {
+        stagingDir = path.dirname(args[3]);
+      },
+      logger: { warn: (message) => warnings.push(String(message)) },
+      cleanupOptions: {
+        maxAttempts: 3,
+        retryDelayMs: 0,
+        sleepImpl: () => {},
+        rmSyncImpl: () => {
+          removalAttempts += 1;
+          const error = new Error('persistent lock');
+          error.code = 'EBUSY';
+          throw error;
+        },
+      },
+    }));
+
+    tempRoots.push(stagingDir);
+    assert.equal(removalAttempts, 3);
+    assert.equal(fs.existsSync(stagingDir), true);
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /GitHub release succeeded/u);
+    assert.match(warnings[0], new RegExp(stagingDir.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
+    assert.match(warnings[0], /Remove this exact directory manually/u);
+  });
+
+  it('preserves the GitHub error when failed publication staging also cannot be cleaned', () => {
+    const fixture = createTemplatePublishFixture();
+    const remoteError = new Error('gh release create failed');
+    const warnings = [];
+    let stagingDir = '';
+
+    let thrown = null;
+    assert.throws(() => releaseMake.runTemplateRelease(fixture.manifest, {
+      githubRepo: 'lintendo/Axhub-Make',
+      confirmPublish: true,
+    }, {
+      currentCommit: fixture.sourceCommit,
+      confirmPublishImpl: () => {},
+      assertToolImpl: () => {},
+      runImpl: (_command, args) => {
+        stagingDir = path.dirname(args[3]);
+        throw remoteError;
+      },
+      logger: { warn: (message) => warnings.push(String(message)) },
+      cleanupOptions: {
+        maxAttempts: 2,
+        retryDelayMs: 0,
+        sleepImpl: () => {},
+        rmSyncImpl: () => {
+          const error = new Error('cleanup lock');
+          error.code = 'EPERM';
+          throw error;
+        },
+      },
+    }), (error) => {
+      thrown = error;
+      return true;
+    });
+
+    tempRoots.push(stagingDir);
+    assert.equal(thrown, remoteError);
+    assert.equal(thrown.cause?.code, 'EPERM');
+    assert.equal(fs.existsSync(stagingDir), true);
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /GitHub release failed/u);
+    assert.match(warnings[0], new RegExp(stagingDir.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
+  });
+
   it('requires explicit human confirmation before external publishing', () => {
     assert.throws(
       () => releaseMake.assertExternalPublishConfirmed({ confirmPublish: false }),

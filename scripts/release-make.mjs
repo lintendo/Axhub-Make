@@ -2400,6 +2400,43 @@ function stageTemplatePublishAssets({ zipBytes, latestManifestBytes }) {
   }
 }
 
+function sleepSync(delayMs) {
+  if (delayMs <= 0) {
+    return;
+  }
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delayMs);
+}
+
+export function cleanupTemplatePublishStaging(stagingDir, {
+  rmSyncImpl = fs.rmSync,
+  sleepImpl = sleepSync,
+  maxAttempts = 5,
+  retryDelayMs = 50,
+} = {}) {
+  const attemptsLimit = Number.isInteger(maxAttempts) && maxAttempts > 0 ? maxAttempts : 1;
+  const retryableCodes = new Set(['EACCES', 'EBUSY', 'ENOTEMPTY', 'EPERM']);
+  let lastError = null;
+  let attempts = 0;
+  for (let attempt = 1; attempt <= attemptsLimit; attempt += 1) {
+    attempts = attempt;
+    try {
+      rmSyncImpl(stagingDir, { recursive: true, force: true });
+      return { cleaned: true, attempts: attempt };
+    } catch (error) {
+      lastError = error;
+      if (!retryableCodes.has(error?.code) || attempt === attemptsLimit) {
+        break;
+      }
+      sleepImpl(Math.max(0, retryDelayMs) * attempt);
+    }
+  }
+  return {
+    cleaned: false,
+    attempts,
+    error: lastError,
+  };
+}
+
 export function publishCommands(manifest, options) {
   const npmArgs = ['publish', manifest.npmPackageDir, '--access', 'public', '--tag', options.npmTag || 'beta'];
   if (options.otp) {
@@ -2502,6 +2539,8 @@ export function runTemplateRelease(manifest, options, dependencies = {}) {
   }
 
   const stagedAssets = stageTemplatePublishAssets(validatedAssets);
+  let publicationError = null;
+  let published = false;
   try {
     const { releaseArgs } = publishTemplateCommands(manifest, options, stagedAssets);
     const confirmPublishImpl = dependencies.confirmPublishImpl || assertExternalPublishConfirmed;
@@ -2511,8 +2550,42 @@ export function runTemplateRelease(manifest, options, dependencies = {}) {
     logStep(`Creating GitHub Release ${manifest.tagName}`);
     assertToolImpl('gh');
     runImpl('gh', releaseArgs);
-  } finally {
-    fs.rmSync(stagedAssets.stagingDir, { recursive: true, force: true });
+    published = true;
+  } catch (error) {
+    publicationError = error;
+  }
+
+  const cleanupResult = cleanupTemplatePublishStaging(
+    stagedAssets.stagingDir,
+    dependencies.cleanupOptions,
+  );
+  if (!cleanupResult.cleaned) {
+    const logger = dependencies.logger || console;
+    const outcome = published ? 'succeeded' : 'failed';
+    const warning = (
+      `GitHub release ${outcome}, but temporary publish assets could not be removed after ${cleanupResult.attempts} attempts: `
+      + `${stagedAssets.stagingDir} (${cleanupResult.error?.message || cleanupResult.error || 'unknown cleanup error'}). `
+      + 'Remove this exact directory manually.'
+    );
+    try {
+      logger.warn(warning);
+    } catch {
+      try {
+        process.stderr.write(`${warning}\n`);
+      } catch {
+        // Preserve the publication result even if both warning channels fail.
+      }
+    }
+    if (publicationError && typeof publicationError === 'object' && publicationError.cause === undefined) {
+      try {
+        publicationError.cause = cleanupResult.error;
+      } catch {
+        // The warning above still records cleanup failure for non-extensible errors.
+      }
+    }
+  }
+  if (publicationError) {
+    throw publicationError;
   }
 }
 

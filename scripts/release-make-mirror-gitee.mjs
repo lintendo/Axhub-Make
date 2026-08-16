@@ -6,6 +6,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const defaultManifestPath = path.join(repoRoot, '.release/make-client-template/manifest.json');
@@ -152,14 +153,26 @@ export function parseGiteeReleaseDownloadUrl(url) {
 }
 
 function assertManifestHasTemplateZip(manifest, manifestPath) {
-  if (!manifest?.templateZip?.path || !manifest?.templateZip?.mirrorUrl || !sha256Pattern.test(manifest.templateZip.sha256)) {
-    throw new Error(`Manifest is missing templateZip.path, templateZip.mirrorUrl, or templateZip.sha256: ${manifestPath}`);
+  if (!manifest?.templateZip?.path || !manifest?.templateZip?.primaryUrl || !manifest?.templateZip?.mirrorUrl || !sha256Pattern.test(manifest.templateZip.sha256)) {
+    throw new Error(`Manifest is missing templateZip.path, source URLs, or templateZip.sha256: ${manifestPath}`);
   }
   if (!sourceCommitPattern.test(manifest.sourceCommit)) {
     throw new Error(`Manifest is missing a valid sourceCommit: ${manifestPath}`);
   }
+  if (manifest.latestManifest && (
+    !manifest.latestManifest.path
+    || !manifest.latestManifest.mirrorUrl
+    || !sha256Pattern.test(manifest.latestManifest.sha256)
+    || !manifest.latestManifest.manifest
+  )) {
+    throw new Error(`Manifest latest asset is missing path, mirrorUrl, sha256, or prepared snapshot: ${manifestPath}`);
+  }
   if (!fs.existsSync(manifest.templateZip.path)) {
     throw new Error(`Template zip asset does not exist. Run release:make-client-template:prepare first: ${manifest.templateZip.path}`);
+  }
+  const zipStat = fs.lstatSync(manifest.templateZip.path);
+  if (!zipStat.isFile() || zipStat.isSymbolicLink()) {
+    throw new Error(`Template zip asset must be a regular file: ${manifest.templateZip.path}`);
   }
   const zipBytes = fs.readFileSync(manifest.templateZip.path);
   const zipSha256 = crypto.createHash('sha256').update(zipBytes).digest('hex');
@@ -171,15 +184,50 @@ function assertManifestHasTemplateZip(manifest, manifestPath) {
     throw new Error(`Template latest manifest asset does not exist. Run release:make-client-template:prepare first: ${manifest.latestManifest.path}`);
   }
   if (manifest.latestManifest?.path) {
+    const latestStat = fs.lstatSync(manifest.latestManifest.path);
+    if (!latestStat.isFile() || latestStat.isSymbolicLink()) {
+      throw new Error(`Template latest manifest asset must be a regular file: ${manifest.latestManifest.path}`);
+    }
     latestManifestBytes = fs.readFileSync(manifest.latestManifest.path);
+    const latestManifestSha256 = crypto.createHash('sha256').update(latestManifestBytes).digest('hex');
+    if (latestManifestSha256 !== manifest.latestManifest.sha256) {
+      throw new Error(`Template latest manifest SHA-256 does not match prepared manifest: ${latestManifestSha256} !== ${manifest.latestManifest.sha256}`);
+    }
     let latestManifest;
     try {
       latestManifest = JSON.parse(latestManifestBytes.toString('utf8'));
     } catch {
       throw new Error(`Template latest manifest JSON is invalid: ${manifest.latestManifest.path}`);
     }
+    if (latestManifest?.schemaVersion !== 1) {
+      throw new Error('Template latest manifest schemaVersion must be 1');
+    }
+    if (latestManifest.version !== manifest.templateVersion) {
+      throw new Error(`Template latest manifest version does not match prepared manifest: ${latestManifest.version || '(missing)'} !== ${manifest.templateVersion}`);
+    }
+    if (latestManifest.sourceCommit !== manifest.sourceCommit) {
+      throw new Error(`Template latest manifest sourceCommit does not match prepared manifest: ${latestManifest.sourceCommit || '(missing)'} !== ${manifest.sourceCommit}`);
+    }
     if (latestManifest.sha256 !== manifest.templateZip.sha256) {
-      throw new Error('Template latest manifest SHA-256 does not match prepared ZIP');
+      throw new Error(`Template latest manifest ZIP SHA-256 does not match prepared manifest: ${latestManifest.sha256 || '(missing)'} !== ${manifest.templateZip.sha256}`);
+    }
+    if (!Array.isArray(latestManifest.sources)) {
+      throw new Error('Template latest manifest sources must be an array');
+    }
+    for (const [sourceId, expectedUrl] of [
+      ['github', manifest.templateZip.primaryUrl],
+      ['gitee', manifest.templateZip.mirrorUrl],
+    ]) {
+      const matches = latestManifest.sources.filter((source) => source?.id === sourceId);
+      if (matches.length !== 1 || matches[0].url !== expectedUrl) {
+        throw new Error(`Template latest manifest ${sourceId} ZIP URL does not match prepared manifest`);
+      }
+      if (matches[0].templateVersion !== manifest.templateVersion) {
+        throw new Error(`Template latest manifest ${sourceId} templateVersion does not match prepared manifest`);
+      }
+    }
+    if (!isDeepStrictEqual(latestManifest, manifest.latestManifest.manifest)) {
+      throw new Error('Template latest manifest content does not match the prepared manifest snapshot');
     }
   }
   return { zipBytes, latestManifestBytes };
