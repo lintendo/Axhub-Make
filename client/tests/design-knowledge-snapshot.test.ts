@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { main, resolveSearchSource } from '../.agents/skills/search-design-system/scripts/cli.mjs';
 import { loadBundledIndex, resolveBundledSnapshot } from '../.agents/skills/search-design-system/scripts/lib/bundled-snapshot.mjs';
+import { readCachedRef } from '../.agents/skills/search-design-system/scripts/lib/cache.mjs';
 import { search } from '../.agents/skills/search-design-system/scripts/lib/index.mjs';
 
 const HASH_RE = /^sha256:[a-f0-9]{64}$/u;
@@ -109,6 +110,48 @@ async function makeSnapshot() {
   return { clientRoot, snapshotRoot };
 }
 
+function remoteManifest(record: object, indexBytes: Buffer) {
+  return Buffer.from(JSON.stringify({
+    schemaVersion: 1,
+    taxonomyVersion: '1.0.0',
+    searchContractVersion: '1.0.0',
+    tokenizationVersion: 'nfkc-intl-segmenter-v1',
+    minReaderVersion: '1.0.0',
+    maxReaderVersionExclusive: '2.0.0',
+    indexes: { desktop: { url: 'desktop.json', hash: sha256(indexBytes), count: 1 } },
+    records: [record],
+  }));
+}
+
+function remoteCatalog() {
+  const manifestUrl = 'https://example.test/catalog/manifest.json';
+  const record = {
+    schemaVersion: 1,
+    id: 'alpha',
+    slug: 'alpha',
+    title: 'Alpha',
+    platforms: ['desktop'],
+    searchable: true,
+    reviewStatus: 'approved',
+    publishable: true,
+    reasons: [],
+  };
+  const indexBytes = Buffer.from(JSON.stringify({
+    schemaVersion: 1,
+    taxonomyVersion: '1.0.0',
+    searchContractVersion: '1.0.0',
+    tokenizationVersion: 'nfkc-intl-segmenter-v1',
+    platform: 'desktop',
+    records: [record],
+    postings: { alpha: ['alpha'] },
+  }));
+  return { manifestUrl, manifestBytes: remoteManifest(record, indexBytes), indexBytes, record };
+}
+
+function remoteResponse(bytes: Buffer, status = 200) {
+  return new Response(Uint8Array.from(bytes), { status, headers: { 'content-length': String(bytes.length) } });
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -198,6 +241,40 @@ describe('bundled design knowledge search', () => {
     expect(resolveSearchSource({ manifestUrl: 'https://example.com/manifest.json' })).toEqual({
       manifestUrl: 'https://example.com/manifest.json',
     });
+  });
+
+  it('retains the last valid remote manifest ref for an offline retry after a bad index refresh', async () => {
+    const remote = remoteCatalog();
+    const cacheDir = await mkdtemp(path.join(os.tmpdir(), 'design-knowledge-cache-'));
+    const fetchValid = async (url: URL) => url.pathname.endsWith('/manifest.json')
+      ? remoteResponse(remote.manifestBytes)
+      : remoteResponse(remote.indexBytes);
+
+    await expect(search(request(), {
+      manifestUrl: remote.manifestUrl,
+      cacheDir,
+      fetch: fetchValid,
+      allowStaleCache: true,
+    })).resolves.toMatchObject({ cacheStatus: 'fresh', results: [{ id: 'alpha' }] });
+    const lastKnownGood = await readCachedRef(cacheDir, remote.manifestUrl);
+
+    const malformedIndex = Buffer.from('not valid JSON');
+    await expect(search(request(), {
+      manifestUrl: remote.manifestUrl,
+      cacheDir,
+      fetch: async (url: URL) => url.pathname.endsWith('/manifest.json')
+        ? remoteResponse(remoteManifest(remote.record, malformedIndex))
+        : remoteResponse(malformedIndex),
+      allowStaleCache: false,
+    })).rejects.toBeDefined();
+
+    await expect(readCachedRef(cacheDir, remote.manifestUrl)).resolves.toBe(lastKnownGood);
+    await expect(search(request(), {
+      manifestUrl: remote.manifestUrl,
+      cacheDir,
+      offline: true,
+      allowStaleCache: true,
+    })).resolves.toMatchObject({ cacheStatus: 'stale', results: [{ id: 'alpha' }] });
   });
 
   it.each([

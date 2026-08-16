@@ -201,6 +201,8 @@ async function loadRemoteIndex(request, options) {
   if (options.offline && options.cachedIndexHash) return { index: await cachedIndexFromKnownHash(cacheOptions, options.cachedIndexHash), cacheStatus: 'stale', cacheVersion: options.cachedIndexHash, remote: true, remotePolicy: policy, baseUrl: options.manifestUrl };
 
   let manifest;
+  let artifact;
+  let manifestBytes;
   let manifestWasStale = false;
   if (options.offline) {
     const manifestHash = await readCachedRef(cacheDir, options.manifestUrl);
@@ -209,9 +211,10 @@ async function loadRemoteIndex(request, options) {
   } else {
     try {
       const remote = await fetchRemoteBytes(options.manifestUrl, { ...policy, fetch: options.fetch, kind: 'manifest', maxBytes: options.maxManifestBytes });
-      const manifestHash = sha256(remote.bytes);
-      await cacheObject(cacheDir, manifestHash, remote.bytes, options.manifestUrl);
-      manifest = parseJson(remote.bytes, 'manifest');
+      manifestBytes = remote.bytes;
+      manifest = parseJson(manifestBytes, 'manifest');
+      artifact = validateManifest(manifest, request);
+      for (const record of manifest.records) validateRemoteRecordUrls(record, policy, options.manifestUrl);
     } catch (error) {
       let staleHash;
       try { staleHash = await readCachedRef(cacheDir, options.manifestUrl); } catch {}
@@ -226,7 +229,7 @@ async function loadRemoteIndex(request, options) {
     }
   }
 
-  const artifact = validateManifest(manifest, request);
+  artifact ??= validateManifest(manifest, request);
   for (const record of manifest.records) validateRemoteRecordUrls(record, policy, options.manifestUrl);
   const indexUrl = new URL(artifact.url, options.manifestUrl).href;
   if (manifestWasStale) return { index: parseJson(await readCachedObject(cacheDir, artifact.hash), 'index'), cacheStatus: 'stale', cacheVersion: artifact.hash, expectedCount: artifact.count, remote: true, remotePolicy: policy, baseUrl: options.manifestUrl };
@@ -234,8 +237,13 @@ async function loadRemoteIndex(request, options) {
   try {
     const remote = await fetchRemoteBytes(indexUrl, { ...policy, fetch: options.fetch, kind: 'index', maxBytes: options.maxIndexBytes });
     if (sha256(remote.bytes) !== artifact.hash) fail('INDEX_HASH_MISMATCH', { expectedHash: artifact.hash, actualHash: sha256(remote.bytes) });
+    const index = parseJson(remote.bytes, 'index');
+    validateIndex(index, request, true);
+    if (index.records.length !== artifact.count) fail('INVALID_INDEX', { reason: 'manifest-count-mismatch', expectedCount: artifact.count, actualCount: index.records.length });
+    for (const record of index.records) validateRemoteRecordUrls(record, policy, options.manifestUrl);
     await cacheObject(cacheDir, artifact.hash, remote.bytes, indexUrl);
-    return { index: parseJson(remote.bytes, 'index'), cacheStatus: 'fresh', cacheVersion: artifact.hash, expectedCount: artifact.count, remote: true, remotePolicy: policy, baseUrl: options.manifestUrl };
+    await cacheObject(cacheDir, sha256(manifestBytes), manifestBytes, options.manifestUrl);
+    return { index, cacheStatus: 'fresh', cacheVersion: artifact.hash, expectedCount: artifact.count, remote: true, remotePolicy: policy, baseUrl: options.manifestUrl };
   } catch (error) {
     let cached;
     try { cached = await readCachedObject(cacheDir, artifact.hash); } catch {}
