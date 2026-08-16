@@ -1,16 +1,19 @@
 import crypto from 'node:crypto';
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { main, resolveSearchSource } from '../.agents/skills/search-design-system/scripts/cli.mjs';
+import { isCliEntrypoint, main, resolveSearchSource } from '../.agents/skills/search-design-system/scripts/cli.mjs';
 import { loadBundledIndex, resolveBundledSnapshot } from '../.agents/skills/search-design-system/scripts/lib/bundled-snapshot.mjs';
 import { search } from '../.agents/skills/search-design-system/scripts/lib/index.mjs';
 
 const HASH_RE = /^sha256:[a-f0-9]{64}$/u;
 const BUNDLED_SNAPSHOT_ROOT = path.resolve(__dirname, '../design-knowledge');
+const SEARCH_SKILL_SCRIPTS_ROOT = path.resolve(__dirname, '../.agents/skills/search-design-system/scripts');
 type BundledSnapshot = Awaited<ReturnType<typeof resolveBundledSnapshot>>;
 type BundledIndex = Awaited<ReturnType<typeof loadBundledIndex>>;
 type BinaryReadFile = (filePath: string | Buffer | URL) => Promise<Buffer>;
@@ -115,6 +118,48 @@ afterEach(() => {
 });
 
 describe('bundled design knowledge search', () => {
+  it('executes the CLI when Node reaches it through an aliased scripts directory', async () => {
+    const aliasRoot = await mkdtemp(path.join(os.tmpdir(), 'design-knowledge-cli-alias-'));
+    const aliasedScriptsRoot = path.join(aliasRoot, 'scripts');
+    try {
+      await symlink(SEARCH_SKILL_SCRIPTS_ROOT, aliasedScriptsRoot, process.platform === 'win32' ? 'junction' : 'dir');
+
+      const result = spawnSync(process.execPath, [path.join(aliasedScriptsRoot, 'cli.mjs')], {
+        encoding: 'utf8',
+        input: '{',
+      });
+
+      expect(result.status).toBe(1);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        results: [],
+        error: { code: 'INVALID_REQUEST', details: { field: 'request' } },
+      });
+    } finally {
+      await rm(aliasRoot, { force: true, recursive: true });
+    }
+  });
+
+  it('declines missing and unresolvable CLI entry paths without throwing', async () => {
+    await expect(isCliEntrypoint(import.meta.url, undefined)).resolves.toBe(false);
+    await expect(isCliEntrypoint(
+      import.meta.url,
+      path.join(os.tmpdir(), `missing-design-knowledge-cli-${crypto.randomUUID()}.mjs`),
+    )).resolves.toBe(false);
+  });
+
+  it('does not execute the CLI main function when the module is imported', () => {
+    const cliUrl = pathToFileURL(path.join(SEARCH_SKILL_SCRIPTS_ROOT, 'cli.mjs')).href;
+    const result = spawnSync(process.execPath, [
+      '--input-type=module',
+      '--eval',
+      `await import(${JSON.stringify(cliUrl)}); process.stdout.write('imported\\n');`,
+    ], { encoding: 'utf8' });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toBe('imported\n');
+  });
+
   it('locks the committed immutable snapshot and artifact metadata', async () => {
     const snapshot = await resolveSnapshot({ snapshotRoot: BUNDLED_SNAPSHOT_ROOT });
 

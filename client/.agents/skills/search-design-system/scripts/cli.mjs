@@ -2,7 +2,7 @@
 import fs from 'node:fs/promises';
 import process from 'node:process';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 import { fetchArtifact } from './lib/fetch-artifact.mjs';
 import { CONTRACT, search } from './lib/index.mjs';
@@ -127,7 +127,20 @@ export async function main(argv = process.argv.slice(2)) {
   throw Object.assign(new Error('INVALID_REQUEST'), { code: 'INVALID_REQUEST', details: { command: options.command } });
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+export async function isCliEntrypoint(moduleUrl, argvPath) {
+  if (!argvPath) return false;
+  try {
+    const [modulePath, executedPath] = await Promise.all([
+      fs.realpath(fileURLToPath(moduleUrl)),
+      fs.realpath(path.resolve(argvPath)),
+    ]);
+    return modulePath === executedPath;
+  } catch {
+    return false;
+  }
+}
+
+if (await isCliEntrypoint(import.meta.url, process.argv[1])) {
   try {
     const result = await main();
     process.stdout.write(`${JSON.stringify(result)}\n`);
