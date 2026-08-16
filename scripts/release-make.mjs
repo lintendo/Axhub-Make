@@ -1003,6 +1003,7 @@ export function createMakeClientTemplateLatestManifest({
   templateVersion,
   releaseNotes,
   zipMetadata,
+  sha256,
   publishedAt = new Date().toISOString(),
 } = {}) {
   const normalizedTemplateVersion = normalizeTemplateVersion(templateVersion);
@@ -1016,10 +1017,14 @@ export function createMakeClientTemplateLatestManifest({
   if (!zipMetadata?.primaryUrl || !zipMetadata?.mirrorUrl) {
     throw new Error('zipMetadata primaryUrl and mirrorUrl are required for Make client template latest manifest');
   }
+  if (!/^[a-f0-9]{64}$/u.test(sha256)) {
+    throw new Error('sha256 must be a lowercase SHA-256 digest for Make client template latest manifest');
+  }
   return {
     schemaVersion: 1,
     version: normalizedTemplateVersion,
     releaseNotes: normalizedReleaseNotes,
+    sha256,
     publishedAt,
     sources: [
       {
@@ -1690,6 +1695,7 @@ function prepareTemplateRelease(options = {}) {
     templateVersion,
     releaseNotes,
     zipMetadata: templateMetadata,
+    sha256: templateArchive.sha256,
   });
   writeJson(latestManifestPath, latestManifest);
   const manifest = {

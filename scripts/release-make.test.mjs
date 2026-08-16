@@ -313,10 +313,12 @@ describe('release make artifact helpers', () => {
 
   it('creates the online make client template latest manifest from release notes and zip metadata', () => {
     const releaseNotes = '# Axhub Make Client 0.2.0\n\n- 更新官方模板文件。';
+    const sha256 = 'a'.repeat(64);
     const manifest = releaseMake.createMakeClientTemplateLatestManifest({
       templateVersion: '0.2.0',
       releaseNotes,
       zipMetadata: releaseMake.createTemplateZipMetadata({ templateVersion: '0.2.0' }),
+      sha256,
       publishedAt: '2026-07-09T00:00:00.000Z',
     });
 
@@ -324,6 +326,7 @@ describe('release make artifact helpers', () => {
       schemaVersion: 1,
       version: '0.2.0',
       releaseNotes,
+      sha256,
       publishedAt: '2026-07-09T00:00:00.000Z',
       sources: [
         {
@@ -340,6 +343,16 @@ describe('release make artifact helpers', () => {
         },
       ],
     });
+
+    assert.throws(
+      () => releaseMake.createMakeClientTemplateLatestManifest({
+        templateVersion: '0.2.0',
+        releaseNotes,
+        zipMetadata: releaseMake.createTemplateZipMetadata({ templateVersion: '0.2.0' }),
+        sha256: 'not-a-sha256',
+      }),
+      /sha256/u,
+    );
   });
 
   it('keeps make client Vitest companion packages on exact matching versions', () => {
