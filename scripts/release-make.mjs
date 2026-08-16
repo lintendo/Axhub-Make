@@ -754,6 +754,7 @@ export function validateDesignKnowledgeSnapshot({
     throw new Error('Design Knowledge snapshot manifest indexes are invalid');
   }
 
+  const declaredSnapshotFiles = new Set(['manifest.json']);
   const allIds = new Set();
   const designPaths = new Set();
   let totalRecordCount = 0;
@@ -769,6 +770,7 @@ export function validateDesignKnowledgeSnapshot({
     }
     const relativeIndexPath = assertSafeDesignKnowledgePath(descriptor.path, `indexes.${platform}.path`);
     const indexPath = assertRegularDesignKnowledgeFile(snapshotRoot, relativeIndexPath, `indexes.${platform}`);
+    declaredSnapshotFiles.add(relativeIndexPath);
     const indexBytes = fs.readFileSync(indexPath);
     const indexHash = `sha256:${crypto.createHash('sha256').update(indexBytes).digest('hex')}`;
     if (indexHash !== descriptor.hash) {
@@ -821,6 +823,7 @@ export function validateDesignKnowledgeSnapshot({
         throw new Error(`Design Knowledge snapshot DESIGN.md hash mismatch: ${id}`);
       }
       designPaths.add(relativeDesignPath);
+      declaredSnapshotFiles.add(relativeDesignPath);
     }
   }
   if (manifest.designMd.count !== totalRecordCount || manifest.designMd.count !== designPaths.size) {
@@ -828,15 +831,12 @@ export function validateDesignKnowledgeSnapshot({
   }
 
   const snapshotFiles = listDesignKnowledgeSnapshotFiles(snapshotRoot);
-  const packagedDesignPaths = new Set(snapshotFiles
-    .map(({ relativePath }) => relativePath)
-    .filter((relativePath) => relativePath.startsWith(`${designRoot}/`)));
-  if (packagedDesignPaths.size !== designPaths.size || Array.from(designPaths).some((relativePath) => !packagedDesignPaths.has(relativePath))) {
-    throw new Error('Design Knowledge snapshot DESIGN.md files do not match the index records');
-  }
   for (const { relativePath } of snapshotFiles) {
     if (/(?:\.tgz|\.zip)$/iu.test(relativePath) || relativePath.split('/').includes('.local')) {
       throw new Error(`Design Knowledge snapshot contains a forbidden release file: ${relativePath}`);
+    }
+    if (!declaredSnapshotFiles.has(relativePath)) {
+      throw new Error(`Design Knowledge snapshot contains an unlisted file: ${relativePath}`);
     }
   }
   return manifest;

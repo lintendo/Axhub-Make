@@ -450,6 +450,30 @@ describe('release make artifact helpers', () => {
     assert(!entries.some((entry) => /\.(?:tgz|zip)$/iu.test(entry)));
   });
 
+  it('rejects snapshot files that are not declared by the immutable manifest and indexes', () => {
+    const sourceRoot = createTempRoot('axhub-release-template-unlisted-snapshot-');
+    const clientRoot = path.join(sourceRoot, 'client');
+    const outputRoot = createTempRoot('axhub-release-template-unlisted-snapshot-output-');
+    writeFile(path.join(clientRoot, 'package.json'), '{"name":"@axhub/make-client"}\n');
+    writeMinimalTemplateAssembly(clientRoot);
+    const contentManifestPath = path.join(clientRoot, 'template-manifest.json');
+    const contentManifest = JSON.parse(fs.readFileSync(contentManifestPath, 'utf8'));
+    contentManifest.runtime.directories = ['design-knowledge'];
+    writeFile(contentManifestPath, `${JSON.stringify(contentManifest, null, 2)}\n`);
+    fs.cpSync(path.resolve('client/design-knowledge'), path.join(clientRoot, 'design-knowledge'), { recursive: true });
+    writeFile(path.join(clientRoot, 'design-knowledge/debug.txt'), 'unlisted debug data\n');
+    writeFile(path.join(clientRoot, 'design-knowledge/tests/fixture.json'), '{}\n');
+
+    assert.throws(
+      () => releaseMake.validateDesignKnowledgeSnapshot({ sourceClientDir: clientRoot }),
+      /unlisted file/u,
+    );
+    assert.throws(
+      () => releaseMake.createMakeClientTemplateZip({ sourceClientDir: clientRoot, outputDir: outputRoot }),
+      /unlisted file/u,
+    );
+  });
+
   it('keeps mobile theme source notices consistent with tracked provenance files', () => {
     const themesRoot = path.resolve('client/src/themes');
     const staleNotices = fs.readdirSync(themesRoot, { withFileTypes: true })
