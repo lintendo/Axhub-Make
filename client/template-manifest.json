@@ -33,6 +33,7 @@
     "directories": [
       ".agents/skills",
       ".claude/skills",
+      "design-knowledge",
       "rules",
       "scripts/templates",
       "scripts/utils",
@@ -50,6 +51,11 @@
         "action": "exclude",
         "pattern": "^\\.(?:agents|claude)/skills/triple-ampersand-operator(?:/|$)",
         "description": "测试用 triple-ampersand-operator 不进入发布模板。"
+      },
+      {
+        "action": "exclude",
+        "pattern": "^design-knowledge/(?:.+\\.(?:tgz|zip)$|(?:.+/)?\\.local(?:/|$))",
+        "description": "Design Knowledge 发布包只允许索引和 DESIGN.md，不携带归档或本地输入。"
       }
     ]
   },
@@ -115,6 +121,11 @@
         "action": "exclude",
         "pattern": "^(?:trae|whop)$",
         "description": "排除仅用于本地调试、不属于正式主题库的主题。"
+      },
+      {
+        "action": "exclude",
+        "pattern": "^.+$",
+        "description": "客户端模板不再内置本地主题，主题由在线设计系统按主源、备用源顺序提供。"
       }
     ]
   },

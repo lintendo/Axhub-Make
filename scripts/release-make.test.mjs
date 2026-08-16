@@ -400,6 +400,56 @@ describe('release make artifact helpers', () => {
     assert(rules.every(({ description }) => typeof description === 'string' && description.trim()));
   });
 
+  it('packages the immutable design knowledge snapshot without themes or release-only files', () => {
+    const sourceClientDir = path.resolve('client');
+    const outputDir = createTempRoot('axhub-release-template-design-knowledge-');
+    const manifest = JSON.parse(fs.readFileSync(path.join(sourceClientDir, 'template-manifest.json'), 'utf8'));
+    const packageJson = JSON.parse(fs.readFileSync(path.join(sourceClientDir, 'package.json'), 'utf8'));
+
+    assert.equal(packageJson.dependencies['tar-stream'], '3.1.7');
+    assert(manifest.runtime.directories.includes('design-knowledge'));
+    assert(manifest.runtime.directories.includes('.agents/skills'));
+    assert(manifest.runtime.directories.includes('.claude/skills'));
+    assert.deepEqual(
+      manifest.runtime.files.filter((filePath) => filePath.startsWith('scripts/')),
+      [
+        'scripts/build-all.js',
+        'scripts/canvas-fig-sync.mjs',
+        'scripts/capture-theme-homepage.mjs',
+        'scripts/capture-theme-source.mjs',
+        'scripts/check-app-ready.mjs',
+        'scripts/chrome-export-converter.mjs',
+        'scripts/scan-entries.js',
+        'scripts/sync-project-metadata.d.ts',
+        'scripts/sync-project-metadata.mjs',
+        'scripts/sync-project-metadata.mjs.d.ts',
+        'scripts/sync-vendor-if-present.mjs',
+      ],
+    );
+
+    const snapshot = releaseMake.validateDesignKnowledgeSnapshot({ sourceClientDir });
+    assert.equal(snapshot.indexes.desktop.count, 123);
+    assert.equal(snapshot.indexes.mobile.count, 100);
+    assert.equal(snapshot.designMd.count, 223);
+
+    const result = releaseMake.createMakeClientTemplateZip({ sourceClientDir, outputDir });
+    const entries = releaseMake.listZipEntries(result.path);
+    for (const requiredEntry of [
+      'design-knowledge/manifest.json',
+      'design-knowledge/indexes/desktop.json',
+      'design-knowledge/indexes/mobile.json',
+      'design-knowledge/design-md/8returns.md',
+      '.agents/skills/search-design-system/SKILL.md',
+      '.claude/skills/search-design-system/SKILL.md',
+    ]) {
+      assert(entries.includes(requiredEntry), requiredEntry);
+    }
+    assert(!entries.some((entry) => entry.startsWith('src/themes/')));
+    assert(!entries.some((entry) => entry.split('/').includes('.local')));
+    assert(!entries.some((entry) => entry.startsWith('tests/') || /(?:^|\/)tests(?:\/|$)|\.test\.[^/]+$/u.test(entry)));
+    assert(!entries.some((entry) => /\.(?:tgz|zip)$/iu.test(entry)));
+  });
+
   it('keeps mobile theme source notices consistent with tracked provenance files', () => {
     const themesRoot = path.resolve('client/src/themes');
     const staleNotices = fs.readdirSync(themesRoot, { withFileTypes: true })

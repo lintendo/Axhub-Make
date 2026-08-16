@@ -669,6 +669,179 @@ function walkTemplateSourceFiles(rootDir, currentDir = rootDir, relativeDir = ''
   return files;
 }
 
+const designKnowledgeHashPattern = /^sha256:[a-f0-9]{64}$/u;
+const designKnowledgePlatforms = ['desktop', 'mobile'];
+const designKnowledgeIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+
+function assertSafeDesignKnowledgePath(value, label) {
+  if (
+    typeof value !== 'string'
+    || !value
+    || value.includes('\\')
+    || path.posix.isAbsolute(value)
+    || path.win32.isAbsolute(value)
+    || path.posix.normalize(value) !== value
+    || value.split('/').some((part) => !part || part === '.' || part === '..')
+  ) {
+    throw new Error(`Design Knowledge snapshot ${label} must be a safe normalized relative path`);
+  }
+  return value;
+}
+
+function assertRegularDesignKnowledgeFile(snapshotRoot, relativePath, label) {
+  assertSafeDesignKnowledgePath(relativePath, label);
+  let currentPath = snapshotRoot;
+  for (const part of relativePath.split('/')) {
+    currentPath = path.join(currentPath, part);
+    if (!fs.existsSync(currentPath)) {
+      throw new Error(`Design Knowledge snapshot ${label} is missing: ${relativePath}`);
+    }
+    if (fs.lstatSync(currentPath).isSymbolicLink()) {
+      throw new Error(`Design Knowledge snapshot ${label} must not be a symbolic link: ${relativePath}`);
+    }
+  }
+  if (!fs.lstatSync(currentPath).isFile()) {
+    throw new Error(`Design Knowledge snapshot ${label} must be a regular file: ${relativePath}`);
+  }
+  return currentPath;
+}
+
+function listDesignKnowledgeSnapshotFiles(snapshotRoot, currentDir = snapshotRoot, relativeDir = '') {
+  const files = [];
+  for (const entry of fs.readdirSync(currentDir, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
+    const relativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
+    const fullPath = path.join(currentDir, entry.name);
+    if (entry.isSymbolicLink()) {
+      throw new Error(`Design Knowledge snapshot must not contain symbolic links: ${relativePath}`);
+    }
+    if (entry.isDirectory()) {
+      files.push(...listDesignKnowledgeSnapshotFiles(snapshotRoot, fullPath, relativePath));
+      continue;
+    }
+    if (!entry.isFile() || !fs.lstatSync(fullPath).isFile()) {
+      throw new Error(`Design Knowledge snapshot must contain only regular files: ${relativePath}`);
+    }
+    files.push({ fullPath, relativePath });
+  }
+  return files;
+}
+
+export function validateDesignKnowledgeSnapshot({
+  sourceClientDir = makeClientTemplateSourceDir,
+} = {}) {
+  const snapshotRoot = path.join(sourceClientDir, 'design-knowledge');
+  if (!fs.existsSync(snapshotRoot) || fs.lstatSync(snapshotRoot).isSymbolicLink() || !fs.lstatSync(snapshotRoot).isDirectory()) {
+    throw new Error(`Design Knowledge snapshot directory is missing: ${snapshotRoot}`);
+  }
+  const manifestPath = assertRegularDesignKnowledgeFile(snapshotRoot, 'manifest.json', 'manifest');
+  let manifest;
+  try {
+    manifest = readJson(manifestPath);
+  } catch (error) {
+    throw new Error(`Design Knowledge snapshot manifest is invalid: ${error.message}`);
+  }
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest) || manifest.schemaVersion !== 1) {
+    throw new Error('Design Knowledge snapshot manifest has an unsupported schema');
+  }
+  if (typeof manifest.snapshotVersion !== 'string' || !manifest.snapshotVersion || /[\\/]/u.test(manifest.snapshotVersion) || manifest.snapshotVersion.includes('..')) {
+    throw new Error('Design Knowledge snapshot manifest snapshotVersion is invalid');
+  }
+  if (!manifest.designMd || !Number.isInteger(manifest.designMd.count) || manifest.designMd.count < 0) {
+    throw new Error('Design Knowledge snapshot manifest designMd count is invalid');
+  }
+  const designRoot = assertSafeDesignKnowledgePath(manifest.designMd.root, 'manifest designMd.root');
+  if (!manifest.indexes || typeof manifest.indexes !== 'object' || Array.isArray(manifest.indexes)) {
+    throw new Error('Design Knowledge snapshot manifest indexes are invalid');
+  }
+
+  const allIds = new Set();
+  const designPaths = new Set();
+  let totalRecordCount = 0;
+  for (const platform of designKnowledgePlatforms) {
+    const descriptor = manifest.indexes[platform];
+    if (
+      !descriptor
+      || !Number.isInteger(descriptor.count)
+      || descriptor.count < 0
+      || !designKnowledgeHashPattern.test(descriptor.hash)
+    ) {
+      throw new Error(`Design Knowledge snapshot index descriptor is invalid: ${platform}`);
+    }
+    const relativeIndexPath = assertSafeDesignKnowledgePath(descriptor.path, `indexes.${platform}.path`);
+    const indexPath = assertRegularDesignKnowledgeFile(snapshotRoot, relativeIndexPath, `indexes.${platform}`);
+    const indexBytes = fs.readFileSync(indexPath);
+    const indexHash = `sha256:${crypto.createHash('sha256').update(indexBytes).digest('hex')}`;
+    if (indexHash !== descriptor.hash) {
+      throw new Error(`Design Knowledge snapshot index hash mismatch: ${platform}`);
+    }
+    let index;
+    try {
+      index = JSON.parse(indexBytes.toString('utf8'));
+    } catch {
+      throw new Error(`Design Knowledge snapshot index is invalid: ${platform}`);
+    }
+    if (
+      !index
+      || typeof index !== 'object'
+      || Array.isArray(index)
+      || index.schemaVersion !== 1
+      || index.platform !== platform
+      || !Array.isArray(index.records)
+      || index.records.length !== descriptor.count
+    ) {
+      throw new Error(`Design Knowledge snapshot index count/platform mismatch: ${platform}`);
+    }
+    totalRecordCount += index.records.length;
+    for (const record of index.records) {
+      const id = record?.id;
+      const artifacts = record?.artifacts;
+      if (
+        !designKnowledgeIdPattern.test(id)
+        || record.schemaVersion !== 1
+        || record.slug !== id
+        || !Array.isArray(record.platforms)
+        || record.platforms.length !== 1
+        || record.platforms[0] !== platform
+        || record.publishable !== true
+        || record.reviewStatus !== 'approved'
+        || !artifacts
+        || artifacts.designMdPath !== `${designRoot}/${id}.md`
+        || !designKnowledgeHashPattern.test(artifacts.designMdHash)
+      ) {
+        throw new Error(`Design Knowledge snapshot record is invalid: ${id || '(unknown)'}`);
+      }
+      if (allIds.has(id)) {
+        throw new Error(`Design Knowledge snapshot record id is duplicated: ${id}`);
+      }
+      allIds.add(id);
+      const relativeDesignPath = assertSafeDesignKnowledgePath(artifacts.designMdPath, `records.${id}.artifacts.designMdPath`);
+      const designPath = assertRegularDesignKnowledgeFile(snapshotRoot, relativeDesignPath, `records.${id}.DESIGN.md`);
+      const designHash = `sha256:${crypto.createHash('sha256').update(fs.readFileSync(designPath)).digest('hex')}`;
+      if (designHash !== artifacts.designMdHash) {
+        throw new Error(`Design Knowledge snapshot DESIGN.md hash mismatch: ${id}`);
+      }
+      designPaths.add(relativeDesignPath);
+    }
+  }
+  if (manifest.designMd.count !== totalRecordCount || manifest.designMd.count !== designPaths.size) {
+    throw new Error('Design Knowledge snapshot DESIGN.md count mismatch');
+  }
+
+  const snapshotFiles = listDesignKnowledgeSnapshotFiles(snapshotRoot);
+  const packagedDesignPaths = new Set(snapshotFiles
+    .map(({ relativePath }) => relativePath)
+    .filter((relativePath) => relativePath.startsWith(`${designRoot}/`)));
+  if (packagedDesignPaths.size !== designPaths.size || Array.from(designPaths).some((relativePath) => !packagedDesignPaths.has(relativePath))) {
+    throw new Error('Design Knowledge snapshot DESIGN.md files do not match the index records');
+  }
+  for (const { relativePath } of snapshotFiles) {
+    if (/(?:\.tgz|\.zip)$/iu.test(relativePath) || relativePath.split('/').includes('.local')) {
+      throw new Error(`Design Knowledge snapshot contains a forbidden release file: ${relativePath}`);
+    }
+  }
+  return manifest;
+}
+
 function addTemplateSourceFile(entries, sourceClientDir, relativeSourcePath, relativeOutputPath = relativeSourcePath) {
   const sourcePath = path.join(sourceClientDir, ...relativeSourcePath.split('/'));
   if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
@@ -1104,6 +1277,10 @@ export function createMakeClientTemplateZip({
 } = {}) {
   if (!fs.existsSync(path.join(sourceClientDir, 'package.json'))) {
     throw new Error(`Make client template source is missing package.json: ${sourceClientDir}`);
+  }
+  const contentManifest = loadMakeClientTemplateContentManifest(sourceClientDir);
+  if (contentManifest.runtime.directories.includes('design-knowledge')) {
+    validateDesignKnowledgeSnapshot({ sourceClientDir });
   }
   fs.mkdirSync(outputDir, { recursive: true });
   const zipPath = path.join(outputDir, makeClientTemplateZipName);
