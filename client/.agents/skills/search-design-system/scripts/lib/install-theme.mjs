@@ -89,6 +89,7 @@ export async function fetchPackageBytes(url, { fetch: fetcher = globalThis.fetch
 async function archiveEntries(bytes, limits = DEFAULT_LIMITS) {
   const entries = [];
   const names = new Set();
+  const fileNames = new Set();
   let entryCount = 0;
   let unpacked = 0;
   let rejected;
@@ -131,7 +132,10 @@ async function archiveEntries(bytes, limits = DEFAULT_LIMITS) {
           next();
           return;
         }
-        if (!rejected) entries.push({ relative, bytes: Buffer.concat(chunks, size) });
+        if (!rejected) {
+          entries.push({ relative, bytes: Buffer.concat(chunks, size) });
+          fileNames.add(relative);
+        }
         next();
       });
       stream.once('error', (error) => {
@@ -153,7 +157,7 @@ async function archiveEntries(bytes, limits = DEFAULT_LIMITS) {
     if (rejected.code) throw rejected;
     throw failure('FETCH_FAILED', { reason: 'invalid-archive' }, rejected);
   }
-  if (REQUIRED_FILES.some((name) => !names.has(name))) throw failure('FETCH_FAILED', { reason: 'package-file-contract' });
+  if (REQUIRED_FILES.some((name) => !fileNames.has(name))) throw failure('FETCH_FAILED', { reason: 'package-file-contract' });
   return entries;
 }
 

@@ -38,15 +38,17 @@ function tarHeader(name: string, size: number, type = '0'): Buffer {
   return header;
 }
 
-function packageBytes(entries?: Array<{ name: string; body: string; type?: string }>): Buffer {
-  const files = entries ?? [
-    { name: 'DESIGN.md', body: '# Theme\n' },
-    { name: 'SOURCE.md', body: '# Source\n' },
-    { name: 'assets/tokens.json', body: '{}\n' },
-    { name: 'index.tsx', body: 'export default function Theme() { return null; }\n' },
-    { name: 'style.css', body: ':root {}\n' },
-    { name: 'theme.json', body: '{}\n' },
-  ];
+const REQUIRED_PACKAGE_ENTRIES = [
+  { name: 'DESIGN.md', body: '# Theme\n' },
+  { name: 'SOURCE.md', body: '# Source\n' },
+  { name: 'assets/tokens.json', body: '{}\n' },
+  { name: 'index.tsx', body: 'export default function Theme() { return null; }\n' },
+  { name: 'style.css', body: ':root {}\n' },
+  { name: 'theme.json', body: '{}\n' },
+];
+
+function packageBytes(entries: Array<{ name: string; body: string; type?: string }> = REQUIRED_PACKAGE_ENTRIES): Buffer {
+  const files = entries;
   const chunks: Buffer[] = [];
   for (const entry of files) {
     const body = Buffer.from(entry.body);
@@ -146,6 +148,33 @@ describe('theme installer', () => {
     expect(result.status).toBe('spec-only');
     await expect(fs.access(path.join(base.projectRoot, 'escape'))).rejects.toThrow();
   });
+
+  it.each(REQUIRED_PACKAGE_ENTRIES)(
+    'requires $name to be a regular-file archive entry',
+    async ({ name }) => {
+      const archive = packageBytes(REQUIRED_PACKAGE_ENTRIES.map((entry) => entry.name === name
+        ? { name: `${name}/`, body: '', type: '5' }
+        : entry));
+      const base = await fixture(archive);
+
+      const result = await installTheme({
+        ...base,
+        themeId: 'alpha',
+        platform: 'desktop',
+        fetch: async () => response(archive),
+        runMetadataSync: async () => {},
+      });
+
+      expect(result).toMatchObject({
+        status: 'spec-only',
+        failures: {
+          primary: { code: 'FETCH_FAILED' },
+          fallback: { code: 'FETCH_FAILED' },
+        },
+      });
+      await expect(fs.readFile(path.join(base.projectRoot, 'src/themes/alpha/SOURCE.md'), 'utf8')).resolves.toContain('mode: spec-only');
+    },
+  );
 
   it('rolls back a successful extraction when metadata sync fails', async () => {
     const base = await fixture();
