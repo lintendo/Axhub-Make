@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -15,6 +16,45 @@ const sourceCommitPattern = /^[a-f0-9]{40}$/u;
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+function resolveCleanGitCommit({
+  cwd = repoRoot,
+  spawnSyncImpl = spawnSync,
+} = {}) {
+  const status = spawnSyncImpl('git', ['status', '--porcelain=v1', '--untracked-files=all'], {
+    cwd,
+    encoding: 'utf8',
+  });
+  if (status.error || status.status !== 0) {
+    throw new Error(`Unable to inspect Gitee mirror worktree status: ${status.error?.message || status.stderr || 'git status failed'}`);
+  }
+  if (String(status.stdout || '').trim()) {
+    throw new Error('Gitee template mirror requires a clean worktree');
+  }
+  const head = spawnSyncImpl('git', ['rev-parse', 'HEAD'], {
+    cwd,
+    encoding: 'utf8',
+  });
+  if (head.error || head.status !== 0) {
+    throw new Error(`Unable to resolve Gitee mirror source commit: ${head.error?.message || head.stderr || 'git rev-parse failed'}`);
+  }
+  const sourceCommit = String(head.stdout || '').trim();
+  if (!sourceCommitPattern.test(sourceCommit)) {
+    throw new Error(`Git HEAD is not a 40-hex Gitee mirror source commit: ${sourceCommit || '(empty)'}`);
+  }
+  return sourceCommit;
+}
+
+function assertManifestSourceCommitMatchesCleanHead(manifest, options) {
+  if (!sourceCommitPattern.test(manifest?.sourceCommit)) {
+    throw new Error('Prepared template manifest is missing a valid sourceCommit');
+  }
+  const currentCommit = resolveCleanGitCommit(options);
+  if (manifest.sourceCommit !== currentCommit) {
+    throw new Error(`Prepared template manifest sourceCommit does not match current HEAD: ${manifest.sourceCommit} !== ${currentCommit}`);
+  }
+  return currentCommit;
 }
 
 function printUsage() {
@@ -379,6 +419,8 @@ export async function runGiteeMirrorRelease({
   env = process.env,
   fetchImpl = fetch,
   logger = console,
+  cwd = repoRoot,
+  spawnSyncImpl = spawnSync,
 } = {}) {
   const options = parseArgs(argv);
   if (options.help) {
@@ -387,6 +429,7 @@ export async function runGiteeMirrorRelease({
   }
 
   const manifest = readJson(options.manifestPath);
+  assertManifestSourceCommitMatchesCleanHead(manifest, { cwd, spawnSyncImpl });
   const localAssets = assertManifestHasTemplateZip(manifest, options.manifestPath);
   const targetCommitish = options.targetCommitish || manifest.sourceCommit;
   if (targetCommitish !== manifest.sourceCommit) {

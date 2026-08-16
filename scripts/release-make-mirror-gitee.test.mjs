@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 
 process.env.AXHUB_MAKE_GITEE_MIRROR_SKIP_MAIN = '1';
 
-const mirrorGitee = await import('./release-make-mirror-gitee.mjs');
+const mirrorGiteeModule = await import('./release-make-mirror-gitee.mjs');
 
 const tempRoots = [];
 
@@ -21,6 +21,36 @@ function writeFile(filePath, content) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, content, 'utf8');
 }
+
+function createGitSpawnSyncMock({ currentCommit, statusOutput = '' }) {
+  const calls = [];
+  return {
+    calls,
+    spawnSyncImpl: (_command, args) => {
+      calls.push(args);
+      if (args[0] === 'status') {
+        return { status: 0, stdout: statusOutput, stderr: '' };
+      }
+      if (args[0] === 'rev-parse') {
+        return { status: 0, stdout: `${currentCommit}\n`, stderr: '' };
+      }
+      throw new Error(`Unexpected git invocation: ${args.join(' ')}`);
+    },
+  };
+}
+
+const mirrorGitee = {
+  ...mirrorGiteeModule,
+  runGiteeMirrorRelease(options) {
+    const manifestIndex = options.argv.indexOf('--manifest');
+    const manifestPath = options.argv[manifestIndex + 1];
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const git = options.spawnSyncImpl
+      ? { spawnSyncImpl: options.spawnSyncImpl }
+      : createGitSpawnSyncMock({ currentCommit: manifest.sourceCommit });
+    return mirrorGiteeModule.runGiteeMirrorRelease({ ...options, ...git });
+  },
+};
 
 function createFixture(options = {}) {
   const root = createTempRoot('axhub-gitee-mirror-');
@@ -133,6 +163,57 @@ describe('gitee make release mirror helper', () => {
       }),
       /SHA-256/u,
     );
+  });
+
+  it('rejects a dirty worktree before the Gitee dry-run can resolve a token or fetch', async () => {
+    const { manifestPath, sourceCommit } = createFixture();
+    const git = createGitSpawnSyncMock({
+      currentCommit: sourceCommit,
+      statusOutput: ' M scripts/release-make-mirror-gitee.mjs\n',
+    });
+    const fetchCalls = [];
+
+    await assert.rejects(
+      () => mirrorGitee.runGiteeMirrorRelease({
+        argv: ['--manifest', manifestPath, '--dry-run'],
+        env: {},
+        fetchImpl: (...args) => {
+          fetchCalls.push(args);
+          throw new Error('fetch must not run');
+        },
+        logger: { log: () => {} },
+        spawnSyncImpl: git.spawnSyncImpl,
+      }),
+      /clean worktree/u,
+    );
+    assert.deepEqual(git.calls, [['status', '--porcelain=v1', '--untracked-files=all']]);
+    assert.equal(fetchCalls.length, 0);
+  });
+
+  it('rejects a clean worktree whose HEAD differs before Gitee confirmation can resolve a token or fetch', async () => {
+    const { manifestPath, sourceCommit } = createFixture();
+    const git = createGitSpawnSyncMock({ currentCommit: 'c'.repeat(40) });
+    const fetchCalls = [];
+
+    await assert.rejects(
+      () => mirrorGitee.runGiteeMirrorRelease({
+        argv: ['--manifest', manifestPath, '--confirm-publish'],
+        env: {},
+        fetchImpl: (...args) => {
+          fetchCalls.push(args);
+          throw new Error('fetch must not run');
+        },
+        logger: { log: () => {} },
+        spawnSyncImpl: git.spawnSyncImpl,
+      }),
+      /current HEAD/u,
+    );
+    assert.deepEqual(git.calls, [
+      ['status', '--porcelain=v1', '--untracked-files=all'],
+      ['rev-parse', 'HEAD'],
+    ]);
+    assert.equal(fetchCalls.length, 0);
+    assert.notEqual(sourceCommit, 'c'.repeat(40));
   });
 
   it('creates the versioned release and replaces an existing latest manifest', async () => {
