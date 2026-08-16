@@ -6,10 +6,11 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { main, resolveSearchSource } from '../.agents/skills/search-design-system/scripts/cli.mjs';
-import { resolveBundledSnapshot } from '../.agents/skills/search-design-system/scripts/lib/bundled-snapshot.mjs';
+import { loadBundledIndex, resolveBundledSnapshot } from '../.agents/skills/search-design-system/scripts/lib/bundled-snapshot.mjs';
 import { search } from '../.agents/skills/search-design-system/scripts/lib/index.mjs';
 
 const HASH_RE = /^sha256:[a-f0-9]{64}$/u;
+const BUNDLED_SNAPSHOT_ROOT = path.resolve(__dirname, '../design-knowledge');
 
 function sha256(bytes: Buffer | string) {
   return `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`;
@@ -98,6 +99,45 @@ afterEach(() => {
 });
 
 describe('bundled design knowledge search', () => {
+  it('locks the committed immutable snapshot and artifact metadata', async () => {
+    const snapshot = await resolveBundledSnapshot({ snapshotRoot: BUNDLED_SNAPSHOT_ROOT });
+
+    expect(snapshot.manifest.snapshotVersion).toBe('2026-08-14.2');
+    expect(snapshot.manifest.indexes.desktop).toEqual({
+      path: 'indexes/desktop.json',
+      hash: 'sha256:fc1f387825decbc194b556cef7faf35accce582cd9967bf98b7e09be9daacce1',
+      count: 123,
+    });
+    expect(snapshot.manifest.indexes.mobile).toEqual({
+      path: 'indexes/mobile.json',
+      hash: 'sha256:e7b43f02e495ae17850eb9d464d4608f497ac3e55893f9be96c00295c01a0b28',
+      count: 100,
+    });
+    expect(snapshot.manifest.designMd).toEqual({ root: 'design-md', count: 223 });
+
+    const indexes = await Promise.all(['desktop', 'mobile'].map((platform) => loadBundledIndex({ snapshot, platform })));
+    const records = indexes.flatMap(({ index }) => index.records);
+    expect(records).toHaveLength(223);
+    expect(new Set(records.map(({ id }) => id)).size).toBe(223);
+
+    for (const record of records) {
+      const { artifacts, remoteArtifacts } = record;
+      expect(sha256(await readFile(path.join(BUNDLED_SNAPSHOT_ROOT, artifacts.designMdPath)))).toBe(artifacts.designMdHash);
+      expect(artifacts.packagePath).toBe(`packages/${record.id}.tgz`);
+      expect(artifacts.packageHash).toMatch(HASH_RE);
+      expect(remoteArtifacts).toEqual({ packagePath: artifacts.packagePath, packageHash: artifacts.packageHash });
+    }
+
+    expect(records.find(({ id }) => id === '8returns')?.artifacts).toMatchObject({
+      packagePath: 'packages/8returns.tgz',
+      packageHash: 'sha256:97c7469d1d3011f61fe19a62300268f7ed6ef15cc41882a014f1f203e9c71663',
+    });
+    expect(records.find(({ id }) => id === 'airbnb-mobile')?.remoteArtifacts).toEqual({
+      packagePath: 'packages/airbnb-mobile.tgz',
+      packageHash: 'sha256:13e839143796d9c5a80f8f50baa68f3a3aa16b1d97cec12e1052e0b9467782d5',
+    });
+  });
+
   it('searches the bundled snapshot by default without fetching', async () => {
     const { snapshotRoot } = await makeSnapshot();
     const requestPath = path.join(snapshotRoot, 'request.json');
