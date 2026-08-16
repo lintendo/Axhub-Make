@@ -1,6 +1,6 @@
 {
   "name": "@axhub/make-client",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "private": true,
   "description": "Official Axhub Make client runtime",
   "type": "module",

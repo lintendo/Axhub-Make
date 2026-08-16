@@ -541,10 +541,21 @@ describe('release make artifact helpers', () => {
     );
   });
 
-  it('keeps the approved annotation range while pinning exact client dependencies and pnpm', () => {
+  it('keeps the 0.1.19 client template identity, release notes, and pinned dependencies', () => {
     const clientPackageJson = JSON.parse(fs.readFileSync(path.resolve('client/package.json'), 'utf8'));
+    const runtimeConstants = fs.readFileSync(path.resolve('src/common/makeClientTemplate.ts'), 'utf8');
+    const releaseNotes = fs.readFileSync(path.resolve('client/RELEASE_NOTES.md'), 'utf8');
 
-    assert.equal(clientPackageJson.version, '0.1.18');
+    assert.equal(clientPackageJson.version, '0.1.19');
+    assert.match(
+      runtimeConstants,
+      /export const DEFAULT_MAKE_CLIENT_TEMPLATE_VERSION = '0\.1\.19';/u,
+    );
+    assert.match(releaseNotes, /^# Axhub Make Client 0\.1\.19$/mu);
+    assert.match(releaseNotes, /本地 Design Knowledge 检索/u);
+    assert.match(releaseNotes, /223 份.*DESIGN\.md/u);
+    assert.match(releaseNotes, /哈希验证.*主源.*Gitee.*固定回退/u);
+    assert.match(releaseNotes, /ZIP.*不包含.*本地主题源码/u);
     assert.equal(clientPackageJson.packageManager, 'pnpm@10.20.0');
     assert.equal(clientPackageJson.dependencies['@axhub/annotation'], '^1.0.18');
     assert.equal(clientPackageJson.dependencies['lucide-react'], '0.562.0');

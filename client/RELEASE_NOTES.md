@@ -1,7 +1,6 @@
-# Axhub Make Client 0.1.18
+# Axhub Make Client 0.1.19
 
-- 更新客户端工作规则和内置技能，完善原型开发与截图还原流程
-- 为 `screenshot-to-prototype` 新增 rembg 背景移除能力和重建清单校验
-- `check-app-ready` 返回 Make 管理端深链，便于直接打开目标资源
-- 支持仅包含主规格的原型参与项目元数据同步
-- 更新内置示例原型及相关标注内容
+- 模板 ZIP 内置本地 Design Knowledge 检索技能和不可变索引，检索无需联网。
+- 模板 ZIP 包含 223 份已校验的 `DESIGN.md` 文档。
+- 主题安装支持经哈希验证的主源与 Gitee 固定回退包。
+- 模板 ZIP 不包含本地主题源码；主题应通过已验证的安装包获取。
