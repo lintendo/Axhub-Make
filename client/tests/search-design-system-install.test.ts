@@ -5,9 +5,20 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 
-import { installTheme } from '../.agents/skills/search-design-system/scripts/lib/install-theme.mjs';
+import { installTheme as installThemeRuntime } from '../.agents/skills/search-design-system/scripts/lib/install-theme.mjs';
 
 const skillRoot = path.resolve(__dirname, '../.agents/skills/search-design-system');
+type InstallThemeOptions = {
+  themeId: string;
+  platform: 'desktop' | 'mobile';
+  projectRoot: string;
+  snapshotRoot: string;
+  fetch?: (url: URL, init?: RequestInit) => Promise<Response>;
+  now?: () => Date;
+  timeoutMs?: number;
+  runMetadataSync?: (projectRoot: string) => Promise<void>;
+};
+const installTheme = installThemeRuntime as (options: InstallThemeOptions) => ReturnType<typeof installThemeRuntime>;
 
 function tarHeader(name: string, size: number, type = '0'): Buffer {
   const header = Buffer.alloc(512);
@@ -42,7 +53,8 @@ function packageBytes(entries?: Array<{ name: string; body: string; type?: strin
     chunks.push(tarHeader(entry.name, body.length, entry.type), body, Buffer.alloc((512 - (body.length % 512)) % 512));
   }
   chunks.push(Buffer.alloc(1024));
-  return zlib.gzipSync(Buffer.concat(chunks), { level: 9, mtime: 0 });
+  const options: zlib.ZlibOptions & { mtime: number } = { level: 9, mtime: 0 };
+  return zlib.gzipSync(Buffer.concat(chunks), options);
 }
 
 const hash = (bytes: Buffer) => `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`;
@@ -86,7 +98,7 @@ async function fixture(archive = packageBytes()) {
 }
 
 function response(body: Buffer, status = 200): Response {
-  return new Response(body, { status, headers: { 'content-length': String(body.length) } });
+  return new Response(Uint8Array.from(body), { status, headers: { 'content-length': String(body.length) } });
 }
 
 describe('theme installer', () => {
