@@ -29,25 +29,49 @@ export function objectPath(cacheDir, hash) {
   return path.join(path.resolve(cacheDir), 'objects', hashHex(hash));
 }
 
-async function atomicWrite(file, bytes) {
-  await fs.mkdir(path.dirname(file), { recursive: true });
+async function replaceExistingFile(temporary, file, fileSystem, initialError) {
+  const backup = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${crypto.randomUUID()}.bak`);
+  try {
+    await fileSystem.rename(file, backup);
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      await fileSystem.rename(temporary, file);
+      return;
+    }
+    throw initialError;
+  }
+  try {
+    await fileSystem.rename(temporary, file);
+  } catch (error) {
+    try {
+      await fileSystem.rename(backup, file);
+    } catch (restoreError) {
+      error.restoreError = restoreError;
+    }
+    throw error;
+  }
+  await fileSystem.rm(backup, { force: true }).catch(() => {});
+}
+
+export async function atomicWrite(file, bytes, { fileSystem = fs } = {}) {
+  await fileSystem.mkdir(path.dirname(file), { recursive: true });
   const temporary = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${crypto.randomUUID()}.tmp`);
   let handle;
   try {
-    handle = await fs.open(temporary, 'wx', 0o600);
+    handle = await fileSystem.open(temporary, 'wx', 0o600);
     await handle.writeFile(bytes);
     await handle.sync();
     await handle.close();
     handle = undefined;
     try {
-      await fs.rename(temporary, file);
+      await fileSystem.rename(temporary, file);
     } catch (error) {
       if (!['EEXIST', 'EPERM'].includes(error?.code)) throw error;
-      await fs.access(file);
+      await replaceExistingFile(temporary, file, fileSystem, error);
     }
   } finally {
     await handle?.close().catch(() => {});
-    await fs.rm(temporary, { force: true }).catch(() => {});
+    await fileSystem.rm(temporary, { force: true }).catch(() => {});
   }
 }
 

@@ -219,6 +219,30 @@ describe('theme installer', () => {
     await expect(installTheme({ ...base, themeId: 'alpha', platform: 'desktop', fetch: async () => { throw new Error('must not request'); } })).rejects.toMatchObject({ code: 'PACKAGE_SOURCE_INVALID' });
   });
 
+  it('rejects a symlinked configured theme root before it can write outside the project', async () => {
+    const base = await fixture();
+    const externalRoot = path.join(path.dirname(base.projectRoot), 'external-themes');
+    const configuredThemesRoot = path.join(base.projectRoot, 'src/themes');
+    await fs.mkdir(externalRoot);
+    await fs.mkdir(path.dirname(configuredThemesRoot), { recursive: true });
+    await fs.symlink(externalRoot, configuredThemesRoot, process.platform === 'win32' ? 'junction' : 'dir');
+
+    let requests = 0;
+    await expect(installTheme({
+      ...base,
+      themeId: 'alpha',
+      platform: 'desktop',
+      fetch: async () => {
+        requests += 1;
+        return response(base.archive);
+      },
+      runMetadataSync: async () => {},
+    })).rejects.toMatchObject({ code: 'INSTALL_DESTINATION_INVALID' });
+
+    expect(requests).toBe(0);
+    await expect(fs.access(path.join(externalRoot, 'alpha'))).rejects.toThrow();
+  });
+
   it('keeps the runtime installer inside the mirrored skill tree', async () => {
     const source = await fs.readFile(path.join(skillRoot, 'scripts/lib/install-theme.mjs'), 'utf8');
     expect(source).toContain('DOWNLOAD_TIMEOUT');

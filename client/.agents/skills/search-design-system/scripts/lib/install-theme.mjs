@@ -171,8 +171,32 @@ async function writeEntries(entries, root) {
   }
 }
 
+async function assertSafeExistingComponents(root, candidate) {
+  const resolvedRoot = path.resolve(root);
+  const resolved = path.resolve(candidate);
+  if (!isInside(resolvedRoot, resolved)) throw failure('INSTALL_DESTINATION_INVALID', { reason: 'themes-root' });
+  let current = resolvedRoot;
+  for (const part of path.relative(resolvedRoot, resolved).split(path.sep).filter(Boolean)) {
+    current = path.join(current, part);
+    try {
+      if ((await fs.lstat(current)).isSymbolicLink()) {
+        throw failure('INSTALL_DESTINATION_INVALID', { reason: 'symlink', path: path.relative(resolvedRoot, current) });
+      }
+    } catch (error) {
+      if (error?.code === 'ENOENT') break;
+      if (error?.code === 'INSTALL_DESTINATION_INVALID') throw error;
+      throw failure('INSTALL_DESTINATION_INVALID', { reason: 'destination-component' }, error);
+    }
+  }
+}
+
 async function readProjectThemesRoot(projectRoot) {
-  const root = path.resolve(projectRoot ?? '');
+  let root;
+  try {
+    root = await fs.realpath(path.resolve(projectRoot ?? ''));
+  } catch (error) {
+    throw failure('INSTALL_DESTINATION_INVALID', { reason: 'project-root' }, error);
+  }
   await fs.realpath(path.join(root, '.axhub/make/client.json')).catch(() => { throw failure('INSTALL_DESTINATION_INVALID', { reason: 'client-marker' }); });
   let relative = 'src/themes';
   try {
@@ -190,6 +214,7 @@ async function readProjectThemesRoot(projectRoot) {
   }
   const themesRoot = path.resolve(root, relative);
   if (!isInside(root, themesRoot)) throw failure('INSTALL_DESTINATION_INVALID', { reason: 'themes-root' });
+  await assertSafeExistingComponents(root, themesRoot);
   return { root, themesRoot };
 }
 
@@ -211,8 +236,9 @@ function defaultMetadataSync(projectRoot) {
 }
 
 async function installEntries({ entries, projectRoot, themesRoot, themeId, runMetadataSync }) {
-  await fs.mkdir(themesRoot, { recursive: true });
   const target = path.join(themesRoot, themeId);
+  await assertSafeExistingComponents(projectRoot, target);
+  await fs.mkdir(themesRoot, { recursive: true });
   const targetExists = await fs.lstat(target).then(() => true).catch((error) => error?.code === 'ENOENT' ? false : Promise.reject(error));
   const replacingSpec = targetExists && await isSpecOnly(target);
   if (targetExists && !replacingSpec) throw failure('INSTALL_DESTINATION_INVALID', { reason: 'exists', themeId });
@@ -241,6 +267,7 @@ async function installEntries({ entries, projectRoot, themesRoot, themeId, runMe
 
 async function writeSpecOnly({ snapshot, themeId, platform, projectRoot, themesRoot, failures, now }) {
   const target = path.join(themesRoot, themeId);
+  await assertSafeExistingComponents(projectRoot, target);
   if (await fs.lstat(target).then(() => true).catch(() => false)) throw failure('INSTALL_DESTINATION_INVALID', { reason: 'exists', themeId });
   const candidate = path.join(themesRoot, `.axhub-theme-spec-${themeId}-${crypto.randomUUID()}`);
   const design = await readBundledDesignMd({ snapshot, slug: themeId });
