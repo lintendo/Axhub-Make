@@ -214,6 +214,30 @@ describe('theme installer', () => {
     await expect(fs.access(path.join(externalRoot, 'alpha'))).rejects.toThrow();
   });
 
+  it('rejects a symlinked theme target before downloading either package source', async () => {
+    const base = await fixture();
+    const externalTheme = path.join(path.dirname(base.projectRoot), 'external-alpha');
+    const themeTarget = path.join(base.projectRoot, 'src/themes/alpha');
+    await fs.mkdir(externalTheme);
+    await fs.mkdir(path.dirname(themeTarget), { recursive: true });
+    await fs.symlink(externalTheme, themeTarget, process.platform === 'win32' ? 'junction' : 'dir');
+
+    let requests = 0;
+    await expect(installTheme({
+      ...base,
+      themeId: 'alpha',
+      platform: 'desktop',
+      fetch: async () => {
+        requests += 1;
+        return response(base.archive);
+      },
+      runMetadataSync: async () => {},
+    })).rejects.toMatchObject({ code: 'INSTALL_DESTINATION_INVALID' });
+
+    expect(requests).toBe(0);
+    await expect(fs.readdir(externalTheme)).resolves.toEqual([]);
+  });
+
   it('keeps the runtime installer inside the mirrored skill tree', async () => {
     const source = await fs.readFile(path.join(skillRoot, 'scripts/lib/install-theme.mjs'), 'utf8');
     expect(source).toContain('DOWNLOAD_TIMEOUT');
