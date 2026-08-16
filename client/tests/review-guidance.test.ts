@@ -88,11 +88,11 @@ describe('client workflow guidance', () => {
     expect(readRule('requirements-alignment-guide.md')).toContain('以下阶段均由用户按需发起');
   });
 
-  it('keeps preview-link guidance brief with a default Make origin and custom-host fallback', () => {
+  it('keeps preview-link guidance brief with the default Make origin', () => {
     const alignmentGuide = readRule('requirements-alignment-guide.md');
     const developmentGuide = readRule('prototype-development-guide.md');
 
-    expect(alignmentGuide).toContain('预览链接默认以 `http://localhost:53817/` 拼接；Make 服务使用其他 host 或端口时改用实际服务地址。');
+    expect(alignmentGuide).toContain('Make 预览链接统一使用 `http://localhost:53817/`；链接需要项目上下文时，项目 id 从 `.axhub/make/client.json` 读取。');
     expect(alignmentGuide).not.toContain('## 预览链接口径');
     expect(alignmentGuide).not.toContain('.dev-server-info.json');
     expect(developmentGuide).not.toContain('“预览链接口径”');
