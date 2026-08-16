@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "snapshotVersion": "2026-08-14.2",
+  "readerVersion": {
+    "min": "1.0.0",
+    "maxExclusive": "2.0.0"
+  },
+  "indexes": {
+    "desktop": {
+      "path": "indexes/desktop.json",
+      "hash": "sha256:fc1f387825decbc194b556cef7faf35accce582cd9967bf98b7e09be9daacce1",
+      "count": 123
+    },
+    "mobile": {
+      "path": "indexes/mobile.json",
+      "hash": "sha256:e7b43f02e495ae17850eb9d464d4608f497ac3e55893f9be96c00295c01a0b28",
+      "count": 100
+    }
+  },
+  "designMd": {
+    "root": "design-md",
+    "count": 223
+  },
+  "packageSources": {
+    "primary": "https://lintendo.github.io/Make-Template/knowledge/versions/2026-08-14.2/",
+    "fallback": {
+      "repository": "axhub/Make-Template",
+      "commit": "1a79c952d6a8b36d2d41be1f7a3d867496a44794",
+      "base": "https://gitee.com/axhub/Make-Template/raw/1a79c952d6a8b36d2d41be1f7a3d867496a44794/knowledge/versions/2026-08-14.2/"
+    }
+  }
+}

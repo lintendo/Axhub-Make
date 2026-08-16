@@ -32,6 +32,21 @@ describe('client skill mirrors', () => {
     }
   });
 
+  it('documents the local-first search and bounded theme install contract', () => {
+    const agents = fs.readFileSync(path.join(clientRoot, '.agents/skills/search-design-system/SKILL.md'), 'utf8');
+    const response = fs.readFileSync(path.join(clientRoot, '.agents/skills/search-design-system/references/response-schema.md'), 'utf8');
+    for (const text of [agents, response]) {
+      expect(text).toContain('bundled');
+      expect(text).toContain('spec-only');
+    }
+    expect(agents).toContain('design-knowledge/manifest.json');
+    expect(agents).toContain('install');
+    expect(agents).toContain('10 seconds');
+    expect(agents).toContain('GitHub Pages');
+    expect(agents).toContain('Gitee');
+    expect(agents).not.toContain('默认使用 `scripts/cli.mjs search` 读取 Make-Template 的线上 manifest');
+  });
+
   it('teaches prototype annotation skills to declare active foreground layers', () => {
     const skillPath = path.join('.agents/skills/prototype-annotation/SKILL.md');
     const referencePath = path.join(
