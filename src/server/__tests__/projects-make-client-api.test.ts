@@ -84,7 +84,7 @@ const runLocalCommandMock = vi.mocked(runLocalCommand);
 
 const DEFAULT_TEMPLATE_VERSION = DEFAULT_MAKE_CLIENT_TEMPLATE_VERSION;
 const ONLINE_TEMPLATE_VERSION = '0.9.0';
-const TEMPLATE_MANIFEST_URL = 'https://github.com/lintendo/Axhub-Make/releases/latest/download/axhub-make-client-template.latest.json';
+const TEMPLATE_MANIFEST_URL = 'https://github.com/lintendo/Axhub-Make/releases/download/make-client-template-latest/axhub-make-client-template.latest.json';
 const TEMPLATE_MANIFEST_MIRROR_URL = 'https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-latest/axhub-make-client-template.latest.json';
 const TEMPLATE_ZIP_URL = `https://github.com/lintendo/Axhub-Make/releases/download/make-client-template-v${DEFAULT_TEMPLATE_VERSION}/axhub-make-client-template.zip`;
 const TEMPLATE_MIRROR_ZIP_URL = `https://gitee.com/axhub/Axhub-Make/releases/download/make-client-template-v${DEFAULT_TEMPLATE_VERSION}/axhub-make-client-template.zip`;

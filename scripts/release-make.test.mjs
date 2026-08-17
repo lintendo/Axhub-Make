@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { unzipSync } from 'fflate';
+import { parse as parseYaml } from 'yaml';
 
 process.env.AXHUB_MAKE_RELEASE_SKIP_MAIN = '1';
 
@@ -712,6 +713,31 @@ describe('release make artifact helpers', () => {
     assert.equal(clientPackageJson.devDependencies['@types/react-dom'], '^18.2.0');
   });
 
+  it('binds Make 0.6.20-beta.0 to client 0.1.19 and ACP 0.1.13', () => {
+    const rootPackageJson = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'));
+    const clientPackageJson = JSON.parse(fs.readFileSync(path.resolve('client/package.json'), 'utf8'));
+    const runtimeConstants = fs.readFileSync(path.resolve('src/common/makeClientTemplate.ts'), 'utf8');
+    const lockfile = parseYaml(fs.readFileSync(path.resolve('pnpm-lock.yaml'), 'utf8'));
+    const acpLockEntry = lockfile.importers['.'].dependencies['@axhub/acp'];
+
+    assert.equal(rootPackageJson.version, '0.6.20-beta.0');
+    assert.equal(rootPackageJson.dependencies['@axhub/acp'], '0.1.13');
+    assert.equal(rootPackageJson.dependencies['@assistant-ui/react'], '0.15.5');
+    assert.equal(rootPackageJson.dependencies['@assistant-ui/react-ai-sdk'], '1.4.4');
+    assert.equal(rootPackageJson.pnpm.overrides['@assistant-ui/core'], '0.3.6');
+    assert.equal(rootPackageJson.pnpm.overrides['@assistant-ui/store'], '0.3.4');
+    assert.equal(rootPackageJson.pnpm.overrides['assistant-cloud'], '0.1.38');
+    assert.equal(acpLockEntry.specifier, '0.1.13');
+    assert.match(acpLockEntry.version, /^0\.1\.13(?:\(|$)/u);
+    assert.equal(clientPackageJson.version, '0.1.19');
+    assert.match(runtimeConstants, /DEFAULT_MAKE_CLIENT_TEMPLATE_VERSION = '0\.1\.19'/u);
+    assert.match(
+      runtimeConstants,
+      /releases\/download\/\$\{MAKE_CLIENT_TEMPLATE_LATEST_RELEASE_TAG\}\/\$\{MAKE_CLIENT_TEMPLATE_LATEST_MANIFEST_NAME\}/u,
+    );
+    assert.doesNotMatch(runtimeConstants, /releases\/latest\/download/u);
+  });
+
   it('keeps live comments ignored in the publishing checkout', () => {
     const sourceGitignore = fs.readFileSync(path.resolve('client/.gitignore'), 'utf8');
 
@@ -768,6 +794,9 @@ describe('release make artifact helpers', () => {
   it('keeps ordinary make release commands free of the client template zip', () => {
     const commands = releaseMake.publishCommands({
       tagName: 'make-v1.2.3',
+      version: '1.2.3',
+      sourceCommit: 'a'.repeat(40),
+      npmTarballPath: '/tmp/axhub-make-1.2.3.tgz',
       templateZip: {
         path: '/tmp/axhub-make-client-template.zip',
       },
@@ -812,6 +841,30 @@ describe('release make artifact helpers', () => {
       '--title',
       'Axhub Make Client Template 0.2.0-beta.1',
       '--generate-notes',
+    ]);
+    assert.deepEqual(commands.latestAliasCreateArgs, [
+      'release',
+      'create',
+      'make-client-template-latest',
+      '/tmp/axhub-make-client-template.latest.json',
+      '--repo',
+      'lintendo/Axhub-Make',
+      '--target',
+      sourceCommit,
+      '--title',
+      'Axhub Make Client Template Latest',
+      '--notes',
+      'Current template version: 0.2.0-beta.1',
+      '--latest=false',
+    ]);
+    assert.deepEqual(commands.latestAliasUploadArgs, [
+      'release',
+      'upload',
+      'make-client-template-latest',
+      '/tmp/axhub-make-client-template.latest.json',
+      '--repo',
+      'lintendo/Axhub-Make',
+      '--clobber',
     ]);
 
     assert.throws(
@@ -940,18 +993,54 @@ describe('release make artifact helpers', () => {
         fs.writeFileSync(fixture.latestPath, 'changed after validation', 'utf8');
       },
       runImpl: (command, args) => {
-        events.push('gh');
         assert.equal(command, 'gh');
-        stagedPaths = args.slice(3, 5);
-        assert.notEqual(stagedPaths[0], fixture.zipPath);
-        assert.notEqual(stagedPaths[1], fixture.latestPath);
-        assert.deepEqual(fs.readFileSync(stagedPaths[0]), fixture.zipBytes);
-        assert.deepEqual(fs.readFileSync(stagedPaths[1]), fixture.latestBytes);
+        if (args[2] === fixture.manifest.tagName) {
+          events.push('version');
+          stagedPaths = args.slice(3, 5);
+          assert.notEqual(stagedPaths[0], fixture.zipPath);
+          assert.notEqual(stagedPaths[1], fixture.latestPath);
+          assert.deepEqual(fs.readFileSync(stagedPaths[0]), fixture.zipBytes);
+          assert.deepEqual(fs.readFileSync(stagedPaths[1]), fixture.latestBytes);
+          return;
+        }
+        events.push('alias');
+        assert.equal(args[2], 'make-client-template-latest');
+        assert.deepEqual(fs.readFileSync(args[3]), fixture.latestBytes);
+      },
+      releaseExistsImpl: () => {
+        events.push('view');
+        return false;
       },
     });
 
-    assert.deepEqual(events, ['confirm', 'tool', 'gh']);
+    assert.deepEqual(events, ['confirm', 'tool', 'version', 'view', 'alias']);
     assert(stagedPaths.every((assetPath) => !fs.existsSync(assetPath)));
+  });
+
+  it('overwrites the fixed latest alias manifest after the version release exists', () => {
+    const fixture = createTemplatePublishFixture();
+    const calls = [];
+
+    releaseMake.runTemplateRelease(fixture.manifest, {
+      githubRepo: 'lintendo/Axhub-Make',
+      confirmPublish: true,
+    }, {
+      currentCommit: fixture.sourceCommit,
+      confirmPublishImpl: () => {},
+      assertToolImpl: () => {},
+      releaseExistsImpl: () => true,
+      runImpl: (command, args) => calls.push([command, args]),
+    });
+
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0][1][2], fixture.manifest.tagName);
+    assert.deepEqual(calls[1][1].slice(0, 4), [
+      'release',
+      'upload',
+      'make-client-template-latest',
+      calls[1][1][3],
+    ]);
+    assert(calls[1][1].includes('--clobber'));
   });
 
   it('retries transient publish staging cleanup locks without warning', () => {
@@ -969,8 +1058,11 @@ describe('release make artifact helpers', () => {
       confirmPublishImpl: () => {},
       assertToolImpl: () => {},
       runImpl: (_command, args) => {
-        stagingDir = path.dirname(args[3]);
+        if (args[2] === fixture.manifest.tagName) {
+          stagingDir = path.dirname(args[3]);
+        }
       },
+      releaseExistsImpl: () => false,
       logger: { warn: (message) => warnings.push(String(message)) },
       cleanupOptions: {
         maxAttempts: 3,
@@ -1008,8 +1100,11 @@ describe('release make artifact helpers', () => {
       confirmPublishImpl: () => {},
       assertToolImpl: () => {},
       runImpl: (_command, args) => {
-        stagingDir = path.dirname(args[3]);
+        if (args[2] === fixture.manifest.tagName) {
+          stagingDir = path.dirname(args[3]);
+        }
       },
+      releaseExistsImpl: () => false,
       logger: { warn: (message) => warnings.push(String(message)) },
       cleanupOptions: {
         maxAttempts: 3,
@@ -1443,11 +1538,13 @@ describe('release make artifact helpers', () => {
   });
 
   it('defaults publish commands to the beta npm tag', () => {
+    const sourceCommit = 'a'.repeat(40);
     const commands = releaseMake.publishCommands({
       packageName: '@axhub/make',
-      version: '1.2.3',
-      tagName: 'make-v1.2.3',
-      npmPackageDir: '/tmp/axhub-make-npm-package',
+      version: '0.6.20-beta.0',
+      tagName: 'make-v0.6.20-beta.0',
+      sourceCommit,
+      npmTarballPath: '/tmp/axhub-make-0.6.20-beta.0.tgz',
       releaseAssets: [],
     }, {
       githubRepo: 'lintendo/Axhub-Make',
@@ -1455,12 +1552,36 @@ describe('release make artifact helpers', () => {
 
     assert.deepEqual(commands.npmArgs, [
       'publish',
-      '/tmp/axhub-make-npm-package',
+      '/tmp/axhub-make-0.6.20-beta.0.tgz',
       '--access',
       'public',
       '--tag',
       'beta',
     ]);
+    assert.deepEqual(commands.releaseArgs, [
+      'release',
+      'create',
+      'make-v0.6.20-beta.0',
+      '--repo',
+      'lintendo/Axhub-Make',
+      '--target',
+      sourceCommit,
+      '--title',
+      '@axhub/make 0.6.20-beta.0',
+      '--generate-notes',
+      '--prerelease',
+      '--latest=false',
+    ]);
+    assert.throws(
+      () => releaseMake.publishCommands({
+        packageName: '@axhub/make',
+        version: '0.6.20-beta.0',
+        tagName: 'make-v0.6.20-beta.0',
+        npmTarballPath: '/tmp/axhub-make-0.6.20-beta.0.tgz',
+        releaseAssets: [],
+      }, { githubRepo: 'lintendo/Axhub-Make' }),
+      /sourceCommit/u,
+    );
   });
 
   it('skips platform release artifacts for npm-only releases', () => {
@@ -1631,7 +1752,7 @@ describe('release make artifact helpers', () => {
     });
     assert.equal(packageJson.files.includes('assets'), false);
     assert.equal(packageJson.files.includes('README.md'), false);
-    assert.deepEqual(packageJson.engines, { node: '>=20' });
+    assert.deepEqual(packageJson.engines, { node: '>=22' });
     assert.deepEqual(packageJson.publishConfig, { access: 'public' });
     for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
       assert.equal(packageJson[field], undefined);

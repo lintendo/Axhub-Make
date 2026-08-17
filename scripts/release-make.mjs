@@ -39,7 +39,7 @@ const makeClientTemplateSourcePath = path.join(makeServerRoot, 'src/common/makeC
 const makeClientTemplateReleaseNotesFileName = 'RELEASE_NOTES.md';
 const makeClientTemplateZipName = 'axhub-make-client-template.zip';
 const makeClientTemplateLatestManifestName = 'axhub-make-client-template.latest.json';
-const makeClientTemplateLatestManifestGiteeTagName = 'make-client-template-latest';
+const makeClientTemplateLatestManifestTagName = 'make-client-template-latest';
 const makeClientTemplatePackageManager = 'pnpm@10.20.0';
 const makeClientTemplateRequiredExactDependencies = new Set([
   'lucide-react',
@@ -260,19 +260,23 @@ export function resolveCleanGitCommit({
   return sourceCommit;
 }
 
-export function assertTemplateSourceCommit(manifest, {
+function assertReleaseSourceCommit(manifest, {
   currentCommit = resolveCleanGitCommit(),
-} = {}) {
+} = {}, manifestLabel = 'Prepared release manifest') {
   if (!/^[a-f0-9]{40}$/u.test(manifest?.sourceCommit)) {
-    throw new Error('Prepared template manifest is missing a valid sourceCommit');
+    throw new Error(`${manifestLabel} is missing a valid sourceCommit`);
   }
   if (!/^[a-f0-9]{40}$/u.test(currentCommit)) {
     throw new Error('Current HEAD is not a valid 40-hex commit');
   }
   if (manifest.sourceCommit !== currentCommit) {
-    throw new Error(`Prepared template manifest sourceCommit does not match current HEAD: ${manifest.sourceCommit} !== ${currentCommit}`);
+    throw new Error(`${manifestLabel} sourceCommit does not match current HEAD: ${manifest.sourceCommit} !== ${currentCommit}`);
   }
   return currentCommit;
+}
+
+export function assertTemplateSourceCommit(manifest, options = {}) {
+  return assertReleaseSourceCommit(manifest, options, 'Prepared template manifest');
 }
 
 function assertTool(command, args = ['--version']) {
@@ -1468,7 +1472,7 @@ export function createPublishPackageJson(sourcePackage) {
       'package.json',
     ],
     engines: {
-      node: '>=20',
+      node: '>=22',
     },
     publishConfig: {
       access: 'public',
@@ -1501,8 +1505,8 @@ function assertPackageJsonShape(packageJson) {
   if (packageJson.publishConfig?.access !== 'public') {
     throw new Error('npm package publishConfig.access must be public');
   }
-  if (packageJson.engines?.node !== '>=20') {
-    throw new Error('npm package engines.node must be >=20');
+  if (packageJson.engines?.node !== '>=22') {
+    throw new Error('npm package engines.node must be >=22');
   }
   for (const [binName, target] of Object.entries(requiredNpmBin)) {
     if (packageJson.bin?.[binName] !== target) {
@@ -1709,6 +1713,7 @@ function createPlatformArtifact(target, executablePath, sourcePackage, canvasFig
     bunTarget: target.bunTarget,
     bundleDir: artifactDir,
     zipPath: artifactZip,
+    zipSha256: sha256File(artifactZip),
     executablePath: path.join(artifactDir, target.executableName),
   };
 }
@@ -1776,6 +1781,7 @@ function prepareRelease(options = {}) {
   if (!fs.existsSync(canvasFigSyncSource)) {
     throw new Error(`Required release asset is missing: ${canvasFigSyncSource}`);
   }
+  const sourceCommit = resolveCleanGitCommit();
 
   logStep('Checking release tools');
   for (const tool of releaseToolsForOptions(options)) {
@@ -1822,11 +1828,13 @@ function prepareRelease(options = {}) {
     packageName: sourcePackage.name,
     version: sourcePackage.version,
     tagName: `make-v${sourcePackage.version}`,
+    sourceCommit,
     preparedAt: new Date().toISOString(),
     adminDir: releaseAdminDir,
     opencodeWebUiDir: null,
     npmPackageDir,
     npmTarballPath: tarballPath,
+    npmTarballSha256: sha256File(tarballPath),
     npmPackDryRun: dryRunInfo,
     releaseAssets,
   };
@@ -1889,7 +1897,7 @@ function prepareTemplateRelease(options = {}) {
     latestManifest: {
       path: latestManifestPath,
       name: makeClientTemplateLatestManifestName,
-      mirrorUrl: `https://gitee.com/axhub/Axhub-Make/releases/download/${makeClientTemplateLatestManifestGiteeTagName}/${makeClientTemplateLatestManifestName}`,
+      mirrorUrl: `https://gitee.com/axhub/Axhub-Make/releases/download/${makeClientTemplateLatestManifestTagName}/${makeClientTemplateLatestManifestName}`,
       sha256: sha256File(latestManifestPath),
       manifest: latestManifest,
     },
@@ -1914,6 +1922,10 @@ function assertPreparedManifestCurrent(manifest) {
       + `package.json has ${sourcePackage.name}@${sourcePackage.version}. Run pnpm release:make:prepare.`,
     );
   }
+  assertReleaseSourceCommit(manifest, {}, 'Prepared Make manifest');
+  if (!/^[a-f0-9]{64}$/u.test(manifest.npmTarballSha256 || '')) {
+    throw new Error('Prepared Make manifest is missing a valid npmTarballSha256');
+  }
   const requiredPaths = [
     manifest.adminDir,
     manifest.npmPackageDir,
@@ -1924,6 +1936,19 @@ function assertPreparedManifestCurrent(manifest) {
   for (const requiredPath of requiredPaths) {
     if (!requiredPath || !fs.existsSync(requiredPath)) {
       throw new Error(`Prepared artifact is missing: ${requiredPath}`);
+    }
+  }
+  const actualTarballSha256 = sha256File(manifest.npmTarballPath);
+  if (actualTarballSha256 !== manifest.npmTarballSha256) {
+    throw new Error(`Prepared npm tarball SHA-256 does not match manifest: ${actualTarballSha256} !== ${manifest.npmTarballSha256}`);
+  }
+  for (const asset of manifest.releaseAssets || []) {
+    if (!/^[a-f0-9]{64}$/u.test(asset.zipSha256 || '')) {
+      throw new Error(`Prepared release asset is missing a valid zipSha256: ${asset.zipPath || '(missing path)'}`);
+    }
+    const actualZipSha256 = sha256File(asset.zipPath);
+    if (actualZipSha256 !== asset.zipSha256) {
+      throw new Error(`Prepared release asset SHA-256 does not match manifest: ${asset.zipPath}`);
     }
   }
 }
@@ -2438,7 +2463,13 @@ export function cleanupTemplatePublishStaging(stagingDir, {
 }
 
 export function publishCommands(manifest, options) {
-  const npmArgs = ['publish', manifest.npmPackageDir, '--access', 'public', '--tag', options.npmTag || 'beta'];
+  if (!manifest.npmTarballPath) {
+    throw new Error('Make release manifest is missing npmTarballPath');
+  }
+  if (!/^[a-f0-9]{40}$/u.test(manifest.sourceCommit)) {
+    throw new Error('Make release manifest is missing a valid sourceCommit');
+  }
+  const npmArgs = ['publish', manifest.npmTarballPath, '--access', 'public', '--tag', options.npmTag || 'beta'];
   if (options.otp) {
     npmArgs.push('--otp', options.otp);
   }
@@ -2449,9 +2480,12 @@ export function publishCommands(manifest, options) {
     ...(manifest.releaseAssets || []).map((asset) => asset.zipPath),
     '--repo',
     options.githubRepo,
+    '--target',
+    manifest.sourceCommit,
     '--title',
     `@axhub/make ${manifest.version}`,
     '--generate-notes',
+    ...(String(manifest.version).includes('-') ? ['--prerelease', '--latest=false'] : []),
   ];
   return { npmArgs, releaseArgs };
 }
@@ -2479,7 +2513,59 @@ export function publishTemplateCommands(manifest, options, publishAssets = {}) {
     `Axhub Make Client Template ${manifest.templateVersion}`,
     '--generate-notes',
   ];
-  return { releaseArgs };
+  const latestManifestPath = publishAssets.latestManifestPath || manifest.latestManifest?.path;
+  if (!latestManifestPath) {
+    throw new Error('Template release manifest is missing latestManifest.path');
+  }
+  const latestAliasCreateArgs = [
+    'release',
+    'create',
+    makeClientTemplateLatestManifestTagName,
+    latestManifestPath,
+    '--repo',
+    options.githubRepo,
+    '--target',
+    manifest.sourceCommit,
+    '--title',
+    'Axhub Make Client Template Latest',
+    '--notes',
+    `Current template version: ${manifest.templateVersion}`,
+    '--latest=false',
+  ];
+  const latestAliasUploadArgs = [
+    'release',
+    'upload',
+    makeClientTemplateLatestManifestTagName,
+    latestManifestPath,
+    '--repo',
+    options.githubRepo,
+    '--clobber',
+  ];
+  return { releaseArgs, latestAliasCreateArgs, latestAliasUploadArgs };
+}
+
+function githubReleaseExists(tagName, githubRepo, spawnSyncImpl = spawnSync) {
+  const result = spawnSyncImpl('gh', [
+    'release',
+    'view',
+    tagName,
+    '--repo',
+    githubRepo,
+  ], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  if (result.error) {
+    throw new Error(`Unable to inspect GitHub Release ${tagName}: ${result.error.message}`);
+  }
+  if (result.status === 0) {
+    return true;
+  }
+  const output = `${result.stdout || ''}\n${result.stderr || ''}`;
+  if (/release not found/iu.test(output)) {
+    return false;
+  }
+  throw new Error(`Unable to inspect GitHub Release ${tagName}: ${output.trim() || `exit ${result.status}`}`);
 }
 
 export function assertExternalPublishConfirmed(options = {}) {
@@ -2493,6 +2579,7 @@ function runRelease(manifest, options) {
     throw new Error('Missing --github-repo OWNER/REPO for GitHub Release. Use --skip-github to publish npm only.');
   }
 
+  assertPreparedManifestCurrent(manifest);
   const { npmArgs, releaseArgs } = publishCommands(manifest, options);
 
   if (options.dryRun) {
@@ -2532,9 +2619,13 @@ export function runTemplateRelease(manifest, options, dependencies = {}) {
   });
 
   if (options.dryRun) {
-    const { releaseArgs } = publishTemplateCommands(manifest, options);
+    const { releaseArgs, latestAliasCreateArgs, latestAliasUploadArgs } = publishTemplateCommands(manifest, options);
     logStep('Dry-run template release commands');
     console.log(quoteCommand('gh', releaseArgs));
+    console.log('Create the fixed latest alias when it does not exist:');
+    console.log(quoteCommand('gh', latestAliasCreateArgs));
+    console.log('Otherwise replace the manifest on the existing fixed alias:');
+    console.log(quoteCommand('gh', latestAliasUploadArgs));
     return;
   }
 
@@ -2542,14 +2633,23 @@ export function runTemplateRelease(manifest, options, dependencies = {}) {
   let publicationError = null;
   let published = false;
   try {
-    const { releaseArgs } = publishTemplateCommands(manifest, options, stagedAssets);
+    const { releaseArgs, latestAliasCreateArgs, latestAliasUploadArgs } = publishTemplateCommands(manifest, options, stagedAssets);
     const confirmPublishImpl = dependencies.confirmPublishImpl || assertExternalPublishConfirmed;
     const assertToolImpl = dependencies.assertToolImpl || assertTool;
     const runImpl = dependencies.runImpl || run;
+    const releaseExistsImpl = dependencies.releaseExistsImpl || ((tagName, githubRepo) => (
+      githubReleaseExists(tagName, githubRepo)
+    ));
     confirmPublishImpl(options);
     logStep(`Creating GitHub Release ${manifest.tagName}`);
     assertToolImpl('gh');
     runImpl('gh', releaseArgs);
+    const latestAliasExists = releaseExistsImpl(
+      makeClientTemplateLatestManifestTagName,
+      options.githubRepo,
+    );
+    logStep(`${latestAliasExists ? 'Updating' : 'Creating'} GitHub Release ${makeClientTemplateLatestManifestTagName}`);
+    runImpl('gh', latestAliasExists ? latestAliasUploadArgs : latestAliasCreateArgs);
     published = true;
   } catch (error) {
     publicationError = error;

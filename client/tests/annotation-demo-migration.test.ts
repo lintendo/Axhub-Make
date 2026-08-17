@@ -7,7 +7,23 @@ const { buildMakeProjectMetadata } = await import('../scripts/sync-project-metad
 
 const appRoot = path.resolve(__dirname, '..');
 const makeRoot = path.resolve(appRoot, '..');
-const workspaceRoot = path.resolve(makeRoot, '../..');
+const findRuntimeWorkspaceRoot = (startPath: string) => {
+  let current = path.resolve(startPath);
+  while (true) {
+    if (
+      fs.existsSync(path.join(current, 'pnpm-lock.yaml'))
+      && fs.existsSync(path.join(current, 'packages/axhub-annotation/package.json'))
+    ) {
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      throw new Error(`Unable to locate Axhub Runtime workspace above ${startPath}`);
+    }
+    current = parent;
+  }
+};
+const workspaceRoot = findRuntimeWorkspaceRoot(makeRoot);
 const demoRoot = path.join(appRoot, 'src/prototypes/annotation-demo');
 
 describe('annotation demo migration', () => {
