@@ -212,7 +212,7 @@ describe('default client skills', () => {
       expect(skillSource).toContain('rules/requirements-alignment-guide.md');
       expect(skillSource).toContain('原型主规格');
       expect(skillSource).not.toContain('同时存在时以 HTML 为准');
-      expect(skillSource).toContain('PRD 仍写入 `src/resources/prd/`');
+      expect(skillSource).toContain('未指定时使用统一内置模板 `templates/prd.md`');
       expect(skillSource).toContain('同步更新主规格中的引用或相关决策');
       expect(skillSource).not.toContain('ready-for-agent');
       expect(skillSource).not.toContain('/setup-matt-pocock-skills');
@@ -220,27 +220,18 @@ describe('default client skills', () => {
     }
   });
 
-  it('keeps requirements exploration in the current prototype main spec', () => {
-    const skillRoots = [
-      '.agents/skills/requirements-exploration',
-      '.claude/skills/requirements-exploration',
-    ];
+  it('keeps requirements exploration in the project alignment rule', () => {
+    const requirementsGuide = readClientFile('rules/requirements-alignment-guide.md');
 
-    for (const root of skillRoots) {
-      const skillSource = readClientFile(`${root}/SKILL.md`);
-
-      expect(skillSource).toContain('rules/requirements-alignment-guide.md');
-      expect(skillSource).toContain('原型主规格');
-      expect(skillSource).not.toContain('同时存在时以 HTML 为准');
-      expect(skillSource).not.toContain('确认前不得修改原型');
-      expect(skillSource).not.toContain('snapshot files');
-    }
+    expect(requirementsGuide).toContain('原型主规格');
+    expect(requirementsGuide).toContain('确认前不得修改原型');
+    expect(requirementsGuide).not.toContain('snapshot files');
   });
 
   it('keeps UI design image skill size guidance within GPT Image 2 API constraints', () => {
     const skillRoots = [
-      '.agents/skills/ui-design-image',
-      '.claude/skills/ui-design-image',
+      '.agents/skills/ui-image-generation',
+      '.claude/skills/ui-image-generation',
     ];
 
     for (const root of skillRoots) {

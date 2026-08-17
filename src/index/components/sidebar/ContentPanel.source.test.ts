@@ -759,7 +759,7 @@ describe('ContentPanel document paste upload source', () => {
       source.indexOf('const resetSidebarHorizontalScroll = () => {'),
     );
 
-    expect(source).toContain("import type { SelectedResourceFolder, UploadedResourceFile } from '../../types/index-page.types';");
+    expect(source).toContain("import type { PromptExecutionMeta, SelectedResourceFolder, UploadedResourceFile } from '../../types/index-page.types';");
     expect(source).toContain('onUploadedResourceFiles?: (files: UploadedResourceFile[]) => void | Promise<void>;');
     expect(uploadSource).toContain('const uploadedFiles = Array.isArray(result?.files)');
     expect(uploadSource).toContain('await Promise.resolve(onUploadedResourceFiles?.(uploadedFiles));');

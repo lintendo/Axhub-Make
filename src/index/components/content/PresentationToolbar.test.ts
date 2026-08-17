@@ -256,7 +256,7 @@ describe('PresentationToolbar Agent host controls source', () => {
     );
   });
 
-  it('labels open-in-editor tooltips with the resolved IDE app name', () => {
+  it('labels the data-table open-in-editor tooltip with the resolved IDE app name', () => {
     const source = readToolbarSource();
 
     expect(source).toContain("import { MAIN_IDE_APP_NAMES, resolveVisibleIDEPreference } from '../../../common/ide';");
@@ -265,9 +265,9 @@ describe('PresentationToolbar Agent host controls source', () => {
     expect(source).toContain('resolveVisibleIDEPreference(preferredIDE, ideAvailability)');
     expect(source).toContain("const openInIdeTooltip = openInIdeName ? `在 ${openInIdeName} 中打开` : '在编辑器中打开';");
     expect(source).toContain("const getOpenInIdeTooltip = (targetLabel: string) => openInIdeName ? `在 ${openInIdeName} 中打开${targetLabel}` : `在编辑器中打开${targetLabel}`;");
-    expect(source).toContain('{getOpenInIdeTooltip(currentMarkdownLabel)}');
-    expect(source).toContain("{getOpenInIdeTooltip('主题')}");
     expect(source).toContain("{getOpenInIdeTooltip('数据表')}");
+    expect(source).not.toContain('{getOpenInIdeTooltip(currentMarkdownLabel)}');
+    expect(source).not.toContain("{getOpenInIdeTooltip('主题')}");
     expect(source).not.toContain("const openInIdeTooltip = '在编辑器中打开';");
   });
 

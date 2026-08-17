@@ -184,8 +184,8 @@ describe('useWorkspaceNavigationController source', () => {
     expect(loadProjectsSource).toContain('setProjectSetupRequired(payload.projects.length === 0);');
     expect(loadDataSource).toContain('if (projectSetupRequiredRef.current) {');
     expect(loadDataSource).toContain('return;');
-    expect(loadDataSource).toContain("fetch('/api/entries.json')");
-    expect(loadDataSource.indexOf('if (projectSetupRequiredRef.current) {')).toBeLessThan(loadDataSource.indexOf("fetch('/api/entries.json')"));
+    expect(loadDataSource).toContain("fetch(withActiveProjectParam('/api/entries.json', activeProjectId))");
+    expect(loadDataSource.indexOf('if (projectSetupRequiredRef.current) {')).toBeLessThan(loadDataSource.indexOf("fetch(withActiveProjectParam('/api/entries.json', activeProjectId))"));
     expect(reloadSidebarAssetsSource).toContain('if (projectSetupRequiredRef.current) {');
     expect(reloadSidebarAssetsSource).toContain('return;');
     expect(source).toContain('projectSetupRequired,');
