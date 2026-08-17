@@ -524,6 +524,10 @@ describe('release make artifact helpers', () => {
     const manifest = JSON.parse(fs.readFileSync(path.resolve('client/template-manifest.json'), 'utf8'));
 
     assert.equal(manifest.schemaVersion, 1);
+    assert(
+      manifest.runtime.files.includes('template-manifest.json'),
+      'published clients need the template manifest marker to discover bundled Design Knowledge safely',
+    );
     assert.equal(manifest.prototypeDefaults, undefined);
     assert.equal(manifest.themes.defaultAction, undefined);
     assert.deepEqual(manifest.prototypes.map(({ id }) => id), [

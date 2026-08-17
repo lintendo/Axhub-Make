@@ -11,6 +11,7 @@
       "RELEASE_NOTES.md",
       "package.json",
       "skills-lock.json",
+      "template-manifest.json",
       "src/index.html",
       "src/vite-env.d.ts",
       "tsconfig.base.json",
