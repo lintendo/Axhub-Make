@@ -404,7 +404,7 @@ describe('make-server IDE open API', () => {
       const response = await fetch(`${server.origin}/api/ide/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetPath: 'src/prototypes/home/index.tsx' }),
+        body: JSON.stringify({ projectId: 'ide-client', targetPath: 'src/prototypes/home/index.tsx' }),
       });
       const body = await response.json();
 
@@ -423,7 +423,7 @@ describe('make-server IDE open API', () => {
         }),
       );
 
-      const config = await fetch(`${server.origin}/api/config`).then((configResponse) => configResponse.json());
+      const config = await fetch(`${server.origin}/api/config?projectId=ide-client`).then((configResponse) => configResponse.json());
       expect(config.toolOpenState['ide:cursor']).toMatchObject({
         executablePath: 'C:\\Stored\\Cursor.exe',
         lastOpenMode: 'direct-app',
@@ -465,7 +465,7 @@ describe('make-server IDE open API', () => {
       const response = await fetch(`${server.origin}/api/ide/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetPath: 'src/prototypes/home/index.tsx' }),
+        body: JSON.stringify({ projectId: 'ide-client', targetPath: 'src/prototypes/home/index.tsx' }),
       });
       const body = await response.json();
 
@@ -595,7 +595,7 @@ describe('make-server IDE open API', () => {
       const response = await fetch(`${server.origin}/api/ide/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetPath: 'src/prototypes/home/index.tsx' }),
+        body: JSON.stringify({ projectId: 'ide-client', targetPath: 'src/prototypes/home/index.tsx' }),
       });
       const body = await response.json();
 
@@ -625,7 +625,7 @@ describe('make-server IDE open API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/config`);
+      const response = await fetch(`${server.origin}/api/config?projectId=ide-client`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -666,7 +666,7 @@ describe('make-server IDE open API', () => {
       const response = await fetch(`${server.origin}/api/ide/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ide: 'cursor' }),
+        body: JSON.stringify({ projectId: 'ide-client', ide: 'cursor' }),
       });
       const body = await response.json();
 
@@ -698,7 +698,7 @@ describe('make-server IDE open API', () => {
       const response = await fetch(`${server.origin}/api/ide/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ide: 'definitely-not-an-ide' }),
+        body: JSON.stringify({ projectId: 'ide-client', ide: 'definitely-not-an-ide' }),
       });
       const body = await response.json();
 

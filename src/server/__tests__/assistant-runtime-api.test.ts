@@ -309,6 +309,14 @@ async function startTestServer(projectRoot: string) {
   return Object.assign(server, { registryHome });
 }
 
+function scopeAssistantApiUrl(origin: string, requestPath: string): string {
+  const url = new URL(requestPath, origin);
+  if (!url.searchParams.has('projectId')) {
+    url.searchParams.set('projectId', 'assistant-client');
+  }
+  return url.toString();
+}
+
 function createLocalCommandResult(command: string, args: string[], stdout = '', stderr = '') {
   return {
     stdout,
@@ -453,7 +461,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=false`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=false`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -492,7 +500,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=false`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=false`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -528,7 +536,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -569,7 +577,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=true`));
       const body = await response.json();
       const assistantPort = new URL(assistant.origin).port;
 
@@ -624,7 +632,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=true`));
       const body = await response.json();
       const assistantPort = new URL(assistant.origin).port;
 
@@ -659,7 +667,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=false`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=false`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -696,7 +704,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=false`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=false`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -780,7 +788,7 @@ describe('make-server assistant runtime API', () => {
     });
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=true`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -863,7 +871,7 @@ describe('make-server assistant runtime API', () => {
     });
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=true`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -941,7 +949,7 @@ describe('make-server assistant runtime API', () => {
     });
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=true`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -997,7 +1005,7 @@ describe('make-server assistant runtime API', () => {
     });
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=false`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=false`));
       const body = await response.json();
       const savedConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(server.registryHome), 'utf8'));
 
@@ -1073,7 +1081,7 @@ describe('make-server assistant runtime API', () => {
     });
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=true`));
       const body = await response.json();
       const savedConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(server.registryHome), 'utf8'));
 
@@ -1119,7 +1127,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=false`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=false`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -1183,7 +1191,7 @@ describe('make-server assistant runtime API', () => {
       });
       expect(registerResponse.status).toBe(201);
 
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=false&projectId=selected-assistant-client`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=false&projectId=selected-assistant-client`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -1218,7 +1226,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=true`));
       const body = await response.json();
       const assistantPort = new URL(assistant.origin).port;
 
@@ -1373,7 +1381,7 @@ describe('make-server assistant runtime API', () => {
     const killSpy = vi.spyOn(process, 'kill').mockImplementation((() => true) as any);
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true`);
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=true`));
       const body = await response.json();
       const savedConfigPath = getGlobalServerConfigPath(server.registryHome);
 
@@ -1428,7 +1436,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=false`, {
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/runtime?autoStart=false`), {
         headers: { 'x-forwarded-host': '192.168.31.9:5174' },
       });
       const body = await response.json();
@@ -1465,7 +1473,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/bootstrap`, {
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/bootstrap`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'start_existing' }),
@@ -1555,7 +1563,7 @@ describe('make-server assistant runtime API', () => {
     });
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/bootstrap`, {
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/bootstrap`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'restart_existing' }),
@@ -1640,7 +1648,7 @@ describe('make-server assistant runtime API', () => {
     });
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/bootstrap`, {
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/bootstrap`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'restart_existing' }),
@@ -1685,7 +1693,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/bootstrap`, {
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/bootstrap`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'restart_existing' }),
@@ -1711,7 +1719,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/assistant/bootstrap`, {
+      const response = await fetch(scopeAssistantApiUrl(server.origin, `/api/assistant/bootstrap`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'bad-mode' }),
@@ -1735,7 +1743,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/prompt/execute`, {
+      const response = await fetch(scopeAssistantApiUrl(server.origin, '/api/prompt/execute'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: 'hello' }),

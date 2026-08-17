@@ -117,6 +117,12 @@ async function startTestServer(projectRoot: string) {
   });
 }
 
+function scopeExportMakeApiUrl(origin: string, requestPath: string): string {
+  const url = new URL(requestPath, origin);
+  url.searchParams.set('projectId', 'figma-client');
+  return url.toString();
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   for (const root of tempRoots.splice(0)) {
@@ -132,7 +138,7 @@ describe('make-server Figma Make export API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const probeResponse = await fetch(`${server.origin}/api/export-make?path=prototypes/home&probe=1`);
+      const probeResponse = await fetch(scopeExportMakeApiUrl(server.origin, `/api/export-make?path=prototypes/home&probe=1`));
       const probe = await probeResponse.json();
 
       expect(probeResponse.status).toBe(200);
@@ -169,7 +175,7 @@ describe('make-server Figma Make export API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/export-make?path=prototypes/home`);
+      const response = await fetch(scopeExportMakeApiUrl(server.origin, `/api/export-make?path=prototypes/home`));
       const body = await response.json();
 
       expect(response.status).toBe(409);
@@ -181,7 +187,7 @@ describe('make-server Figma Make export API', () => {
       expect(body.prompt).toContain('.axhub/make/artifacts/figma/home/canvas.fig');
       expect(body.prompt).toContain('/api/export-make?path=prototypes/home');
 
-      const promptResponse = await fetch(`${server.origin}/api/export-make?path=prototypes/home&prompt=1`);
+      const promptResponse = await fetch(scopeExportMakeApiUrl(server.origin, `/api/export-make?path=prototypes/home&prompt=1`));
       const promptBody = await promptResponse.json();
       expect(promptResponse.status).toBe(200);
       expect(promptBody).toMatchObject({
@@ -208,7 +214,7 @@ describe('make-server Figma Make export API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/export-make?path=prototypes/home`);
+      const response = await fetch(scopeExportMakeApiUrl(server.origin, `/api/export-make?path=prototypes/home`));
       const body = await response.json();
 
       expect(response.status).toBe(409);
@@ -231,7 +237,7 @@ describe('make-server Figma Make export API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/export-make?path=prototypes/home`);
+      const response = await fetch(scopeExportMakeApiUrl(server.origin, `/api/export-make?path=prototypes/home`));
       const body = await response.text();
 
       expect(response.status).toBe(200);
