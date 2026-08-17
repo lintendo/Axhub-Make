@@ -137,10 +137,6 @@
     container-type: inline-size;
 }
 
-.ax-start-guide-title {
-    font-size: 28px;
-}
-
 .ax-start-prompt-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
@@ -149,10 +145,6 @@
 }
 
 @container (min-width: 768px) {
-    .ax-start-guide-title {
-        font-size: 34px;
-    }
-
     .ax-start-prompt-grid {
         margin-top: 64px;
     }

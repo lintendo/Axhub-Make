@@ -25,11 +25,11 @@ describe('start prompt grid responsive layout', () => {
     expect(themeGrid).not.toContain('sm:grid-cols-2');
     expect(themeGrid).not.toContain('lg:grid-cols-4');
     expect(content).toContain('ax-start-guide');
-    expect(content).toContain('ax-start-guide-title');
+    expect(content).not.toContain('ax-start-guide-title');
     expect(styles).toContain('.ax-start-guide {\n    container-type: inline-size;\n}');
-    expect(styles).toContain('.ax-start-guide-title {\n    font-size: 28px;\n}');
+    expect(styles).not.toContain('.ax-start-guide-title');
     expect(styles).toContain('.ax-start-prompt-grid {\n    display: grid;\n    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));\n    gap: 16px;\n    margin-top: 32px;\n}');
-    expect(styles).toContain('@container (min-width: 768px) {\n    .ax-start-guide-title {\n        font-size: 34px;\n    }\n\n    .ax-start-prompt-grid {\n        margin-top: 64px;\n    }\n}');
+    expect(styles).toContain('@container (min-width: 768px) {\n    .ax-start-prompt-grid {\n        margin-top: 64px;\n    }\n}');
     expect(composer).toContain('h-8 items-center gap-1.5 whitespace-nowrap rounded-md');
   });
 });
