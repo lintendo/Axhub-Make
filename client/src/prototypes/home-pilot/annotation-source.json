@@ -13,22 +13,10 @@
           "selectors": [],
           "fingerprint": "div",
           "path": [
-            {
-              "tag": "div",
-              "index": 0
-            },
-            {
-              "tag": "div",
-              "index": 0
-            },
-            {
-              "tag": "div",
-              "index": 0
-            },
-            {
-              "tag": "div",
-              "index": 1
-            }
+            0,
+            0,
+            0,
+            1
           ]
         },
         "aiPrompt": "",
