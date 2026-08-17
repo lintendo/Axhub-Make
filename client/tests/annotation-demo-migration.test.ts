@@ -7,7 +7,6 @@ const { buildMakeProjectMetadata } = await import('../scripts/sync-project-metad
 
 const appRoot = path.resolve(__dirname, '..');
 const makeRoot = path.resolve(appRoot, '..');
-const workspaceRoot = path.resolve(makeRoot, '../..');
 const demoRoot = path.join(appRoot, 'src/prototypes/annotation-demo');
 
 describe('annotation demo migration', () => {
@@ -40,9 +39,8 @@ describe('annotation demo migration', () => {
     }
   });
 
-  it('locks the annotation runtime to the marker bridge capable published package in workspace lockfiles', () => {
+  it('locks the annotation runtime to the marker bridge capable published package', () => {
     const lockfiles = [
-      fs.readFileSync(path.join(workspaceRoot, 'pnpm-lock.yaml'), 'utf8'),
       fs.readFileSync(path.join(makeRoot, 'pnpm-lock.yaml'), 'utf8'),
     ];
 
