@@ -217,7 +217,8 @@ export async function resolveMakeClientRegistryRoute(options: {
   runCommand: RegistryCommandRunner;
 }): Promise<MakeClientRegistryRoute> {
   const env = options.env || process.env;
-  if (stringValue(env.NPM_CONFIG_REGISTRY) || stringValue(env.npm_config_registry)) {
+  const environmentRegistry = normalizedRegistryUrl(env.NPM_CONFIG_REGISTRY || env.npm_config_registry);
+  if (environmentRegistry && environmentRegistry !== NPM_OFFICIAL_REGISTRY.url) {
     return { mode: 'configured', probes: [], reason: 'environment-configured' };
   }
 

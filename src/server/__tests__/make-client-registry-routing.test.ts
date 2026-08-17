@@ -93,6 +93,32 @@ describe('make client npm registry routing', () => {
     expect(probeRegistry).not.toHaveBeenCalled();
   });
 
+  it('treats the lifecycle-provided official registry as the npm default', async () => {
+    const runCommand = vi.fn(async (_command: string, args: string[]) => ({
+      stdout: args.includes('ls') ? '; "default" config from default values\n' : 'https://registry.npmjs.org/\n',
+    }));
+    const probeRegistry = vi.fn(async (registry: typeof NPM_OFFICIAL_REGISTRY) => ({
+      ...registry,
+      durationMs: registry.id === 'npmjs' ? 1_200 : 300,
+      ok: true,
+    }));
+
+    await expect(resolveMakeClientRegistryRoute({
+      cwd: '/tmp/make-client',
+      env: { npm_config_registry: 'https://registry.npmjs.org/' },
+      npmCommand: 'npm',
+      probePackages: [{ name: 'vite', version: '5.4.21' }],
+      probeRegistry,
+      runCommand,
+    })).resolves.toMatchObject({
+      alternate: NPM_OFFICIAL_REGISTRY,
+      mode: 'automatic',
+      reason: 'faster',
+      selected: NPM_MIRROR_REGISTRY,
+    });
+    expect(probeRegistry).toHaveBeenCalledTimes(2);
+  });
+
   it('preserves a non-default effective npm registry without probing', async () => {
     const runCommand = vi.fn(async (_command: string, args: string[]) => ({
       stdout: args.includes('ls') ? '' : 'https://registry.example.test/\n',
