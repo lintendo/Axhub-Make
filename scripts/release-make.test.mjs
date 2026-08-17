@@ -640,6 +640,23 @@ describe('release make artifact helpers', () => {
     assert.equal(clientPackageJson.devDependencies['@types/react-dom'], '^18.2.0');
   });
 
+  it('binds Make 0.6.20-beta.1 to client 0.1.20 and ACP 0.1.13', () => {
+    const packageJson = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'));
+    const runtimeConstants = fs.readFileSync(path.resolve('src/common/makeClientTemplate.ts'), 'utf8');
+
+    assert.equal(packageJson.version, '0.6.20-beta.1');
+    assert.equal(packageJson.dependencies['@axhub/acp'], '0.1.13');
+    assert.match(runtimeConstants, /DEFAULT_MAKE_CLIENT_TEMPLATE_VERSION = '0\.1\.20'/u);
+
+    const releaseNotes = fs.readFileSync(path.resolve('RELEASE_NOTES.md'), 'utf8');
+    assert.match(releaseNotes, /^# Axhub Make 0\.6\.20-beta\.1$/mu);
+    assert.match(releaseNotes, /完整.*Make.*产品/u);
+    assert.match(releaseNotes, /移除.*我们先从哪里开始呢/u);
+    assert.match(releaseNotes, /5 个.*固定模板/u);
+    assert.match(releaseNotes, /Client Template 0\.1\.20/u);
+    assert.match(releaseNotes, /Design Knowledge.*223/u);
+  });
+
   it('keeps live comments ignored in the publishing checkout', () => {
     const sourceGitignore = fs.readFileSync(path.resolve('client/.gitignore'), 'utf8');
 
