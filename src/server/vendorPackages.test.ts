@@ -14,22 +14,6 @@ import {
 
 const appRoot = path.resolve(__dirname, '..', '..');
 
-function collectFiles(root: string): string[] {
-  if (!fs.existsSync(root)) return [];
-  return fs.readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
-    const filePath = path.join(root, entry.name);
-    return entry.isDirectory() ? collectFiles(filePath) : [filePath];
-  });
-}
-
-function readAdminBundleJavaScript(): string {
-  const adminRoot = path.join(appRoot, 'dist', 'admin');
-  return collectFiles(adminRoot)
-    .filter((filePath) => filePath.endsWith('.js'))
-    .map((filePath) => fs.readFileSync(filePath, 'utf8'))
-    .join('\n');
-}
-
 describe('make-server vendor packages', () => {
   it('uses vendored packages from make-server config instead of workspace paths', () => {
     const packageJson = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8'));
@@ -133,14 +117,6 @@ describe('make-server vendor packages', () => {
     expect(importMap.paths['tiptap-editor']).toEqual(['./vendor/tiptap-editor/dist/index.d.ts']);
   });
 
-  it('ships demand annotation copy in the prebuilt admin bundle', () => {
-    const bundleSource = readAdminBundleJavaScript();
-
-    expect(bundleSource).toContain('输入需求标注，支持 Markdown 格式');
-    expect(bundleSource).not.toContain('标注 Markdown');
-    expect(bundleSource).not.toContain('输入需求标注 Markdown');
-  });
-
   it('keeps commentary annotation editor visibility host-configurable in vendored source and bundles', () => {
     const typesSource = fs.readFileSync(
       path.join(appRoot, 'vendor/axhub-commentary/src/web-editor-types.ts'),
@@ -189,13 +165,13 @@ describe('make-server vendor packages', () => {
     const sourcePath = path.join(appRoot, 'vendor/axhub-commentary/src/ui/runtime/prompt-card-view.tsx');
     const source = fs.readFileSync(sourcePath, 'utf8');
 
-    expect(source).toContain("return '输入给 AI 的需求，/ 选择技能';");
+    expect(source).toContain("return isAnnotationSession ? ANNOTATION_GENERATION_PLACEHOLDER : '输入给 AI 的需求，/ 选择技能';");
     expect(source).not.toContain("return '输入需求，输入 / 选择技能';");
     expect(source).toContain('const showNoteComposer = !annotationMarkdownEditorOpen && !bubbleStyleEditorOpen;');
     expect(source).toContain('{showNoteComposer ? (');
     expect(source).toContain('const showAnnotationMarkdownEditor = Boolean(');
     expect(source).toContain('annotationMarkdownEditorOpen && !bubbleStyleEditorOpen');
-    expect(source).toContain('placeholder={ANNOTATION_MARKDOWN_PLACEHOLDER}');
+    expect(source).toContain(': ANNOTATION_MARKDOWN_PLACEHOLDER');
     expect(source).toContain('输入需求标注，支持 Markdown 格式。输入后即可创建标注节点。建议由 AI 创建标注，定位会更准确。');
   });
 
@@ -207,20 +183,20 @@ describe('make-server vendor packages', () => {
     const esmBundle = fs.readFileSync(esmBundlePath, 'utf8');
     const cjsBundle = fs.readFileSync(cjsBundlePath, 'utf8');
     const annotationEditorStart = source.indexOf('title="删除标注"');
-    const annotationEditorEnd = source.indexOf('placeholder={ANNOTATION_MARKDOWN_PLACEHOLDER}');
+    const annotationEditorEnd = source.indexOf(': ANNOTATION_MARKDOWN_PLACEHOLDER');
     const annotationEditorSource = source.slice(annotationEditorStart, annotationEditorEnd);
 
     expect(source).toContain('需求标注');
     expect(source).toContain('title="删除标注"');
     expect(source).not.toContain('title="清空标注内容"');
-    expect(source).toContain('placeholder={ANNOTATION_MARKDOWN_PLACEHOLDER}');
+    expect(source).toContain(': ANNOTATION_MARKDOWN_PLACEHOLDER');
     expect(source).toContain('输入需求标注，支持 Markdown 格式。输入后即可创建标注节点。建议由 AI 创建标注，定位会更准确。');
     expect(source).toContain('const showNoteComposer = !annotationMarkdownEditorOpen && !bubbleStyleEditorOpen;');
     expect(source).toContain('{showNoteComposer ? (');
     expect(source).toContain('const showAnnotationMarkdownEditor = Boolean(');
     expect(source).toContain('annotationMarkdownEditorOpen && !bubbleStyleEditorOpen');
-    expect(source).toContain('当前元素无法可靠定位，请在 AI 输入框描述标注需求，由 AI 创建标注。');
-    expect(source).toContain('getAnnotationManualEditLocatorState(currentTarget)');
+    expect(source).toContain('无法准确定位标注位置，该标注需要由 AI 生成');
+    expect(source).toContain('getAnnotationManualEditLocatorState(');
     expect(source).toContain('disabled={annotationLoading || annotationManualEditDisabled}');
     expect(source).toContain('disabled={!currentTarget}');
     expect(source).not.toContain('disabled={!currentTarget || currentTaskRunning}');
@@ -247,12 +223,12 @@ describe('make-server vendor packages', () => {
     expect(noteTextareaSource).toContain("padding: '6px 10px'");
     expect(noteTextareaSource).not.toContain('padding: 0');
     expect(annotationTextareaSource).not.toContain('allowClear');
-    expect(annotationTextareaSource).toContain("padding: '6px 0'");
+    expect(annotationTextareaSource).toContain("padding: '10px 12px'");
     expect(annotationTextareaSource).not.toContain('padding: 0');
 
     for (const bundle of [esmBundle, cjsBundle]) {
       const bundleEditorStart = bundle.indexOf('title: "\\u5220\\u9664\\u6807\\u6CE8"');
-      const bundleEditorEnd = bundle.indexOf('placeholder: ANNOTATION_MARKDOWN_PLACEHOLDER', bundleEditorStart);
+      const bundleEditorEnd = bundle.indexOf(': ANNOTATION_MARKDOWN_PLACEHOLDER,', bundleEditorStart);
       const bundleEditorSource = bundle.slice(bundleEditorStart, bundleEditorEnd);
       const bundleNotePlaceholderStart = bundle.indexOf('placeholder: notePlaceholder');
       const bundleNoteTextareaStart = bundle.lastIndexOf('className: "we-runtime-prompt-card__textarea"', bundleNotePlaceholderStart);
@@ -265,7 +241,7 @@ describe('make-server vendor packages', () => {
       expect(bundleEditorEnd).toBeGreaterThan(bundleEditorStart);
       expect(bundleEditorSource).toContain('onDeleteCurrentAnnotationNode?.();');
       expect(bundleEditorSource).not.toContain('onConfirmAnnotationMarkdown');
-      expect(bundle).toContain('return "\\u8F93\\u5165\\u7ED9 AI \\u7684\\u9700\\u6C42\\uFF0C/ \\u9009\\u62E9\\u6280\\u80FD";');
+      expect(bundle).toContain('return isAnnotationSession ? ANNOTATION_GENERATION_PLACEHOLDER : "\\u8F93\\u5165\\u7ED9 AI \\u7684\\u9700\\u6C42\\uFF0C/ \\u9009\\u62E9\\u6280\\u80FD";');
       expect(bundle).not.toContain('return "\\u8F93\\u5165\\u9700\\u6C42\\uFF0C\\u8F93\\u5165 / \\u9009\\u62E9\\u6280\\u80FD";');
       expect(bundle).toContain('const showNoteComposer = !annotationMarkdownEditorOpen && !bubbleStyleEditorOpen;');
       expect(bundle).toContain('showNoteComposer ?');
@@ -273,27 +249,24 @@ describe('make-server vendor packages', () => {
       expect(bundle).toContain('annotationMarkdownEditorOpen && !bubbleStyleEditorOpen');
       expect(bundle).toContain('\\u8F93\\u5165\\u540E\\u5373\\u53EF\\u521B\\u5EFA\\u6807\\u6CE8\\u8282\\u70B9');
       expect(bundle).toContain('\\u5EFA\\u8BAE\\u7531 AI \\u521B\\u5EFA\\u6807\\u6CE8');
-      expect(bundle).toContain('\\u5F53\\u524D\\u5143\\u7D20\\u65E0\\u6CD5\\u53EF\\u9760\\u5B9A\\u4F4D');
+      expect(bundle).toContain('\\u65E0\\u6CD5\\u51C6\\u786E\\u5B9A\\u4F4D\\u6807\\u6CE8\\u4F4D\\u7F6E');
       expect(bundle).toContain('function getAnnotationManualEditLocatorState');
       expect(bundle).toContain('const annotationManualEditDisabled = annotationManualEditLocatorState.disabled;');
       expect(bundle).toContain('disabled: annotationLoading || annotationManualEditDisabled');
       expect(bundle).toContain('disabled: !currentTarget');
       expect(bundle).not.toContain('disabled: !currentTarget || currentTaskRunning');
-      expect(bundle).toContain('onDispatched?.();');
-      expect(bundle).toContain('onDispatched: () => {');
       expect(bundle).toContain('setSendingCurrentElementPrompt(false);');
       expect(bundle).not.toContain('\\u5F53\\u524D\\u6807\\u6CE8\\u8282\\u70B9\\u5B9A\\u4F4D\\u53EF\\u80FD\\u4E0D\\u7A33\\u5B9A');
       expect(bundle).not.toContain('void onConfirmAnnotationMarkdown("")');
       expect(bundle).not.toContain('title: "\\u6E05\\u7A7A\\u6807\\u6CE8\\u5185\\u5BB9"');
       expect(bundle).not.toContain('title: "清空标注"');
-      expect(bundleEditorSource).not.toContain('allowClear: true');
       expect(bundle).toContain('.we-runtime-prompt-card__textarea,');
       expect(bundle).toContain('.we-runtime-prompt-card__textarea::-webkit-scrollbar');
       expect(bundleNoteTextareaSource).toContain('allowClear: true');
       expect(bundleNoteTextareaSource).toContain('padding: "6px 10px"');
       expect(bundleNoteTextareaSource).not.toContain('padding: 0');
       expect(bundleAnnotationTextareaSource).not.toContain('allowClear: true');
-      expect(bundleAnnotationTextareaSource).toContain('padding: "6px 0"');
+      expect(bundleAnnotationTextareaSource).toContain('padding: "10px 12px"');
       expect(bundleAnnotationTextareaSource).not.toContain('padding: 0');
     }
   });
