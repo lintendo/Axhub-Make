@@ -66,12 +66,12 @@ describe('obsolete prompt execution APIs', () => {
         fetch(`${server.origin}/api/prompt/execute`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: 'run' }),
+          body: JSON.stringify({ projectId: 'obsolete-exec-client', prompt: 'run' }),
         }),
         fetch(`${server.origin}/api/prototype-generation/session-run`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: 'run' }),
+          body: JSON.stringify({ projectId: 'obsolete-exec-client', prompt: 'run' }),
         }),
       ]);
 

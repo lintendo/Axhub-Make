@@ -49,16 +49,17 @@ describe('obsolete AI image APIs', () => {
 
     try {
       const [historyGet, historyPut, generate] = await Promise.all([
-        fetch(`${server.origin}/api/ai-image/history?targetPath=prototypes/home`),
-        fetch(`${server.origin}/api/ai-image/history?targetPath=prototypes/home`, {
+        fetch(`${server.origin}/api/ai-image/history?projectId=ai-image-obsolete&targetPath=prototypes/home`),
+        fetch(`${server.origin}/api/ai-image/history?projectId=ai-image-obsolete&targetPath=prototypes/home`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tasks: [], images: {} }),
+          body: JSON.stringify({ projectId: 'ai-image-obsolete', tasks: [], images: {} }),
         }),
-        fetch(`${server.origin}/api/ai-image/generate`, {
+        fetch(`${server.origin}/api/ai-image/generate?projectId=ai-image-obsolete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            projectId: 'ai-image-obsolete',
             prompt: '一张产品主视觉',
             params: { n: 1 },
           }),

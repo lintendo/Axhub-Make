@@ -292,7 +292,7 @@ describe('prototype spec API', () => {
       const response = await fetch(specUrl(server.origin, projectRoot), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ format: 'html' }),
+        body: JSON.stringify({ projectId: path.basename(projectRoot), format: 'html' }),
       });
       expect(response.status).toBe(404);
       expect(fs.existsSync(path.join(projectRoot, 'src/prototypes/home/.spec/spec.html'))).toBe(false);
