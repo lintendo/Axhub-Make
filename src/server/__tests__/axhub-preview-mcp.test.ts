@@ -185,6 +185,7 @@ describe('axhub preview MCP endpoint', () => {
       'axhub_make_get_page_structure',
       'axhub_make_activate_page_element',
       'axhub_make_create_comment',
+      'axhub_make_apply_page_change',
       'axhub_make_list_comments',
       'axhub_make_execute_comment',
       'axhub_make_get_comment_execution',

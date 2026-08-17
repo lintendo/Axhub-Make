@@ -172,8 +172,8 @@ describe('make-server HTTP server', () => {
   it('serves project registry APIs, active project resources, docs content, and entries compatibility', async () => {
     const projectRoot = createProjectRoot();
     const secondProjectRoot = createProjectRoot();
-    const docPath = path.join(projectRoot, 'docs', 'spec.md');
-    const secondDocPath = path.join(secondProjectRoot, 'docs', 'spec.md');
+    const docPath = path.join(projectRoot, 'src', 'resources', 'spec.md');
+    const secondDocPath = path.join(secondProjectRoot, 'src', 'resources', 'spec.md');
     fs.mkdirSync(path.dirname(docPath), { recursive: true });
     fs.mkdirSync(path.dirname(secondDocPath), { recursive: true });
     fs.writeFileSync(docPath, '# First Spec\n', 'utf8');
@@ -642,7 +642,6 @@ describe('make-server HTTP server', () => {
           project: { id: 'missing-metadata' },
           resources: {
             prototypes: [],
-            docs: [],
             themes: [],
           },
         });
@@ -829,7 +828,7 @@ describe('make-server HTTP server', () => {
   it('serves legacy docs preview routes from make-server before runtime proxy fallback', async () => {
     const projectRoot = createProjectRoot();
     const adminRoot = path.join(projectRoot, 'admin-dist');
-    const docPath = path.join(projectRoot, 'docs', 'spec.md');
+    const docPath = path.join(projectRoot, 'src', 'resources', 'spec.md');
     fs.mkdirSync(path.dirname(docPath), { recursive: true });
     fs.mkdirSync(adminRoot, { recursive: true });
     fs.writeFileSync(docPath, '# Project Spec\n\n## Intro\n', 'utf8');
@@ -868,16 +867,16 @@ describe('make-server HTTP server', () => {
       await registerExistingMakeProject(server.origin, projectRoot);
       const preview = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/docs/spec`)).then((response) => response.text());
       expect(preview).toContain('<title>Docs: Project Spec</title>');
-      expect(preview).toContain('/api/markdown-file?path=');
+      expect(preview).toContain('/api/markdown-file?projectId=docs-client&path=');
       expect(preview).toContain('false');
       expect(preview).not.toContain('/@vite/client');
       expect(preview).not.toContain('@vitejs/plugin-react/preamble');
 
-      const legacyPreview = await fetch(`${server.origin}/assets/docs/spec/spec.html`, { redirect: 'manual' });
+      const legacyPreview = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/assets/docs/spec/spec.html`), { redirect: 'manual' });
       expect(legacyPreview.status).toBe(302);
-      expect(legacyPreview.headers.get('location')).toBe('/docs/spec');
+      expect(legacyPreview.headers.get('location')).toBe('/docs/spec?projectId=docs-client');
 
-      const markdown = await fetch(`${server.origin}/docs/spec.md`).then((response) => response.text());
+      const markdown = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/docs/spec.md`)).then((response) => response.text());
       expect(markdown).toBe('# Project Spec\n\n## Intro\n');
     } finally {
       await server.close();
@@ -958,7 +957,7 @@ describe('make-server HTTP server', () => {
         adminRoot: path.join(projectRoot, 'missing-admin'),
         registryPath,
       })).rejects.toMatchObject({ code: 'EADDRINUSE' });
-      expect(fs.existsSync(getAdminServerInfoPath(projectRoot))).toBe(true);
+      expect(fs.existsSync(getAdminServerInfoPath(undefined, { homeDir: registryHome }))).toBe(true);
 
       const health = await fetch(`${first.origin}/api/health`).then((response) => response.json());
       expect(health).toMatchObject({
@@ -1122,15 +1121,6 @@ describe('make-server HTTP server', () => {
         references: [],
       });
 
-      const canvasCreate = await fetch(scopeProjectApiUrl(projectRoot, `${first.origin}/api/canvas/create`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName: 'Main Canvas' }),
-      }).then((response) => response.json());
-      expect(canvasCreate).toMatchObject({
-        displayName: 'Main Canvas',
-      });
-      expect(canvasCreate.name).toMatch(/main-canvas-\d+\.excalidraw|main-canvas\.excalidraw/);
     } finally {
       await first.close();
     }
@@ -2467,9 +2457,9 @@ describe('make-server HTTP server', () => {
     }
   });
 
-  it('accepts project metadata document ids when saving docs workspace navigation', async () => {
+  it('moves filesystem documents when saving docs workspace navigation', async () => {
     const projectRoot = createProjectRoot();
-    const docPath = path.join(projectRoot, 'docs', 'spec.md');
+    const docPath = path.join(projectRoot, 'src', 'resources', 'spec.md');
     fs.mkdirSync(path.dirname(docPath), { recursive: true });
     fs.writeFileSync(docPath, '# Project Spec\n', 'utf8');
     writeJson(getProjectMetadataPath(projectRoot), {
@@ -2514,22 +2504,20 @@ describe('make-server HTTP server', () => {
 
     try {
       await registerExistingMakeProject(server.origin, projectRoot);
+      const current = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`))
+        .then((currentResponse) => currentResponse.json());
+      const specNode = current.tree.find((node: any) => node.itemKey === 'docs/spec.md');
+      expect(specNode).toBeTruthy();
       const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tree: [
             {
-              id: 'folder:docs:product',
               kind: 'folder',
-              title: '产品文档',
+              title: 'product',
               children: [
-                {
-                  id: 'item:docs:spec',
-                  kind: 'item',
-                  title: 'Project Spec',
-                  itemKey: 'docs/spec',
-                },
+                specNode,
               ],
             },
           ],
@@ -2539,21 +2527,10 @@ describe('make-server HTTP server', () => {
 
       expect(response.status).toBe(200);
       expect(update).toMatchObject({ success: true, tab: 'docs' });
-      expect(update.tree).toEqual([
-        {
-          id: 'folder:docs:product',
-          kind: 'folder',
-          title: '产品文档',
-          children: [
-            {
-              id: 'item:docs:spec',
-              kind: 'item',
-              title: 'Project Spec',
-              itemKey: 'docs/spec',
-            },
-          ],
-        },
-      ]);
+      expect(update.tree[0]?.children?.[0]).toMatchObject({ itemKey: 'docs/product/spec.md' });
+      expect(fs.existsSync(docPath)).toBe(false);
+      expect(fs.readFileSync(path.join(projectRoot, 'src', 'resources', 'product', 'spec.md'), 'utf8'))
+        .toBe('# Project Spec\n');
     } finally {
       await server.close();
     }

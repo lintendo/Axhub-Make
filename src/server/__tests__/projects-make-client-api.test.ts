@@ -2536,10 +2536,11 @@ describe('make-server make client project APIs', () => {
       project: { id: 'default-client', name: 'Default Client' },
     });
     const projectRoot = createTempRoot('axhub-make-client-existing-');
+    const registryHome = createTempRoot('axhub-make-client-registry-');
     writeMakeClientMarker(projectRoot, 'existing-client', 'Existing Client');
     writeMakeClientPackage(projectRoot);
     writeMakeClientMetadata(projectRoot, 'existing-client', 'Existing Client');
-    const server = await startTestServer(defaultRoot);
+    const server = await startTestServer(defaultRoot, registryHome);
     const runtimeServer = await startTestServer(projectRoot);
 
     try {
@@ -2580,7 +2581,7 @@ describe('make-server make client project APIs', () => {
           origin: runtimeServer.origin,
         },
       });
-      expect(fs.existsSync(getAdminServerInfoPath(projectRoot))).toBe(true);
+      expect(fs.existsSync(getAdminServerInfoPath(undefined, { homeDir: registryHome }))).toBe(true);
 
       const activeResponse = await fetch(`${server.origin}/api/projects/active`, {
         method: 'PUT',

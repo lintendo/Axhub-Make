@@ -120,7 +120,7 @@ describe('make-server project legacy compatibility APIs', () => {
       expect(config.projectInfo.name).toBe('Second Client');
 
       const docs = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/docs`)).then((response) => response.json());
-      expect(docs.map((doc: any) => doc.name)).toEqual(['second.md']);
+      expect(docs.map((doc: any) => doc.name)).toEqual(['second.md', 'spec.md']);
 
       const markdown = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/markdown-file?path=${encodeURIComponent('src/resources/second.md')}`))
         .then((response) => response.text());
@@ -264,7 +264,7 @@ describe('make-server project legacy compatibility APIs', () => {
       await registerProject(server.origin, projectRoot, 'legacy-docs-list', 'Legacy Docs List');
 
       const docs = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs`)).then((response) => response.json());
-      expect(docs.map((doc: any) => doc.name)).toEqual(['visible.json']);
+      expect(docs.map((doc: any) => doc.name)).toEqual(['spec.md', 'visible.json']);
     } finally {
       await server.close();
     }

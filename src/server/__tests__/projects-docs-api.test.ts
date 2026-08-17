@@ -122,7 +122,8 @@ describe('make-server project docs APIs', () => {
       const docs = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs`)).then((response) => response.json());
       expect(docs).toEqual(expect.arrayContaining([
         expect.objectContaining({
-          name: 'nested/guide.md',
+          name: 'guide.md',
+          path: 'nested/guide.md',
           displayName: 'Guide Title',
           description: 'Useful notes.',
           absoluteFilePath: path.join(docsDir, 'nested', 'guide.md'),

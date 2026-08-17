@@ -145,7 +145,7 @@ describe('Axhub publish source contracts', () => {
     expect(source).toContain('fetch(`/api/axhub/html-projects${query}`)');
     expect(source).toContain("fetch('/api/axhub/html-projects'");
     expect(source).toContain("fetch('/api/axhub/publish'");
-    expect(source).toContain('async publishAxhubHtmlProject(payload: { pid: number; path: string; projectId?: string | null }): Promise<AxhubPublishResponse>');
+    expect(source).toContain('async publishAxhubHtmlProject(payload: { pid: number; path: string; projectId: string }): Promise<AxhubPublishResponse>');
   });
 
   it('keeps the Make client annotation dependency independent from Axhub publish gating', () => {
