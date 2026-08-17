@@ -12,7 +12,7 @@ type InstallThemeOptions = {
   themeId: string;
   platform: 'desktop' | 'mobile';
   projectRoot: string;
-  snapshotRoot: string;
+  snapshotRoot?: string;
   fetch?: (url: URL, init?: RequestInit) => Promise<Response>;
   now?: () => Date;
   timeoutMs?: number;
@@ -112,6 +112,22 @@ describe('theme installer', () => {
     expect(result.source).toBe('primary');
     expect(urls).toHaveLength(1);
     await expect(fs.readFile(path.join(base.projectRoot, 'src/themes/alpha/index.tsx'), 'utf8')).resolves.toContain('Theme');
+  });
+
+  it('discovers the bundled snapshot from an explicit project root outside the current directory', async () => {
+    const base = await fixture();
+    await fs.writeFile(path.join(base.projectRoot, 'template-manifest.json'), '{}\n');
+    await fs.cp(base.snapshotRoot, path.join(base.projectRoot, 'design-knowledge'), { recursive: true });
+
+    const result = await installTheme({
+      themeId: 'alpha',
+      platform: 'desktop',
+      projectRoot: base.projectRoot,
+      fetch: async () => response(base.archive),
+      runMetadataSync: async () => {},
+    });
+
+    expect(result).toMatchObject({ status: 'installed', source: 'primary' });
   });
 
   it('falls back after a primary HTTP failure', async () => {

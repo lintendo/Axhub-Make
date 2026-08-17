@@ -302,7 +302,11 @@ function stableFailure(error) {
 
 export async function installTheme({ themeId, platform, projectRoot, snapshotRoot, fetch, now, timeoutMs = 10_000, runMetadataSync } = {}) {
   if (!SLUG_PATTERN.test(themeId ?? '') || !['desktop', 'mobile'].includes(platform)) throw failure('INSTALL_DESTINATION_INVALID');
-  const snapshot = await resolveBundledSnapshot({ startDir: process.cwd(), snapshotRoot });
+  const snapshot = await resolveBundledSnapshot({
+    startDir: projectRoot ?? process.cwd(),
+    snapshotRoot,
+    projectRoot,
+  });
   const loaded = await loadBundledIndex({ snapshot, platform });
   const record = loaded.index.records.find((item) => item.id === themeId);
   if (!record?.publishable) throw failure('PACKAGE_SOURCE_INVALID', { themeId, platform });
