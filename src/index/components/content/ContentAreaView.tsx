@@ -53,7 +53,6 @@ import type { AssistantImageAttachmentPayload } from '../../domains/assistant/as
 import type { AiImageTaskParams } from '../../domains/ai-image/aiImageStore';
 import {
     NO_PROTOTYPE_THEME_VALUE,
-    resolvePrototypeGenerationInitialThemeName,
 } from '../../domains/prototype-generation/prototypeGenerationThemeSelection';
 import { PrototypeThemeSearchSelect } from '../../domains/prototype-generation/PrototypeThemeSearchSelect';
 import type { CanvasDocumentFormat } from '../../domains/ai-generation/canvasGenerationPromptSettings';
@@ -65,13 +64,10 @@ import {
 } from '../../services/documentTemplates';
 import { generateTemplateImportPrompt, type TemplateLibraryPromptItem } from '../../utils/templateImportPrompts';
 import { getUserFriendlyUploadErrorMessage } from '../../utils/uploadErrors';
-import { copyToClipboard } from '../../utils/clipboard';
 import { resolveMarkdownPreviewIframeUrl } from '../../utils/markdownPreview';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
-import { ResourceStartPromptGrid, type ResourceStartPromptCard } from './ResourceStartPromptGrid';
-import { applyResourceStartImageSize } from './resourceStartPromptSelection';
-import { ThemeStartPromptGrid, type ThemeStartPromptCard } from './ThemeStartPromptGrid';
-import { buildStartGuidePrompt } from './startGuidePrompt';
+import type { ResourceStartPromptCard } from './ResourceStartPromptGrid';
+import type { ThemeStartPromptCard } from './ThemeStartPromptGrid';
 import { useProgressiveLibraryItems } from '../../hooks/useProgressiveLibraryItems';
 
 const ExcalidrawCanvas = React.lazy(() => lazyWithRetry(() => import('./ExcalidrawCanvas')));
@@ -1463,13 +1459,7 @@ function StartGuide({
     assistantVisible,
     aiPanelMode,
     onExecutePrompt,
-    themes,
-    defaultThemeName,
-    onOpenPrototypeCreateDialog,
     onRefreshPrototypes,
-    onUploadResourceFiles,
-    onCreateResourceCanvasFile,
-    onCreateDrawioResourceFile,
     onRefreshThemes,
 }: {
     kind: StartGuideKind;
@@ -1498,9 +1488,6 @@ function StartGuide({
     onCreateDrawioResourceFile?: () => void | Promise<void>;
     onRefreshThemes?: () => void | Promise<void>;
 }) {
-    const shouldShowPrototypeActions = kind === 'prototype';
-    const shouldShowResourceActions = kind === 'resource';
-    const shouldShowTopActions = shouldShowPrototypeActions || shouldShowResourceActions;
     const shouldShowPrototypeCases = kind === 'prototype';
     const shouldShowThemeCases = kind === 'design';
     const [templateCases, setTemplateCases] = useState<TemplateLibraryCardItem[]>([]);
@@ -1531,137 +1518,11 @@ function StartGuide({
         `${activeProjectId || ''}:${themePlatform}`,
         themeProgressiveLoadArmed,
     );
-    const selectedThemeName = resolvePrototypeGenerationInitialThemeName(themes, defaultThemeName);
     const prototypeIndexPath = resolvePrototypeIndexFilePath(item);
-    const activePrototypePromptCards = useMemo(
-        () => kind === 'prototype'
-            ? PROTOTYPE_START_PROMPT_CARDS.filter((card) => card.title.trim() && card.prompt.trim())
-            : [],
-        [kind],
-    );
-    const activeResourcePromptCards = useMemo(
-        () => kind === 'resource'
-            ? RESOURCE_START_PROMPT_CARDS.filter((card) => card.title.trim() && card.prompt.trim())
-            : [],
-        [kind],
-    );
-    const activeThemePromptCards = useMemo(
-        () => kind === 'design'
-            ? THEME_START_PROMPT_CARDS.filter((card) => card.title.trim() && card.prompt.trim())
-            : [],
-        [kind],
-    );
-    const selectedTheme = useMemo(() => (
-        themes?.find((theme) => theme.name === selectedThemeName) || null
-    ), [selectedThemeName, themes]);
-    const effectiveImageStartParams = useMemo<ImageStartParams>(() => ({
-        ...DEFAULT_IMAGE_START_PARAMS,
-        themeName: selectedThemeName === NO_PROTOTYPE_THEME_VALUE ? '' : selectedTheme?.name || '',
-        disable_prompt_optimization: selectedThemeName !== NO_PROTOTYPE_THEME_VALUE,
-        background: 'auto',
-    }), [selectedTheme?.name, selectedThemeName]);
-    const copyStartCardPrompt = async (prompt: string) => {
-        try {
-            await copyToClipboard(prompt);
-            toast.success('提示词已复制，请交给本地 AI 使用');
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : '复制提示词失败');
-        }
-    };
     const handleThemePlatformChange = (platform: ThemeCatalogPlatform) => {
         if (platform === themePlatform) return;
         setThemeProgressiveLoadArmed(false);
         setThemePlatform(platform);
-    };
-    const copyPrototypeStartCardPrompt = async (card: ThemeStartPromptCard) => {
-        const prompt = buildStartGuidePrompt({
-            kind: 'prototype',
-            scene: 'page',
-            prompt: card.prompt,
-            settings: undefined,
-            finalGuide: 'local-ai-acknowledgement',
-        });
-        await copyStartCardPrompt(prompt);
-    };
-    const executePrototypeStartCardPrompt = async (card: ThemeStartPromptCard) => {
-        if (!onExecutePrompt) return;
-        const prompt = buildStartGuidePrompt({
-            kind: 'prototype',
-            scene: 'page',
-            prompt: card.prompt,
-            settings: undefined,
-            finalGuide: 'local-ai-acknowledgement',
-        });
-        const executed = await onExecutePrompt(prompt, {
-            scene: 'start-guide-prototype-page',
-            targetPath: draftActive ? null : prototypeIndexPath,
-            autoSend: false,
-        });
-        if (executed === false) throw new Error('AI 侧栏未能打开');
-    };
-    const copyResourceStartCardPrompt = async (card: ResourceStartPromptCard) => {
-        const settings = card.scene === 'design'
-            ? card.imageSize ? applyResourceStartImageSize(effectiveImageStartParams, card.imageSize) : effectiveImageStartParams
-            : {
-                ...(card.prdPlanning ? {
-                    usePrdPlanning: card.prdPlanning === 'enable',
-                } : {}),
-            };
-        const prompt = buildStartGuidePrompt({
-            kind,
-            scene: card.scene,
-            prompt: card.prompt,
-            settings,
-            finalGuide: 'local-ai-acknowledgement',
-        });
-        await copyStartCardPrompt(prompt);
-    };
-    const executeResourceStartCardPrompt = async (card: ResourceStartPromptCard) => {
-        if (!onExecutePrompt) return;
-        const settings = card.scene === 'design'
-            ? card.imageSize ? applyResourceStartImageSize(effectiveImageStartParams, card.imageSize) : effectiveImageStartParams
-            : {
-                ...(card.prdPlanning ? { usePrdPlanning: card.prdPlanning === 'enable' } : {}),
-            };
-        const prompt = buildStartGuidePrompt({
-            kind,
-            scene: card.scene,
-            prompt: card.prompt,
-            settings,
-            finalGuide: 'local-ai-acknowledgement',
-        });
-        const executed = await onExecutePrompt(prompt, {
-            scene: `start-guide-${kind}-${card.scene}`,
-            targetPath: kind === 'prototype' ? prototypeIndexPath : null,
-            autoSend: false,
-        });
-        if (executed === false) throw new Error('AI 侧栏未能打开');
-    };
-    const copyThemeStartCardPrompt = async (card: ThemeStartPromptCard) => {
-        const prompt = buildStartGuidePrompt({
-            kind,
-            scene: 'design',
-            prompt: card.prompt,
-            settings: undefined,
-            finalGuide: 'local-ai-acknowledgement',
-        });
-        await copyStartCardPrompt(prompt);
-    };
-    const executeThemeStartCardPrompt = async (card: ThemeStartPromptCard) => {
-        if (!onExecutePrompt) return;
-        const prompt = buildStartGuidePrompt({
-            kind,
-            scene: 'design',
-            prompt: card.prompt,
-            settings: undefined,
-            finalGuide: 'local-ai-acknowledgement',
-        });
-        const executed = await onExecutePrompt(prompt, {
-            scene: 'start-guide-design',
-            targetPath: null,
-            autoSend: false,
-        });
-        if (executed === false) throw new Error('AI 侧栏未能打开');
     };
 
     useEffect(() => {
@@ -1947,139 +1808,6 @@ function StartGuide({
                 if (shouldShowThemeCases) setThemeProgressiveLoadArmed(true);
             }}
         >
-            <div className="flex min-h-[76vh] w-full items-center justify-center">
-                <div className="flex min-h-full w-full max-w-[960px] flex-col items-center justify-center">
-                    {shouldShowTopActions ? (
-                        <div className="z-10 mb-5 flex w-full flex-wrap items-center justify-center gap-2 text-[12px] xl:absolute xl:right-6 xl:top-5 xl:mb-0 xl:w-auto xl:justify-end">
-                            <TooltipProvider>
-                                {shouldShowPrototypeActions ? (
-                                    <>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
-                                                    onClick={() => onOpenPrototypeCreateDialog?.({ initialTab: 'upload', targetPrototypeName: draftActive ? undefined : item.name })}
-                                                >
-                                                    <UploadCloud className="h-3.5 w-3.5" />
-                                                    导入原型
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="top">Axhub Make / Axure / V0 / aistudio / Stitch / Figma Make</TooltipContent>
-                                        </Tooltip>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <span className="inline-flex h-7 cursor-default items-center gap-1.5 rounded-md px-2 text-xs text-slate-600">
-                                                    <Globe className="h-3.5 w-3.5" />
-                                                    导入任意网页
-                                                </span>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="top">使用 Chrome 扩展可以采集任意网页</TooltipContent>
-                                        </Tooltip>
-                                    </>
-                                ) : null}
-                                {shouldShowResourceActions ? (
-                                    <>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
-                                                    onClick={onUploadResourceFiles}
-                                                >
-                                                    <UploadCloud className="h-3.5 w-3.5" />
-                                                    上传资源
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="top">上传资源文件</TooltipContent>
-                                        </Tooltip>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
-                                                    onClick={() => { void onCreateResourceCanvasFile?.(); }}
-                                                >
-                                                    <LayoutDashboard className="h-3.5 w-3.5" />
-                                                    画布
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="top">新建 Excalidraw 画布文件</TooltipContent>
-                                        </Tooltip>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
-                                                    onClick={() => { void onCreateDrawioResourceFile?.(); }}
-                                                >
-                                                    <Network className="h-3.5 w-3.5" />
-                                                    Drawio 图表
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="top">新建 Drawio 图表文件</TooltipContent>
-                                        </Tooltip>
-                                    </>
-                                ) : null}
-                            </TooltipProvider>
-                        </div>
-                    ) : null}
-                    <div className="w-full">
-                        <h1 className="ax-start-guide-title font-semibold leading-tight text-slate-950">
-                            我们先从哪里开始呢?
-                        </h1>
-                    </div>
-
-                    {kind === 'prototype' ? (
-                        <div className="w-full">
-                            <ThemeStartPromptGrid
-                                cards={activePrototypePromptCards}
-                                ariaLabel="原型生成能力"
-                                disabled={false}
-                                copyOnSelect
-                                selectPrompt={() => undefined}
-                                onCopyPrompt={copyPrototypeStartCardPrompt}
-                                onExecutePrompt={executePrototypeStartCardPrompt}
-                            />
-                        </div>
-                    ) : kind === 'resource' ? (
-                        <div className="w-full">
-                            <ResourceStartPromptGrid
-                                cards={activeResourcePromptCards}
-                                activeScene="document"
-                                disabled={false}
-                                copyOnSelect
-                                selectPrompt={() => undefined}
-                                onCopyPrompt={copyResourceStartCardPrompt}
-                                onExecutePrompt={executeResourceStartCardPrompt}
-                                onSceneChange={() => undefined}
-                                onImageSizeChange={() => undefined}
-                                onPrdPlanningChange={() => undefined}
-                            />
-                        </div>
-                    ) : kind === 'design' ? (
-                        <div className="w-full">
-                            <ThemeStartPromptGrid
-                                cards={activeThemePromptCards}
-                                disabled={false}
-                                copyOnSelect
-                                selectPrompt={() => undefined}
-                                onCopyPrompt={copyThemeStartCardPrompt}
-                                onExecutePrompt={executeThemeStartCardPrompt}
-                            />
-                        </div>
-                    ) : null}
-
-                </div>
-            </div>
             {shouldShowPrototypeCases ? (
                 <div className="mx-auto w-full max-w-[1080px] pt-8 text-left">
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-3">

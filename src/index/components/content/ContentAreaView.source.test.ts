@@ -27,7 +27,7 @@ function getSourceSegment(source: string, startNeedle: string, endNeedle: string
 }
 
 describe('ContentAreaView Codex surface source', () => {
-  it('removes the inline local-AI app list from the start guide', () => {
+  it('removes the obsolete empty-state prompt panel and inline app launcher', () => {
     const source = readContentAreaViewSource();
     const startGuideSegment = getSourceSegment(
       source,
@@ -41,9 +41,13 @@ describe('ContentAreaView Codex surface source', () => {
     expect(startGuideSegment).not.toContain('onOpenProjectInIDE,');
     expect(startGuideSegment).not.toContain('onPreferredIDEChange,');
     expect(startGuideSegment).not.toContain('agentAvailability,');
+    expect(startGuideSegment).not.toContain('我们先从哪里开始呢?');
+    expect(startGuideSegment).not.toContain('<ResourceStartPromptGrid');
+    expect(startGuideSegment).not.toContain('<ThemeStartPromptGrid');
+    expect(startGuideSegment).not.toContain('shouldShowTopActions');
   });
 
-  it('shows seven capability-focused prototype cards with copy and quick-execute actions', () => {
+  it('keeps legacy capability cards detached from the empty-state library view', () => {
     const source = readContentAreaViewSource();
     const startGuideSegment = getSourceSegment(
       source,
@@ -59,7 +63,7 @@ describe('ContentAreaView Codex surface source', () => {
     expect(source).toContain('conversationUiEnabled?: boolean;');
     expect(source).not.toContain('CanvasGenerationDisplayComposer');
     expect(source).not.toContain('原型起始页 AI 输入');
-    expect(startGuideSegment.match(/copyOnSelect/g)).toHaveLength(3);
+    expect(startGuideSegment).not.toContain('copyOnSelect');
     expect(source).toContain("title: '根据 PRD 生成原型'");
     expect(source).toContain('根据我提供的 PRD 生成原型，梳理页面和主要流程。');
     expect(source).toContain("title: '根据设计图还原原型'");
@@ -82,16 +86,14 @@ describe('ContentAreaView Codex surface source', () => {
     expect(source).not.toContain('生成数据看板');
     expect(source).not.toContain('生成审批表单流程');
     expect(source).not.toContain('生成预约服务流程');
-    expect(startGuideSegment).toContain('ariaLabel="原型生成能力"');
-    expect(startGuideSegment).toContain('const copyPrototypeStartCardPrompt = async (card: ThemeStartPromptCard) => {');
-    expect(startGuideSegment).toContain('const executePrototypeStartCardPrompt = async (card: ThemeStartPromptCard) => {');
-    expect(startGuideSegment).toContain("scene: 'start-guide-prototype-page'");
-    expect(startGuideSegment).toContain('onExecutePrompt={executePrototypeStartCardPrompt}');
-    expect(startGuideSegment).toContain('onExecutePrompt={executeResourceStartCardPrompt}');
-    expect(startGuideSegment).toContain('onExecutePrompt={executeThemeStartCardPrompt}');
-    expect(startGuideSegment).toContain('autoSend: false');
-    expect(startGuideSegment).toContain('导入原型');
-    expect(startGuideSegment).toContain('导入任意网页');
+    expect(startGuideSegment).not.toContain('ariaLabel="原型生成能力"');
+    expect(startGuideSegment).not.toContain('copyPrototypeStartCardPrompt');
+    expect(startGuideSegment).not.toContain('executePrototypeStartCardPrompt');
+    expect(startGuideSegment).not.toContain("scene: 'start-guide-prototype-page'");
+    expect(startGuideSegment).not.toContain('executeResourceStartCardPrompt');
+    expect(startGuideSegment).not.toContain('executeThemeStartCardPrompt');
+    expect(startGuideSegment).not.toContain('导入原型');
+    expect(startGuideSegment).not.toContain('导入任意网页');
   });
 });
 
@@ -311,7 +313,7 @@ describe('ContentAreaView review zoom source', () => {
     expect(source).toContain('const selectedThemeClientUnavailable = selectedThemeRuntimeUnavailable || (');
   });
 
-  it('renders reusable start guides with scoped scenes and aligned actions', () => {
+  it('retains reusable template libraries without the obsolete prompt panel', () => {
     const source = readContentAreaViewSource();
     const registrySource = readCanvasAiSceneRegistrySource();
     const startGuideSegment = getSourceSegment(
@@ -335,9 +337,9 @@ describe('ContentAreaView review zoom source', () => {
     expect(source).not.toContain("import { createCanvasGenerationComposerDraftStorageKey } from '../../domains/shared/canvasGenerationComposerDraft';");
     expect(source).not.toContain('CanvasGenerationDisplayComposer');
     expect(source).toContain("type StartGuideKind = 'prototype' | 'resource' | 'design';");
-    expect(source).toContain("const shouldShowPrototypeActions = kind === 'prototype';");
-    expect(source).toContain("const shouldShowResourceActions = kind === 'resource';");
-    expect(source).toContain("const shouldShowTopActions = shouldShowPrototypeActions || shouldShowResourceActions;");
+    expect(source).not.toContain("const shouldShowPrototypeActions = kind === 'prototype';");
+    expect(source).not.toContain("const shouldShowResourceActions = kind === 'resource';");
+    expect(source).not.toContain('shouldShowTopActions');
     expect(source).not.toContain("const shouldShowDesignImportAction = kind === 'design';");
     expect(source).toContain("const shouldShowPrototypeCases = kind === 'prototype';");
     expect(source).not.toContain("const shouldUseImageStartSettings = activeScene === 'design' && kind !== 'design';");
@@ -347,17 +349,17 @@ describe('ContentAreaView review zoom source', () => {
     expect(startGuideSegment).not.toContain('导入设计规范');
     expect(source).toContain('PrototypeStartSettingsPopover');
     expect(source).toContain('DocumentStartSettingsPopover');
-    expect(startGuideSegment).toContain('我们先从哪里开始呢?');
+    expect(startGuideSegment).not.toContain('我们先从哪里开始呢?');
     expect(startGuideSegment).toContain('px-6 py-10');
-    expect(startGuideSegment).toContain('max-w-[960px]');
+    expect(startGuideSegment).not.toContain('max-w-[960px]');
     expect(startGuideSegment).toContain('max-w-[1080px]');
     expect(startGuideSegment).not.toContain('<Segmented');
-    expect(startGuideSegment).toContain('onExecutePrompt={executeResourceStartCardPrompt}');
-    expect(startGuideSegment).toContain('onExecutePrompt={executeThemeStartCardPrompt}');
+    expect(startGuideSegment).not.toContain('executeResourceStartCardPrompt');
+    expect(startGuideSegment).not.toContain('executeThemeStartCardPrompt');
     expect(startGuideSegment).not.toContain('更多模板');
-    expect(startGuideSegment).toContain('导入原型');
-    expect(startGuideSegment).toContain('导入任意网页');
-    expect(startGuideSegment).toContain('Drawio 图表');
+    expect(startGuideSegment).not.toContain('导入原型');
+    expect(startGuideSegment).not.toContain('导入任意网页');
+    expect(startGuideSegment).not.toContain('Drawio 图表');
     expect(startGuideSegment).not.toContain('导入设计规范');
     expect(startGuideSegment).not.toContain('导入设计稿');
     expect(startGuideSegment).not.toContain('打开在线模板库');
@@ -387,9 +389,8 @@ describe('ContentAreaView review zoom source', () => {
     expect(startGuideSegment).not.toContain('projectResourceTrees');
     expect(startGuideSegment).not.toContain('projectResourceItems');
     expect(startGuideSegment).not.toContain('externalFileDropTargetRef');
-    expect(startGuideSegment).toContain('onExecutePrompt={executeResourceStartCardPrompt}');
-    expect(startGuideSegment).toContain('onExecutePrompt={executeThemeStartCardPrompt}');
-    expect(startGuideSegment).toContain('autoSend: false');
+    expect(startGuideSegment).not.toContain('executeResourceStartCardPrompt');
+    expect(startGuideSegment).not.toContain('executeThemeStartCardPrompt');
     expect(startGuideSegment).not.toContain('w-full pt-24');
     expect(startGuideSegment).not.toContain('onClick={() => onSubmitPrototypeStartRequest?.({');
     expect(startGuideSegment).not.toContain('mt-5 flex flex-wrap items-center justify-center gap-2');
@@ -401,7 +402,7 @@ describe('ContentAreaView review zoom source', () => {
     expect(startGuideSegment).not.toContain('variant="inline-app-list"');
   });
 
-  it('renders every resource capability in a quiet title-free grid', () => {
+  it('keeps resource capability helpers detached from the library-only empty state', () => {
     const source = readContentAreaViewSource();
     const resourceGridSegment = readResourceStartPromptGridSource();
     const startPromptCardSegment = readStartPromptCardSource();
@@ -464,11 +465,9 @@ describe('ContentAreaView review zoom source', () => {
     expect(source).not.toContain("resource: ['document', 'design']");
     expect(source).not.toContain('const shouldShowSceneSwitcher = availableScenes.length > 1;');
     expect(startGuideSegment).not.toContain('常用资源');
-    expect(startGuideSegment).toContain('<ResourceStartPromptGrid');
-    expect(startGuideSegment).toContain('copyOnSelect');
-    expect(startGuideSegment).toContain('onExecutePrompt={executeResourceStartCardPrompt}');
-    expect(startGuideSegment).toContain('onPrdPlanningChange={() => undefined}');
-    expect(startGuideSegment).toContain('onImageSizeChange={() => undefined}');
+    expect(startGuideSegment).not.toContain('<ResourceStartPromptGrid');
+    expect(startGuideSegment).not.toContain('copyOnSelect');
+    expect(startGuideSegment).not.toContain('executeResourceStartCardPrompt');
     expect(resourceGridSegment).toContain('<StartPromptGrid ariaLabel="资源生成能力">');
     expect(resourceGridSegment).toContain('<StartPromptCard');
     expect(resourceGridSegment).toContain('key={card.id}');
@@ -482,10 +481,10 @@ describe('ContentAreaView review zoom source', () => {
     expect(startPromptCardSegment).not.toContain('shadow-');
     expect(resourceGridSegment).toContain('copyOnSelect');
     expect(resourceGridSegment).toContain('onExecute');
-    expect(startGuideSegment).toContain('card.title.trim() && card.prompt.trim()');
+    expect(startGuideSegment).not.toContain('card.title.trim() && card.prompt.trim()');
   });
 
-  it('renders theme source cards only on the design start guide', () => {
+  it('does not render legacy theme prompt cards in the design library view', () => {
     const source = readContentAreaViewSource();
     const startGuideSegment = getSourceSegment(
       source,
@@ -495,11 +494,11 @@ describe('ContentAreaView review zoom source', () => {
 
     expect(source).toContain("const THEME_START_PROMPT_CARDS");
     expect(startGuideSegment).toContain("kind === 'design'");
-    expect(startGuideSegment).toContain('<ThemeStartPromptGrid');
-    expect(startGuideSegment).toContain('cards={activeThemePromptCards}');
-    expect(startGuideSegment).toContain('copyOnSelect');
-    expect(startGuideSegment).toContain('onCopyPrompt={copyThemeStartCardPrompt}');
-    expect(startGuideSegment).toContain('onExecutePrompt={executeThemeStartCardPrompt}');
+    expect(startGuideSegment).not.toContain('<ThemeStartPromptGrid');
+    expect(startGuideSegment).not.toContain('activeThemePromptCards');
+    expect(startGuideSegment).not.toContain('copyOnSelect');
+    expect(startGuideSegment).not.toContain('copyThemeStartCardPrompt');
+    expect(startGuideSegment).not.toContain('executeThemeStartCardPrompt');
   });
 
   it('passes homepage project resource trees and file drop targets into placeholder composers', () => {
@@ -535,8 +534,8 @@ describe('ContentAreaView review zoom source', () => {
     expect(startGuideSegment).not.toContain('projectResourceTrees={{');
     expect(startGuideSegment).not.toContain('projectResourceItems={{');
     expect(startGuideSegment).not.toContain('externalFileDropTargetRef={placeholderDropZoneRef}');
-    expect(startGuideSegment).toContain('onExecutePrompt={executeResourceStartCardPrompt}');
-    expect(startGuideSegment).toContain('onExecutePrompt={executeThemeStartCardPrompt}');
+    expect(startGuideSegment).not.toContain('executeResourceStartCardPrompt');
+    expect(startGuideSegment).not.toContain('executeThemeStartCardPrompt');
     expect(selectedPlaceholderRenderSegment).toContain('sidebarTrees={sidebarTrees}');
     expect(selectedPlaceholderRenderSegment).toContain('docsItems={docsItems}');
     expect(selectedPlaceholderRenderSegment).toContain('prototypes={prototypes}');
@@ -557,8 +556,7 @@ describe('ContentAreaView review zoom source', () => {
     expect(source).not.toContain("import { optimizeCanvasPrompt } from '../../domains/ai-generation/canvasPromptOptimization';");
     expect(source).not.toContain('CanvasPromptOptimizationRequest');
     expect(startGuideSegment).not.toContain('onOptimizePrompt=');
-    expect(startGuideSegment).toContain('onExecutePrompt={executeResourceStartCardPrompt}');
-    expect(startGuideSegment).toContain('autoSend: false');
+    expect(startGuideSegment).not.toContain('executeResourceStartCardPrompt');
   });
 
   it('opens start-guide prompts through the ordinary assistant entry without generation side effects', () => {
@@ -567,8 +565,7 @@ describe('ContentAreaView review zoom source', () => {
 
     expect(source).toContain("import type { PromptExecutionMeta, PrototypeCreateDialogOpenOptions, SelectedResourceFolder } from '../../types/index-page.types';");
     expect(source).toContain('onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;');
-    expect(startGuideSegment).toContain('onExecutePrompt={executePrototypeStartCardPrompt}');
-    expect(startGuideSegment).toContain('autoSend: false');
+    expect(startGuideSegment).not.toContain('executePrototypeStartCardPrompt');
     expect(source).not.toContain('handleSubmitPrototypeStartRequest');
     expect(source).not.toContain('onSubmitPrototypeStartRequest');
     expect(source).not.toContain('onCreatePrototypeForDraftStart');
@@ -788,7 +785,7 @@ describe('ContentAreaView review zoom source', () => {
     expect(startGuideSegment).not.toContain('documentUsePrdPlanning');
   });
 
-  it('copies local AI prompt text from the composer and resource or design cards', () => {
+  it('removes prompt-copy wiring from the obsolete empty-state panel', () => {
     const source = readContentAreaViewSource();
     const prototypeSettingsSegment = getSourceSegment(
       source,
@@ -813,22 +810,15 @@ describe('ContentAreaView review zoom source', () => {
 
     expect(source).not.toContain('stripCanvasUpdateInstruction,');
     expect(source).not.toContain('CanvasGenerationDisplayComposer');
-    expect(source).toContain("import { copyToClipboard } from '../../utils/clipboard';");
-    expect(source).toContain("import { buildStartGuidePrompt } from './startGuidePrompt';");
-    expect(startGuideSegment).toContain('const copyResourceStartCardPrompt = async (card: ResourceStartPromptCard) => {');
-    expect(startGuideSegment).toContain('const copyThemeStartCardPrompt = async (card: ThemeStartPromptCard) => {');
-    expect(startGuideSegment).toContain("finalGuide: 'local-ai-acknowledgement',");
-    expect(startGuideSegment).toContain('scene: card.scene,');
-    expect(startGuideSegment).toContain('card.imageSize ? applyResourceStartImageSize(effectiveImageStartParams, card.imageSize)');
-    expect(startGuideSegment).toContain("usePrdPlanning: card.prdPlanning === 'enable',");
-    expect(startGuideSegment).toContain('await copyToClipboard(prompt);');
-    expect(startGuideSegment).toContain("toast.success('提示词已复制，请交给本地 AI 使用');");
-    expect(startGuideSegment).toContain("toast.error(error instanceof Error ? error.message : '复制提示词失败');");
-    expect(startGuideSegment).toContain('onCopyPrompt={copyResourceStartCardPrompt}');
-    expect(startGuideSegment).toContain('onCopyPrompt={copyThemeStartCardPrompt}');
-    expect(startGuideSegment).toContain('onExecutePrompt={executeResourceStartCardPrompt}');
-    expect(startGuideSegment).toContain('onExecutePrompt={executeThemeStartCardPrompt}');
-    expect(startGuideSegment).toContain('autoSend: false');
+    expect(source).not.toContain("import { copyToClipboard } from '../../utils/clipboard';");
+    expect(source).not.toContain("import { buildStartGuidePrompt } from './startGuidePrompt';");
+    expect(startGuideSegment).not.toContain('copyResourceStartCardPrompt');
+    expect(startGuideSegment).not.toContain('copyThemeStartCardPrompt');
+    expect(startGuideSegment).not.toContain("finalGuide: 'local-ai-acknowledgement',");
+    expect(startGuideSegment).not.toContain('applyResourceStartImageSize');
+    expect(startGuideSegment).not.toContain('copyToClipboard');
+    expect(startGuideSegment).not.toContain('executeResourceStartCardPrompt');
+    expect(startGuideSegment).not.toContain('executeThemeStartCardPrompt');
     expect(source).not.toContain("const COPY_START_PROMPT_TOOLTIP = '复制提示词给本地AI使用';");
     expect(source).not.toContain('function StartSettingsCopyPromptButton({ onCopyPrompt }');
     expect(source).not.toContain('aria-label={COPY_START_PROMPT_TOOLTIP}');
@@ -839,7 +829,7 @@ describe('ContentAreaView review zoom source', () => {
     }
   });
 
-  it('adds scoped placeholder header actions without restoring a design import entry', () => {
+  it('removes scoped placeholder header actions with the obsolete panel', () => {
     const source = readContentAreaViewSource();
     const propsSegment = getSourceSegment(
       source,
@@ -853,31 +843,21 @@ describe('ContentAreaView review zoom source', () => {
     );
 
     expect(propsSegment).toContain('onOpenPrototypeCreateDialog?: (options: PrototypeCreateDialogOpenOptions) => void;');
-    expect(startGuideSegment).toContain('onOpenPrototypeCreateDialog');
-    const topActionsSegment = getSourceSegment(
-      startGuideSegment,
-      '{shouldShowTopActions ? (',
-      '<div className="w-full">',
-    );
+    expect(startGuideSegment).not.toContain('onOpenPrototypeCreateDialog,');
     expect(startGuideSegment).not.toContain("onOpenPrototypeCreateDialog?.({ initialTab: 'onlineImport', targetPrototypeName: draftActive ? undefined : item.name })");
-    expect(startGuideSegment).toContain("onOpenPrototypeCreateDialog?.({ initialTab: 'upload', targetPrototypeName: draftActive ? undefined : item.name })");
-    expect(topActionsSegment).not.toContain('更多模板');
+    expect(startGuideSegment).not.toContain("onOpenPrototypeCreateDialog?.({ initialTab: 'upload'");
     expect(startGuideSegment).not.toContain('更多模板');
     expect(startGuideSegment).not.toContain('更多模型');
-    expect(topActionsSegment).toContain('导入原型');
-    expect(startGuideSegment).toContain('导入任意网页');
-    expect(topActionsSegment).toContain('上传资源');
-    expect(topActionsSegment).toContain('画布');
-    expect(topActionsSegment).toContain('Drawio 图表');
-    expect(topActionsSegment).not.toContain('导入设计规范');
-    expect(topActionsSegment).not.toContain('导入设计稿');
+    expect(startGuideSegment).not.toContain('导入原型');
+    expect(startGuideSegment).not.toContain('导入任意网页');
+    expect(startGuideSegment).not.toContain('上传资源');
+    expect(startGuideSegment).not.toContain('Drawio 图表');
     expect(startGuideSegment).not.toContain('CanvasGenerationDisplayComposer');
-    expect(startGuideSegment).toContain('Axhub Make / Axure / V0 / aistudio / Stitch / Figma Make');
-    expect(startGuideSegment).toContain('使用 Chrome 扩展可以采集任意网页');
-    expect(startGuideSegment).toContain('cursor-default');
+    expect(startGuideSegment).not.toContain('Axhub Make / Axure / V0 / aistudio / Stitch / Figma Make');
+    expect(startGuideSegment).not.toContain('使用 Chrome 扩展可以采集任意网页');
     expect(startGuideSegment).not.toContain('ExternalLink');
-    expect(startGuideSegment).toContain('UploadCloud');
-    expect(startGuideSegment).toContain('Globe');
+    expect(startGuideSegment).not.toContain('<UploadCloud');
+    expect(startGuideSegment).not.toContain('<Globe');
     expect(startGuideSegment).not.toContain('hover:underline');
   });
 
@@ -945,21 +925,16 @@ describe('ContentAreaView review zoom source', () => {
     expect(source).toContain("metaLabel: platform === 'desktop' ? 'PC 端' : '移动端'");
   });
 
-  it('keeps placeholder header actions on a separate row below the desktop xl breakpoint', () => {
+  it('does not retain the placeholder header action row', () => {
     const source = readContentAreaViewSource();
     const startGuideSegment = getSourceSegment(
       source,
       'function StartGuide({',
       'export default function ContentArea({',
     );
-    const contentStartIndex = startGuideSegment.indexOf('<div className="flex min-h-[76vh] w-full items-center justify-center">');
-    const topActionsIndex = startGuideSegment.indexOf('{shouldShowTopActions ? (');
-    const titleIndex = startGuideSegment.indexOf('我们先从哪里开始呢?');
-
-    expect(contentStartIndex).toBeGreaterThan(-1);
-    expect(topActionsIndex).toBeGreaterThan(contentStartIndex);
-    expect(topActionsIndex).toBeLessThan(titleIndex);
-    expect(startGuideSegment).toContain(
+    expect(startGuideSegment).not.toContain('我们先从哪里开始呢?');
+    expect(startGuideSegment).not.toContain('shouldShowTopActions');
+    expect(startGuideSegment).not.toContain(
       'className="z-10 mb-5 flex w-full flex-wrap items-center justify-center gap-2 text-[12px] xl:absolute xl:right-6 xl:top-5 xl:mb-0 xl:w-auto xl:justify-end"',
     );
   });
@@ -1046,8 +1021,8 @@ describe('ContentAreaView review zoom source', () => {
     expect(imageSettingsSegment).not.toContain('className="space-y-2 pt-1"');
     expect(imageSettingsSegment).not.toContain('rounded-md border border-border/60 bg-muted/20 p-2');
     expect(imageSettingsSegment).not.toContain('justify-between gap-3 rounded-sm px-1.5');
-    expect(startGuideSegment).toContain('themeName: selectedThemeName === NO_PROTOTYPE_THEME_VALUE ? \'\' : selectedTheme?.name || \'\'');
-    expect(startGuideSegment).toContain('disable_prompt_optimization: selectedThemeName !== NO_PROTOTYPE_THEME_VALUE');
+    expect(startGuideSegment).not.toContain('selectedThemeName');
+    expect(startGuideSegment).not.toContain('disable_prompt_optimization');
     expect(startGuideSegment).not.toContain('<ImageStartSettingsPopover');
   });
 
@@ -1094,7 +1069,7 @@ describe('ContentAreaView review zoom source', () => {
     expect(unsupportedFallbackSegment).not.toContain('const fileSize = (selectedMarkdownItem as any).fileSize;');
   });
 
-  it('passes ACP selector and project resource context into start guide composers', () => {
+  it('keeps template-library prompt actions while removing start-guide composers', () => {
     const source = readContentAreaViewSource();
     const startGuideSegment = getSourceSegment(
       source,
@@ -1122,16 +1097,15 @@ describe('ContentAreaView review zoom source', () => {
     expect(startGuideSegment).not.toContain('workspacePath={assistantProjectPath}');
     expect(startGuideSegment).not.toContain('projectResourceTrees={{');
     expect(startGuideSegment).not.toContain('projectResourceItems={{');
-    expect(startGuideSegment).toContain('onExecutePrompt={executeResourceStartCardPrompt}');
-    expect(startGuideSegment).toContain('onExecutePrompt={executeThemeStartCardPrompt}');
-    expect(startGuideSegment).toContain('autoSend: false');
+    expect(startGuideSegment).not.toContain('executeResourceStartCardPrompt');
+    expect(startGuideSegment).not.toContain('executeThemeStartCardPrompt');
     expect(placeholderRenderSegment).toContain('preferredPromptClient={preferredPromptClient}');
     expect(placeholderRenderSegment).toContain('sidebarTrees={sidebarTrees}');
     expect(placeholderRenderSegment).toContain('docsItems={docsItems}');
     expect(placeholderRenderSegment).toContain('prototypes={prototypes}');
   });
 
-  it('uses the project default design for prototype start settings until the user picks one', () => {
+  it('does not retain project-default design state in the removed prompt panel', () => {
     const source = readContentAreaViewSource();
     const startGuideSegment = getSourceSegment(
       source,
@@ -1140,11 +1114,11 @@ describe('ContentAreaView review zoom source', () => {
     );
 
     expect(source).toContain('defaultThemeName?: string | null;');
-    expect(startGuideSegment).toContain('defaultThemeName,');
-    expect(startGuideSegment).toContain('resolvePrototypeGenerationInitialThemeName(themes, defaultThemeName)');
+    expect(startGuideSegment).not.toContain('defaultThemeName,');
+    expect(startGuideSegment).not.toContain('resolvePrototypeGenerationInitialThemeName(themes, defaultThemeName)');
     expect(startGuideSegment).not.toContain('previousDefaultThemeNameRef');
     expect(startGuideSegment).not.toContain('userSelectedThemeRef');
-    expect(startGuideSegment).toContain('const selectedThemeName = resolvePrototypeGenerationInitialThemeName(themes, defaultThemeName);');
+    expect(startGuideSegment).not.toContain('const selectedThemeName');
   });
 
   it('keeps placeholder content free of the obsolete waiting-generation submission path', () => {
