@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { afterEach, describe, it } from 'node:test';
@@ -194,8 +193,22 @@ function shouldScanTrackedFile(relativePath) {
   if (/^(?:automation-reports|\.local|\.release|coverage|dist|node_modules)\//u.test(relativePath)) {
     return false;
   }
+  if (/(?:^|\/)(?:__tests__\/|[^/]+\.test\.[^/]+$)/u.test(relativePath)) {
+    return false;
+  }
   return /^(?:package\.json|pnpm-lock\.yaml|bin\/|scripts\/|src\/|client\/(?:package\.json|src\/|\.axhub\/make\/|\.agents\/|\.claude\/|rules\/|vite-plugins\/))/u
     .test(relativePath);
+}
+
+function resolveWorkspaceRootFromGitCommonDir() {
+  const result = spawnSync(
+    'git',
+    ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+    { cwd: process.cwd(), encoding: 'utf8' },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const sourceRepositoryRoot = path.dirname(result.stdout.trim());
+  return path.resolve(sourceRepositoryRoot, '../..');
 }
 
 function containsLocalMachinePath(source) {
@@ -1379,7 +1392,10 @@ describe('release make artifact helpers', () => {
     assert(Number.isInteger(releaseTypescriptMajor), 'release TypeScript major version must be detectable');
 
     const exportCoreTsconfig = JSON.parse(
-      fs.readFileSync(path.resolve('../../packages/axhub-export-core/tsconfig.json'), 'utf8'),
+      fs.readFileSync(
+        path.join(resolveWorkspaceRootFromGitCommonDir(), 'packages/axhub-export-core/tsconfig.json'),
+        'utf8',
+      ),
     );
     const ignoreDeprecations = exportCoreTsconfig.compilerOptions?.ignoreDeprecations;
     if (ignoreDeprecations === undefined) {
