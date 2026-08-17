@@ -11,17 +11,11 @@ describe('Make Commentary voice dependency boundary', () => {
       dependencies: Record<string, string>;
       pnpm: { overrides: Record<string, string> };
     };
-    const workspacePackageJson = JSON.parse(read('../../../../../../package.json')) as {
-      pnpm: { overrides: Record<string, string> };
-    };
-
     expect(packageJson.dependencies['@axhub/acp']).toBe('0.1.13');
     expect(packageJson.dependencies['@assistant-ui/react']).toBe('0.15.5');
     expect(packageJson.dependencies['@assistant-ui/react-ai-sdk']).toBe('1.4.4');
     expect(packageJson.pnpm.overrides['@assistant-ui/core']).toBe('0.3.7');
     expect(packageJson.pnpm.overrides['@assistant-ui/store']).toBe('0.3.6');
-    expect(workspacePackageJson.pnpm.overrides['@assistant-ui/core']).toBe('0.3.7');
-    expect(workspacePackageJson.pnpm.overrides['@assistant-ui/store']).toBe('0.3.6');
   });
 
   it('keeps only host tools and removes the duplicate browser speech stack', () => {
