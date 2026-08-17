@@ -467,6 +467,7 @@ function templateZipFetchCalls(fetchMock: ReturnType<typeof vi.fn>) {
 }
 
 function installNpmRegistryFetchMock(options: {
+  failNpmjs?: boolean;
   npmjsDelayMs?: number;
   npmmirrorDelayMs?: number;
 } = {}) {
@@ -477,6 +478,9 @@ function installNpmRegistryFetchMock(options: {
     const isNpmmirror = url.startsWith('https://registry.npmmirror.com/');
     if (!isNpmjs && !isNpmmirror) {
       return previousFetch(input, init);
+    }
+    if (isNpmjs && options.failNpmjs) {
+      return new Response('official registry unavailable', { status: 503 });
     }
     const delayMs = isNpmjs ? options.npmjsDelayMs ?? 200 : options.npmmirrorDelayMs ?? 1;
     await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -1803,14 +1807,14 @@ describe('make-server make client project APIs', () => {
     }
   });
 
-  it('uses npmmirror for npm registry routing when required package probes are faster', async () => {
+  it('uses npmmirror for npm registry routing when official required package probes fail', async () => {
     const defaultRoot = createTempRoot();
     writeProjectMetadata(defaultRoot);
     const projectRoot = createTempRoot('axhub-make-client-registry-routing-');
     writeMakeClientMarker(projectRoot, 'registry-routing-client', 'Registry Routing Client');
     writeRegistryRoutingMakeClientPackage(projectRoot);
     writeMakeClientMetadata(projectRoot, 'registry-routing-client', 'Registry Routing Client');
-    installNpmRegistryFetchMock();
+    installNpmRegistryFetchMock({ failNpmjs: true });
     runLocalCommandMock.mockImplementation(async (command: string, args: string[]) => {
       if ((command === 'npm' || command === 'npm.cmd') && args.join(' ') === 'config get registry') {
         return { ...localCommandResult(command, args), stdout: 'https://registry.npmjs.org/\n' };
@@ -1873,7 +1877,7 @@ describe('make-server make client project APIs', () => {
     writeMakeClientMarker(projectRoot, 'registry-retry-client', 'Registry Retry Client');
     writeRegistryRoutingMakeClientPackage(projectRoot);
     writeMakeClientMetadata(projectRoot, 'registry-retry-client', 'Registry Retry Client');
-    installNpmRegistryFetchMock();
+    installNpmRegistryFetchMock({ failNpmjs: true });
     runLocalCommandMock.mockImplementation(async (command: string, args: string[]) => {
       if ((command === 'npm' || command === 'npm.cmd') && args.join(' ') === 'config get registry') {
         return { ...localCommandResult(command, args), stdout: 'https://registry.npmjs.org/\n' };
@@ -1907,7 +1911,7 @@ describe('make-server make client project APIs', () => {
     writeMakeClientMarker(projectRoot, 'registry-pnpm-client', 'Registry PNPM Client');
     writeRegistryRoutingMakeClientPackage(projectRoot);
     writeMakeClientMetadata(projectRoot, 'registry-pnpm-client', 'Registry PNPM Client');
-    installNpmRegistryFetchMock();
+    installNpmRegistryFetchMock({ failNpmjs: true });
     runLocalCommandMock.mockImplementation(async (command: string, args: string[]) => {
       if ((command === 'npm' || command === 'npm.cmd') && args.join(' ') === 'config get registry') {
         return { ...localCommandResult(command, args), stdout: 'https://registry.npmjs.org/\n' };
