@@ -42,6 +42,8 @@ export const prototypeSpecsApi = {
 
 function getPrototypeDirectory(prototypeFilePath: string, prototypeId: string): string {
     const normalized = String(prototypeFilePath || '').trim().replace(/\\/gu, '/').replace(/\/+$/gu, '');
+    const specMarkerIndex = normalized.indexOf('/.spec/');
+    if (specMarkerIndex > 0) return normalized.slice(0, specMarkerIndex);
     const slashIndex = normalized.lastIndexOf('/');
     if (slashIndex > 0) return normalized.slice(0, slashIndex);
     const fallbackId = String(prototypeId || '').trim();
@@ -60,8 +62,8 @@ export function buildPrototypeSpecCreationPrompt(params: {
         `当前原型 ${params.prototypeId || prototypeDir} 缺少主规格，请协助创建。`,
         '',
         '请先询问我选择 Markdown（节省 Token）还是 HTML（体验更好）；建议 HTML，但必须等我明确选择后再继续。',
-        `- HTML：基于 src/resources/templates/规格文档 HTML 模板.html 写入 ${specDir}/spec.html`,
-        `- Markdown：基于 src/resources/templates/规格文档 Markdown 模板.md 写入 ${specDir}/spec.md`,
+        `- HTML：基于 templates/prototype-spec.html 写入 ${specDir}/spec.html`,
+        `- Markdown：基于 templates/prototype-spec.md 写入 ${specDir}/spec.md`,
         '- 不要同时创建两个主规格；同时存在时以 HTML 为准。',
         '- 不要创建日期版本或 spec-state.json。',
         '- 可以在主规格中链接同目录下的子文档。',

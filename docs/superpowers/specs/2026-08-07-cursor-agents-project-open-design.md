@@ -41,11 +41,12 @@ For integrated Cursor opening:
 1. Validate the requested path against the current Make project root using the existing project-scoped API boundary.
 2. Inspect Cursor process and CDP state.
 3. If Cursor is running without Axhub CDP, preserve the existing restart-or-open-normally dialog.
-4. On direct launch or approved restart, launch Cursor Agents with `--chat` plus the fixed loopback CDP arguments.
-5. On reuse, focus the existing Agents window before handing off the directory.
-6. Wait for the expected `Cursor Agents` target.
-7. Invoke the Cursor desktop router with only the absolute project directory as the positional argument.
-8. Return success without calling `openIDEPath()`.
+4. If the loopback CDP endpoint is still available but the Agents renderer was closed, classify the session as recoverable, reopen Agents with `--chat`, and continue without restarting Cursor.
+5. On direct launch or approved restart, launch Cursor Agents with `--chat` plus the fixed loopback CDP arguments.
+6. On reuse, focus the existing Agents window before handing off the directory.
+7. Wait for the expected `Cursor Agents` target.
+8. Invoke the Cursor desktop router with only the absolute project directory as the positional argument.
+9. Return success without calling `openIDEPath()`.
 
 For `Open normally`, continue to call the existing Cursor IDE path opener. A failure in integrated mode never silently falls back to normal IDE opening.
 
@@ -79,6 +80,7 @@ Windows behavior receives argument-array unit coverage and requires a native Win
 
 - Integrated opening never passes `--new-window`, `--reuse-window`, `--classic`, `--add`, or another IDE-routing flag.
 - If Cursor is running without Axhub CDP, Make asks whether to restart and inject or open normally, as it does today.
+- If Cursor's CDP browser process is alive but the Agents window is closed, reopen Agents in place; do not show the restart dialog.
 - If Agents does not expose the expected CDP target, return the existing compatibility/startup error.
 - If the desktop directory handoff process fails, report a Cursor Agents project-open error and leave Agents running.
 - Do not call `openIDEPath()` as a fallback from integrated mode.
@@ -96,6 +98,7 @@ Write failing tests before implementation for:
 - integrated Cursor opening never calls `openIDEPath()`;
 - normal Cursor opening still calls `openIDEPath()`;
 - ready, direct-launch, restart, missing-installation, and handoff-failure coordinator states;
+- recovery of a CDP-enabled Cursor process whose Agents renderer is closed;
 - rejection of paths outside the selected Make project;
 - detection of a newly created non-Agents workbench target;
 - ChatGPT and Codex++ behavior remains unchanged.

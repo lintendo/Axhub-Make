@@ -1,0 +1,179 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 1,
+  "pageId": "gd40pc",
+  "pageName": "作品首页",
+  "sitemapPath": "作品首页",
+  "requestedPath": "作品首页.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.51.43/%E4%BD%9C%E5%93%81%E9%A6%96%E9%A1%B5.html",
+  "dataUrl": "http://127.0.0.1:32768/20.51.43/files/%E4%BD%9C%E5%93%81%E9%A6%96%E9%A1%B5/data.js",
+  "generationDate": "2026-08-14T12:51:43.872Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 1200,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 这是一款婴幼儿早教APP原型模板，主要有成长记录、宝宝日记、疫苗接种、百科知识、菜谱、我的等功能，可作为原型制作的模板使用，也可作为同行业实战原型功能逻辑参考。\n- paragraph: 婴幼儿早教移动端原型模板V2.0\n- paragraph: 作品编号\n- paragraph: MOB005\n- paragraph: 作品类型\n- paragraph: 原型模版\n- paragraph: 软件版本\n- paragraph: Axure8/9\n- paragraph: 页面数量\n- paragraph: \"32\"\n- paragraph: 下载源文件\n- paragraph: 更多作品\n- paragraph: 联系作者\n- paragraph: QQ咨询:3318424510\n- paragraph: 微信咨询:Daisy0000704\n- paragraph: QQ交流群:769073380\n- paragraph: 公众号:Axure交互设计\n- paragraph: 高 保 真 Axure 原 型 模 版 及 元 件 库\n- paragraph: Copyright © DaisyAxure.com All Rights Reserved\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "001-work-cover-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "qq卡片",
+    "微信卡片",
+    "home"
+  ],
+  "fields": [],
+  "panels": [
+    {
+      "scope": "master:底部 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:作品首页 / Group / Repeater",
+      "event": "Item loaded",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set text on 内容 equal to \"[[Item.contect]]\", and<br> text on 名称 equal to \"[[Item.name]]\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:作品首页 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/mob005.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "page:作品首页 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "page:作品首页 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/ in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "page:作品首页 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "scrollToWidget",
+      "description": "Scroll to (底部)/(Dynamic panel) vertically only linear 400ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:底部 / Dynamic panel / state:State1 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

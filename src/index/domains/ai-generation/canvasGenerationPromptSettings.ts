@@ -1,4 +1,5 @@
 import type { CanvasAiScene } from '../shared/CanvasGenerationComposer';
+import { isDocumentTemplateCompatibleWithFormat } from '../../services/documentTemplates';
 
 export interface CanvasPrototypePromptSettings {
   count?: number;
@@ -30,7 +31,7 @@ export interface CanvasDocumentPromptSettings {
   format?: CanvasDocumentFormat;
   htmlVisualSpec?: CanvasHtmlVisualSpecPromptSetting;
   templateName?: string;
-  needsRequirementsAnalysis?: boolean;
+  usePrdPlanning?: boolean;
 }
 
 export type CanvasGenerationPromptSettings =
@@ -114,9 +115,15 @@ function formatDocumentFormat(format: CanvasDocumentFormat | undefined): string 
   return '';
 }
 
-function formatRequirementsAnalysisInstruction(enabled?: boolean): string {
+function formatPrototypeRequirementsAnalysisInstruction(enabled?: boolean): string {
   return enabled
-    ? '- 需求分析：使用 $requirements-exploration 对当前需求做探索和完善，先补齐目标用户、核心任务、范围、关键流程和验收口径。'
+    ? '- 需求分析：先读取 rules/requirements-alignment-guide.md，先补齐目标用户、核心任务、范围、关键流程和验收口径，再生成原型。'
+    : '';
+}
+
+function formatPrdPlanningInstruction(enabled?: boolean): string {
+  return enabled
+    ? '- PRD 规划：使用 $plan-prds 先整理来源、现状基线、需求范围和文档计划，再按确认结果执行；不要预设 PRD 数量。'
     : '';
 }
 
@@ -149,7 +156,7 @@ function formatHtmlVisualSpecInstruction(
 
 function formatDocumentTemplatePath(templateName: string): string {
   const normalizedName = templateName.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-  return normalizedName ? `resources/templates/${normalizedName}` : '';
+  return normalizedName.startsWith('templates/') ? normalizedName : '';
 }
 
 function normalizeCanvasContextValue(value: unknown): string {
@@ -219,7 +226,7 @@ export function appendPrototypeStartPromptSettings({
     count == null ? '' : `- 方案数量：${count} 个`,
     formatMultiOptionInstruction(count, 'prototype'),
     isSpecifiedValue(settings.themeName) ? `- 设计系统：${formatOptionalValue(settings.themeName)}` : '',
-    formatRequirementsAnalysisInstruction(settings.needsRequirementsAnalysis),
+    formatPrototypeRequirementsAnalysisInstruction(settings.needsRequirementsAnalysis),
   ]);
 }
 
@@ -253,12 +260,14 @@ export function appendDocumentStartPromptSettings({
 }): string {
   const formatLabel = formatDocumentFormat(settings.format);
   const templateName = typeof settings.templateName === 'string' ? settings.templateName.trim() : '';
-  const templatePath = formatDocumentTemplatePath(templateName);
+  const templatePath = isDocumentTemplateCompatibleWithFormat(templateName, settings.format || '')
+    ? formatDocumentTemplatePath(templateName)
+    : '';
   return appendSettingsBlock(prompt, '文档生成设置：', [
     formatLabel ? `- 文档格式：${formatLabel}` : '',
     formatHtmlVisualSpecInstruction(settings.format, settings.htmlVisualSpec),
     templatePath ? `- 文档模板：${templatePath}` : '',
-    formatRequirementsAnalysisInstruction(settings.needsRequirementsAnalysis),
+    formatPrdPlanningInstruction(settings.usePrdPlanning),
   ]);
 }
 

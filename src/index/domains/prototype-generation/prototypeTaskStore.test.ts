@@ -24,7 +24,7 @@ describe('prototype generation task store', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
     const store = createPrototypeGenerationTaskStore();
 
-    await store.configure({ targetPath: 'prototypes/home' });
+    await store.configure({ projectId: 'project-b', targetPath: 'prototypes/home' });
     store.deleteTask('missing-task');
 
     expect(fetchMock).not.toHaveBeenCalled();
@@ -40,7 +40,7 @@ describe('prototype generation task store', () => {
     const store = createPrototypeGenerationTaskStore({ now: vi.fn()
       .mockReturnValueOnce(1000)
       .mockReturnValueOnce(2500) });
-    await store.configure({ targetPath: 'prototypes/home' });
+    await store.configure({ projectId: 'project-b', targetPath: 'prototypes/home' });
     const seenStages: string[] = [];
     store.subscribe(() => {
       const task = store.getTasks()[0];
@@ -74,6 +74,7 @@ describe('prototype generation task store', () => {
     });
     expect(seenStages).toEqual(expect.arrayContaining(['submitting', 'running', 'refreshing', 'done']));
     expect(runnerMock.runAcpPrototypeAgent).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: 'project-b',
       provider: 'codex',
       prompt: '生成 CRM 原型',
       canvasFilePath: 'src/resources/flows/home.excalidraw',
@@ -100,6 +101,7 @@ describe('prototype generation task store', () => {
     const store = createPrototypeGenerationTaskStore({ now: vi.fn()
       .mockReturnValueOnce(1000)
       .mockReturnValueOnce(1800) });
+    await store.configure({ projectId: 'project-b', targetPath: 'prototypes/home' });
 
     const result = await store.submit({
       prompt: '生成当前原型',
@@ -142,6 +144,7 @@ describe('prototype generation task store', () => {
     const store = createPrototypeGenerationTaskStore({ now: vi.fn()
       .mockReturnValueOnce(1000)
       .mockReturnValueOnce(1800) });
+    await store.configure({ projectId: 'project-b', targetPath: 'prototypes/home' });
 
     const submitPromise = store.submit({
       prompt: '生成当前原型',
@@ -180,6 +183,7 @@ describe('prototype generation task store', () => {
     const store = createPrototypeGenerationTaskStore({ now: vi.fn()
       .mockReturnValueOnce(1000)
       .mockReturnValueOnce(1200) });
+    await store.configure({ projectId: 'project-b', targetPath: null });
 
     const result = await store.submit({
       prompt: '失败案例',
@@ -203,6 +207,7 @@ describe('prototype generation task store', () => {
     const store = createPrototypeGenerationTaskStore({ now: vi.fn()
       .mockReturnValueOnce(1000)
       .mockReturnValueOnce(1200) });
+    await store.configure({ projectId: 'project-b', targetPath: null });
 
     await store.submit({
       prompt: '生成当前原型',
@@ -229,7 +234,7 @@ describe('prototype generation task store', () => {
       .mockReturnValueOnce(1000)
       .mockReturnValueOnce(1200) });
 
-    await store.configure({ targetPath: 'src/resources/flows/home.excalidraw' });
+    await store.configure({ projectId: 'project-b', targetPath: 'src/resources/flows/home.excalidraw' });
     await store.submit({
       prompt: '生成当前原型',
       preferredPromptClient: 'acp:codex',
@@ -241,7 +246,35 @@ describe('prototype generation task store', () => {
     });
 
     expect(runnerMock.runAcpPrototypeAgent).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: 'project-b',
       targetPath: 'src/resources/flows/home.excalidraw',
     }));
+  });
+
+  it('does not publish a previous project task after switching the same target path', async () => {
+    let resolveProjectA: ((result: { status: 'done'; sessionId: string }) => void) | undefined;
+    runnerMock.runAcpPrototypeAgent.mockImplementation(() => new Promise((resolve) => {
+      resolveProjectA = resolve;
+    }));
+    const store = createPrototypeGenerationTaskStore({ now: vi.fn()
+      .mockReturnValueOnce(1000)
+      .mockReturnValueOnce(1200) });
+    await store.configure({ projectId: 'project-a', targetPath: 'prototypes/home' });
+
+    const projectATask = store.submit({
+      prompt: 'Project A task',
+      generatorElementId: 'generator-a',
+    });
+    await vi.waitFor(() => {
+      expect(runnerMock.runAcpPrototypeAgent).toHaveBeenCalledWith(expect.objectContaining({
+        projectId: 'project-a',
+        targetPath: 'prototypes/home',
+      }));
+    });
+    await store.configure({ projectId: 'project-b', targetPath: 'prototypes/home' });
+    resolveProjectA?.({ status: 'done', sessionId: 'project-a-session' });
+    await projectATask;
+
+    expect(store.getTasks()).toEqual([]);
   });
 });

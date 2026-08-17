@@ -33,6 +33,10 @@ export const WEB_AGENT_OPTIONS = [
 export const LOCAL_APP_AGENT_OPTIONS = [
   { value: 'codex', label: 'ChatGPT' },
   { value: 'opencode', label: 'OpenCode' },
+  { value: 'workbuddy', label: 'WorkBuddy' },
+  { value: 'traework', label: 'TRAEWORK' },
+  { value: 'qoderwork', label: 'QoderWork' },
+  { value: 'trae', label: 'TRAE' },
 ] as const;
 
 export type CLIAgent = typeof CLI_AGENT_OPTIONS[number]['value'];
@@ -57,6 +61,10 @@ export const WEB_AGENT_APP_NAMES: Record<WebAgent, string> = {
 export const LOCAL_APP_AGENT_APP_NAMES: Record<LocalAppAgent, string> = {
   codex: 'ChatGPT',
   opencode: 'OpenCode',
+  workbuddy: 'WorkBuddy',
+  traework: 'TRAEWORK',
+  qoderwork: 'QoderWork',
+  trae: 'TRAE',
 };
 
 export type AgentAvailabilityMap<T extends string> = Partial<Record<T, AgentAvailabilityInfo>>;

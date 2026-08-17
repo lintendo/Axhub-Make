@@ -2,6 +2,7 @@ import type { GitWorkspaceChangeGroup, GitWorkspaceStatusResponse } from '../../
 import { runAiText } from './aiRunClient';
 
 export interface GitCommitMessageGenerationOptions {
+  projectId: string;
   scope: 'workspace' | 'prototype';
   status: GitWorkspaceStatusResponse | null;
   targetName?: string;
@@ -77,6 +78,7 @@ export function buildGitCommitMessagePrompt(options: GitCommitMessageGenerationO
 export async function generateGitCommitMessage(options: GitCommitMessageGenerationOptions): Promise<string> {
   const runId = createGitCommitMessageRunId();
   const result = await runAiText({
+    projectId: options.projectId,
     scene: 'direct',
     prompt: buildGitCommitMessagePrompt(options),
     runId,

@@ -406,13 +406,24 @@ export function createSmokeProject({ root, registryHome, assistantOrigin }) {
 export async function startMockAcpServer() {
   const requests = [];
   const server = createServer(async (req, res) => {
+    const requestOrigin = String(req.headers.origin || '*');
+    const corsHeaders = {
+      'access-control-allow-origin': requestOrigin,
+      'access-control-allow-methods': 'GET, POST, OPTIONS',
+      'access-control-allow-headers': 'content-type',
+    };
     if (req.url === '/') {
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', ...corsHeaders });
       res.end('<!doctype html><title>Mock ACP UI</title><main>Mock ACP UI ready</main>');
       return;
     }
+    if (req.url?.startsWith('/api/chat') && req.method === 'OPTIONS') {
+      res.writeHead(204, corsHeaders);
+      res.end();
+      return;
+    }
     if (req.url?.startsWith('/api/chat') && req.method === 'GET') {
-      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', ...corsHeaders });
       res.end(JSON.stringify({ sessions: [], mock: true }));
       return;
     }
@@ -425,6 +436,7 @@ export async function startMockAcpServer() {
         'cache-control': 'no-store',
         'x-acp-provider': body.provider || 'codex',
         'x-acp-thread-id': encodeURIComponent(body.threadId || 'mock-thread'),
+        ...corsHeaders,
       });
       const toolOutput = createMockToolOutput(prompt);
       writeSse(res, { type: 'text-delta', delta: `Mock ACP completed: ${prompt.slice(0, 80)}` });
@@ -539,4 +551,9 @@ export async function writeReport(options, report) {
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   return reportPath;
+}
+export function buildProjectApiUrl(origin, apiPath, projectId) {
+  const url = new URL(apiPath, origin);
+  url.searchParams.set('projectId', String(projectId || '').trim());
+  return url.toString();
 }

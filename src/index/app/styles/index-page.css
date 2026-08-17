@@ -95,23 +95,120 @@
     opacity: 1;
 }
 
-@media (max-width: 640px) {
-    .pc-layout {
-        display: none !important;
+.pc-layout {
+    display: block;
+}
+
+.mobile-layout {
+    display: none !important;
+}
+
+.ax-sidebar-shell {
+    position: relative;
+    flex: 0 0 240px;
+    width: 240px;
+    height: 100%;
+    min-height: 0;
+    transition: width 0.3s, flex-basis 0.3s;
+}
+
+.ax-sidebar-shell.is-collapsed {
+    z-index: 30;
+    flex-basis: 0 !important;
+    width: 0 !important;
+    overflow: visible;
+}
+
+.ax-sidebar-content {
+    display: flex;
+    width: 240px;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    border-right: 1px solid hsl(var(--border));
+    background: hsl(var(--background));
+}
+
+.ax-presentation-toolbar {
+    container-type: inline-size;
+}
+
+.ax-start-guide {
+    container-type: inline-size;
+}
+
+.ax-start-guide-title {
+    font-size: 28px;
+}
+
+.ax-start-prompt-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+    gap: 16px;
+    margin-top: 32px;
+}
+
+@container (min-width: 768px) {
+    .ax-start-guide-title {
+        font-size: 34px;
     }
 
-    .mobile-layout {
-        display: block !important;
+    .ax-start-prompt-grid {
+        margin-top: 64px;
     }
 }
 
-@media (min-width: 641px) {
+.ax-sidebar-compact-fallback-trigger {
+    position: absolute;
+    z-index: 20;
+    top: 6px;
+    left: 8px;
+    display: flex;
+}
+
+@container (max-width: 600px) {
+    .ax-toolbar-adaptive-action {
+        display: none !important;
+    }
+}
+
+.ax-sidebar-shell.is-collapsed .ax-sidebar-content {
+    position: absolute;
+    z-index: 40;
+    top: 48px;
+    bottom: 8px;
+    left: 8px;
+    width: 240px;
+    height: auto;
+    border: 1px solid hsl(var(--border));
+    border-radius: 10px;
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+    transform: translateX(-8px) scale(0.98);
+    transform-origin: top left;
+    transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.ax-sidebar-shell.is-collapsed.is-preview-open .ax-sidebar-content {
+    opacity: 1;
+    pointer-events: auto;
+    visibility: visible;
+    transform: translateX(0) scale(1);
+}
+
+.axhub-canvas-sidebar-toggle-anchor {
+    display: none !important;
+}
+
+@media (max-width: 640px) and (hover: none) and (pointer: coarse) {
     .pc-layout {
-        display: block !important;
+        display: none !important;
     }
 
     .mobile-layout {
-        display: none !important;
+        display: block !important;
     }
 }
 

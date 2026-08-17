@@ -14,6 +14,7 @@ export function getNextVisibleLibraryItemCount(currentCount: number, totalCount:
 export function useProgressiveLibraryItems<T>(
   items: readonly T[],
   resetKey: string | null = null,
+  loadMoreEnabled = true,
 ) {
   const [visibleCount, setVisibleCount] = useState(ONLINE_LIBRARY_BATCH_SIZE);
   const [loadMoreElement, setLoadMoreElement] = useState<HTMLDivElement | null>(null);
@@ -25,7 +26,7 @@ export function useProgressiveLibraryItems<T>(
   const hasMore = visibleCount < items.length;
 
   useEffect(() => {
-    if (!hasMore || !loadMoreElement || typeof IntersectionObserver === 'undefined') return;
+    if (!loadMoreEnabled || !hasMore || !loadMoreElement || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) {
         setVisibleCount((current) => getNextVisibleLibraryItemCount(current, items.length));
@@ -33,7 +34,7 @@ export function useProgressiveLibraryItems<T>(
     }, { rootMargin: '160px 0px' });
     observer.observe(loadMoreElement);
     return () => observer.disconnect();
-  }, [hasMore, items.length, loadMoreElement]);
+  }, [hasMore, items.length, loadMoreElement, loadMoreEnabled]);
 
   const visibleItems = useMemo(
     () => items.slice(0, visibleCount),

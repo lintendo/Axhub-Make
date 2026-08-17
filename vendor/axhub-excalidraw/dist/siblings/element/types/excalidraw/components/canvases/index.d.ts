@@ -1,3 +1,4 @@
 import InteractiveCanvas from "./InteractiveCanvas";
 import StaticCanvas from "./StaticCanvas";
-export { InteractiveCanvas, StaticCanvas };
+import StaticCanvasLayer from "./StaticCanvasLayer";
+export { InteractiveCanvas, StaticCanvas, StaticCanvasLayer };

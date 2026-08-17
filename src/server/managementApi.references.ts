@@ -31,7 +31,7 @@ interface UploadAndReferenceHandlers {
     req: IncomingMessage,
     res: ServerResponse,
     options: ManagementApiOptions,
-    mode: 'active-fallback',
+    mode: 'explicit-required',
   ) => ReferenceProjectContext | null;
   readMultipartParts: (req: IncomingMessage) => Promise<MultipartPart[]>;
   resolveMarkdownFileAssetPath: (
@@ -93,7 +93,7 @@ export function handleUploadAndReferenceApis(
   handlers: UploadAndReferenceHandlers,
 ): boolean {
   if (pathname === '/api/markdown-file-asset' && req.method === 'GET') {
-    const context = handlers.resolveProjectContext(req, res, options, 'active-fallback');
+    const context = handlers.resolveProjectContext(req, res, options, 'explicit-required');
     if (!context) return true;
     const url = getRequestUrl(req);
     try {
@@ -116,7 +116,7 @@ export function handleUploadAndReferenceApis(
   }
 
   if (pathname === '/api/spec-doc/save' && req.method === 'POST') {
-    const context = handlers.resolveProjectContext(req, res, options, 'active-fallback');
+    const context = handlers.resolveProjectContext(req, res, options, 'explicit-required');
     if (!context) return true;
     readJsonBody(req).then((body) => {
       const targetPath = handlers.resolveLegacySpecDocPath(context, String(body?.docUrl || ''));
@@ -133,7 +133,7 @@ export function handleUploadAndReferenceApis(
   }
 
   if (pathname === '/api/spec-doc/upload-image' && req.method === 'POST') {
-    const context = handlers.resolveProjectContext(req, res, options, 'active-fallback');
+    const context = handlers.resolveProjectContext(req, res, options, 'explicit-required');
     if (!context) return true;
     handlers.readMultipartParts(req).then((parts) => {
       const filePart = getPrimaryMultipartFile(parts);
@@ -170,7 +170,7 @@ export function handleUploadAndReferenceApis(
   }
 
   if (pathname === '/api/media/upload' && req.method === 'POST') {
-    const context = handlers.resolveProjectContext(req, res, options, 'active-fallback');
+    const context = handlers.resolveProjectContext(req, res, options, 'explicit-required');
     if (!context) return true;
     const mediaDir = handlers.getDeclaredResourceWriteDir(context, 'media');
     if (!mediaDir) {

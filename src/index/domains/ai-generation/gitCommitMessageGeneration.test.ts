@@ -76,6 +76,7 @@ describe('git commit message generation', () => {
     });
 
     const result = await generateGitCommitMessage({
+      projectId: 'project-b',
       scope: 'workspace',
       currentMessage: '',
       status: {
@@ -120,6 +121,7 @@ describe('git commit message generation', () => {
     });
 
     await expect(generateGitCommitMessage({
+      projectId: 'project-b',
       scope: 'workspace',
       status: null,
     })).rejects.toThrow('AI 生成版本记录为空');

@@ -15,6 +15,16 @@ function readClientFile(filePath: string): string {
 }
 
 describe('client workflow guidance', () => {
+  it('limits requirements alignment triggers to new pages and structural changes', () => {
+    const alignmentGuide = readRule('requirements-alignment-guide.md');
+    const triggerSection = alignmentGuide.match(/## 何时触发\n\n([\s\S]*?)\n\n## /u)?.[1] ?? '';
+    const triggers = triggerSection.match(/^- /gmu) ?? [];
+
+    expect(triggers).toHaveLength(2);
+    expect(triggerSection).toContain('新建原型或为现有原型新增页面。');
+    expect(triggerSection).toContain('明显重构信息架构、核心交互、页面流程或视觉方向。');
+  });
+
   it('uses one current prototype main spec with HTML priority and bidirectional sync', () => {
     const alignmentGuide = readRule('requirements-alignment-guide.md');
     const developmentGuide = readRule('prototype-development-guide.md');
@@ -22,11 +32,8 @@ describe('client workflow guidance', () => {
     const mainSpecSection = alignmentGuide.match(/## 原型主规格\n\n([\s\S]*?)\n## /u)?.[1] ?? '';
     const questionSection = alignmentGuide.match(/## 提问规则\n\n([\s\S]*?)\n## /u)?.[1] ?? '';
 
-    expect(alignmentGuide).toContain('读取上下文 -> 产品需求对齐 -> DESIGN.md 候选与设计方向对齐 -> 创建/更新主规格草案 -> 围绕主规格多轮评审与确认 -> 实现 -> 同步主规格 -> 验收');
+    expect(alignmentGuide).toContain('读取上下文 -> 产品需求对齐 -> DESIGN.md 候选与设计方向对齐 -> 创建/更新主规格草案 -> 围绕主规格多轮评审与确认 -> 实现 -> 同步主规格 -> 提供预览链接 -> 验收');
     expect(alignmentGuide).toContain('需求与设计完成第一轮对齐后');
-    expect(alignmentGuide).toContain('Review（可选）');
-    expect(alignmentGuide).toContain('标注（可选）');
-    expect(alignmentGuide).toContain('发布（可选）');
     expect(mainSpecSection.match(/^- /gmu)).toHaveLength(4);
     expect(mainSpecSection).toContain('`.spec/spec.html` 或 `.spec/spec.md`');
     expect(mainSpecSection).toContain('同时存在时以 HTML 为准');
@@ -46,9 +53,10 @@ describe('client workflow guidance', () => {
     expect(alignmentGuide).toContain('原型必须以主规格作为确认载体');
 
     expect(developmentGuide).toContain('requirements-alignment-guide.md');
-    expect(alignmentGuide).toContain('src/resources/templates/规格文档 HTML 模板.html');
-    expect(alignmentGuide).toContain('src/resources/templates/规格文档 Markdown 模板.md');
-    expect(developmentGuide).toContain('规格文档 <格式> 模板');
+    expect(alignmentGuide).toContain('templates/prototype-spec.html');
+    expect(alignmentGuide).toContain('templates/prototype-spec.md');
+    expect(developmentGuide).toContain('templates/prototype-spec.html');
+    expect(developmentGuide).toContain('templates/prototype-spec.md');
     expect(prototypeReviewGuide).toContain('`.spec/spec.html`、`.spec/spec.md`');
     expect(prototypeReviewGuide).toContain('主规格链接的必要子文档');
   });
@@ -61,6 +69,18 @@ describe('client workflow guidance', () => {
     expect(alignmentGuide).not.toContain('ASCII Diagram');
   });
 
+  it('uses one concise local-first gate for DESIGN.md recommendations', () => {
+    const alignmentGuide = readRule('requirements-alignment-guide.md');
+    const designSection = alignmentGuide.match(/## 设计方案对齐\n\n([\s\S]*?)\n## /u)?.[1] ?? '';
+
+    expect(designSection).toContain('先从当前项目本地候选（项目默认主题、已有同类原型和 `src/themes/`）中选择');
+    expect(designSection).toContain('本地不足 3 个时，才使用 `$search-design-system` 从 Design Knowledge 主题库补足');
+    expect(designSection).not.toContain('只有用户明确要求线上检索时才访问线上源');
+    expect(designSection).toContain('从这些已有候选中选择设计基底不得触发 `$build-design-system`');
+    expect(designSection).toContain('只有用户明确要求创建或修改主题时才使用它');
+    expect(designSection).not.toContain('$design-system-search');
+  });
+
   it('prefers token-efficient structured text before visual diagrams during alignment', () => {
     const expected = '优先用简短摘要或结构化文字对齐；文字难以表达时再用 ASCII Wireframe/Diagram 或 Mermaid';
 
@@ -69,21 +89,47 @@ describe('client workflow guidance', () => {
     }
   });
 
-  it('marks optional post-acceptance stages as user initiated', () => {
+  it('keeps optional post-acceptance stages in the client entry guidance only', () => {
     for (const guidancePath of ['AGENTS.md', 'CLAUDE.md', 'AGENTS.template.md']) {
-      expect(readClientFile(guidancePath)).toContain('验收后由用户按需发起的可选阶段');
+      const guidance = readClientFile(guidancePath);
+      expect(guidance).toContain('验收后由用户按需发起的可选阶段');
+      expect(guidance).toContain('原型标注使用 `$prototype-annotation`。');
+      expect(guidance).toContain('Commentary 批注处理使用 `$handle-comments`，不属于原型标注阶段。');
     }
-    expect(readRule('requirements-alignment-guide.md')).toContain('以下阶段均由用户按需发起');
+    const alignmentGuide = readRule('requirements-alignment-guide.md');
+    expect(alignmentGuide).not.toContain('## 可选后续');
+    expect(alignmentGuide).not.toContain('Review（可选）');
+    expect(alignmentGuide).not.toContain('触发过对齐时');
   });
 
   it('keeps preview-link guidance brief with a default Make origin and custom-host fallback', () => {
     const alignmentGuide = readRule('requirements-alignment-guide.md');
     const developmentGuide = readRule('prototype-development-guide.md');
 
-    expect(alignmentGuide).toContain('预览链接默认以 `http://localhost:53817/` 拼接；Make 服务使用其他 host 或端口时改用实际服务地址。');
+    expect(alignmentGuide).toContain('Make 管理端默认使用 `http://localhost:53817/`；`check-app-ready` 返回 `serverUrl` 时以实际返回值为准。');
+    for (const guidancePath of ['AGENTS.md', 'CLAUDE.md', 'AGENTS.template.md']) {
+      const guidance = readClientFile(guidancePath);
+      expect(guidance).toContain('Make 管理端默认使用 `http://localhost:53817/`；`check-app-ready` 返回 `serverUrl` 时以实际值为准。');
+      expect(guidance).not.toContain('Make 管理端固定使用');
+    }
     expect(alignmentGuide).not.toContain('## 预览链接口径');
     expect(alignmentGuide).not.toContain('.dev-server-info.json');
     expect(developmentGuide).not.toContain('“预览链接口径”');
+  });
+
+  it('uses Make serverUrl for user-facing annotation and theme links', () => {
+    const annotationSkill = readClientFile('.agents/skills/prototype-annotation/SKILL.md');
+    const annotationReference = readClientFile(
+      '.agents/skills/prototype-annotation/references/axhub-annotation.md',
+    );
+    const themeContract = readClientFile(
+      '.agents/skills/build-design-system/references/theme-output-contract.md',
+    );
+
+    for (const guidance of [annotationSkill, annotationReference, themeContract]) {
+      expect(guidance).toContain('`serverUrl`');
+      expect(guidance).not.toContain('使用 ready 检查返回的 `targetUrl`');
+    }
   });
 
   it('routes theme work through build-design-system instead of legacy rule files', () => {
@@ -98,10 +144,21 @@ describe('client workflow guidance', () => {
     expect(fs.existsSync(path.join(clientRoot, 'rules/theme-source-capture-guide.md'))).toBe(false);
   });
 
-  it('lists discoverable theme and PRD skill routes in every core workflow table', () => {
+  it('separates existing-theme search from explicit theme creation in core guidance', () => {
     for (const guidancePath of ['AGENTS.md', 'CLAUDE.md', 'AGENTS.template.md']) {
       const guidance = readClientFile(guidancePath);
-      expect(guidance).toContain('| 主题、设计系统、设计规范 |');
+      expect(guidance).toContain('先检查当前项目本地候选（项目默认主题、已有同类原型和 `src/themes/`）');
+      expect(guidance).toContain('本地不足 3 个时，再使用 `$search-design-system` 从 Design Knowledge 主题库补足');
+      expect(guidance).not.toContain('只有用户明确要求线上检索时才访问线上源');
+      expect(guidance).toContain('只有用户明确要求创建或修改主题时才使用 `$build-design-system`');
+    }
+  });
+
+  it('lists theme-creation and PRD skill routes in every core workflow table', () => {
+    for (const guidancePath of ['AGENTS.md', 'CLAUDE.md', 'AGENTS.template.md']) {
+      const guidance = readClientFile(guidancePath);
+      expect(guidance).not.toContain('| 选择设计基底 |');
+      expect(guidance).toContain('| 创建或修改主题、设计系统、设计规范 |');
       expect(guidance).toContain('$build-design-system 技能');
       expect(guidance).toContain('| PRD 文档 | `src/resources/` |');
       expect(guidance).toContain('$plan-prds 技能');
@@ -111,10 +168,18 @@ describe('client workflow guidance', () => {
     }
   });
 
+  it('keeps fixed document templates outside the ordinary resource route', () => {
+    for (const guidancePath of ['AGENTS.md', 'CLAUDE.md', 'AGENTS.template.md']) {
+      const guidance = readClientFile(guidancePath);
+      expect(guidance).toContain('| 固定文档模板 | `templates/` | 项目设置 |');
+      expect(guidance).not.toContain('`templates/` 是普通子目录');
+    }
+  });
+
   it('ships aligned Markdown and HTML main-spec templates with stable multipage navigation', () => {
-    const templatesDir = path.join(clientRoot, 'src/resources/templates');
-    const markdownPath = path.join(templatesDir, '规格文档 Markdown 模板.md');
-    const htmlPath = path.join(templatesDir, '规格文档 HTML 模板.html');
+    const templatesDir = path.join(clientRoot, 'templates');
+    const markdownPath = path.join(templatesDir, 'prototype-spec.md');
+    const htmlPath = path.join(templatesDir, 'prototype-spec.html');
 
     expect(fs.existsSync(markdownPath)).toBe(true);
     expect(fs.existsSync(htmlPath)).toBe(true);

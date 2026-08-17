@@ -11,6 +11,7 @@ import {
   cleanupProjectApiTestRoots,
   createTempRoot,
   registerProject,
+  scopeProjectApiUrl,
   startTestServer,
   setActiveProject,
   writeJson,
@@ -54,7 +55,7 @@ describe('make-server project resource capability APIs', () => {
       await registerProject(server.origin, projectRoot, 'capability-client', 'Capability Client');
       await setActiveProject(server.origin, 'capability-client');
 
-      const resources = await fetch(`${server.origin}/api/projects/capability-client/resources`)
+      const resources = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/projects/capability-client/resources`))
         .then((response) => response.json());
 
       expect(resources.capabilities.resourceWrites).toEqual({
@@ -99,7 +100,7 @@ describe('make-server project resource capability APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'default-docs-capability-client', 'Default Docs Capability Client');
 
-      const resources = await fetch(`${server.origin}/api/projects/default-docs-capability-client/resources`)
+      const resources = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/projects/default-docs-capability-client/resources`))
         .then((response) => response.json());
 
       expect(resources.capabilities.resourceWrites).toMatchObject({
@@ -122,7 +123,7 @@ describe('make-server project resource capability APIs', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const docsUpload = await fetch(`${server.origin}/api/upload-docs`, {
+      const docsUpload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload-docs`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -134,13 +135,13 @@ describe('make-server project resource capability APIs', () => {
       expect(docsUpload).toMatchObject({ status: 404, body: { error: 'Not found' } });
       expect(fs.existsSync(path.join(projectRoot, 'src/resources/Guide.md'))).toBe(false);
 
-      const importStatus = await fetch(`${server.origin}/api/docs/import/markitdown-status`)
+      const importStatus = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/import/markitdown-status`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(importStatus.status).toBe(404);
 
       const importForm = new FormData();
       importForm.append('files', new File(['# Imported\n'], 'Imported.md', { type: 'text/markdown' }));
-      const imported = await fetch(`${server.origin}/api/docs/import`, {
+      const imported = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/import`), {
         method: 'POST',
         body: importForm,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -150,7 +151,7 @@ describe('make-server project resource capability APIs', () => {
       const mediaForm = new FormData();
       mediaForm.append('path', 'icons');
       mediaForm.append('file', new File(['<svg />'], 'logo.svg', { type: 'image/svg+xml' }));
-      const mediaUpload = await fetch(`${server.origin}/api/media/upload`, {
+      const mediaUpload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/media/upload`), {
         method: 'POST',
         body: mediaForm,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -171,7 +172,7 @@ describe('make-server project resource capability APIs', () => {
       const genericForm = new FormData();
       genericForm.append('uploadType', 'local_axure');
       genericForm.append('file', new File(['zip-ish'], 'sample.zip', { type: 'application/zip' }));
-      const genericUpload = await fetch(`${server.origin}/api/upload`, {
+      const genericUpload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: genericForm,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -182,7 +183,7 @@ describe('make-server project resource capability APIs', () => {
         projectId: 'upload-client',
       });
 
-      const manualCreate = await fetch(`${server.origin}/api/docs/manual-create`, {
+      const manualCreate = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/manual-create`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: 'Manual Doc' }),
@@ -190,7 +191,7 @@ describe('make-server project resource capability APIs', () => {
       expect(manualCreate).toMatchObject({ status: 404, body: { error: 'Not found' } });
       expect(fs.existsSync(path.join(projectRoot, 'src/resources/Manual-Doc.md'))).toBe(false);
 
-      const templateCreate = await fetch(`${server.origin}/api/docs/templates`, {
+      const templateCreate = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/templates`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: 'Spec Template' }),
@@ -207,7 +208,7 @@ describe('make-server project resource capability APIs', () => {
 
       fs.mkdirSync(path.join(projectRoot, 'src/resources/templates'), { recursive: true });
       fs.writeFileSync(path.join(projectRoot, 'src/resources/templates/base.md'), '# Base\n', 'utf8');
-      const templateCopy = await fetch(`${server.origin}/api/docs/templates/base.md/copy`, {
+      const templateCopy = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/templates/base.md/copy`), {
         method: 'POST',
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(templateCopy).toMatchObject({
@@ -220,7 +221,7 @@ describe('make-server project resource capability APIs', () => {
       });
       expect(fs.readFileSync(path.join(projectRoot, 'src/resources/templates/base-copy.md'), 'utf8')).toBe('# Base\n');
 
-      const createTable = await fetch(`${server.origin}/api/data/tables`, {
+      const createTable = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/data/tables`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tableName: 'Customers' }),
@@ -239,7 +240,7 @@ describe('make-server project resource capability APIs', () => {
         records: [],
       });
 
-      const itemCheck = await fetch(`${server.origin}/api/items/check-references`, {
+      const itemCheck = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/items/check-references`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: 'prototypes/home', action: 'delete' }),
@@ -287,7 +288,7 @@ describe('make-server project resource capability APIs', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const templateCreate = await fetch(`${server.origin}/api/docs/templates`, {
+      const templateCreate = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/templates`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: 'Escaping Template' }),

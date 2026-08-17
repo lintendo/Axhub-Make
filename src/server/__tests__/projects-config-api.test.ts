@@ -14,6 +14,7 @@ import {
   cleanupProjectApiTestRoots,
   createTempRoot,
   registerProject,
+  scopeProjectApiUrl,
   startTestServer,
   writeJson,
   writeProjectMetadata,
@@ -114,33 +115,46 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'config-client', 'Config Client');
 
     try {
-      const legacyConfig = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const legacyConfig = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(legacyConfig.automation).toEqual({
-        defaultPromptClient: 'acp:claude',
+        conversationPromptClient: 'acp:claude',
+        conversationModel: null,
         defaultIDE: 'cursor',
+        injectLocalAiEntry: true,
         acp: {
           mode: 'prompt',
           permission: 'approve-all',
           timeout: 1800,
         },
-        annotationPromptClient: null,
+        annotationPromptClient: 'acp:claude',
         annotationModel: null,
+        canvasPromptClient: 'acp:claude',
+        canvasModel: null,
         agentRunConcurrency: 5,
+        autoClearCompletedComments: true,
       });
+      expect(legacyConfig.automation).not.toHaveProperty('defaultPromptClient');
       expect(legacyConfig.assistant).toEqual({
         webBaseUrl: 'http://legacy.local',
         apiBaseUrl: 'http://legacy.local/api',
       });
 
-      const saved = await fetch(`${server.origin}/api/config`, {
+      const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           server: { host: '0.0.0.0', allowLAN: false, port: 51720 },
           projectInfo: { name: 'Updated Project' },
           automation: {
-            defaultPromptClient: 'manual',
+            conversationPromptClient: 'acp:codex',
+            conversationModel: 'gpt-5.1-codex',
+            annotationPromptClient: 'acp:cursor',
+            annotationModel: 'fast-cursor',
+            canvasPromptClient: 'acp:qoder',
+            canvasModel: 'qoder-canvas',
             defaultIDE: 'qoder',
+            injectLocalAiEntry: false,
+            autoClearCompletedComments: false,
           },
           assistant: {
             webBaseUrl: 'http://assistant.local',
@@ -160,7 +174,7 @@ describe('make-server project config APIs', () => {
       const metadata = JSON.parse(fs.readFileSync(getProjectMetadataPath(projectRoot), 'utf8'));
       expect(metadata.project.name).toBe('Updated Project');
 
-      const projects = await fetch(`${server.origin}/api/projects`).then((response) => response.json());
+      const projects = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/projects`)).then((response) => response.json());
       expect(projects.projects).toEqual([
         expect.objectContaining({
           id: 'config-client',
@@ -171,16 +185,21 @@ describe('make-server project config APIs', () => {
       const serverConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
       expect(serverConfig).toEqual({
         automation: {
-          defaultPromptClient: 'manual',
+          conversationPromptClient: 'acp:codex',
+          conversationModel: 'gpt-5.1-codex',
           defaultIDE: 'qoder',
+          injectLocalAiEntry: false,
           acp: {
             mode: 'prompt',
             permission: 'approve-all',
             timeout: 1800,
           },
-          annotationPromptClient: null,
-          annotationModel: null,
+          annotationPromptClient: 'acp:cursor',
+          annotationModel: 'fast-cursor',
+          canvasPromptClient: 'acp:qoder',
+          canvasModel: 'qoder-canvas',
           agentRunConcurrency: 5,
+          autoClearCompletedComments: false,
         },
         assistant: {
           webBaseUrl: 'http://assistant.local',
@@ -200,15 +219,21 @@ describe('make-server project config APIs', () => {
         toolOpenState: {},
       });
 
-      const nextConfig = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const nextConfig = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(nextConfig).toMatchObject({
         projectId: 'config-client',
         projectPath: projectRoot,
         server: { host: '0.0.0.0' },
         projectInfo: { name: 'Updated Project' },
         automation: {
-          defaultPromptClient: 'manual',
+          conversationPromptClient: 'acp:codex',
+          conversationModel: 'gpt-5.1-codex',
+          annotationPromptClient: 'acp:cursor',
+          annotationModel: 'fast-cursor',
+          canvasPromptClient: 'acp:qoder',
+          canvasModel: 'qoder-canvas',
           defaultIDE: 'qoder',
+          injectLocalAiEntry: false,
           acp: {
             mode: 'prompt',
             permission: 'approve-all',
@@ -226,6 +251,52 @@ describe('make-server project config APIs', () => {
           },
         },
       });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('prefers explicit purpose fields when legacy and new AI preferences coexist', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot, {
+      project: { id: 'mixed-ai-preferences', name: 'Mixed AI Preferences' },
+    });
+    writeJson(path.join(projectRoot, '.axhub', 'make', 'axhub.config.json'), {
+      server: { host: 'localhost' },
+      projectInfo: { name: 'Mixed AI Preferences' },
+    });
+    const registryHome = createTempRoot('axhub-make-projects-api-home-');
+    writeJson(getGlobalServerConfigPath(registryHome), {
+      automation: {
+        defaultPromptClient: 'acp:claude',
+        conversationPromptClient: 'acp:qoder',
+        conversationModel: '  conversation-model  ',
+        annotationPromptClient: 'acp:cursor',
+        annotationModel: '  annotation-model  ',
+        canvasPromptClient: 'acp:codebuddy',
+        canvasModel: '  canvas-model  ',
+      },
+    });
+    const server = await startRegisteredConfigTestServer(
+      projectRoot,
+      registryHome,
+      'mixed-ai-preferences',
+      'Mixed AI Preferences',
+    );
+
+    try {
+      const config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`))
+        .then((response) => response.json());
+
+      expect(config.automation).toMatchObject({
+        conversationPromptClient: 'acp:qoder',
+        conversationModel: 'conversation-model',
+        annotationPromptClient: 'acp:cursor',
+        annotationModel: 'annotation-model',
+        canvasPromptClient: 'acp:codebuddy',
+        canvasModel: 'canvas-model',
+      });
+      expect(config.automation).not.toHaveProperty('defaultPromptClient');
     } finally {
       await server.close();
     }
@@ -274,7 +345,7 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'agent-instructions-client', 'Agent Instructions Client');
 
     try {
-      const saved = await fetch(`${server.origin}/api/config`, {
+      const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -347,7 +418,7 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'default-design-client', '运营活动配置台');
 
     try {
-      const saved = await fetch(`${server.origin}/api/config`, {
+      const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -387,14 +458,14 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'lan-config-client', 'LAN Config Client');
 
     try {
-      const before = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const before = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(before.server).toEqual(expect.objectContaining({
         host: 'localhost',
       }));
       expect(before.server).not.toHaveProperty('allowLAN');
       expect(before.availableLANHosts).toEqual(expect.any(Array));
 
-      const saved = await fetch(`${server.origin}/api/config`, {
+      const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -416,7 +487,7 @@ describe('make-server project config APIs', () => {
         skipLanPreviewAuth: true,
       });
 
-      const after = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const after = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(after.server).toEqual(expect.objectContaining({
         host: 'localhost',
         lanHost: '10.0.8.42',
@@ -442,13 +513,13 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'canvas-ui-client', 'Canvas UI Client');
 
     try {
-      const defaultConfig = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const defaultConfig = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(defaultConfig.uiPreferences).toEqual({
         excalidrawPropertyPanelMode: 'collapsed',
         excalidrawPropertyPanelPosition: 'right',
       });
 
-      const savedExpanded = await fetch(`${server.origin}/api/config`, {
+      const savedExpanded = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -465,13 +536,13 @@ describe('make-server project config APIs', () => {
         excalidrawPropertyPanelMode: 'expanded',
         excalidrawPropertyPanelPosition: 'left',
       });
-      const nextConfig = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const nextConfig = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(nextConfig.uiPreferences).toEqual({
         excalidrawPropertyPanelMode: 'expanded',
         excalidrawPropertyPanelPosition: 'left',
       });
 
-      await fetch(`${server.origin}/api/config`, {
+      await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -481,7 +552,7 @@ describe('make-server project config APIs', () => {
           },
         }),
       });
-      const invalidIgnoredConfig = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const invalidIgnoredConfig = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(invalidIgnoredConfig.uiPreferences).toEqual({
         excalidrawPropertyPanelMode: 'expanded',
         excalidrawPropertyPanelPosition: 'left',
@@ -505,13 +576,18 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'bootstrap-client', 'Bootstrap Client');
 
     try {
-      const bootstrap = await fetch(`${server.origin}/api/config/bootstrap`).then((response) => response.json());
+      const bootstrap = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/bootstrap`)).then((response) => response.json());
       expect(bootstrap).toMatchObject({
         projectId: 'bootstrap-client',
         projectPath: projectRoot,
         projectInfo: { name: 'Bootstrap Client' },
         automation: {
-          defaultPromptClient: null,
+          conversationPromptClient: null,
+          conversationModel: null,
+          annotationPromptClient: null,
+          annotationModel: null,
+          canvasPromptClient: null,
+          canvasModel: null,
         },
         uiPreferences: {
           excalidrawPropertyPanelMode: 'collapsed',
@@ -526,7 +602,7 @@ describe('make-server project config APIs', () => {
       expect(fs.existsSync(path.join(projectRoot, 'AGENTS.md'))).toBe(false);
       expect(fs.existsSync(path.join(projectRoot, 'CLAUDE.md'))).toBe(false);
 
-      const config = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(config.ideAvailability).toEqual({});
       expect(config.agentAvailability).toEqual({
         cli: {},
@@ -534,7 +610,7 @@ describe('make-server project config APIs', () => {
         web: {},
       });
 
-      const availability = await fetch(`${server.origin}/api/config/availability`).then((response) => response.json());
+      const availability = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/availability`)).then((response) => response.json());
       expect(availability).toMatchObject({
         ideAvailability: {},
         agentAvailability: {
@@ -565,7 +641,7 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'preferences-client', 'Preferences Client');
 
     try {
-      const saved = await fetch(`${server.origin}/api/config`, {
+      const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -584,8 +660,10 @@ describe('make-server project config APIs', () => {
       });
       const serverConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
       expect(serverConfig.automation).toEqual({
-        defaultPromptClient: null,
+        conversationPromptClient: null,
+        conversationModel: null,
         defaultIDE: 'windsurf',
+        injectLocalAiEntry: true,
         acp: {
           mode: 'prompt',
           permission: 'approve-all',
@@ -593,8 +671,43 @@ describe('make-server project config APIs', () => {
         },
         annotationPromptClient: null,
         annotationModel: null,
+        canvasPromptClient: null,
+        canvasModel: null,
         agentRunConcurrency: 5,
+        autoClearCompletedComments: true,
       });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('does not migrate the legacy manual prompt client into annotation automation', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot, {
+      project: { id: 'legacy-manual-client', name: 'Legacy Manual Client' },
+    });
+    writeJson(path.join(projectRoot, '.axhub', 'make', 'axhub.config.json'), {
+      server: { host: 'localhost', allowLAN: true },
+      projectInfo: { name: 'Legacy Manual Client' },
+      automation: {
+        defaultPromptClient: 'manual',
+      },
+    });
+    const registryHome = createTempRoot('axhub-make-projects-api-home-');
+    const server = await startRegisteredConfigTestServer(
+      projectRoot,
+      registryHome,
+      'legacy-manual-client',
+      'Legacy Manual Client',
+    );
+
+    try {
+      const config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`))
+        .then((response) => response.json());
+
+      expect(config.automation.conversationPromptClient).toBe('manual');
+      expect(config.automation.annotationPromptClient).toBeNull();
+      expect(config.automation.canvasPromptClient).toBe('manual');
     } finally {
       await server.close();
     }
@@ -627,10 +740,10 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'legacy-acp-timeout-client', 'Legacy ACP Timeout Client');
 
     try {
-      const currentConfig = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const currentConfig = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(currentConfig.automation.acp.timeout).toBe(1_200);
 
-      const saved = await fetch(`${server.origin}/api/config`, {
+      const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -652,7 +765,7 @@ describe('make-server project config APIs', () => {
     }
   });
 
-  it('saves, reads, and bootstraps OpenCode as the default prompt client', async () => {
+  it('saves, reads, and bootstraps OpenCode as the conversation prompt client', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot, {
       project: { id: 'opencode-prompt-client', name: 'OpenCode Prompt Client' },
@@ -664,47 +777,47 @@ describe('make-server project config APIs', () => {
     const registryHome = createTempRoot('axhub-make-projects-api-home-');
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'opencode-prompt-client', 'OpenCode Prompt Client');
 
-    async function saveAndExpectDefaultPromptClient(input: string) {
-      const saved = await fetch(`${server.origin}/api/config`, {
+    async function saveAndExpectConversationPromptClient(input: string) {
+      const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           automation: {
-            defaultPromptClient: input,
+            conversationPromptClient: input,
           },
         }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(saved).toMatchObject({ status: 200, body: { success: true } });
       const serverConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
-      expect(serverConfig.automation.defaultPromptClient).toBe('acp:opencode');
+      expect(serverConfig.automation.conversationPromptClient).toBe('acp:opencode');
 
-      const config = await fetch(`${server.origin}/api/config`).then((response) => response.json());
-      expect(config.automation.defaultPromptClient).toBe('acp:opencode');
+      const config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
+      expect(config.automation.conversationPromptClient).toBe('acp:opencode');
 
-      const bootstrap = await fetch(`${server.origin}/api/config/bootstrap`).then((response) => response.json());
-      expect(bootstrap.automation.defaultPromptClient).toBe('acp:opencode');
+      const bootstrap = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/bootstrap`)).then((response) => response.json());
+      expect(bootstrap.automation.conversationPromptClient).toBe('acp:opencode');
     }
 
     try {
-      await saveAndExpectDefaultPromptClient('acp:opencode');
-      await saveAndExpectDefaultPromptClient('opencode');
+      await saveAndExpectConversationPromptClient('acp:opencode');
+      await saveAndExpectConversationPromptClient('opencode');
 
-      const saved = await fetch(`${server.origin}/api/config`, {
+      const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           automation: {
-            defaultPromptClient: 'genie:opencode',
+            conversationPromptClient: 'genie:opencode',
           },
         }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(saved).toMatchObject({ status: 200, body: { success: true } });
       const serverConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
-      expect(serverConfig.automation.defaultPromptClient).toBe('acp:opencode');
-      const config = await fetch(`${server.origin}/api/config`).then((response) => response.json());
-      expect(config.automation.defaultPromptClient).toBe('acp:opencode');
+      expect(serverConfig.automation.conversationPromptClient).toBe('acp:opencode');
+      const config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
+      expect(config.automation.conversationPromptClient).toBe('acp:opencode');
     } finally {
       await server.close();
     }
@@ -722,66 +835,75 @@ describe('make-server project config APIs', () => {
     const registryHome = createTempRoot('axhub-make-projects-api-home-');
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'new-acp-providers-client', 'New ACP Providers Client');
 
-    async function saveAndExpectDefaultPromptClient(input: string, expected: string) {
-      const saved = await fetch(`${server.origin}/api/config`, {
+    async function saveAndExpectPurposePromptClients(input: string, expected: string) {
+      const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           automation: {
-            defaultPromptClient: input,
+            conversationPromptClient: input,
+            conversationModel: 'conversation-model',
             annotationPromptClient: 'acp:cursor',
             annotationModel: 'fast-cursor',
+            canvasPromptClient: input,
+            canvasModel: 'canvas-model',
           },
         }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(saved).toMatchObject({ status: 200, body: { success: true } });
       const serverConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
-      expect(serverConfig.automation.defaultPromptClient).toBe(expected);
+      expect(serverConfig.automation.conversationPromptClient).toBe(expected);
+      expect(serverConfig.automation.conversationModel).toBe('conversation-model');
       expect(serverConfig.automation.annotationPromptClient).toBe('acp:cursor');
       expect(serverConfig.automation.annotationModel).toBe('fast-cursor');
+      expect(serverConfig.automation.canvasPromptClient).toBe(expected);
+      expect(serverConfig.automation.canvasModel).toBe('canvas-model');
       expect(serverConfig.automation.acpModels).toBeUndefined();
 
-      const config = await fetch(`${server.origin}/api/config`).then((response) => response.json());
-      expect(config.automation.defaultPromptClient).toBe(expected);
+      const config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
+      expect(config.automation.conversationPromptClient).toBe(expected);
       expect(config.automation.annotationPromptClient).toBe('acp:cursor');
       expect(config.automation.annotationModel).toBe('fast-cursor');
+      expect(config.automation.canvasPromptClient).toBe(expected);
 
-      const bootstrap = await fetch(`${server.origin}/api/config/bootstrap`).then((response) => response.json());
-      expect(bootstrap.automation.defaultPromptClient).toBe(expected);
+      const bootstrap = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/bootstrap`)).then((response) => response.json());
+      expect(bootstrap.automation.conversationPromptClient).toBe(expected);
       expect(bootstrap.automation.annotationPromptClient).toBe('acp:cursor');
       expect(bootstrap.automation.annotationModel).toBe('fast-cursor');
+      expect(bootstrap.automation.canvasPromptClient).toBe(expected);
     }
 
     try {
-      await saveAndExpectDefaultPromptClient('acp:cursor', 'acp:cursor');
-      await saveAndExpectDefaultPromptClient('qoder', 'acp:qoder');
-      await saveAndExpectDefaultPromptClient('codebuddy', 'acp:codebuddy');
-      await saveAndExpectDefaultPromptClient('reasonix', 'acp:reasonix');
-      await saveAndExpectDefaultPromptClient('grok-build', 'acp:grok-build');
+      await saveAndExpectPurposePromptClients('acp:cursor', 'acp:cursor');
+      await saveAndExpectPurposePromptClients('qoder', 'acp:qoder');
+      await saveAndExpectPurposePromptClients('codebuddy', 'acp:codebuddy');
+      await saveAndExpectPurposePromptClients('reasonix', 'acp:reasonix');
+      await saveAndExpectPurposePromptClients('grok-build', 'acp:grok-build');
 
-      const savedWithoutAnnotationProvider = await fetch(`${server.origin}/api/config`, {
+      const savedWithoutAnnotationProvider = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           automation: {
-            defaultPromptClient: 'acp:qoder',
+            conversationPromptClient: 'acp:qoder',
             annotationPromptClient: null,
             annotationModel: null,
+            canvasPromptClient: 'acp:qoder',
           },
         }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(savedWithoutAnnotationProvider).toMatchObject({ status: 200, body: { success: true } });
       const serverConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
-      expect(serverConfig.automation.defaultPromptClient).toBe('acp:qoder');
+      expect(serverConfig.automation.conversationPromptClient).toBe('acp:qoder');
       expect(serverConfig.automation.annotationPromptClient).toBeNull();
       expect(serverConfig.automation.annotationModel).toBeNull();
 
-      const config = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(config.automation.annotationPromptClient).toBeNull();
 
-      const bootstrap = await fetch(`${server.origin}/api/config/bootstrap`).then((response) => response.json());
+      const bootstrap = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/bootstrap`)).then((response) => response.json());
       expect(bootstrap.automation.annotationPromptClient).toBeNull();
     } finally {
       await server.close();
@@ -801,7 +923,7 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'tool-state-client', 'Tool State Client');
 
     try {
-      const saved = await fetch(`${server.origin}/api/config`, {
+      const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -835,7 +957,7 @@ describe('make-server project config APIs', () => {
         },
       });
 
-      const nextConfig = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const nextConfig = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(nextConfig.toolOpenState).toEqual(serverConfig.toolOpenState);
     } finally {
       await server.close();
@@ -855,7 +977,7 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'ai-settings-client', 'AI Settings Client');
 
     try {
-      const saved = await fetch(`${server.origin}/api/config`, {
+      const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -890,7 +1012,7 @@ describe('make-server project config APIs', () => {
         model: 'gpt-image-2',
       });
 
-      const config = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(config.ai.imageGeneration).toEqual({
         baseUrl: 'https://api.images.example.com/v1',
         apiKey: 'sk-ai',
@@ -914,7 +1036,7 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'ai-image-test-client', 'AI Image Test Client');
 
     try {
-      const savedPassed = await fetch(`${server.origin}/api/config`, {
+      const savedPassed = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -934,14 +1056,14 @@ describe('make-server project config APIs', () => {
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(savedPassed).toMatchObject({ status: 200, body: { success: true } });
-      let config = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      let config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(config.ai.imageGeneration.lastTest).toEqual({
         status: 'passed',
         message: '已返回图片结果',
         testedAt: 1780713600000,
       });
 
-      const savedFailed = await fetch(`${server.origin}/api/config`, {
+      const savedFailed = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -970,7 +1092,7 @@ describe('make-server project config APIs', () => {
         },
       });
 
-      config = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(config.ai.imageGeneration.lastTest).toEqual({
         status: 'failed',
         message: '测试超时',
@@ -991,7 +1113,7 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'ai-image-probe-client', 'AI Image Probe Client');
 
     try {
-      const result = await fetch(`${server.origin}/api/config/ai-image/test`, {
+      const result = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/ai-image/test`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1020,7 +1142,7 @@ describe('make-server project config APIs', () => {
       });
       expect(imageApi.requests[0].headers.authorization).toBe('Bearer sk-current-image');
 
-      await fetch(`${server.origin}/api/config`, {
+      await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1033,7 +1155,7 @@ describe('make-server project config APIs', () => {
           },
         }),
       });
-      const resultWithoutKey = await fetch(`${server.origin}/api/config/ai-image/test`, {
+      const resultWithoutKey = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/ai-image/test`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1072,7 +1194,7 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'codex-local-config-client', 'Codex Local Config Client');
 
     try {
-      const result = await fetch(`${server.origin}/api/config/ai-image/codex-local`).then(async (response) => ({
+      const result = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/ai-image/codex-local`)).then(async (response) => ({
         status: response.status,
         body: await response.json(),
       }));
@@ -1112,13 +1234,13 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'empty-name-client', '');
 
     try {
-      const initialConfig = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const initialConfig = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(initialConfig.projectInfo).toEqual({
         name: '',
         description: 'Description',
       });
 
-      const saved = await fetch(`${server.origin}/api/config`, {
+      const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1128,7 +1250,7 @@ describe('make-server project config APIs', () => {
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(saved).toMatchObject({ status: 200, body: { success: true } });
-      const config = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(config.projectInfo).toEqual({
         name: '',
         description: 'Updated description',
@@ -1139,7 +1261,7 @@ describe('make-server project config APIs', () => {
       });
       const metadata = JSON.parse(fs.readFileSync(getProjectMetadataPath(projectRoot), 'utf8'));
       expect(metadata.project.name).toBe('');
-      const projects = await fetch(`${server.origin}/api/projects`).then((response) => response.json());
+      const projects = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/projects`)).then((response) => response.json());
       expect(projects.projects).toEqual([
         expect.objectContaining({
           id: 'empty-name-client',
@@ -1170,13 +1292,13 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'make-project', 'Axhub Make');
 
     try {
-      const initialConfig = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const initialConfig = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(initialConfig.projectInfo).toEqual({
         name: '',
         description: 'Description',
       });
 
-      const savedBlank = await fetch(`${server.origin}/api/config`, {
+      const savedBlank = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1200,7 +1322,7 @@ describe('make-server project config APIs', () => {
         id: 'make-project',
         name: '',
       });
-      const blankProjects = await fetch(`${server.origin}/api/projects`).then((response) => response.json());
+      const blankProjects = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/projects`)).then((response) => response.json());
       expect(blankProjects.projects).toEqual([
         expect.objectContaining({
           id: 'make-project',
@@ -1208,7 +1330,7 @@ describe('make-server project config APIs', () => {
         }),
       ]);
 
-      const savedName = await fetch(`${server.origin}/api/config`, {
+      const savedName = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1227,7 +1349,7 @@ describe('make-server project config APIs', () => {
         server: { host: 'localhost' },
         projectInfo: { description: 'Named description' },
       });
-      const namedConfig = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const namedConfig = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(namedConfig.projectInfo).toEqual({
         name: 'Named Client',
         description: 'Named description',

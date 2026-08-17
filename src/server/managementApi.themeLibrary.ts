@@ -2,7 +2,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import {
   isPathInside,
@@ -11,14 +10,14 @@ import {
   type RegisteredProject,
 } from './projectCore/index.ts';
 
+import {
+  designKnowledgeThemeCatalog,
+  type ThemeCatalogPlatform,
+  type ThemeCatalogRecord,
+} from './designKnowledgeThemeCatalog.ts';
 import { readJsonBody, sendJson } from './http.ts';
 import { runLocalCommand } from './localCommand.ts';
 import type { ManagementApiOptions } from './managementApi.ts';
-
-const THEME_LIBRARY_REPO = 'lintendo/Make-Template';
-const THEME_LIBRARY_INDEX_PATH = 'design-systems.json';
-const SAFE_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
-const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 
 interface ThemeLibraryProjectContext {
   project: RegisteredProject;
@@ -58,55 +57,7 @@ interface ThemeLibraryHandlers {
   ) => void;
 }
 
-export interface ThemeLibraryIndexItem {
-  id: string;
-  title: string;
-  slug: string;
-  sourcePath: string;
-  entryPath: string;
-  tokenPath: string;
-  stylePath: string;
-  coverPath: string;
-  description: string;
-  previewUrl?: string;
-}
-
-interface LoadedThemeLibrary {
-  branch: string;
-  designSystems: ThemeLibraryIndexItem[];
-  localAppPath?: string;
-}
-
-function findLocalThemeLibraryAppPath(): string | null {
-  const candidates = [
-    path.resolve(process.cwd(), 'apps/make-template'),
-    path.resolve(process.cwd(), '..', 'make-template'),
-    path.resolve(MODULE_DIR, '..', '..', '..', '..', 'make-template'),
-  ];
-
-  for (const candidate of candidates) {
-    const indexPath = path.join(candidate, 'design-systems.json');
-    if (fs.existsSync(indexPath) && fs.statSync(indexPath).isFile()) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
-function loadLocalThemeLibrary(): LoadedThemeLibrary | null {
-  const localAppPath = findLocalThemeLibraryAppPath();
-  if (!localAppPath) {
-    return null;
-  }
-
-  const rawIndex = JSON.parse(fs.readFileSync(path.join(localAppPath, 'design-systems.json'), 'utf8'));
-  return {
-    branch: 'local',
-    localAppPath,
-    designSystems: validateThemeLibraryIndex(rawIndex),
-  };
-}
+const activeThemeImportTargets = new Set<string>();
 
 function sendThemeLibraryError(
   res: ServerResponse,
@@ -123,216 +74,19 @@ function sendThemeLibraryError(
   }, { status });
 }
 
-function assertRelativeThemePath(value: unknown, fieldName: string): string {
-  const raw = typeof value === 'string' ? value.trim().replace(/\\/g, '/') : '';
-  const parts = raw.split('/').filter(Boolean);
-  if (
-    !raw
-    || raw.startsWith('/')
-    || path.isAbsolute(raw)
-    || parts.some((part) => part === '..' || part === '.')
-  ) {
-    throw new Error(`Invalid ${fieldName}: ${String(value || '')}`);
-  }
-  return parts.join('/');
+function parsePlatform(value: unknown): ThemeCatalogPlatform | null {
+  return value === 'desktop' || value === 'mobile' ? value : null;
 }
 
-function assertThemeId(value: unknown, fieldName: string): string {
-  const raw = typeof value === 'string' ? value.trim() : '';
-  if (!SAFE_ID_PATTERN.test(raw)) {
-    throw new Error(`Invalid ${fieldName}: ${String(value || '')}`);
-  }
-  return raw;
+function parseListPlatform(req: IncomingMessage): ThemeCatalogPlatform | null {
+  const value = new URL(req.url || '/', 'http://localhost').searchParams.get('platform');
+  return value === null || value === '' ? 'desktop' : parsePlatform(value);
 }
 
-function assertString(value: unknown, fieldName: string): string {
-  const raw = typeof value === 'string' ? value.trim() : '';
-  if (!raw) {
-    throw new Error(`Invalid ${fieldName}`);
-  }
-  return raw;
-}
-
-function assertOptionalHttpUrl(value: unknown, fieldName: string): string | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-  const raw = typeof value === 'string' ? value.trim() : '';
-  if (!raw) {
-    throw new Error(`Invalid ${fieldName}`);
-  }
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    throw new Error(`Invalid ${fieldName}: ${String(value || '')}`);
-  }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error(`Invalid ${fieldName}: ${raw}`);
-  }
-  return raw;
-}
-
-function validateThemeLibraryIndex(raw: unknown): ThemeLibraryIndexItem[] {
-  if (!raw || typeof raw !== 'object') {
-    throw new Error('Theme library index must be an object');
-  }
-  const record = raw as Record<string, unknown>;
-  if (record.schemaVersion !== 1) {
-    throw new Error('Theme library index schemaVersion must be 1');
-  }
-  if (!Array.isArray(record.designSystems)) {
-    throw new Error('Theme library index designSystems must be an array');
-  }
-  const ids = new Set<string>();
-  const slugs = new Set<string>();
-  return record.designSystems.map((item, index) => {
-    if (!item || typeof item !== 'object') {
-      throw new Error(`Invalid design system at index ${index}`);
-    }
-    const designSystem = item as Record<string, unknown>;
-    const id = assertThemeId(designSystem.id, `designSystems[${index}].id`);
-    const slug = assertThemeId(designSystem.slug, `designSystems[${index}].slug`);
-    const sourcePath = assertRelativeThemePath(designSystem.sourcePath, `designSystems[${index}].sourcePath`);
-    const entryPath = assertRelativeThemePath(designSystem.entryPath, `designSystems[${index}].entryPath`);
-    const tokenPath = assertRelativeThemePath(designSystem.tokenPath, `designSystems[${index}].tokenPath`);
-    const stylePath = assertRelativeThemePath(designSystem.stylePath, `designSystems[${index}].stylePath`);
-    const coverPath = assertRelativeThemePath(designSystem.coverPath, `designSystems[${index}].coverPath`);
-    if (!sourcePath.startsWith('design-systems/')) {
-      throw new Error(`Invalid designSystems[${index}].sourcePath: ${sourcePath}`);
-    }
-    for (const [fieldName, value] of Object.entries({ entryPath, tokenPath, stylePath, coverPath })) {
-      if (!value.startsWith(`${sourcePath}/`)) {
-        throw new Error(`Invalid designSystems[${index}].${fieldName}: ${value}`);
-      }
-    }
-    if (ids.has(id)) {
-      throw new Error(`Duplicate design system id: ${id}`);
-    }
-    if (slugs.has(slug)) {
-      throw new Error(`Duplicate design system slug: ${slug}`);
-    }
-    ids.add(id);
-    slugs.add(slug);
-    const previewUrl = assertOptionalHttpUrl(designSystem.previewUrl, `designSystems[${index}].previewUrl`);
-    return {
-      id,
-      title: assertString(designSystem.title, `designSystems[${index}].title`),
-      slug,
-      sourcePath,
-      entryPath,
-      tokenPath,
-      stylePath,
-      coverPath,
-      description: assertString(designSystem.description, `designSystems[${index}].description`),
-      ...(previewUrl ? { previewUrl } : {}),
-    };
-  });
-}
-
-async function readResponseText(response: Response): Promise<string> {
-  try {
-    return await response.text();
-  } catch {
-    return '';
-  }
-}
-
-async function fetchJsonOrThrow<T>(url: string): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': '@axhub/make theme-library',
-      },
-    });
-  } catch (error: any) {
-    throw Object.assign(new Error(error?.message || 'Failed to read remote theme library'), {
-      code: 'THEME_LIBRARY_REMOTE_UNAVAILABLE',
-    });
-  }
-  if (!response.ok) {
-    const text = await readResponseText(response);
-    throw Object.assign(new Error(`Remote theme library request failed (${response.status})${text ? `: ${text}` : ''}`), {
-      code: 'THEME_LIBRARY_REMOTE_UNAVAILABLE',
-    });
-  }
-  return response.json() as Promise<T>;
-}
-
-async function fetchArrayBufferOrThrow(url: string): Promise<ArrayBuffer> {
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      headers: {
-        Accept: 'application/gzip',
-        'User-Agent': '@axhub/make theme-library',
-      },
-    });
-  } catch (error: any) {
-    throw Object.assign(new Error(error?.message || 'Failed to download theme archive'), {
-      code: 'THEME_LIBRARY_REMOTE_UNAVAILABLE',
-    });
-  }
-  if (!response.ok) {
-    const text = await readResponseText(response);
-    throw Object.assign(new Error(`Remote theme archive request failed (${response.status})${text ? `: ${text}` : ''}`), {
-      code: 'THEME_LIBRARY_REMOTE_UNAVAILABLE',
-    });
-  }
-  return response.arrayBuffer();
-}
-
-async function loadRemoteThemeLibrary(): Promise<LoadedThemeLibrary> {
-  const localLibrary = loadLocalThemeLibrary();
-  if (localLibrary) {
-    return localLibrary;
-  }
-
-  let branch = 'HEAD';
-  try {
-    const repo = await fetchJsonOrThrow<{ default_branch?: unknown }>(`https://api.github.com/repos/${THEME_LIBRARY_REPO}`);
-    branch = typeof repo.default_branch === 'string' && repo.default_branch.trim()
-      ? repo.default_branch.trim()
-      : branch;
-  } catch {
-    branch = 'HEAD';
-  }
-  const indexUrl = `https://raw.githubusercontent.com/${THEME_LIBRARY_REPO}/${encodeURIComponent(branch)}/${THEME_LIBRARY_INDEX_PATH}`;
-  let rawIndex: unknown;
-  try {
-    rawIndex = await fetchJsonOrThrow<unknown>(indexUrl);
-  } catch (error: any) {
-    throw error;
-  }
-  try {
-    return {
-      branch,
-      designSystems: validateThemeLibraryIndex(rawIndex),
-    };
-  } catch (error: any) {
-    throw Object.assign(new Error(error?.message || 'Theme library schema is invalid'), {
-      code: 'THEME_LIBRARY_SCHEMA_INVALID',
-    });
-  }
-}
-
-function createRemoteLibraryPath(...parts: string[]): string {
-  return parts
-    .map((part) => part.trim().replace(/^\/+|\/+$/gu, ''))
-    .filter(Boolean)
-    .join('/');
-}
-
-function toPublicDesignSystem(designSystem: ThemeLibraryIndexItem, branch: string) {
-  const branchPath = branch === 'local' ? 'HEAD' : encodeURIComponent(branch);
-  return {
-    ...designSystem,
-    coverUrl: `https://raw.githubusercontent.com/${THEME_LIBRARY_REPO}/${branchPath}/${createRemoteLibraryPath(designSystem.coverPath)}`,
-    sourceUrl: `https://github.com/${THEME_LIBRARY_REPO}/tree/${branchPath}/${createRemoteLibraryPath(designSystem.sourcePath)}`,
-    canDirectImport: true,
-  };
+function themeLibraryErrorCode(error: any): 'THEME_LIBRARY_SCHEMA_INVALID' | 'THEME_LIBRARY_REMOTE_UNAVAILABLE' {
+  return error?.code === 'THEME_LIBRARY_SCHEMA_INVALID'
+    ? 'THEME_LIBRARY_SCHEMA_INVALID'
+    : 'THEME_LIBRARY_REMOTE_UNAVAILABLE';
 }
 
 async function execFilePromise(command: string, args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
@@ -379,7 +133,7 @@ function resolveThemeClientUrl(
 function updateThemeMetadataAfterImport(
   context: ThemeLibraryProjectContext,
   params: {
-    designSystem: ThemeLibraryIndexItem;
+    theme: ThemeCatalogRecord;
     themeDir: string;
     entryPath: string;
     clientUrl: string;
@@ -394,36 +148,27 @@ function updateThemeMetadataAfterImport(
       ...current.resources,
       themes: [
         {
-          id: params.designSystem.slug,
-          name: params.designSystem.slug,
-          title: params.designSystem.title,
+          id: params.theme.slug,
+          name: params.theme.slug,
+          title: params.theme.title,
           path: themePath,
           sourcePath: themePath,
           filePath,
           absoluteFilePath: params.entryPath,
           clientUrl: params.clientUrl,
           previewUrl: params.clientUrl,
-          description: params.designSystem.description,
+          description: params.theme.description,
           updatedAt: new Date().toISOString(),
         },
-        ...current.resources.themes.filter((theme) => theme.id !== params.designSystem.slug && theme.name !== params.designSystem.slug),
+        ...current.resources.themes.filter((theme) => theme.id !== params.theme.slug && theme.name !== params.theme.slug),
       ],
     },
     orders: {
       ...current.orders,
-      themes: prependUnique(current.orders.themes, params.designSystem.slug),
+      themes: prependUnique(current.orders.themes, params.theme.slug),
     },
   });
   return filePath;
-}
-
-function findExtractedRepoRoot(extractDir: string): string {
-  const entries = fs.readdirSync(extractDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory());
-  if (entries.length !== 1) {
-    throw new Error('Theme archive root is invalid');
-  }
-  return path.join(extractDir, entries[0].name);
 }
 
 function requireThemeImportTarget(
@@ -449,22 +194,22 @@ function requireThemeImportTarget(
   return targetBaseDir;
 }
 
-async function handleListThemeLibrary(res: ServerResponse): Promise<void> {
+async function handleListThemeLibrary(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const platform = parseListPlatform(req);
+  if (!platform) {
+    sendThemeLibraryError(res, 400, 'THEME_LIBRARY_PLATFORM_INVALID', 'platform must be desktop or mobile');
+    return;
+  }
+
   try {
-    const library = await loadRemoteThemeLibrary();
+    const result = await designKnowledgeThemeCatalog.load(platform);
     sendJson(res, {
       schemaVersion: 1,
-      source: {
-        repo: THEME_LIBRARY_REPO,
-        branch: library.branch,
-      },
-      designSystems: library.designSystems.map((designSystem) => toPublicDesignSystem(designSystem, library.branch)),
+      ...result,
     });
   } catch (error: any) {
-    const code = error?.code === 'THEME_LIBRARY_SCHEMA_INVALID'
-      ? 'THEME_LIBRARY_SCHEMA_INVALID'
-      : 'THEME_LIBRARY_REMOTE_UNAVAILABLE';
-    sendThemeLibraryError(res, 502, code, error?.message || 'Failed to load remote theme library');
+    const code = themeLibraryErrorCode(error);
+    sendThemeLibraryError(res, 502, code, error?.message || 'Failed to load theme library');
   }
 }
 
@@ -481,82 +226,108 @@ async function handleImportThemeLibrary(
     sendJson(res, { error: 'Invalid JSON body', code: 'INVALID_JSON_BODY' }, { status: 400 });
     return;
   }
+
   const context = handlers.createProjectContextFromBody(req, res, options, body);
-  if (!context) {
-    return;
-  }
+  if (!context) return;
+
   const targetBaseDir = requireThemeImportTarget(res, context, handlers);
-  if (!targetBaseDir) {
+  if (!targetBaseDir) return;
+
+  const themeId = typeof body?.themeId === 'string' ? body.themeId.trim() : '';
+  if (!themeId) {
+    sendThemeLibraryError(res, 400, 'THEME_LIBRARY_THEME_ID_REQUIRED', 'Missing themeId');
     return;
   }
-  const designSystemId = typeof body?.designSystemId === 'string' ? body.designSystemId.trim() : '';
-  if (!designSystemId) {
-    sendJson(res, { error: 'Missing designSystemId', code: 'THEME_LIBRARY_DESIGN_SYSTEM_ID_REQUIRED' }, { status: 400 });
+  const platform = parsePlatform(body?.platform);
+  if (!platform) {
+    sendThemeLibraryError(res, 400, 'THEME_LIBRARY_PLATFORM_INVALID', 'platform must be desktop or mobile');
     return;
   }
 
   const tempRoot = path.join(context.project.root, 'temp', 'theme-library');
   const tempDir = path.join(tempRoot, `${Date.now()}-${randomUUID()}`);
   let targetDir = '';
+  let stagingDir = '';
+  let activeTargetKey = '';
+  let ownsActiveTarget = false;
+  let publishedTarget = false;
   try {
-    const library = await loadRemoteThemeLibrary();
-    const designSystem = library.designSystems.find((item) => item.id === designSystemId);
-    if (!designSystem) {
-      sendJson(res, {
-        error: `Design system not found: ${designSystemId}`,
-        code: 'THEME_LIBRARY_DESIGN_SYSTEM_NOT_FOUND',
-        designSystemId,
-      }, { status: 404 });
+    const theme = await designKnowledgeThemeCatalog.getRecord(platform, themeId);
+    if (!theme) {
+      sendThemeLibraryError(res, 404, 'THEME_LIBRARY_THEME_NOT_FOUND', `Theme not found: ${themeId}`);
+      return;
+    }
+    if (!theme.canDirectImport) {
+      sendThemeLibraryError(
+        res,
+        409,
+        'THEME_LIBRARY_NOT_IMPORTABLE',
+        theme.directImportDisabledReason || 'This theme does not provide a verified import package',
+        { themeId, platform },
+      );
       return;
     }
 
-    targetDir = path.join(targetBaseDir, designSystem.slug);
+    targetDir = path.join(targetBaseDir, theme.slug);
     if (!isPathInside(targetBaseDir, targetDir) || targetDir === path.resolve(targetBaseDir)) {
       throw new Error('Theme target path is unsafe');
     }
+    activeTargetKey = path.resolve(targetDir);
+    if (activeThemeImportTargets.has(activeTargetKey)) {
+      sendThemeLibraryError(
+        res,
+        409,
+        'THEME_LIBRARY_IMPORT_IN_PROGRESS',
+        `Theme import is already in progress: ${theme.slug}`,
+        { themeId, folderName: theme.slug },
+      );
+      return;
+    }
+    activeThemeImportTargets.add(activeTargetKey);
+    ownsActiveTarget = true;
     if (fs.existsSync(targetDir)) {
-      sendJson(res, {
-        error: `Theme folder already exists: ${designSystem.slug}`,
-        code: 'THEME_LIBRARY_TARGET_EXISTS',
-        designSystemId: designSystem.id,
-        folderName: designSystem.slug,
-      }, { status: 409 });
+      sendThemeLibraryError(
+        res,
+        409,
+        'THEME_LIBRARY_TARGET_EXISTS',
+        `Theme folder already exists: ${theme.slug}`,
+        { themeId, folderName: theme.slug },
+      );
       return;
     }
 
-    let sourceDir: string;
-    let sourceBaseDir: string;
-    if (library.localAppPath) {
-      sourceBaseDir = library.localAppPath;
-      sourceDir = path.resolve(sourceBaseDir, designSystem.sourcePath);
-    } else {
-      fs.mkdirSync(tempDir, { recursive: true });
-      const tarballUrl = `https://codeload.github.com/${THEME_LIBRARY_REPO}/tar.gz/${encodeURIComponent(library.branch)}`;
-      const archiveBuffer = Buffer.from(await fetchArrayBufferOrThrow(tarballUrl));
-      const tarballPath = path.join(tempDir, 'source.tar.gz');
-      fs.writeFileSync(tarballPath, archiveBuffer);
-      const extractDir = path.join(tempDir, 'extract');
-      await extractTarball(tarballPath, extractDir);
+    fs.mkdirSync(tempDir, { recursive: true });
+    const tarballPath = path.join(tempDir, 'package.tar.gz');
+    fs.writeFileSync(tarballPath, await designKnowledgeThemeCatalog.downloadPackage(theme));
+    const extractDir = path.join(tempDir, 'extract');
+    await extractTarball(tarballPath, extractDir);
 
-      const repoRoot = findExtractedRepoRoot(extractDir);
-      sourceBaseDir = path.resolve(repoRoot);
-      sourceDir = path.resolve(sourceBaseDir, designSystem.sourcePath);
-    }
-    if (!isPathInside(sourceBaseDir, sourceDir) || !fs.existsSync(sourceDir) || !fs.statSync(sourceDir).isDirectory()) {
-      throw new Error(`Design system source is missing: ${designSystem.sourcePath}`);
-    }
-    const relativeEntryPath = path.relative(designSystem.sourcePath, designSystem.entryPath).split(path.sep).join('/');
-    const sourceEntryPath = path.resolve(sourceDir, relativeEntryPath);
-    if (!isPathInside(sourceDir, sourceEntryPath) || !fs.existsSync(sourceEntryPath)) {
-      throw new Error('Design system source must contain entryPath');
+    const sourceEntryPath = path.join(extractDir, 'index.tsx');
+    if (!isPathInside(extractDir, sourceEntryPath) || !fs.existsSync(sourceEntryPath) || !fs.statSync(sourceEntryPath).isFile()) {
+      throw new Error('Theme package must contain index.tsx at its root');
     }
 
     fs.mkdirSync(targetBaseDir, { recursive: true });
-    copyDirectoryRecursive(sourceDir, targetDir);
-    const entryPath = path.join(targetDir, relativeEntryPath);
-    const clientUrl = resolveThemeClientUrl(options, context, designSystem.slug);
+    stagingDir = path.join(targetBaseDir, `.axhub-theme-import-${theme.slug}-${randomUUID()}`);
+    if (!isPathInside(targetBaseDir, stagingDir)) throw new Error('Theme staging path is unsafe');
+    copyDirectoryRecursive(extractDir, stagingDir);
+    if (fs.existsSync(targetDir)) {
+      sendThemeLibraryError(
+        res,
+        409,
+        'THEME_LIBRARY_TARGET_EXISTS',
+        `Theme folder already exists: ${theme.slug}`,
+        { themeId, folderName: theme.slug },
+      );
+      return;
+    }
+    fs.renameSync(stagingDir, targetDir);
+    stagingDir = '';
+    publishedTarget = true;
+    const entryPath = path.join(targetDir, 'index.tsx');
+    const clientUrl = resolveThemeClientUrl(options, context, theme.slug);
     const filePath = updateThemeMetadataAfterImport(context, {
-      designSystem,
+      theme,
       themeDir: targetDir,
       entryPath,
       clientUrl,
@@ -564,25 +335,35 @@ async function handleImportThemeLibrary(
     sendJson(res, {
       success: true,
       projectId: context.project.id,
-      designSystemId: designSystem.id,
-      folderName: designSystem.slug,
-      path: `themes/${designSystem.slug}`,
+      themeId: theme.id,
+      platform: theme.platform,
+      folderName: theme.slug,
+      path: `themes/${theme.slug}`,
       filePath,
       absoluteFilePath: entryPath,
       clientUrl,
     });
   } catch (error: any) {
-    if (targetDir && fs.existsSync(targetDir) && isPathInside(targetBaseDir, targetDir)) {
+    if (publishedTarget && targetDir && fs.existsSync(targetDir) && isPathInside(targetBaseDir, targetDir)) {
       fs.rmSync(targetDir, { recursive: true, force: true });
     }
+    if (error?.code === 'EEXIST' || error?.code === 'ENOTEMPTY') {
+      sendThemeLibraryError(res, 409, 'THEME_LIBRARY_TARGET_EXISTS', 'Theme folder already exists');
+      return;
+    }
     const code = error?.code === 'THEME_LIBRARY_SCHEMA_INVALID'
-      ? 'THEME_LIBRARY_SCHEMA_INVALID'
-      : error?.code === 'THEME_LIBRARY_REMOTE_UNAVAILABLE'
-        ? 'THEME_LIBRARY_REMOTE_UNAVAILABLE'
-        : 'THEME_LIBRARY_IMPORT_FAILED';
-    const status = code === 'THEME_LIBRARY_IMPORT_FAILED' ? 400 : 502;
-    sendThemeLibraryError(res, status, code, error?.message || 'Theme library import failed');
+      || error?.code === 'THEME_LIBRARY_REMOTE_UNAVAILABLE'
+      ? themeLibraryErrorCode(error)
+      : 'THEME_LIBRARY_IMPORT_FAILED';
+    sendThemeLibraryError(
+      res,
+      code === 'THEME_LIBRARY_IMPORT_FAILED' ? 400 : 502,
+      code,
+      error?.message || 'Theme library import failed',
+    );
   } finally {
+    if (stagingDir) fs.rmSync(stagingDir, { recursive: true, force: true });
+    if (ownsActiveTarget && activeTargetKey) activeThemeImportTargets.delete(activeTargetKey);
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 }
@@ -599,7 +380,7 @@ export function handleThemeLibraryApi(
       sendJson(res, { error: 'Method not allowed' }, { status: 405 });
       return true;
     }
-    void handleListThemeLibrary(res);
+    void handleListThemeLibrary(req, res);
     return true;
   }
 

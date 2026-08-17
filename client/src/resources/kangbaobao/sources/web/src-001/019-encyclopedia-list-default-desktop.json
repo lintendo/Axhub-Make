@@ -1,0 +1,133 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 19,
+  "pageId": "gn5fv9",
+  "pageName": "百科列表",
+  "sitemapPath": "百科 / 百科列表",
+  "requestedPath": "百科列表.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.59.46/%E7%99%BE%E7%A7%91%E5%88%97%E8%A1%A8.html",
+  "dataUrl": "http://127.0.0.1:32768/20.59.46/files/%E7%99%BE%E7%A7%91%E5%88%97%E8%A1%A8/data.js",
+  "generationDate": "2026-08-14T12:59:46.124Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 食材挑选\n- paragraph: 夏天不能光脚丫、不能吃冰激凌？\n- paragraph: 别用养生折腾孩子了\n- paragraph\n- paragraph: 9555次浏览 2222人喜欢\n- paragraph: 夏天不能光脚丫、不能吃冰激凌？\n- paragraph: 别用养生折腾孩子了\n- paragraph\n- paragraph: 9555次浏览 2222人喜欢\n- paragraph: 夏天不能光脚丫、不能吃冰激凌？\n- paragraph: 别用养生折腾孩子了\n- paragraph\n- paragraph: 9555次浏览 2222人喜欢\n- paragraph: 夏天不能光脚丫、不能吃冰激凌？\n- paragraph: 别用养生折腾孩子了\n- paragraph\n- paragraph: 9555次浏览 2222人喜欢\n- paragraph: 夏天不能光脚丫、不能吃冰激凌？\n- paragraph: 别用养生折腾孩子了\n- paragraph\n- paragraph: 9555次浏览 2222人喜欢\n- paragraph: 数据加载中\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "019-encyclopedia-list-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "导航",
+    "036d81c1 ba1e 43ca a498 8164300e61be",
+    "背景",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [],
+  "panels": [
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:百科列表 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:百科列表 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 百科详情 in Current window",
+      "target": "百科详情.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

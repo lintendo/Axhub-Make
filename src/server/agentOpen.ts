@@ -6,6 +6,12 @@ import path from 'node:path';
 import type { ChildProcess } from 'node:child_process';
 
 import {
+  buildProjectOpenCommands,
+  openProject as openAgentSurfaceProject,
+  type ProjectProviderId,
+} from '../../vendor/agent-surface/dist/index.js';
+
+import {
   CLI_AGENT_APP_NAMES,
   LOCAL_APP_AGENT_APP_NAMES,
   WEB_AGENT_APP_NAMES,
@@ -132,63 +138,78 @@ function quoteForCmd(value: string): string {
   return `"${String(value).replace(/"/g, '""')}"`;
 }
 
-function quoteForPowerShellSingle(value: string): string {
-  return `'${String(value).replace(/'/g, "''")}'`;
+type DirectoryAppAgent = Extract<LocalAppAgent, 'trae'>;
+
+const DIRECTORY_APP_DEFAULTS: Record<DirectoryAppAgent, {
+  application: string;
+  command: string;
+}> = {
+  trae: { application: 'Trae', command: 'trae' },
+};
+
+function isDirectoryAppAgent(agent: LocalAppAgent): agent is DirectoryAppAgent {
+  return agent === 'trae';
 }
 
-function encodeLocalPathForDeeplink(value: string, platform: NodeJS.Platform): string {
-  if (platform === 'win32') {
-    return encodeURIComponent(value);
+function resolveMacApplication(applicationPath: string | undefined, fallback: string): string {
+  const appBundleMarkerIndex = applicationPath?.indexOf('.app/') ?? -1;
+  if (appBundleMarkerIndex >= 0) {
+    return applicationPath!.slice(0, appBundleMarkerIndex + '.app'.length);
   }
-
-  return value
-    .split('/')
-    .map((segment, index) => (index === 0 ? segment : encodeURIComponent(segment)))
-    .join('/');
+  return applicationPath?.endsWith('.app') ? applicationPath : fallback;
 }
 
-function buildLocalAppDeeplink(agent: LocalAppAgent, directory: string, platform: NodeJS.Platform): string {
-  const encodedDirectory = encodeLocalPathForDeeplink(directory, platform);
-  if (agent === 'codex') {
-    return `codex://threads/new?path=${encodedDirectory}`;
-  }
-  return `opencode://open-project?directory=${encodedDirectory}`;
-}
-
-function buildDeeplinkOpenCommand(url: string, platform: NodeJS.Platform): CommandSpec {
-  if (platform === 'win32') {
-    const displayCommand = `Start-Process ${quoteForPowerShellSingle(url)}`;
-    return {
-      command: 'powershell',
-      args: ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', displayCommand],
-      displayCommand,
-    };
-  }
-
+export function buildLocalAppLaunchCommandForPlatform({
+  applicationPath,
+  platform = process.platform,
+}: {
+  applicationPath: string;
+  platform?: NodeJS.Platform;
+}): CommandSpec {
+  const normalizedPath = applicationPath.trim();
+  if (!normalizedPath) throw new Error('Application path is required.');
   if (platform === 'darwin') {
+    const application = resolveMacApplication(normalizedPath, '');
+    if (!application) throw new Error('macOS application path must point to an .app bundle.');
     return {
       command: 'open',
-      args: [url],
-      displayCommand: `open ${quoteForPowerShellSingle(url)}`,
+      args: ['-a', application],
+      displayCommand: `open -a ${quoteForShell(application)}`,
     };
   }
-
   return {
-    command: 'xdg-open',
-    args: [url],
-    displayCommand: `xdg-open ${quoteForShell(url)}`,
+    command: normalizedPath,
+    args: [],
+    displayCommand: normalizedPath,
   };
 }
 
-function buildCodexAppCommand(directory: string, availability?: AgentAvailabilityInfo): CommandSpec {
-  const baseSpec: CommandSpec = {
-    command: 'codex',
-    args: ['app', directory],
-    displayCommand: `codex app ${quoteForShell(directory)}`,
-  };
+function buildDirectoryAppCommand({
+  agent,
+  directory,
+  platform,
+  applicationPath,
+}: {
+  agent: DirectoryAppAgent;
+  directory: string;
+  platform: NodeJS.Platform;
+  applicationPath?: string;
+}): CommandSpec {
+  const defaults = DIRECTORY_APP_DEFAULTS[agent];
+  if (platform === 'darwin') {
+    const application = resolveMacApplication(applicationPath, defaults.application);
+    return {
+      command: 'open',
+      args: ['-a', application, directory],
+      displayCommand: `open -a ${quoteForShell(application)} ${quoteForShell(directory)}`,
+    };
+  }
+
+  const command = applicationPath || defaults.command;
   return {
-    ...baseSpec,
-    command: getExecutableCommand(baseSpec, availability),
+    command,
+    args: [directory],
+    displayCommand: `${command} ${quoteForShell(directory)}`,
   };
 }
 
@@ -196,15 +217,28 @@ export function buildLocalAppOpenCommandForPlatform({
   agent,
   directory,
   platform = process.platform,
+  applicationPath,
 }: {
   agent: LocalAppAgent;
   directory: string;
   platform?: NodeJS.Platform;
+  applicationPath?: string;
 }): CommandSpec {
-  if (agent === 'codex') {
-    return buildCodexAppCommand(directory);
+  if (isDirectoryAppAgent(agent)) {
+    return buildDirectoryAppCommand({ agent, directory, platform, applicationPath });
   }
-  return buildDeeplinkOpenCommand(buildLocalAppDeeplink(agent, directory, platform), platform);
+  const command = buildProjectOpenCommands({
+    provider: agent as ProjectProviderId,
+    targetPath: directory,
+    appPath: applicationPath,
+    platform,
+  })[0];
+  if (!command) throw new Error(`No project-opening command is available for ${agent}.`);
+  return {
+    command: command.executable,
+    args: command.args,
+    displayCommand: [command.executable, ...command.args].join(' '),
+  };
 }
 
 export async function buildLocalAppOpenResultForPlatform({
@@ -220,27 +254,45 @@ export async function buildLocalAppOpenResultForPlatform({
   availability?: AgentAvailabilityInfo;
   preferDeeplink?: boolean;
 }): Promise<Pick<OpenAgentResult, 'command' | 'url' | 'openInBrowser' | 'openMode'>> {
-  if (agent === 'codex' && !preferDeeplink) {
+  if (isDirectoryAppAgent(agent)) {
+    const command = buildLocalAppOpenCommandForPlatform({
+      agent,
+      directory,
+      platform,
+      applicationPath: availability?.path,
+    });
     return {
-      command: await spawnDetachedCommand(buildCodexAppCommand(directory, availability), directory),
+      command: await spawnDetachedCommand(command, directory),
       openMode: 'direct-app',
     };
   }
-
-  const url = buildLocalAppDeeplink(agent, directory, platform);
-  if (platform === 'win32') {
+  if (platform !== 'darwin' && platform !== 'win32') {
+    const command = buildLocalAppOpenCommandForPlatform({
+      agent,
+      directory,
+      platform,
+      applicationPath: availability?.path,
+    });
+    const url = command.args.find((arg) => arg.includes('://'));
     return {
-      command: `browser ${url}`,
-      url,
-      openInBrowser: true,
-      openMode: 'deeplink',
+      command: await spawnDetachedCommand(command, directory),
+      ...(url ? { url } : {}),
+      openMode: url ? 'deeplink' : 'direct-app',
     };
   }
-
+  const result = await openAgentSurfaceProject({
+    provider: agent as ProjectProviderId,
+    targetPath: directory,
+    appPath: availability?.path,
+    platform,
+    preferDeeplink,
+  });
+  if (!result.ok) throw new Error(result.message);
   return {
-    command: await spawnDetachedCommand(buildDeeplinkOpenCommand(url, platform), directory),
-    url,
-    openMode: 'deeplink',
+    command: result.command || '',
+    ...(result.url ? { url: result.url } : {}),
+    ...(result.openInBrowser ? { openInBrowser: true } : {}),
+    openMode: result.url ? 'deeplink' : 'direct-app',
   };
 }
 
@@ -633,6 +685,20 @@ function spawnDetachedCommand(spec: CommandSpec, cwd: string): Promise<OpenAgent
   });
 }
 
+export async function openLocalAppApplication({
+  applicationPath,
+  platform = process.platform,
+}: {
+  applicationPath: string;
+  platform?: NodeJS.Platform;
+}): Promise<{ command: string; openMode: 'direct-app' }> {
+  const command = buildLocalAppLaunchCommandForPlatform({ applicationPath, platform });
+  return {
+    command: await spawnDetachedCommand(command, path.dirname(applicationPath)),
+    openMode: 'direct-app',
+  };
+}
+
 export async function openLocalAppAgent({
   agent,
   targetPath,
@@ -648,6 +714,29 @@ export async function openLocalAppAgent({
   const directory = openTarget.workingDirectory;
   const preferDeeplink = toolOpenState?.lastOpenMode === 'deeplink';
 
+  if (agent !== 'trae' && (process.platform === 'darwin' || process.platform === 'win32')) {
+    const open = (forceDeeplink = false) => openAgentSurfaceProject({
+      provider: agent as ProjectProviderId,
+      targetPath: directory,
+      appPath: availability?.path || toolOpenState?.commandPath,
+      preferDeeplink: forceDeeplink || preferDeeplink,
+    });
+    let result = await open();
+    if (!result.ok && agent === 'codex' && !preferDeeplink) {
+      result = await open(true);
+    }
+    if (!result.ok) throw new Error(result.message);
+    return {
+      success: true,
+      agent,
+      targetPath: openTarget.targetPath,
+      command: result.command || '',
+      ...(result.url ? { url: result.url } : {}),
+      ...(result.openInBrowser ? { openInBrowser: true } : {}),
+      openMode: result.url ? 'deeplink' : 'direct-app',
+    };
+  }
+
   const buildResult = (forceDeeplink = false) => buildLocalAppOpenResultForPlatform({
     agent,
     directory,
@@ -655,21 +744,7 @@ export async function openLocalAppAgent({
     preferDeeplink: forceDeeplink || preferDeeplink,
   });
 
-  if (agent === 'codex' && availability?.status !== 'missing' && !preferDeeplink) {
-    try {
-      const result = await buildResult();
-      return {
-        success: true,
-        agent,
-        targetPath: openTarget.targetPath,
-        ...result,
-      };
-    } catch {
-      // Fall through to the Codex deeplink fallback.
-    }
-  }
-
-  const result = await buildResult(agent === 'codex');
+  const result = await buildResult();
 
   return {
     success: true,

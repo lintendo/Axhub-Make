@@ -32,9 +32,13 @@ body::-webkit-scrollbar,
 `;
 
 export interface CaptureDocumentScreenshotOptions {
+  scope?: 'viewport' | 'full-page';
   targetWidth?: number;
   targetHeight?: number;
   targetPixelRatio?: number;
+  format?: 'png' | 'jpeg' | 'jpg';
+  quality?: number;
+  maxBytes?: number;
 }
 
 export interface CaptureDocumentScreenshotResult {
@@ -44,8 +48,10 @@ export interface CaptureDocumentScreenshotResult {
 }
 
 type SnapdomToPng = (element: Element, options?: SnapdomOptions) => Promise<HTMLImageElement>;
+type SnapdomToJpg = (element: Element, options?: SnapdomOptions) => Promise<HTMLImageElement>;
 type RuntimeExportCoreTestGlobal = typeof globalThis & {
   __AXHUB_RUNTIME_EXPORT_CORE_TEST_SNAPDOM_TO_PNG__?: SnapdomToPng | null;
+  __AXHUB_RUNTIME_EXPORT_CORE_TEST_SNAPDOM_TO_JPG__?: SnapdomToJpg | null;
 };
 
 function getExportCoreOrigin(): string {
@@ -511,15 +517,40 @@ function installScreenshotScrollbarHidingStyle(): () => void {
   return () => style.remove();
 }
 
-function getSnapdomPngDataUrl(image: HTMLImageElement): string {
+function getSnapdomDataUrl(image: HTMLImageElement, format: 'png' | 'jpeg'): string {
   const dataUrl = image.src || image.getAttribute('src') || '';
   if (!dataUrl) {
     throw new Error('snapdom returned an empty screenshot');
   }
-  if (!dataUrl.startsWith('data:image/png')) {
-    throw new Error('snapdom returned a non-PNG screenshot');
+  const acceptedPrefixes = format === 'jpeg'
+    ? ['data:image/jpeg', 'data:image/jpg']
+    : ['data:image/png'];
+  if (!acceptedPrefixes.some((prefix) => dataUrl.startsWith(prefix))) {
+    throw new Error(`snapdom returned a non-${format.toUpperCase()} screenshot`);
   }
   return dataUrl;
+}
+
+function getDataUrlByteLength(dataUrl: string): number {
+  const commaIndex = dataUrl.indexOf(',');
+  if (commaIndex < 0) return 0;
+  const metadata = dataUrl.slice(0, commaIndex);
+  const payload = dataUrl.slice(commaIndex + 1);
+  if (!metadata.includes(';base64')) {
+    return new TextEncoder().encode(decodeURIComponent(payload)).byteLength;
+  }
+  const padding = payload.endsWith('==') ? 2 : payload.endsWith('=') ? 1 : 0;
+  return Math.max(0, Math.floor((payload.length * 3) / 4) - padding);
+}
+
+function normalizedQuality(value: unknown): number {
+  const quality = Number(value);
+  return Number.isFinite(quality) ? Math.max(0.1, Math.min(1, quality)) : 0.8;
+}
+
+function positiveByteLimit(value: unknown): number | undefined {
+  const bytes = Number(value);
+  return Number.isFinite(bytes) && bytes > 0 ? Math.floor(bytes) : undefined;
 }
 
 async function captureElementWithSnapdom(
@@ -528,11 +559,15 @@ async function captureElementWithSnapdom(
     width: number;
     height: number;
     pixelRatio: number;
+    format: 'png' | 'jpeg';
+    quality: number;
+    maxBytes?: number;
   },
 ): Promise<string> {
-  const testSnapdomToPng = (globalThis as RuntimeExportCoreTestGlobal).__AXHUB_RUNTIME_EXPORT_CORE_TEST_SNAPDOM_TO_PNG__;
+  const testGlobal = globalThis as RuntimeExportCoreTestGlobal;
+  const testSnapdomToPng = testGlobal.__AXHUB_RUNTIME_EXPORT_CORE_TEST_SNAPDOM_TO_PNG__;
   const snapdomToPng = testSnapdomToPng ?? snapdom.toPng;
-  const image = await snapdomToPng(element, {
+  const baseOptions: SnapdomOptions = {
     width: options.width,
     height: options.height,
     dpr: options.pixelRatio,
@@ -544,8 +579,40 @@ async function captureElementWithSnapdom(
     placeholders: false,
     outerTransforms: false,
     outerShadows: false,
-  });
-  return getSnapdomPngDataUrl(image);
+  };
+
+  if (options.format === 'png') {
+    const image = await snapdomToPng(element, baseOptions);
+    return getSnapdomDataUrl(image, 'png');
+  }
+
+  const testSnapdomToJpg = testGlobal.__AXHUB_RUNTIME_EXPORT_CORE_TEST_SNAPDOM_TO_JPG__;
+  const snapdomToJpg = testSnapdomToJpg ?? snapdom.toJpg;
+  let quality = options.quality;
+  let pixelRatio = options.pixelRatio;
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const image = await snapdomToJpg(element, {
+      ...baseOptions,
+      dpr: pixelRatio,
+      format: 'jpeg',
+      quality,
+    });
+    const dataUrl = getSnapdomDataUrl(image, 'jpeg');
+    const byteLength = getDataUrlByteLength(dataUrl);
+    if (!options.maxBytes || byteLength <= options.maxBytes) {
+      return dataUrl;
+    }
+
+    const sizeRatio = options.maxBytes / byteLength;
+    if (quality > 0.35) {
+      quality = Math.max(0.35, Math.min(quality - 0.05, quality * sizeRatio * 0.95));
+    } else {
+      pixelRatio = Math.max(0.1, pixelRatio * Math.min(0.9, Math.sqrt(sizeRatio) * 0.95));
+    }
+  }
+
+  throw new Error(`snapdom could not compress screenshot below ${options.maxBytes} bytes`);
 }
 
 export function copyDocumentForFigmaNewOfficialClipboard(selector: string | Element = 'body') {
@@ -572,11 +639,15 @@ export async function captureDocumentScreenshot(
   const targetWidth = positiveNumber(options.targetWidth);
   const targetHeight = positiveNumber(options.targetHeight);
   const targetPixelRatio = positivePixelRatio(options.targetPixelRatio);
+  const format = options.format === 'jpeg' || options.format === 'jpg' ? 'jpeg' : 'png';
+  const quality = normalizedQuality(options.quality);
+  const maxBytes = positiveByteLimit(options.maxBytes);
+  const captureViewport = options.scope === 'viewport';
   const restoreScreenshotLayout = installScreenshotLayoutOverride(element, {
     targetWidth,
     targetHeight,
   });
-  const restoreScrollOrigin = installScreenshotScrollOrigin(element);
+  const restoreScrollOrigin = captureViewport ? () => undefined : installScreenshotScrollOrigin(element);
   if (targetWidth || targetHeight) {
     await settleScreenshotLayout();
   }
@@ -586,8 +657,8 @@ export async function captureDocumentScreenshot(
   try {
     await settleScreenshotLayout();
     const measuredSize = collectScreenshotSize(element);
-    const width = measuredSize.width;
-    const height = measuredSize.height;
+    const width = captureViewport ? targetWidth ?? Math.max(1, window.innerWidth) : measuredSize.width;
+    const height = captureViewport ? targetHeight ?? Math.max(1, window.innerHeight) : measuredSize.height;
     applyScreenshotBoxSize(element, document.documentElement instanceof HTMLElement ? document.documentElement : null, document.body instanceof HTMLElement ? document.body : null, {
       width,
       height,
@@ -598,6 +669,9 @@ export async function captureDocumentScreenshot(
       width,
       height,
       pixelRatio,
+      format,
+      quality,
+      maxBytes,
     });
 
     return { dataUrl, width, height };

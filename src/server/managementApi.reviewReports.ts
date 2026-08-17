@@ -40,7 +40,7 @@ interface ReviewReportsApiHandlers {
     req: IncomingMessage,
     res: ServerResponse,
     options: ManagementApiOptions,
-    mode: 'active-fallback',
+    mode: 'explicit-required',
     body?: unknown,
   ) => ReviewReportsProjectContext | null;
   createProjectContextFromBody: (
@@ -592,7 +592,7 @@ export function handleReviewReportsApi(
   }
 
   if (pathname === '/api/review-reports/lan-submit-config' && req.method === 'GET') {
-    const context = handlers.resolveProjectContext(req, res, options, 'active-fallback');
+    const context = handlers.resolveProjectContext(req, res, options, 'explicit-required');
     if (!context) return true;
     const prototypeId = getRequiredPrototypeId(res, url.searchParams.get('prototypeId'));
     if (!prototypeId) return true;
@@ -631,7 +631,7 @@ export function handleReviewReportsApi(
   }
 
   if (pathname === '/api/review-reports/exists' && req.method === 'GET') {
-    const context = handlers.resolveProjectContext(req, res, options, 'active-fallback');
+    const context = handlers.resolveProjectContext(req, res, options, 'explicit-required');
     if (!context) return true;
     const prototypeId = getRequiredPrototypeId(res, url.searchParams.get('prototypeId'));
     if (!prototypeId) return true;
@@ -659,7 +659,7 @@ export function handleReviewReportsApi(
   }
 
   if (pathname === '/api/review-reports' && req.method === 'GET') {
-    const context = handlers.resolveProjectContext(req, res, options, 'active-fallback');
+    const context = handlers.resolveProjectContext(req, res, options, 'explicit-required');
     if (!context) return true;
     const prototypeId = String(url.searchParams.get('prototypeId') || '').trim();
     const prototypeDir = getPrototypeContext(res, context, prototypeId);
@@ -705,7 +705,7 @@ export function handleReviewReportsApi(
   }
 
   if (detailMatch && req.method === 'GET') {
-    const context = handlers.resolveProjectContext(req, res, options, 'active-fallback');
+    const context = handlers.resolveProjectContext(req, res, options, 'explicit-required');
     if (!context) return true;
     const prototypeId = String(url.searchParams.get('prototypeId') || '').trim();
     const prototypeDir = getPrototypeContext(res, context, prototypeId);

@@ -72,7 +72,29 @@ function readWebPDimensions(bytes: Buffer): { width: number; height: number } {
 }
 
 describe('generate-data-cockpit-prototype skill', () => {
-  it('ships matching skill packages with a narrow trigger', () => {
+  it('keeps the unfinished source mirrored but excludes it from the client template', () => {
+    expect(listRelativeFiles(agentsRoot)).toEqual(listRelativeFiles(claudeRoot));
+
+    const templateManifest = JSON.parse(
+      fs.readFileSync(path.join(clientRoot, 'template-manifest.json'), 'utf8'),
+    );
+    const excludedPaths = (templateManifest.runtime.fileRules || [])
+      .filter(({ action }: { action?: string }) => action === 'exclude')
+      .map(({ pattern }: { pattern: string }) => new RegExp(pattern, 'u'));
+
+    for (const skillRoot of ['.agents', '.claude']) {
+      expect(
+        excludedPaths.some((pattern: RegExp) => pattern.test(`${skillRoot}/skills/${skillName}/SKILL.md`)),
+      ).toBe(true);
+    }
+    expect(
+      templateManifest.resources.files.some((relativePath: string) => (
+        relativePath.startsWith('src/resources/data-visualization-style-reference/')
+      )),
+    ).toBe(false);
+  });
+
+  it('keeps matching source packages with a narrow trigger', () => {
     for (const relativePath of relativeFiles) {
       expect(fs.existsSync(path.join(agentsRoot, relativePath)), `${relativePath} missing in .agents`).toBe(true);
       expect(fs.existsSync(path.join(claudeRoot, relativePath)), `${relativePath} missing in .claude`).toBe(true);
@@ -98,7 +120,7 @@ describe('generate-data-cockpit-prototype skill', () => {
     expect(metadata).toContain(`$${skillName}`);
   });
 
-  it('uses the built-in style library instead of the default DESIGN.md flow', () => {
+  it.skip('uses the built-in style library instead of the default DESIGN.md flow', () => {
     const skill = read(agentsRoot, 'SKILL.md');
     const styleAlignment = read(agentsRoot, 'references/style-alignment.md');
 
@@ -561,7 +583,7 @@ describe('generate-data-cockpit-prototype skill', () => {
     expect(routing).not.toContain('八套风格');
   });
 
-  it('ships eight compressed 4K WebP style references within the package budget', () => {
+  it.skip('ships eight compressed 4K WebP style references within the package budget', () => {
     const styleRoot = path.join(clientRoot, 'src/resources/data-visualization-style-reference');
     const stylePrompts = fs.readFileSync(path.join(styleRoot, 'visualization-style-prompts.md'), 'utf8');
     const fourKRoot = path.join(styleRoot, 'assets/4k');

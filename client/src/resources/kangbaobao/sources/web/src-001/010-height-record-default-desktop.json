@@ -1,0 +1,254 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 10,
+  "pageId": "vzxuv9",
+  "pageName": "身高记录",
+  "sitemapPath": "首页 / 身高记录",
+  "requestedPath": "身高记录.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.59.00/%E8%BA%AB%E9%AB%98%E8%AE%B0%E5%BD%95.html",
+  "dataUrl": "http://127.0.0.1:32768/20.59.00/files/%E8%BA%AB%E9%AB%98%E8%AE%B0%E5%BD%95/data.js",
+  "generationDate": "2026-08-14T12:59:00.537Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 身高\n- paragraph: 体重\n- paragraph: \"90\"\n- paragraph: \"80\"\n- paragraph: \"70\"\n- paragraph: \"60\"\n- paragraph: \"50\"\n- paragraph: \"0\"\n- paragraph: 出生\n- paragraph: 8个月\n- paragraph: 1年\n- paragraph: 16个月\n- paragraph: 2年\n- paragraph: 单位：cm\n- paragraph: \"50.0\"\n- paragraph: \"58.0\"\n- paragraph: \"70.0\"\n- paragraph: \"82.0\"\n- paragraph: \"85.0\"\n- paragraph: 曲线\n- paragraph: 记录\n- paragraph: 添加记录\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "010-height-record-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "导航",
+    "B",
+    "曲线/记录",
+    "面积图",
+    "背景",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [],
+  "panels": [
+    {
+      "scope": "page:身高记录 / 曲线/记录",
+      "label": "曲线/记录",
+      "visible": true,
+      "states": [
+        "曲线",
+        "记录"
+      ]
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:身高记录 / 导航 / B",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 身高记录 in Current window",
+      "target": "身高记录.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:身高记录 / 导航 / B",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 体重记录 in Current window",
+      "target": "体重记录.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:身高记录 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:身高记录 / 曲线/记录 / state:记录 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 增加/编辑记录 in Current window",
+      "target": "增加_编辑记录.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:身高记录 / 曲线/记录 / state:记录 / Group / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 增加/编辑记录 in Current window",
+      "target": "增加_编辑记录.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:身高记录 / 曲线/记录 / state:记录 / Group / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 增加/编辑记录 in Current window",
+      "target": "增加_编辑记录.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:身高记录 / 曲线/记录 / state:记录 / Group / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 增加/编辑记录 in Current window",
+      "target": "增加_编辑记录.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:身高记录 / 曲线/记录 / state:记录 / Group / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 增加/编辑记录 in Current window",
+      "target": "增加_编辑记录.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:身高记录 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:身高记录 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set 曲线/记录 to&nbsp; to 曲线 ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:身高记录 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:身高记录 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set 曲线/记录 to&nbsp; to 记录 ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:身高记录 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 增加/编辑记录 in Current window",
+      "target": "增加_编辑记录.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

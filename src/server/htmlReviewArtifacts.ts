@@ -98,8 +98,66 @@ function slugify(value: string): string {
     .slice(0, 72);
 }
 
+function resolveHtmlDocumentScope(documentPath: string): {
+  documentRoot: '' | 'templates' | 'src/resources';
+  relativePath: string;
+} | null {
+  const documentRoot = documentPath.startsWith('templates/')
+    ? 'templates'
+    : documentPath.startsWith('src/resources/')
+      ? 'src/resources'
+      : '';
+  const scopedPath = documentRoot
+    ? documentPath.slice(`${documentRoot}/`.length)
+    : documentPath;
+  const relativePath = normalizeProjectHtmlRelativePath(scopedPath);
+  return relativePath ? { documentRoot, relativePath } : null;
+}
+
+function normalizeProjectHtmlRelativePath(value: unknown): string {
+  const raw = String(value || '').trim().replace(/\\/gu, '/');
+  if (!raw || raw.includes('\0') || path.posix.isAbsolute(raw) || path.win32.isAbsolute(raw)) return '';
+  const normalized = path.posix.normalize(raw).replace(/^\.\/+|\/+$/gu, '');
+  if (!normalized || normalized === '.') return '';
+  const segments = normalized.split('/');
+  if (
+    segments.some((segment) => !segment || segment === '.' || segment === '..')
+    || segments.some((segment) => segment === '.git' || segment === '.axhub')
+  ) {
+    return '';
+  }
+  return normalized;
+}
+
+function isRealPathInside(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate);
+  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
+}
+
+function isExistingPathSafe(rootPath: string, candidatePath: string): boolean {
+  try {
+    const realRootPath = fs.realpathSync.native(rootPath);
+    let existingPath = candidatePath;
+    while (!fs.existsSync(existingPath)) {
+      const parentPath = path.dirname(existingPath);
+      if (parentPath === existingPath) return false;
+      existingPath = parentPath;
+    }
+    return isRealPathInside(realRootPath, fs.realpathSync.native(existingPath));
+  } catch {
+    return false;
+  }
+}
+
 function sidecarPaths(documentPath: string, key: string, kind: HtmlReviewDiagramDescriptor['kind']) {
-  const assetsPath = documentPath.slice(0, -'.html'.length) + '.assets';
+  const scope = resolveHtmlDocumentScope(documentPath);
+  if (!scope) {
+    throw new Error('Invalid HTML review document path');
+  }
+  const assetRelativePath = `.assets/${scope.relativePath}`;
+  const assetsPath = scope.documentRoot
+    ? `${scope.documentRoot}/${assetRelativePath}`
+    : assetRelativePath;
   const extension = kind === 'mermaid' ? '.excalidraw' : '.drawio.svg';
   return {
     sourcePath: `${assetsPath}/diagrams/${key}${extension}`,
@@ -116,7 +174,9 @@ function resolveLinkedDrawioProjectPath(documentPath: string, sourceUrl: string)
     // Keep the encoded path when it cannot be decoded safely.
   }
   const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(documentPath), cleanUrl));
-  return resolved.startsWith('src/resources/') ? resolved : '';
+  const scope = resolveHtmlDocumentScope(documentPath);
+  if (!scope || resolved.startsWith('../') || path.posix.isAbsolute(resolved)) return '';
+  return !scope.documentRoot || resolved.startsWith(`${scope.documentRoot}/`) ? resolved : '';
 }
 
 function sourceSlice(html: string, node: Parse5Node): string {
@@ -219,8 +279,7 @@ export function resolveHtmlReviewDocument(
 ): HtmlReviewDocumentResolution | null {
   const raw = String(resourcePath || '').trim().replace(/\\/gu, '/');
   if (
-    !raw.startsWith('src/resources/')
-    || raw.includes('\0')
+    raw.includes('\0')
     || raw.split('/').some((segment) => segment === '..' || segment === '.')
     || path.posix.isAbsolute(raw)
     || path.win32.isAbsolute(raw)
@@ -228,13 +287,28 @@ export function resolveHtmlReviewDocument(
   ) {
     return null;
   }
-  const normalized = path.posix.normalize(raw);
-  const resourcesDir = path.resolve(projectRoot, 'src/resources');
+  const scope = resolveHtmlDocumentScope(raw);
+  if (!scope) {
+    return null;
+  }
+  const normalized = scope.documentRoot
+    ? `${scope.documentRoot}/${scope.relativePath}`
+    : scope.relativePath;
+  const resourcesDir = scope.documentRoot
+    ? path.resolve(projectRoot, ...scope.documentRoot.split('/'))
+    : path.resolve(projectRoot);
   const absolutePath = path.resolve(projectRoot, ...normalized.split('/'));
-  if (!isPathInside(resourcesDir, absolutePath) || !isPathInside(projectRoot, absolutePath)) return null;
-  const assetsPath = normalized.replace(/\.html?$/iu, '.assets');
-  const absoluteAssetsPath = path.resolve(projectRoot, ...assetsPath.split('/'));
-  if (!isPathInside(resourcesDir, absoluteAssetsPath)) return null;
+  if (
+    !isPathInside(resourcesDir, absolutePath)
+    || !isPathInside(projectRoot, absolutePath)
+    || !isExistingPathSafe(resourcesDir, absolutePath)
+  ) return null;
+  const assetRelativePath = `.assets/${scope.relativePath}`;
+  const absoluteAssetsPath = path.resolve(resourcesDir, ...assetRelativePath.split('/'));
+  if (!assetRelativePath || !absoluteAssetsPath || !isExistingPathSafe(resourcesDir, absoluteAssetsPath)) return null;
+  const assetsPath = scope.documentRoot
+    ? `${scope.documentRoot}/${assetRelativePath}`
+    : assetRelativePath;
   return { documentPath: normalized, absolutePath, resourcesDir, assetsPath, absoluteAssetsPath };
 }
 
@@ -339,7 +413,11 @@ function resolveLinkedDrawioSource(
   if (descriptor.source) return descriptor.source;
   const cleanUrl = descriptor.sourceUrl.split(/[?#]/u)[0];
   const absolutePath = path.resolve(path.dirname(resolution.absolutePath), ...cleanUrl.split('/'));
-  if (!isPathInside(resolution.resourcesDir, absolutePath) || !fs.statSync(absolutePath).isFile()) {
+  if (
+    !isPathInside(resolution.resourcesDir, absolutePath)
+    || !isExistingPathSafe(resolution.resourcesDir, absolutePath)
+    || !fs.statSync(absolutePath).isFile()
+  ) {
     throw Object.assign(new Error('Linked Draw.io source is unavailable'), { status: 404 });
   }
   const stats = fs.statSync(absolutePath);
@@ -351,6 +429,33 @@ function resolveLinkedDrawioSource(
 
 function publicSession(session: HtmlReviewDraftSession) {
   return { ...session };
+}
+
+function findDraftSessionPath(projectRoot: string, sessionId: string): string {
+  const roots = [
+    path.join(projectRoot, '.assets'),
+    path.join(projectRoot, 'templates', '.assets'),
+    path.join(projectRoot, 'src', 'resources', '.assets'),
+  ];
+  for (const root of roots) {
+    if (!fs.existsSync(root) || !isExistingPathSafe(projectRoot, root)) continue;
+    const queue = [root];
+    while (queue.length > 0) {
+      const directory = queue.shift() as string;
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+        const candidate = path.join(directory, entry.name);
+        if (!isExistingPathSafe(projectRoot, candidate)) continue;
+        if (entry.name === '.sessions') {
+          const filePath = path.join(candidate, `${sessionId}.json`);
+          if (fs.existsSync(filePath) && isExistingPathSafe(projectRoot, filePath)) return filePath;
+          continue;
+        }
+        queue.push(candidate);
+      }
+    }
+  }
+  return '';
 }
 
 export async function handleHtmlReviewArtifactsApi(
@@ -437,24 +542,7 @@ export async function handleHtmlReviewArtifactsApi(
     const sessionMatch = pathname.match(/^\/api\/html-review\/diagram-drafts\/([a-z0-9-]+)$/u);
     if (!sessionMatch) return false;
     const sessionId = sessionMatch[1];
-    const resourcesRoot = path.join(projectRoot, 'src/resources');
-    let foundPath = '';
-    if (fs.existsSync(resourcesRoot)) {
-      const queue = [resourcesRoot];
-      while (queue.length > 0 && !foundPath) {
-        const directory = queue.shift() as string;
-        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-          if (!entry.isDirectory()) continue;
-          const candidate = path.join(directory, entry.name);
-          if (entry.name === '.sessions') {
-            const file = path.join(candidate, `${sessionId}.json`);
-            if (fs.existsSync(file)) foundPath = file;
-            continue;
-          }
-          queue.push(candidate);
-        }
-      }
-    }
+    const foundPath = findDraftSessionPath(projectRoot, sessionId);
     let session = foundPath ? readJsonFile<HtmlReviewDraftSession>(foundPath) : null;
     if (!session) {
       sendJson(res, { error: 'Diagram draft session not found' }, { status: 404 });

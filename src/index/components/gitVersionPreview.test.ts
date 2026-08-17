@@ -36,6 +36,7 @@ describe('git version preview probes', () => {
     await expect(probeGitVersionEntry({
       commitHash: '8b8f52da12345678',
       targetPath: 'prototypes/home',
+      projectId: 'make-project',
     }, failedFetch)).resolves.toBe(false);
   });
 });

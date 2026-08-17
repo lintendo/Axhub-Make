@@ -56,7 +56,12 @@ vi.mock('../localCommand.ts', async (importActual) => {
 });
 
 const { commandExists, runLocalCommand } = await import('../localCommand.ts');
-const { resolveAssistantMakeCorsOrigins, resolveAssistantRuntime } = await import('../assistantRuntime.ts');
+const {
+  resolveAssistantEndpointProbeTimeoutMs,
+  resolveAssistantMakeCorsOrigins,
+  resolveAssistantRuntime,
+  runAssistantBootstrap,
+} = await import('../assistantRuntime.ts');
 const { startMakeServer } = await import('../index');
 const { handleAssistantPromptIde } = await import('../managementApi.assistantIde.ts');
 
@@ -234,11 +239,21 @@ function useLocalAcpUiCheckout() {
   return root;
 }
 
+const ACP_UI_DEFAULT_CORS_ORIGINS = [
+  'http://localhost:53817',
+  'http://127.0.0.1:53817',
+  'chrome-extension://cndglokmgjecikflojjieeeajbljgfae',
+  'chrome-extension://inmihdeflblgkefcngaljagdmhdkghka',
+];
+
 function expectAcpUiCorsArg(args: string[], makeOrigin: string) {
   const corsIndex = args.indexOf('--cors-origin');
   expect(corsIndex).toBeGreaterThanOrEqual(0);
   const origins = String(args[corsIndex + 1] || '').split(',').filter(Boolean);
-  expect(origins).toEqual([new URL(makeOrigin).origin]);
+  expect(origins).toEqual(Array.from(new Set([
+    ...ACP_UI_DEFAULT_CORS_ORIGINS,
+    new URL(makeOrigin).origin,
+  ])));
 }
 
 function normalizeTestPath(value: string): string {
@@ -265,6 +280,7 @@ function expectAcpUiSpawn(params: {
     : expect.arrayContaining(['-y', '@axhub/acp@latest', '--port', params.port, '--cors-origin']));
   expectAcpUiCorsArg(args, params.makeOrigin);
   expect(options.detached).toBe(true);
+  expect(options.stdio).toBe('ignore');
   expect(normalizeTestPath(options.cwd)).toBe(normalizeTestPath(params.cwd));
 }
 
@@ -329,26 +345,93 @@ afterEach(() => {
   }
 });
 
+describe('resolveAssistantEndpointProbeTimeoutMs', () => {
+  it('uses 15 seconds when Axhub Make is started with --dev', () => {
+    expect(resolveAssistantEndpointProbeTimeoutMs({
+      argv: ['node', 'src/server/cli.ts', '--', '--dev'],
+    })).toBe(15_000);
+  });
+
+  it('uses 3 seconds outside Axhub Make development mode', () => {
+    expect(resolveAssistantEndpointProbeTimeoutMs({
+      argv: ['node', 'src/server/cli.ts'],
+    })).toBe(3_000);
+  });
+});
+
 describe('resolveAssistantMakeCorsOrigins', () => {
   it.each([
     'http://localhost:53817',
     'http://127.0.0.1:53817',
-  ])('omits the ACP default Make origin %s', (makeOrigin) => {
+  ])('uses ACP defaults without an override for the default Make origin %s', (makeOrigin) => {
     expect(resolveAssistantMakeCorsOrigins(makeOrigin, { env: {} })).toBe('');
   });
 
-  it('keeps only the current non-default Make origin', () => {
+  it('carries ACP defaults forward before adding a non-default Make origin', () => {
     expect(resolveAssistantMakeCorsOrigins('http://192.168.10.82:53817', { env: {} }))
-      .toBe('http://192.168.10.82:53817');
+      .toBe(`${ACP_UI_DEFAULT_CORS_ORIGINS.join(',')},http://192.168.10.82:53817`);
   });
 
-  it('preserves explicit origins without adding local variants', () => {
+  it('carries ACP defaults forward before explicit origins', () => {
     expect(resolveAssistantMakeCorsOrigins('http://localhost:53817', {
       env: {
         AXHUB_ACP_UI_CORS_ORIGIN: 'https://configured.example.com',
         ACP_UI_CORS_ORIGINS: 'https://second.example.com',
       },
-    })).toBe('https://configured.example.com,https://second.example.com');
+    })).toBe(`${ACP_UI_DEFAULT_CORS_ORIGINS.join(',')},https://configured.example.com,https://second.example.com`);
+  });
+});
+
+describe('assistant runtime process preservation', () => {
+  it('keeps a responsive ACP UI running when auto-start detects missing CORS', async () => {
+    const projectRoot = createTempRoot();
+    const assistant = await startAcpUiServer();
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation((() => true) as any);
+
+    try {
+      const runtime = await resolveAssistantRuntime({
+        projectPath: projectRoot,
+        assistantConfig: {
+          webBaseUrl: assistant.origin,
+          apiBaseUrl: `${assistant.origin}/api`,
+        },
+        autoStart: true,
+        makeOrigin: 'http://localhost:53817',
+      });
+
+      expect(runtime.health.status).toBe('runtime_unreachable');
+      expect(runtime.health.message).toContain('为保留共享服务配置，Make 未自动重启');
+      expect(killSpy).not.toHaveBeenCalled();
+      expect(childProcessMock.spawn).not.toHaveBeenCalled();
+      expect(childProcessMock.spawnSync).not.toHaveBeenCalled();
+    } finally {
+      killSpy.mockRestore();
+    }
+  });
+
+  it('reuses a responsive ACP UI when restart bootstrap is called repeatedly', async () => {
+    const projectRoot = createTempRoot();
+    const assistant = await startAcpUiServer({ cors: true });
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation((() => true) as any);
+
+    try {
+      const runtime = await runAssistantBootstrap({
+        mode: 'restart_existing',
+        projectPath: projectRoot,
+        assistantConfig: {
+          webBaseUrl: assistant.origin,
+          apiBaseUrl: `${assistant.origin}/api`,
+        },
+        makeOrigin: 'http://localhost:53817',
+      });
+
+      expect(runtime.health.status).toBe('ready');
+      expect(killSpy).not.toHaveBeenCalled();
+      expect(childProcessMock.spawn).not.toHaveBeenCalled();
+      expect(childProcessMock.spawnSync).not.toHaveBeenCalled();
+    } finally {
+      killSpy.mockRestore();
+    }
   });
 });
 
@@ -640,7 +723,7 @@ describe('make-server assistant runtime API', () => {
     }
   });
 
-  it('auto-start repairs a local configured ACP endpoint with missing CORS by restarting the same port', async () => {
+  it('does not restart a responsive configured ACP endpoint when CORS is missing', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot);
     const assistantOrigin = 'http://localhost:32125';
@@ -706,25 +789,17 @@ describe('make-server assistant runtime API', () => {
         apiBaseUrl: `${assistantOrigin}/api`,
         source: 'config',
         health: {
-          status: 'ready',
-          commandSource: 'acp-ui',
+          status: 'runtime_unreachable',
+          commandSource: 'config',
         },
         runtime: {
-          available: true,
+          available: false,
         },
       });
-      expect(killSpy).toHaveBeenCalledWith(889, 'SIGTERM');
-      expectAcpUiSpawn({
-        command: 'npx',
-        port: String(assistantPort),
-        cwd: projectRoot,
-        makeOrigin: server.origin,
-      });
-      expect(childProcessMock.spawnSync).not.toHaveBeenCalledWith(
-        'lsof',
-        expect.arrayContaining(['-tiTCP:32124']),
-        expect.any(Object),
-      );
+      expect(body.health.message).toContain('为保留共享服务配置，Make 未自动重启');
+      expect(killSpy).not.toHaveBeenCalled();
+      expect(childProcessMock.spawn).not.toHaveBeenCalled();
+      expect(childProcessMock.spawnSync).not.toHaveBeenCalled();
     } finally {
       fetchSpy.mockRestore();
       killSpy.mockRestore();
@@ -732,7 +807,7 @@ describe('make-server assistant runtime API', () => {
     }
   });
 
-  it('auto-start repairs the default ACP endpoint with missing CORS by restarting 32124', async () => {
+  it('does not restart a responsive default ACP endpoint when CORS is missing', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot);
     let portLookupCount = 0;
@@ -797,25 +872,17 @@ describe('make-server assistant runtime API', () => {
         apiBaseUrl: 'http://localhost:32124/api',
         source: 'default',
         health: {
-          status: 'ready',
-          commandSource: 'acp-ui',
+          status: 'runtime_unreachable',
+          commandSource: 'default',
         },
         runtime: {
-          available: true,
+          available: false,
         },
       });
-      expect(killSpy).toHaveBeenCalledWith(890, 'SIGTERM');
-      expectAcpUiSpawn({
-        command: 'npx',
-        port: '32124',
-        cwd: projectRoot,
-        makeOrigin: server.origin,
-      });
-      expect(childProcessMock.spawn).not.toHaveBeenCalledWith(
-        'npx',
-        expect.arrayContaining(['32125']),
-        expect.any(Object),
-      );
+      expect(body.health.message).toContain('为保留共享服务配置，Make 未自动重启');
+      expect(killSpy).not.toHaveBeenCalled();
+      expect(childProcessMock.spawn).not.toHaveBeenCalled();
+      expect(childProcessMock.spawnSync).not.toHaveBeenCalled();
     } finally {
       fetchSpy.mockRestore();
       killSpy.mockRestore();
@@ -1385,7 +1452,7 @@ describe('make-server assistant runtime API', () => {
     }
   });
 
-  it('starts assistant bootstrap explicitly and returns runtime identity', async () => {
+  it('reuses a healthy ACP UI for repeated assistant bootstrap calls', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot);
     const assistant = await startAcpUiServer({ cors: true });
@@ -1404,13 +1471,11 @@ describe('make-server assistant runtime API', () => {
         body: JSON.stringify({ mode: 'start_existing' }),
       });
       const body = await response.json();
-      const assistantPort = new URL(assistant.origin).port;
-
       expect(response.status).toBe(200);
       expect(body).toMatchObject({
         success: true,
         mode: 'start_existing',
-        message: 'ACP UI 启动命令已触发',
+        message: 'ACP UI 启动或复用检查已完成',
         runtime: {
           webBaseUrl: assistant.origin,
           apiBaseUrl: `${assistant.origin}/api`,
@@ -1420,12 +1485,7 @@ describe('make-server assistant runtime API', () => {
           },
         },
       });
-      expectAcpUiSpawn({
-        command: 'npx',
-        port: assistantPort,
-        cwd: projectRoot,
-        makeOrigin: server.origin,
-      });
+      expect(childProcessMock.spawn).not.toHaveBeenCalled();
       expect(runLocalCommandMock).not.toHaveBeenCalled();
       expect(childProcessMock.spawnSync).not.toHaveBeenCalled();
     } finally {
@@ -1433,7 +1493,7 @@ describe('make-server assistant runtime API', () => {
     }
   });
 
-  it('waits for restarted ACP UI to expose the current Make CORS origin before returning ready', async () => {
+  it('does not restart a healthy ACP UI to repair a missing Make CORS origin', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot);
     writeProjectConfig(projectRoot, {
@@ -1510,21 +1570,18 @@ describe('make-server assistant runtime API', () => {
           webBaseUrl: 'http://localhost:32124',
           apiBaseUrl: 'http://localhost:32124/api',
           health: {
-            status: 'ready',
+            status: 'runtime_unreachable',
           },
           runtime: {
-            available: true,
+            available: false,
           },
         },
       });
-      expect(corsProbeCount).toBeGreaterThanOrEqual(3);
-      expect(killSpy).toHaveBeenCalledWith(999, 'SIGTERM');
-      expectAcpUiSpawn({
-        command: 'npx',
-        port: '32124',
-        cwd: projectRoot,
-        makeOrigin: server.origin,
-      });
+      expect(body.runtime.health.message).toContain('为保留共享服务配置，Make 未自动重启');
+      expect(corsProbeCount).toBe(1);
+      expect(killSpy).not.toHaveBeenCalled();
+      expect(childProcessMock.spawn).not.toHaveBeenCalled();
+      expect(childProcessMock.spawnSync).not.toHaveBeenCalled();
     } finally {
       fetchSpy.mockRestore();
       killSpy.mockRestore();
@@ -1532,7 +1589,7 @@ describe('make-server assistant runtime API', () => {
     }
   });
 
-  it('restarts only a local configured ACP endpoint', async () => {
+  it('does not restart a healthy local configured ACP endpoint', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot);
     const assistantOrigin = 'http://localhost:32125';
@@ -1605,13 +1662,9 @@ describe('make-server assistant runtime API', () => {
           },
         },
       });
-      expect(killSpy).toHaveBeenCalledWith(888, 'SIGTERM');
-      expectAcpUiSpawn({
-        command: 'npx',
-        port: '32125',
-        cwd: projectRoot,
-        makeOrigin: server.origin,
-      });
+      expect(killSpy).not.toHaveBeenCalled();
+      expect(childProcessMock.spawn).not.toHaveBeenCalled();
+      expect(childProcessMock.spawnSync).not.toHaveBeenCalled();
     } finally {
       fetchSpy.mockRestore();
       killSpy.mockRestore();

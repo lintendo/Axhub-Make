@@ -65,6 +65,12 @@ export type CreateDialogTab = 'upload' | 'onlineImport';
 export type PrototypeUploadType = 'make' | 'google_stitch' | 'axure_html' | 'figma_make' | 'v0' | 'google_aistudio';
 export type AiPanelMode = 'general-ai' | 'image-ai' | null;
 
+export interface PromptExecutionMeta {
+    scene: string;
+    targetPath?: string | null;
+    autoSend?: boolean;
+}
+
 export interface PrototypeCreateDialogOpenOptions {
     initialTab: CreateDialogTab;
     initialUploadType?: PrototypeUploadType;
@@ -108,7 +114,7 @@ export interface ExportAvailability {
 export interface CreateDialogState {
     visible: boolean;
     activeTab: TabType;
-    activeProjectId?: string | null;
+    activeProjectId: string;
     initialTab?: CreateDialogTab;
     initialUploadType?: PrototypeUploadType;
     targetPrototypeName?: string;
@@ -122,12 +128,13 @@ export interface CreateDialogState {
 export interface CreateDialogActions {
     onClose: () => void;
     onAfterCreatePromptAction: () => void;
-    onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+    onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
     onUploadSuccess?: (result?: any) => void | Promise<void>;
 }
 
 export interface ExportState {
     open: boolean;
+    projectId: string;
     preferencesStorageKey: string;
     imageConfig: ImageConfig;
     axureCopyOptions: AxureCopyOptions;
@@ -139,7 +146,7 @@ export interface ExportState {
     preferredIDE: MainIDEPreference;
     ideAvailability?: IDEAvailabilityMap;
     assistantOpen?: boolean;
-    onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+    onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
     initialReviewResult?: ReviewResult | null;
     exportAvailability: ExportAvailability;
 }
@@ -189,6 +196,7 @@ export interface NewSidebarState {
     sidebarTrees: Record<SidebarTreeTab, SidebarTreeNode[]>;
     webAgentPanelOpen?: boolean;
     aiPanelMode?: AiPanelMode;
+    externalOpenMenu?: boolean;
     prototypeStartPageActive?: boolean;
     resourceStartDraftActive?: boolean;
     themeStartDraftActive?: boolean;
@@ -268,7 +276,7 @@ export interface NewSidebarActions {
     onOpenAcpWebAgent?: (targetPath?: string, provider?: AcpProvider) => void | Promise<void>;
     onOpenImageAiPanel?: () => void | Promise<void>;
     onOpenWebAgentInPanel?: (url: string) => boolean | void | Promise<boolean | void>;
-    onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+    onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
     onCloseAiPanel?: () => void;
     onCloseWebAgentPanel?: () => void;
     onOpenAISettings?: () => void;
@@ -306,6 +314,10 @@ export interface PresentationAreaState {
     localShareUrl: string;
     quickEditAvailable: boolean;
     quickEditActive?: boolean;
+    prototypeAnnotationSessionActive?: boolean;
+    prototypeAnnotationEnabled?: boolean;
+    prototypeAnnotationEnableLoading?: boolean;
+    prototypeAnnotationPromptCopying?: boolean;
     docEditState?: {
         enabled: boolean;
         dirty: boolean;
@@ -336,11 +348,12 @@ export interface PresentationAreaState {
     allowLAN: boolean;
     projectAccessDeniedReason?: string;
     assistantVisible?: boolean;
+    conversationUiEnabled?: boolean;
     startServerLoading?: boolean;
     containerRef: RefObject<HTMLDivElement>;
     previewIframeRef: MutableRefObject<HTMLIFrameElement | null>;
     secondaryPreviewIframeRef: MutableRefObject<HTMLIFrameElement | null>;
-    handlePreviewIframeLoad?: () => void;
+    handlePreviewIframeLoad?: (iframe?: HTMLIFrameElement | null) => void;
     currentDevice: { id: string; [key: string]: any };
     displaySize: { width: number; height: number };
     scale: number;
@@ -371,6 +384,9 @@ export interface PresentationAreaState {
     excalidrawPropertyPanelPosition?: ExcalidrawPropertyPanelPosition;
     startServerError?: string;
     preferredPromptClient: PromptClientPreference;
+    preferredModel?: string | null;
+    canvasPromptClient?: PromptClientPreference;
+    canvasModel?: string | null;
     preferredIDE: MainIDEPreference;
     standalonePanelOpen?: boolean;
     bridgeConnected?: boolean;
@@ -379,6 +395,7 @@ export interface PresentationAreaState {
     agentAvailability?: RuntimeAgentAvailability;
     webAgentPanelOpen?: boolean;
     aiPanelMode?: AiPanelMode;
+    externalOpenMenu?: boolean;
     assistantApiBaseUrl?: string;
     assistantProjectPath?: string;
     prototypes?: ItemData[];
@@ -386,6 +403,9 @@ export interface PresentationAreaState {
     defaultThemeName?: string | null;
     onOpenPrototypeCreateDialog?: (options: PrototypeCreateDialogOpenOptions) => void;
     onRefreshPrototypes?: (preferredName?: string) => Promise<ItemData[]>;
+    /** Client-only Commentary voice entry supplied by the Make shell. */
+    commentaryVoiceEntry?: React.ReactNode;
+    commentaryVoiceVisible?: boolean;
 }
 
 export interface PresentationAreaActions {
@@ -403,7 +423,12 @@ export interface PresentationAreaActions {
     handleChangeSplitPreviewWidth: (pane: 'primary' | 'secondary', width: number) => void;
     handleChangeSplitPreviewHeight: (pane: 'primary' | 'secondary', height: number) => void;
     handleChangePreviewScaleMode: (mode: PreviewScaleMode) => void;
-    handleOpenWebEditor: () => void;
+    handlePreviewContainerSizeChange: (width: number) => void;
+    handleOpenWebEditor: () => void | Promise<void>;
+    handleOpenPrototypeAnnotationSession: () => void | Promise<void>;
+    handleCheckPrototypeAnnotationEnabled: () => Promise<boolean | null>;
+    handleEnablePrototypeAnnotation: () => Promise<boolean>;
+    handleCopyPrototypeAnnotationPrompt: () => void | Promise<void>;
     handleEnableDocEdit: (mode?: SpecQuickEditMode, options?: { disableSelectionMode?: boolean; preserveSidebar?: boolean }) => void;
     handleSaveDocEdit: () => void;
     handleExitDocEdit: () => void;
@@ -472,16 +497,17 @@ export interface PresentationAreaActions {
     onOpenAcpWebAgent?: (targetPath?: string, provider?: AcpProvider) => void | Promise<void>;
     onOpenImageAiPanel?: () => void | Promise<void>;
     onOpenWebAgentInPanel?: (url: string) => boolean | void | Promise<boolean | void>;
-    onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+    onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
     onCloseAiPanel?: () => void;
     onCloseWebAgentPanel?: () => void;
     onPreferredIDEChange?: (ide: MainIDEPreference) => void;
     onOpenAISettings?: () => void;
-    onCreatePrototypeForDraftStart?: () => Promise<ItemData | null>;
+    onToggleCommentaryVoice?: () => void;
     onUploadResourceFiles?: () => void;
     onCreateResourceCanvasFile?: () => void | Promise<void>;
     onCreateDrawioResourceFile?: () => void | Promise<void>;
     onOpenDesignImport?: () => void;
+    onRefreshThemes?: () => void | Promise<void>;
     onRefreshPrototypes?: (preferredName?: string) => Promise<ItemData[]>;
     agentRunConcurrency?: number;
     onSubmitCanvasAssistantPrompt?: (request: CanvasAiGenerationRequest) => Promise<CanvasAiGenerationResult | boolean> | CanvasAiGenerationResult | boolean;

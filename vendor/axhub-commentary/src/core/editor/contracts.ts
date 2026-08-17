@@ -23,10 +23,13 @@ import type { WebEditorUiSettings } from './ui-settings';
 import type { PromptImageAttachment } from './state';
 import type {
   CommentaryCopyPromptContext,
+  CommentaryAnnotationSaveStatus,
   CommentaryClearEditsOptions,
+  CommentaryClearEditsTarget,
   CommentaryHostResource,
+  CommentaryModifiedElementSummary,
   PrototypeEditCommentsDocument,
-  PrototypeEditCommentTaskStatus,
+  PrototypeEditCommentStatus,
   PrototypeEditCommentsWriteReason,
 } from '../../web-editor-types';
 import type { TextComment } from '../../selection/text-comment-manager';
@@ -39,9 +42,12 @@ export interface ConfirmDialogOptions {
   title: string;
   content?: string;
   confirmText: string;
+  secondaryConfirmText?: string;
   cancelText?: string;
   confirmTone?: 'primary' | 'default';
 }
+
+export type ConfirmDialogResult = boolean | 'secondary';
 
 export interface AlertDialogOptions {
   title: string;
@@ -66,7 +72,7 @@ export interface PromptDialogOptions {
 }
 
 export interface EditorFeedbackService {
-  confirm(options: ConfirmDialogOptions): Promise<boolean>;
+  confirm(options: ConfirmDialogOptions): Promise<ConfirmDialogResult>;
   alert(options: AlertDialogOptions): Promise<void>;
   prompt(options: PromptDialogOptions): Promise<string | null>;
   toast(type: 'success' | 'info' | 'warning' | 'error', content: string): void;
@@ -100,6 +106,19 @@ export interface AgentProviderAvailability {
 
 export type SessionActivityListener = (item: SessionActivityItem) => void;
 
+export interface PersistedConversationTask {
+  commentId: string;
+  provider: string;
+  sessionId: string;
+  requestId: string;
+}
+
+export interface ConversationTaskTerminalTransition extends PersistedConversationTask {
+  state: 'completed' | 'error';
+  error?: string | null;
+  code?: string | null;
+}
+
 export type MoveSummary = {
   label: string;
   locator: ElementLocator;
@@ -128,6 +147,7 @@ export interface EditorSummariesService {
   formatElementLabelFromLocator(locator: ElementLocator): string;
   collectTextChanges(): CommentaryTextChange[];
   collectTargetedTextChanges(): CommentaryTargetedTextChange[];
+  collectModifiedElementSummaries(): CommentaryModifiedElementSummary[];
   collectStyleCss(): string;
   collectStyleChanges(): CommentaryStyleChangeSet;
   collectMoveSummaries(transactions: readonly Transaction[]): MoveSummary[];
@@ -159,7 +179,17 @@ export interface EditorChangesService {
   clearPendingSelectionAnchor(): void;
   renderChangeMarkers(): void;
   syncEditMetaWithTransactions(): void;
-  setNoteForElement(element: Element | null, note: string, options?: { skillIds?: readonly string[] }): void;
+  setNoteForElement(
+    element: Element | null,
+    note: string,
+    options?: {
+      skillIds?: readonly string[];
+      voiceCreateOperationId?: string;
+      voiceTargetRef?: string;
+      voiceTarget?: import('../../web-editor-types').CommentaryPageElementSummary;
+      anchorPlacement?: 'target';
+    },
+  ): string | null;
   getImagesForElement(element: Element | null): PromptImageAttachment[];
   setImagesForElement(element: Element | null, images: readonly PromptImageAttachment[]): void;
   recordTweakValuesForElement(
@@ -214,20 +244,37 @@ export interface EditorPersistenceService {
   clearAgentConversationState(scopeKey: string): void;
   readAgentTaskStates(scopeKey: string): PersistedElementAgentTaskState[];
   writeAgentTaskStates(scopeKey: string, tasks: PersistedElementAgentTaskState[]): void;
+  discardAgentTaskStates(
+    scopeKeys: readonly string[],
+    elementKeys: readonly WebEditorElementKey[],
+  ): void;
   pruneExpiredAgentTaskStates(scopeKey: string): void;
   recordCommentTaskState?(
     elementKey: WebEditorElementKey,
-    state: PrototypeEditCommentTaskStatus,
+    state: PrototypeEditCommentStatus,
     taskRef?: Partial<ExternalEditingTaskRef> | null,
   ): void;
+  getCommentTaskState?(
+    elementKey: WebEditorElementKey,
+  ): PrototypeEditCommentStatus | null;
+  resetTerminalCommentStateForElement(elementKey: WebEditorElementKey): boolean;
+  waitForPendingWrites(): Promise<void>;
+  getSaveStatus(): CommentaryAnnotationSaveStatus;
+  listEditingConversationTasks(): PersistedConversationTask[];
+  transitionConversationTaskTerminal(
+    input: ConversationTaskTerminalTransition,
+  ): Promise<boolean>;
   clearCommentRecord?(elementKey: WebEditorElementKey): void;
   scheduleWrite(): void;
   persistFromTransactions(): void;
   flushPendingWrite(reason?: PrototypeEditCommentsWriteReason): void;
-  restoreCachedChanges(): Promise<void>;
+  restoreCachedChanges(): Promise<WebEditorElementKey[]>;
   getPersistedPrototypeCommentsDocument(): PrototypeEditCommentsDocument | null;
   clearCachedChanges(kind: 'text' | 'style'): void;
-  clearStorage(scope?: CommentaryClearEditsOptions['scope']): void;
+  clearStorage(
+    scope?: CommentaryClearEditsOptions['scope'],
+    target?: CommentaryClearEditsTarget,
+  ): void | Promise<void>;
 }
 
 export interface EditorTextSessionService {
@@ -239,10 +286,15 @@ export interface EditorTextSessionService {
 
 export interface EditorInteractionService {
   handleHover(element: Element | null): void;
+  activatePageTarget(
+    element: Element,
+    selectionAnchor?: { clientX: number; clientY: number },
+  ): boolean;
   handleSelect(
     element: Element,
     modifiers: EventModifiers,
     selectionAnchor?: { clientX: number; clientY: number },
+    initialSelectionElement?: Element,
   ): Promise<void>;
   handleDeselect(): void;
   handlePositionUpdate(rects: TrackedRects): void;
@@ -337,6 +389,7 @@ export interface EditorAgentBridgeService {
     prompt: string | ((element: Element) => string),
   ): Promise<void>;
   handleSendPromptToAgentForElement(element: Element, prompt: string): Promise<void>;
+  discardDeletedElementStates?(elementKeys: readonly WebEditorElementKey[]): void;
   rehydratePersistedAgentState(): void;
 }
 
@@ -355,8 +408,15 @@ export interface EditorIntegrationWsService {
 
 export interface EditorLocalActionsService {
   handleCopyPrompt(): Promise<void>;
-  handleClearEdits(options?: CommentaryClearEditsOptions): Promise<void>;
+  handleClearEdits(
+    options?: CommentaryClearEditsOptions,
+  ): Promise<CommentaryClearEditsTarget | null>;
   handleClearElementEdits(element: Element): Promise<boolean>;
+}
+
+export interface EditorConversationTaskMonitor {
+  reconcile(): void;
+  stop(): void;
 }
 
 export interface EditorServices {
@@ -368,6 +428,7 @@ export interface EditorServices {
   interaction: EditorInteractionService;
   agentBridge: EditorAgentBridgeService;
   integrationWs?: EditorIntegrationWsService;
+  conversationTaskMonitor?: EditorConversationTaskMonitor;
   localActions: EditorLocalActionsService;
 }
 

@@ -1,0 +1,381 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "sourceName": "TRAE 官网与 generate-theme 工作流",
+    "originalDetailUrl": "https://github.com/lintendo/Axhub-Skills/blob/main/skills/generate-theme/SKILL.md",
+    "websiteUrl": "https://www.trae.cn/",
+    "capturedAt": "2026-08-14T12:31:43.832Z",
+    "captureMethod": "pnpm run capture:theme-source",
+    "localPaths": [
+      ".local/theme-capture-trae/screenshot.png",
+      ".local/theme-capture-trae/responsive/desktop.png",
+      ".local/theme-capture-trae/responsive/tablet.png",
+      ".local/theme-capture-trae/responsive/mobile.png",
+      ".local/theme-capture-trae/theme.json",
+      ".local/theme-capture-trae/computed-tokens.json"
+    ],
+    "coverage": "公开首页默认态；1440、768、390 三视口；computed tokens 与 CSS Variables",
+    "conversionNotes": "截图用于布局和视觉层级事实，官网 CSS Variables 用于精确 token；排除浏览器默认边框、追踪像素与未展示状态。"
+  },
+  "identity": {
+    "id": "trae-web-2026-08",
+    "slug": "trae",
+    "brand": "TRAE",
+    "titleZh": "TRAE 设计系统",
+    "titleEn": "TRAE Design System",
+    "descriptionZh": "从 TRAE 中国官网反推的暗色开发者工具主题，以荧光绿、直角控件、真实产品截图和克制层级为核心。",
+    "descriptionEn": "A dark developer-tool system derived from TRAE China, built on fluorescent green, square controls, real product imagery, and restrained depth."
+  },
+  "tags": {
+    "sourceTags": [
+      "official-website",
+      "responsive-capture",
+      "css-variables"
+    ],
+    "generatedTags": [
+      "saas-devtool",
+      "dark-ui",
+      "ai-ide",
+      "developer-tools"
+    ],
+    "designTags": [
+      "high-contrast",
+      "square-controls",
+      "fluorescent-green",
+      "product-imagery"
+    ],
+    "distributionTags": [
+      "开发者工具",
+      "AI IDE",
+      "深色界面",
+      "SaaS",
+      "技术产品",
+      "品牌展示",
+      "响应式"
+    ]
+  },
+  "assets": {
+    "designMd": {
+      "path": "DESIGN.md",
+      "method": "derived_from_official_website_evidence"
+    },
+    "sources": {
+      "path": "SOURCES.md"
+    },
+    "plan": {
+      "path": "PLAN.md"
+    },
+    "tailwind": {
+      "path": "tw.css"
+    },
+    "tokens": {
+      "path": "assets/tokens.json",
+      "method": "derived_from_design_md"
+    },
+    "previewHtml": {
+      "type": "local-preview",
+      "path": "assets/official-homepage.webp",
+      "publicPath": "assets/official-homepage.webp",
+      "importPath": "./assets/official-homepage.webp?url",
+      "sourcePath": "assets/official-homepage.webp"
+    }
+  },
+  "tokens": {
+    "palette": [
+      "#32F08C",
+      "#0FDC78",
+      "#0A0B0D",
+      "#121314",
+      "#171A1C",
+      "#F5F9FE",
+      "#A6AAB5",
+      "#787D87",
+      "#FFFFFF1F",
+      "#387BFF",
+      "#26A57B",
+      "#F64D46"
+    ],
+    "colors": {
+      "background": "#0A0B0D",
+      "surface": "#121314",
+      "surfaceRaised": "#171A1C",
+      "overlay1": "#EDEFF20A",
+      "overlay2": "#EDEFF214",
+      "overlay3": "#EDEFF221",
+      "brand": "#32F08C",
+      "brandHover": "#0FDC78",
+      "brandDisabled": "#32F08C4D",
+      "foreground": "#F5F9FE",
+      "mutedForeground": "#A6AAB5",
+      "tertiaryForeground": "#787D87",
+      "border": "#FFFFFF1F",
+      "borderSubtle": "#FFFFFF0F",
+      "info": "#387BFF",
+      "success": "#26A57B",
+      "warning": "#DC8730",
+      "destructive": "#F64D46",
+      "brandGradient": "linear-gradient(90deg, #3EE1A3 0%, #32F08C 36%, #60F2BD 71.63%, #A0FDE7 100%)"
+    },
+    "typography": {
+      "display": "Inter",
+      "body": "Inter",
+      "mono": "JetBrains Mono",
+      "fontFamily": {
+        "display": "Inter, PingFang SC, Microsoft YaHei, sans-serif",
+        "body": "Inter, PingFang SC, Microsoft YaHei, sans-serif",
+        "mono": "JetBrains Mono, SFMono-Regular, Consolas, monospace"
+      },
+      "fontSize": {
+        "display1": "72px",
+        "heading1": "56px",
+        "heading2": "48px",
+        "subhead": "24px",
+        "body1": "18px",
+        "body2": "16px",
+        "body3": "14px",
+        "caption": "12px",
+        "code": "13px"
+      },
+      "lineHeight": {
+        "display1": "1.1",
+        "heading": "1.2",
+        "subhead": "1.3",
+        "body": "1.6",
+        "ui": "1.2",
+        "code": "1.3"
+      },
+      "fontWeight": {
+        "regular": 400,
+        "medium": 500,
+        "semibold": 600
+      },
+      "letterSpacing": {
+        "default": "0",
+        "ui": "0.025em"
+      }
+    },
+    "radius": {
+      "control": "0px",
+      "card": "4px",
+      "preview": "0px",
+      "micro": "2px"
+    },
+    "spacing": {
+      "xxs": "2px",
+      "xs": "4px",
+      "sm": "8px",
+      "md": "12px",
+      "lg": "16px",
+      "xl": "24px",
+      "2xl": "32px",
+      "3xl": "48px",
+      "section": "80px",
+      "sectionLg": "100px"
+    },
+    "borders": {
+      "subtle": "1px solid #FFFFFF0F",
+      "default": "1px solid #FFFFFF1F",
+      "strong": "1px solid #FFFFFF2E",
+      "brand": "1px solid #32F08C"
+    },
+    "shadows": {
+      "control": "0 1px 3px rgba(0, 0, 0, 0.10), 0 1px 2px -1px rgba(0, 0, 0, 0.10)",
+      "focusRing": "0 0 0 2px #0A0B0D, 0 0 0 4px #32F08C"
+    },
+    "motion": {
+      "fast": "150ms cubic-bezier(0.4, 0, 0.2, 1)",
+      "base": "200ms ease",
+      "slow": "300ms ease"
+    }
+  },
+  "previewImages": [
+    {
+      "type": "local-preview",
+      "path": "assets/official-homepage.webp"
+    }
+  ],
+  "display": {
+    "brand": "TRAE 设计系统",
+    "brandAlias": "TRAE",
+    "description": "暗色开发者工具主题，以荧光绿单一强调、直角控件、真实产品界面和克制层级组织页面。",
+    "descriptionEn": "A dark developer-tool theme with one fluorescent-green accent, square controls, real product UI, and restrained depth.",
+    "variant": "saas-devtool",
+    "distributionTags": [
+      "开发者工具",
+      "AI IDE",
+      "深色界面",
+      "SaaS",
+      "技术产品",
+      "品牌展示",
+      "响应式"
+    ],
+    "fontStylesheets": [],
+    "palette": [
+      {
+        "color": "#32F08C",
+        "labelZh": "品牌主色",
+        "labelEn": "Brand",
+        "textColor": "#0A0B0D"
+      },
+      {
+        "color": "#0FDC78",
+        "labelZh": "主色悬停",
+        "labelEn": "Brand Hover",
+        "textColor": "#0A0B0D"
+      },
+      {
+        "color": "#0A0B0D",
+        "labelZh": "页面背景",
+        "labelEn": "Background",
+        "textColor": "#F5F9FE"
+      },
+      {
+        "color": "#121314",
+        "labelZh": "基础表面",
+        "labelEn": "Surface",
+        "textColor": "#F5F9FE"
+      },
+      {
+        "color": "#171A1C",
+        "labelZh": "抬升表面",
+        "labelEn": "Raised Surface",
+        "textColor": "#F5F9FE"
+      },
+      {
+        "color": "#F5F9FE",
+        "labelZh": "主要文本",
+        "labelEn": "Foreground",
+        "textColor": "#0A0B0D"
+      },
+      {
+        "color": "#A6AAB5",
+        "labelZh": "次要文本",
+        "labelEn": "Muted Text",
+        "textColor": "#0A0B0D"
+      },
+      {
+        "color": "#787D87",
+        "labelZh": "三级文本",
+        "labelEn": "Tertiary Text",
+        "textColor": "#F5F9FE"
+      },
+      {
+        "color": "#387BFF",
+        "labelZh": "信息状态",
+        "labelEn": "Info",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#26A57B",
+        "labelZh": "成功状态",
+        "labelEn": "Success",
+        "textColor": "#FFFFFF"
+      },
+      {
+        "color": "#DC8730",
+        "labelZh": "警告状态",
+        "labelEn": "Warning",
+        "textColor": "#0A0B0D"
+      },
+      {
+        "color": "#F64D46",
+        "labelZh": "错误状态",
+        "labelEn": "Error",
+        "textColor": "#FFFFFF"
+      }
+    ],
+    "shadows": [
+      {
+        "label": "控件轻阴影 - Control",
+        "value": "0 1px 3px rgba(0,0,0,.10), 0 1px 2px -1px rgba(0,0,0,.10)",
+        "cssValue": "0 1px 3px rgba(0,0,0,.10), 0 1px 2px -1px rgba(0,0,0,.10)",
+        "description": "只用于需要与相邻暗色表面分离的按钮，不作为卡片默认层级。"
+      }
+    ],
+    "borders": [
+      {
+        "label": "轻分割 - Subtle",
+        "value": "#FFFFFF0F",
+        "cssValue": "#FFFFFF0F",
+        "description": "暗色区块和静态卡片的轻分割线。"
+      },
+      {
+        "label": "默认边框 - Default",
+        "value": "#FFFFFF1F",
+        "cssValue": "#FFFFFF1F",
+        "description": "输入、按钮和可交互面板的默认边界。"
+      },
+      {
+        "label": "品牌边框 - Brand",
+        "value": "#32F08C",
+        "cssValue": "#32F08C",
+        "description": "仅用于 focus、选中和短促品牌强调。"
+      }
+    ],
+    "typography": [
+      "Inter",
+      "Inter",
+      "JetBrains Mono",
+      "PingFang SC",
+      "Microsoft YaHei"
+    ],
+    "previewImages": [
+      {
+        "type": "local-preview",
+        "path": "assets/official-homepage.webp"
+      }
+    ],
+    "panels": [
+      {
+        "eyebrow": "CTA",
+        "title": "直角行动控件",
+        "body": "品牌按钮使用荧光绿与深色文字，描边按钮保持透明底；通过清晰边界而非圆角制造可点击感。"
+      },
+      {
+        "eyebrow": "Surface",
+        "title": "平面分层",
+        "body": "页面背景、基础表面和抬升表面逐级增亮，卡片默认不依赖重阴影。"
+      },
+      {
+        "eyebrow": "Content",
+        "title": "真实产品优先",
+        "body": "开发者场景以真实 IDE、Agent 与工作流截图为主视觉，确保关键界面完整可检查。"
+      }
+    ],
+    "usageGuidance": {
+      "do": [
+        "用 #32F08C 作为唯一高饱和品牌强调，同一视口优先只保留一个主 CTA。",
+        "使用 0px 控件圆角、4px 卡片上限、1px 半透明白边框与暗色表面构建工程感。",
+        "标题使用 Inter 500/600，正文使用 400，代码索引使用 JetBrains Mono。",
+        "产品页面优先展示真实 IDE 与 Agent 状态，并保持图片关键区域完整。",
+        "在 1440、768、390 视口检查导航折叠、CTA 重排和横向内容边界。"
+      ],
+      "dont": [
+        "不要添加第二品牌强调色、紫蓝渐变、装饰光球或大面积彩色背景。",
+        "不要把按钮和标签普遍做成胶囊，也不要给所有卡片添加柔和大阴影。",
+        "不要用玻璃拟态、嵌套卡片或浮动 section 破坏清晰的平面层级。",
+        "不要使用负字距、viewport 字号缩放或低于 14px 的正文。",
+        "不要把未采集的后台表格、弹窗与错误态描述为 TRAE 官方既有组件。"
+      ]
+    },
+    "radius": {
+      "control": "0px",
+      "card": "4px",
+      "preview": "0px",
+      "source": "design-md"
+    },
+    "spacing": {
+      "xxs": "2px",
+      "xs": "4px",
+      "sm": "8px",
+      "md": "12px",
+      "lg": "16px",
+      "xl": "24px",
+      "2xl": "32px",
+      "3xl": "48px",
+      "section": "80px",
+      "sectionLg": "100px"
+    }
+  }
+}
+

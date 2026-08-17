@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>首页工作台（home-pilot）· 主规格</title>
+<style>
+  :root {
+    --fg: #303846;
+    --muted: #606266;
+    --border: #E5E6EB;
+    --bg: #F1F3F6;
+    --surface: #FFFFFF;
+    --primary: #0A6EFA;
+    --code-bg: #f5f7fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 22px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 24px 64px; }
+  header { background: var(--surface); border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); padding: 24px; margin-bottom: 16px; }
+  header h1 { margin: 0 0 8px; font-size: 22px; font-weight: 700; }
+  header .meta { color: var(--muted); font-size: 13px; }
+  header .meta span { margin-right: 16px; }
+  .badge { display: inline-block; background: var(--primary); color: #fff; border-radius: 4px; padding: 2px 8px; font-size: 12px; margin-left: 8px; vertical-align: middle; }
+  section {
+    background: var(--surface);
+    border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  section > h2 { margin: 0 0 16px; font-size: 18px; font-weight: 600; border-left: 3px solid var(--primary); padding-left: 10px; }
+  section > h3 { margin: 20px 0 10px; font-size: 15px; font-weight: 600; color: var(--fg); }
+  p { margin: 8px 0; color: var(--muted); }
+  ul { margin: 8px 0; padding-left: 22px; color: var(--muted); }
+  li { margin: 4px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #fafafa; font-weight: 600; color: var(--fg); }
+  td { color: var(--muted); }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 3px; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 12px; color: var(--fg); }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: 12px; margin: 2px 4px 2px 0; }
+  .todo { background: #FFF7E6; border-left: 3px solid #E6A23C; padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .todo ul { color: #8C5A00; }
+  .ok { background: #F0F9EB; color: #529B2C; }
+  .info { background: #F4F4F5; color: #606266; }
+  .warn { background: #FDF6EC; color: #B88230; }
+  .danger { background: #FEF0F0; color: #C45656; }
+  .primary { background: #ECF5FF; color: #0A6EFA; }
+  .preview-link { display: inline-block; margin-top: 12px; padding: 8px 16px; background: var(--primary); color: #fff; text-decoration: none; border-radius: 4px; font-size: 13px; }
+  .preview-link:hover { background: #0051D4; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>首页工作台（home-pilot）<span class="badge">已实现</span></h1>
+  <div class="meta">
+    <span>原型 id：<code>home-pilot</code></span>
+    <span>原型目录：<code>src/prototypes/home-pilot/</code></span>
+    <span>来源：Axure 导入原型 <code>src/prototypes/html/</code> page-002</span>
+    <span>更新：2026-07-31（将 meeting-pilot 会议列表与归档详情、info-pilot 信息列表与详情合并至 home-pilot；顶部导航「会议」「信息」改为进入 home-pilot 内部页面；删除 meeting-pilot 与 info-pilot 原目录）</span>
+  </div>
+  <p>本文档是用户与 Agent 围绕当前原型进行方案沟通、确认和持续生成的事实依据。只维护当前有效方案，并简短记录会影响当前原型的重要用户决策和变更。</p>
+</header>
+
+<section>
+  <h2>当前方案</h2>
+  <p><strong>原型意图</strong>：将 Axure 导入原型中的「首页（非领导）」页面，以 Axhub Make 原生 React 重新实现，作为系统的非领导用户工作台入口，统一使用 sinopec-workbench 主题组件与视觉规范。</p>
+  <p><strong>使用场景</strong>：集团董事会 / 董办非领导人员登录后查看待办事项、快速发起各类业务申请、进入常用系统。</p>
+  <p><strong>当前表达</strong>：十四个 Hash 页面——<code>home</code>（首页工作台）、<code>regulation</code>（制度列表）、<code>regulation-create</code>（制度发起）、<code>meeting-create</code>（会议发起表单）、<code>meeting-todo</code>（会议发起待办审批）、<code>meeting-archive</code>（会议材料归档发起）、<code>meeting-list</code>（会议列表）、<code>meeting-detail</code>（会议材料归档详情）、<code>research-list</code>（调研列表）、<code>research-detail</code>（调研详情）、<code>research-create</code>（调研发起）、<code>info-list</code>（信息列表）、<code>info-detail</code>（信息详情）、<code>info-create</code>（董事参考信息发起）；默认页为 <code>home</code>。会议发起、待办审批、材料归档发起、调研发起与信息发起以内嵌页面形式置于首页原型中，入口均从首页进入；制度列表通过顶部导航「制度」进入，会议列表通过顶部导航「会议」进入，信息列表通过顶部导航「信息」进入。会议发起表单按「通知类型」切换字段，三种类型分别为会议安排、议案材料、会议记录。</p>
+</section>
+
+<section>
+  <h2>事实与输入</h2>
+
+  <h3>用户确认事实</h3>
+  <ul>
+    <li>本轮范围：Axure 页面 <code>page-002 首页（非领导）</code>，共 1 个页面。</li>
+    <li>入口页不转换：用户明确「入口页面不用转换」，因此 home-pilot 不包含 <code>page-001 入口</code>。</li>
+    <li>保真度：按生产级界面重写，保持原页面的信息架构、模块与核心交互，不追求像素级复刻。</li>
+    <li>放置位置：独立原型目录 <code>src/prototypes/home-pilot/</code>，保留 <code>html/</code> 原型不动。</li>
+    <li>设计基底：采用 <code>src/themes/sinopec-workbench/DESIGN.md</code>。</li>
+    <li>组件来源：顶部导航、分页器及通用基础样式从 <code>src/themes/sinopec-workbench/components</code> 与 <code>styles</code> 导入。</li>
+    <li>交互完整度：mock 数据驱动（分类 tab 筛选 / 分页可用）。</li>
+    <li>顶部导航：采用通用导航组件 <code>AppTopNav</code>，7 个一级菜单中当前模块高亮；「首页」「制度」「会议」「信息」「调研」「我的发起」可点击并跳转；「我的发起」中展示董事签字任务；「议案」暂未接入，禁用置灰。</li>
+    <li>会议与信息页面合并：将 <code>meeting-pilot</code> 的会议列表与会议材料归档详情、<code>info-pilot</code> 的信息列表与信息详情合并至 <code>home-pilot</code>，作为 <code>meeting-list</code>、<code>meeting-detail</code>、<code>info-list</code>、<code>info-detail</code> 四个 Hash 页面；合并后删除 <code>src/prototypes/meeting-pilot/</code> 与 <code>src/prototypes/info-pilot/</code> 目录。</li>
+    <li>会议相关页面内嵌：用户明确待办审批和发起会议的入口都在首页，倾向「首页内嵌页面」的实现方式；因此将会议发起表单、会议发起待办审批与会议材料归档发起作为 <code>home-pilot</code> 的内嵌页面，入口分别从首页的「会议发起」磁贴、「会议」分类待办标题与「材料归档」磁贴进入。</li>
+    <li>董事签字接入：首页发起申请磁贴中材料归档后增加「签字发起」入口，点击跳转至 <code>src/prototypes/director-sign/#page=create</code>；董事会事务待办中增加「董事签字」业务类型，点击标题跳转至对应审批页；「我的发起」列表中第一页展示董事签字任务，支持查看与已驳回状态的修改跳转。</li>
+    <li>主规格格式：HTML，固定路径 <code>.spec/spec.html</code>。</li>
+  </ul>
+
+  <h3>参考资料</h3>
+  <ul>
+    <li><code>src/prototypes/html/legacy/首页（非领导）.html</code>：Axure 原始页面，提供布局、文案与跳转来源。</li>
+    <li><code>src/prototypes/html/legacy/files/首页（非领导）/data.js</code>：Axure 静态模型。</li>
+    <li><code>src/themes/sinopec-workbench/DESIGN.md</code>：品牌蓝、磁贴渐变、卡片、表格、按钮等设计规范。</li>
+    <li><code>src/prototypes/info-pilot/</code>：已验收的参考实现；本次合并后删除。</li>
+    <li><code>src/prototypes/meeting-pilot/</code>：会议列表 / 详情 / 发起 / 待办审批参考实现，作为本次迁移来源；本次合并后删除。</li>
+    <li><code>src/prototypes/director-sign/</code>：董事签字模块原型，home-pilot 通过待办与我的发起向其跳转。</li>
+    <li><code>src/resources/董事签字.md</code>：董事签字模块 PRD。</li>
+    <li><code>src/common/useHashPage.ts</code>：hash 路由。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>原型范围</h2>
+
+  <h3>本次呈现</h3>
+  <ul>
+    <li>顶部导航栏：品牌栏 64px + 主导航 52px，7 个一级菜单中当前模块高亮；「首页」「制度」「调研」「会议」「信息」可点击并进入 <code>home-pilot</code> 内部对应页面；「议案」「我的发起」暂未接入，禁用置灰。</li>
+    <li>发起申请卡片：左侧 2/3 宽度，含 6 个快捷发起磁贴（制度发起 / 议案征集 / 会议发起 / 材料归档 / 调研发起 / 信息发起）；「制度发起」使用品牌蓝 <code>#2F6BFF</code> 背景与白色文字，其余磁贴使用设计系统浅色渐变。</li>
+    <li>常用系统卡片：右侧 1/3 宽度，含 3 个系统入口磁贴（石化邮箱 / 协同办公系统 / 财务共享平台）。</li>
+    <li>待办事项卡片：左侧一级页签（待办 / 已办，均带数量）；右侧二级页签（公文 / 董事会事务 / 会议，均带数量，无「全部」）。待办与已办下均展示这三个业务页签；默认进入「待办-公文」。</li>
+    <li>制度列表页（<code>regulation</code>）：顶部 6 个分类 tab（全部 / 公司章程 / 议事规则 / 决策运行 / 支撑保障 / 管理监督）；搜索区（制度名称 + 时间范围 + 查询/重置）；表格（序号 / 制度名称 / 制度文号 / 制度类型 / 签发时间）+ 分页。</li>
+    <li>调研列表页（<code>research-list</code>）：从顶部导航「调研」进入；搜索区（关键词 + 调研时间范围 + 查询/重置）；表格（序号 / 标题 / 调研地点 / 调研人员 / 调研时间 / 状态 / 操作）+ 分页；标题与「查看」可点击进入调研详情。</li>
+    <li>调研详情页（<code>research-detail</code>）：从调研列表进入；顶部「返回」与「批量下载」；Tab 切换（基本信息 / 流程跟踪 / 流程图）；基本信息展示标题、调研阶段、调研时间、调研地点、调研人员、调研安排、调研材料、调研报告及对应附件。</li>
+    <li>会议列表页（<code>meeting-list</code>）：从顶部导航「会议」进入；分类标签（全部 / 董事会 / 各专业委员会）；搜索区（会议名称 + 会议时间起止 + 状态 + 查询/重置）；表格（序号 / 会议名称 / 会议形式 / 会议时间 / 状态 / 操作）+ 分页；点击会议名称或「编辑」进入会议材料归档详情。</li>
+    <li>会议材料归档详情页（<code>meeting-detail</code>）：从会议列表进入；顶部「返回」+ 居中标题「会议材料归档」；归档信息表（标题 / 会议类型 / 密级 / 会议形式 / 会议时间 / 会议通知 / 议案材料 / 会议决议）；议案材料支持批量下载；附件以红色 PDF 图标展示。</li>
+    <li>信息列表页（<code>info-list</code>）：从顶部导航「信息」进入；Chip 类型筛选（全部 / 月报 / 季报 / 专报 / 专项报告）；查询区（名称 + 日期范围 + 查询/重置）；7 列表格（序号 / 名称 / 类型 / 密级 / 时间 / 状态 / 操作）+ 分页与排序；点击数据行进入信息详情。</li>
+    <li>信息详情页（<code>info-detail</code>）：从信息列表进入；顶部「返回」+ 居中标题「信息」；横向 Tab（基本信息 / 流程跟踪 / 流程图）；基本信息含名称 / 类别 / 密级 / 日期 / 附件与批量下载；流程跟踪含 6 组记录表（审批 / 外部董事批阅 / 职工董事批阅 / 浏览 / 短信发送 / 邮件发送）；流程图展示「暂无流程」空状态。</li>
+    <li>内嵌会议发起表单页（<code>meeting-create</code>）：左右两栏布局；左侧为按「通知类型」动态切换的表单，通知类型包括会议安排、议案材料、会议记录，各类型字段如下：
+      <ul>
+        <li><strong>会议安排</strong>：通知类型、文件名称（必填）、附件（必填）。</li>
+        <li><strong>议案材料</strong>：通知类型、文件名称（必填）、密级（普通商密 / 内部，必填）、会议类型（董事沟通会前 / 专门委员会前 / 董事会会前，多选，必填）、会议日期、情况简述（500 字限制）、附件（必填）。</li>
+        <li><strong>会议记录</strong>：通知类型、文件名称（必填）、密级（普通商密 / 内部，必填）、情况简述（500 字限制）、附件（必填）。</li>
+      </ul>
+      右侧边栏为「填写意见」与「提交流程」（部室负责人复选框、提醒方式复选框、提交 / 保存按钮）。
+    </li>
+    <li>内嵌会议发起待办审批页（<code>meeting-todo</code>）：待办列表（序号 / 会议名称 / 会议形式 / 会议时间 / 状态 / 操作）+ 审批详情（会议信息 / 填写意见 / 提交流程 / 审批记录）+ 返回工作台。</li>
+    <li>内嵌会议材料归档发起页（<code>meeting-archive</code>）：归档表单 + 右侧操作栏。</li>
+    <li>内嵌调研发起页（<code>research-create</code>）：左侧表单（标题 / 调研阶段 / 调研时间 / 调研地点 / 调研人员 / 调研安排 / 调研材料 / 调研报告）+ 右侧边栏（填写意见 / 提交流程 / 提交保存）。</li>
+    <li>内嵌董事参考信息发起页（<code>info-create</code>）：左侧表单（名称 / 类别 / 密级 / 日期 / 情况简述 / 附件）+ 右侧边栏（填写意见 / 提交流程 / 提交保存）。</li>
+    <li>首页入口：「发起申请」区「会议发起」磁贴点击进入会议发起表单；「材料归档」磁贴点击进入会议材料归档发起；「调研发起」磁贴点击进入调研发起页；「信息发起」磁贴点击进入董事参考信息发起页；「会议」分类下的待办标题点击进入会议发起待办审批；顶部导航「首页」点击进入首页工作台；顶部导航「制度」点击进入制度列表；顶部导航「调研」点击进入调研列表；顶部导航「会议」点击进入会议列表；顶部导航「信息」点击进入信息列表。</li>
+    <li>磁贴 hover 效果：阴影提升 + 微缩放。</li>
+    <li>mock 数据驱动的可交互：分类 tab / chip 筛选、名称/关键词搜索、时间范围筛选、查询/重置、分页切换、每页条数切换；会议列表状态筛选；信息列表名称/类型/时间列排序；表单/审批的本地状态与成功提示。</li>
+    <li>董事签字接入：董事会事务待办表格新增「董事签字」业务类型，点击标题跳转至 <code>director-sign</code> 原型对应审批页；「我的发起」列表新增「董事签字」任务类型与对应状态，支持查看与已驳回状态的修改跳转。</li>
+  </ul>
+
+  <h3>本次不呈现</h3>
+  <ul>
+    <li>「议案」导航项的真实页面跳转（待后续模块原型接入）。</li>
+    <li>真实后端接口、用户权限、待办数字实时同步。</li>
+    <li>非会议/非董事签字待办标题点击进入详情等高级交互。</li>
+    <li>董事签字任务的真实状态流转与后端 persistence。</li>
+    <li>「入口」页面及其他 33 个 Axure 页面。</li>
+  </ul>
+
+  <h3>董事签字相关调整</h3>
+  <ul>
+    <li>在「发起申请」磁贴区域，「材料归档」之后新增「签字发起」磁贴，图标使用 <code>file-signature</code>，点击跳转至 <code>director-sign/#page=create</code>。</li>
+    <li>「我的发起」列表前 5 条固定为董事签字任务，确保打开该页面即可在第一页看到。</li>
+    <li>董事会事务待办中保留董事签字待办，点击标题跳转至对应审批/办理页。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>页面与内容方案</h2>
+  <table>
+    <thead>
+      <tr><th>页面</th><th>作用</th><th>主要模块与内容</th><th>示例数据</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>home</code><br>首页工作台<br>（默认页）</td>
+        <td>非领导用户登录后的主工作台</td>
+        <td>顶部导航；发起申请 6 磁贴；常用系统 3 磁贴；待办事项分类 tab + 表格 + 分页</td>
+        <td>15 条待办记录，覆盖 公文 / 董事会事务 / 会议 三类</td>
+      </tr>
+      <tr>
+        <td><code>regulation</code><br>制度列表</td>
+        <td>从顶部导航「制度」进入的制度查询列表</td>
+        <td>6 个分类 tab；搜索区（制度名称 / 时间范围 / 查询 / 重置）；表格（序号 / 制度名称 / 制度文号 / 制度类型 / 签发时间）+ 分页</td>
+        <td>46 条制度记录，覆盖 公司章程 / 议事规则 / 决策运行 / 支撑保障 / 管理监督 五类</td>
+      </tr>
+      <tr>
+        <td><code>research-list</code><br>调研列表</td>
+        <td>从顶部导航「调研」进入的调研查询列表</td>
+        <td>搜索区（关键词 / 调研时间范围 / 查询 / 重置）；表格（序号 / 标题 / 调研地点 / 调研人员 / 调研时间 / 状态 / 操作）+ 分页</td>
+        <td>14 条调研记录，状态均为「已结束」</td>
+      </tr>
+      <tr>
+        <td><code>research-detail</code><br>调研详情</td>
+        <td>从调研列表标题或「查看」进入的调研详情</td>
+        <td>顶部返回与批量下载；Tab（基本信息 / 流程跟踪 / 流程图）；基本信息含标题、调研阶段、调研时间、调研地点、调研人员、调研安排、调研材料、调研报告及附件</td>
+        <td>基于列表数据动态生成的详情，附件含 doc / docx / pdf</td>
+      </tr>
+      <tr>
+        <td><code>meeting-list</code><br>会议列表</td>
+        <td>从顶部导航「会议」进入的会议查询列表</td>
+        <td>分类标签（全部 / 董事会 / 各专业委员会）；搜索区（会议名称 / 会议时间起止 / 状态 / 查询 / 重置）；表格（序号 / 会议名称 / 会议形式 / 会议时间 / 状态 / 操作）+ 分页</td>
+        <td>78 条会议记录，覆盖 6 种会议类型与 4 种状态</td>
+      </tr>
+      <tr>
+        <td><code>meeting-detail</code><br>会议材料归档详情</td>
+        <td>从会议列表标题或「编辑」进入的归档详情</td>
+        <td>顶部返回 + 居中标题「会议材料归档」；归档信息表（标题 / 会议类型 / 密级 / 会议形式 / 会议时间 / 会议通知 / 议案材料 / 会议决议）；议案材料批量下载；PDF 附件列表</td>
+        <td>第四届董事会第三十次会议</td>
+      </tr>
+      <tr>
+        <td><code>meeting-create</code><br>会议发起</td>
+        <td>从首页进入的会议发起表单</td>
+        <td>返回按钮 + 页面标题；左侧按「通知类型」动态切换的表单（会议安排 / 议案材料 / 会议记录）；右侧边栏（填写意见 / 提交流程 / 提交保存）；提交/保存成功提示</td>
+        <td>默认通知类型「会议安排」；密级默认「内部」；部室负责人默认选中「孙友」；情况简述 500 字限制</td>
+      </tr>
+      <tr>
+        <td><code>meeting-todo</code><br>会议发起待办审批</td>
+        <td>从首页会议待办进入的审批页面</td>
+        <td>返回工作台按钮 + 页面标题；待办列表；点击审批后展示会议信息 / 填写意见 / 提交流程 / 审批记录</td>
+        <td>4 条会议待办记录；1 条会议详情；4 条审批记录</td>
+      </tr>
+      <tr>
+        <td><code>meeting-archive</code><br>会议材料归档发起</td>
+        <td>从首页「材料归档」磁贴进入的归档发起页面</td>
+        <td>返回按钮 + 页面标题；归档表单 + 右侧操作栏</td>
+        <td>默认会议类型与日期</td>
+      </tr>
+      <tr>
+        <td><code>info-list</code><br>信息列表</td>
+        <td>从顶部导航「信息」进入的信息查询列表</td>
+        <td>Chip 类型筛选（全部 / 月报 / 季报 / 专报 / 专项报告）；查询区（名称 / 日期范围 / 查询 / 重置）；7 列表格（序号 / 名称 / 类型 / 密级 / 时间 / 状态 / 操作）+ 分页与排序</td>
+        <td>48 条信息记录，覆盖 4 种类型，状态均为「已结束」</td>
+      </tr>
+      <tr>
+        <td><code>info-detail</code><br>信息详情</td>
+        <td>从信息列表数据行进入的详情</td>
+        <td>顶部返回 + 居中标题「信息」；横向 Tab（基本信息 / 流程跟踪 / 流程图）；基本信息含字段与多附件批量下载；流程跟踪含 6 组记录表；流程图为「暂无流程」空状态</td>
+        <td>1 条完整记录；多附件；各记录表多条数据</td>
+      </tr>
+      <tr>
+        <td><code>research-create</code><br>调研发起</td>
+        <td>从首页「调研发起」磁贴进入的调研发起表单</td>
+        <td>返回按钮 + 页面标题；左侧表单（标题 / 调研阶段 / 调研时间 / 调研地点 / 调研人员 / 调研安排 / 调研材料 / 调研报告）+ 右侧边栏（填写意见 / 提交流程 / 提交保存）</td>
+        <td>调研阶段默认全选；调研人员带默认名单；部室负责人默认选中「孙友」</td>
+      </tr>
+      <tr>
+        <td><code>info-create</code><br>董事参考信息发起</td>
+        <td>从首页「信息发起」磁贴进入的信息发起表单</td>
+        <td>返回按钮 + 页面标题「董事参考」；左侧表单（名称 / 类别 / 密级 / 日期 / 情况简述 / 附件）+ 右侧边栏（填写意见 / 提交流程 / 提交保存）</td>
+        <td>类别默认「月报」；密级默认「内部」；情况简述限制 200 字；部室负责人默认选中「孙友」</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>磁贴清单</h3>
+  <table>
+    <thead>
+      <tr><th>区域</th><th>磁贴</th><th>渐变配色</th><th>图标</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>发起申请</td><td>制度发起</td><td>品牌蓝 #2F6BFF，白色文字</td><td>FileText</td></tr>
+      <tr><td>发起申请</td><td>议案征集</td><td>蓝色 #E5EDFF → #DBE5FF</td><td>ClipboardList</td></tr>
+      <tr><td>发起申请</td><td>会议发起</td><td>薄荷 #DFF6F0 → #D2F0E8</td><td>CalendarDays</td></tr>
+      <tr><td>发起申请</td><td>材料归档</td><td>绿色 #E4F3E1 → #D6ECD1</td><td>Archive</td></tr>
+      <tr><td>发起申请</td><td>调研发起</td><td>琥珀 #FDECD1 → #FBE0B8</td><td>Search</td></tr>
+      <tr><td>发起申请</td><td>信息发起</td><td>珊瑚 #FDE1D6 → #FBD1C1</td><td>Info</td></tr>
+      <tr><td>常用系统</td><td>石化邮箱</td><td>蓝色 #E5EDFF → #DBE5FF</td><td>Mail</td></tr>
+      <tr><td>常用系统</td><td>协同办公系统</td><td>薄荷 #DFF6F0 → #D2F0E8</td><td>Monitor</td></tr>
+      <tr><td>常用系统</td><td>财务共享平台</td><td>琥珀 #FDECD1 → #FBE0B8</td><td>CircleDollarSign</td></tr>
+    </tbody>
+  </table>
+
+  <h3>待办表格列</h3>
+  <table>
+    <thead>
+      <tr><th>列</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>序号</td><td>当前页连续序号</td></tr>
+      <tr><td>业务系统</td><td>董事会事务 / 公文 / 会议</td></tr>
+      <tr><td>业务类型</td><td>调研 / 信息 / 会议发起 / 归档材料 / 制度 / 收文 / 发文 / 会议变更</td></tr>
+      <tr><td>待办标题</td><td>蓝色链接样式；「会议」分类下的标题可点击，跳转至 <code>meeting-todo</code></td></tr>
+      <tr><td>提交人</td><td>姓名</td></tr>
+      <tr><td>提交时间</td><td>yyyy-MM-dd HH:mm:ss</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>交互与状态方案</h2>
+  <table>
+    <thead>
+      <tr><th>对象 / 场景</th><th>前置状态</th><th>用户操作</th><th>原型表现</th><th>后续状态</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>页面路由</td><td>无路由或非法 Hash</td><td>打开原型 / 改 Hash</td><td>回退到 <code>#page=home</code></td><td>首页工作台渲染</td></tr>
+      <tr><td>一级页签</td><td>默认「待办」</td><td>点击 待办 / 已办</td><td>切换当前列表为待办/已办，右侧业务页签保持当前选中，重置到第 1 页</td><td>表格与总数更新</td></tr>
+      <tr><td>二级页签</td><td>「待办」下默认「公文」</td><td>点击 公文 / 董事会事务 / 会议</td><td>按 category 过滤当前列表，重置到第 1 页</td><td>表格与总数更新</td></tr>
+      <tr><td>分页</td><td>当前页码 / 每页条数</td><td>点页码 / 上一页 / 下一页 / 改每页条数</td><td>切片 mock 数据，更新当前页与总数</td><td>表格内容更新</td></tr>
+      <tr><td>磁贴 hover</td><td>默认态</td><td>鼠标悬浮</td><td>阴影提升 + scale(1.01)</td><td>无状态变化</td></tr>
+      <tr><td>顶部导航</td><td>「首页」高亮</td><td>点「首页」</td><td>保持在 <code>home</code></td><td>页面不变</td></tr>
+      <tr><td>顶部导航</td><td>任意页面</td><td>点「制度」</td><td>Hash 变为 <code>#page=regulation</code>，「制度」高亮，渲染制度列表</td><td>可在制度列表筛选/查询/分页</td></tr>
+      <tr><td>制度分类 tab</td><td>默认「全部」</td><td>点击 全部 / 公司章程 / 议事规则 / 决策运行 / 支撑保障 / 管理监督</td><td>按制度类型过滤列表，重置到第 1 页</td><td>表格与总数更新</td></tr>
+      <tr><td>制度搜索</td><td>搜索条件为空</td><td>输入制度名称或选择时间范围后点「查询」</td><td>按条件过滤列表，重置到第 1 页</td><td>表格与总数更新</td></tr>
+      <tr><td>制度重置</td><td>已输入搜索条件</td><td>点「重置」</td><td>清空名称与时间条件，分类 tab 回到「全部」，重置到第 1 页</td><td>表格恢复全部数据</td></tr>
+      <tr><td>制度分页</td><td>当前页码 / 每页条数</td><td>点页码 / 上一页 / 下一页 / 改每页条数</td><td>切片 mock 数据，更新当前页与总数</td><td>表格内容更新</td></tr>
+      <tr><td>调研入口</td><td>任意页面</td><td>点顶部导航「调研」</td><td>Hash 变为 <code>#page=research-list</code>，「调研」高亮，渲染调研列表</td><td>可在调研列表搜索/分页</td></tr>
+      <tr><td>调研搜索</td><td>搜索条件为空</td><td>输入关键词或选择调研时间范围后点「查询」</td><td>按条件过滤列表，重置到第 1 页</td><td>表格与总数更新</td></tr>
+      <tr><td>调研重置</td><td>已输入搜索条件</td><td>点「重置」</td><td>清空关键词与时间条件，重置到第 1 页</td><td>表格恢复全部数据</td></tr>
+      <tr><td>调研分页</td><td>当前页码 / 每页条数</td><td>点页码 / 上一页 / 下一页 / 改每页条数</td><td>切片 mock 数据，更新当前页与总数</td><td>表格内容更新</td></tr>
+      <tr><td>调研详情入口</td><td>调研列表</td><td>点标题或「查看」</td><td>Hash 变为 <code>#page=research-detail</code>，渲染对应调研详情</td><td>可查看基本信息 / 流程跟踪 / 流程图</td></tr>
+      <tr><td>调研详情返回</td><td>调研详情</td><td>点「返回」</td><td>Hash 回到 <code>#page=research-list</code></td><td>回到调研列表</td></tr>
+      <tr><td>会议列表入口</td><td>任意页面</td><td>点顶部导航「会议」</td><td>Hash 变为 <code>#page=meeting-list</code>，「会议」高亮，渲染会议列表</td><td>可在会议列表筛选/查询/分页</td></tr>
+      <tr><td>会议分类标签</td><td>默认「全部」</td><td>点击分类标签</td><td>按会议类型过滤列表，重置到第 1 页</td><td>表格与总数更新</td></tr>
+      <tr><td>会议列表搜索</td><td>搜索条件为空</td><td>输入会议名称/起止日期/状态下点「查询」</td><td>按条件过滤列表，重置到第 1 页</td><td>表格与总数更新</td></tr>
+      <tr><td>会议列表重置</td><td>已输入搜索条件</td><td>点「重置」</td><td>清空分类与条件，回到全部数据第 1 页</td><td>表格恢复全部数据</td></tr>
+      <tr><td>会议详情入口</td><td>会议列表</td><td>点会议名称或「编辑」</td><td>Hash 变为 <code>#page=meeting-detail</code>，渲染该条归档详情</td><td>可查看归档信息</td></tr>
+      <tr><td>会议详情返回</td><td>归档详情页</td><td>点「返回」</td><td>Hash 回到 <code>#page=meeting-list</code></td><td>回到会议列表</td></tr>
+      <tr><td>信息列表入口</td><td>任意页面</td><td>点顶部导航「信息」</td><td>Hash 变为 <code>#page=info-list</code>，「信息」高亮，渲染信息列表</td><td>可在信息列表筛选/查询/排序/分页</td></tr>
+      <tr><td>信息 Chip 筛选</td><td>默认「全部」</td><td>点击类型 chip</td><td>即时按类型过滤 mock 数据，重置到第 1 页</td><td>表格与总数更新</td></tr>
+      <tr><td>信息列表查询</td><td>查询区有默认值（空）</td><td>输入名称/选日期范围/点查询</td><td>按条件前端过滤，重置分页到第 1 页</td><td>表格与总数更新</td></tr>
+      <tr><td>信息列表排序</td><td>默认按日期倒序</td><td>点「名称」「类型」「时间」列头排序图标</td><td>对当前结果按列升/降序，切换方向</td><td>表格重排</td></tr>
+      <tr><td>信息列表分页</td><td>当前页码 / 每页条数</td><td>点页码 / 上一页 / 下一页 / 改每页条数</td><td>切片 mock 数据，更新当前页与总数</td><td>表格内容更新</td></tr>
+      <tr><td>信息详情入口</td><td>信息列表</td><td>点击数据行</td><td>Hash 变为 <code>#page=info-detail</code>，渲染对应详情</td><td>可查看基本信息/流程跟踪/流程图</td></tr>
+      <tr><td>信息详情返回</td><td>信息详情</td><td>点「返回」或导航「信息」</td><td>Hash 回到 <code>#page=info-list</code></td><td>回到信息列表</td></tr>
+      <tr><td>信息详情 tab</td><td>默认「基本信息」</td><td>点顶部横向 tab</td><td>切换内容区，当前 tab 蓝底蓝字高亮</td><td>tab 状态保持</td></tr>
+      <tr><td>会议发起入口</td><td>首页工作台</td><td>点「发起申请」区「会议发起」磁贴</td><td>Hash 变为 <code>#page=meeting-create</code>，渲染会议发起表单</td><td>可在表单填写并提交</td></tr>
+      <tr><td>调研发起入口</td><td>首页工作台</td><td>点「发起申请」区「调研发起」磁贴</td><td>Hash 变为 <code>#page=research-create</code>，渲染调研发起表单</td><td>可在表单填写并提交/保存</td></tr>
+      <tr><td>信息发起入口</td><td>首页工作台</td><td>点「发起申请」区「信息发起」磁贴</td><td>Hash 变为 <code>#page=info-create</code>，渲染董事参考信息发起表单</td><td>可在表单填写并提交/保存</td></tr>
+      <tr><td>会议待办入口</td><td>首页工作台</td><td>点「会议」分类下的待办标题</td><td>Hash 变为 <code>#page=meeting-todo</code>，渲染会议待办列表</td><td>可点击审批进入审批详情</td></tr>
+      <tr><td>返回工作台</td><td>meeting-create / meeting-todo / research-create / info-create</td><td>点页面顶部「返回」/「返回工作台」</td><td>Hash 回到 <code>#page=home</code></td><td>回到首页工作台</td></tr>
+      <tr><td>会议发起通知类型切换</td><td>默认「会议安排」</td><td>点击 会议安排 / 议案材料 / 会议记录</td><td>左侧表单字段按所选类型动态显隐，类型相关字段重置为空</td><td>进入对应通知类型的表单视图</td></tr>
+      <tr><td>会议发起提交</td><td>会议发起表单已填写</td><td>点「提交」</td><td>显示绿色「提交成功」提示，2 秒后自动消失</td><td>表单状态保持，可继续操作</td></tr>
+      <tr><td>会议发起保存</td><td>会议发起表单已填写</td><td>点「保存」</td><td>显示绿色「保存成功」提示，2 秒后自动消失</td><td>表单状态保持，可继续操作</td></tr>
+      <tr><td>调研发起提交</td><td>调研发起表单已填写</td><td>点「提交」</td><td>显示绿色「提交成功」提示，2 秒后自动消失</td><td>表单状态保持，可继续操作</td></tr>
+      <tr><td>调研发起保存</td><td>调研发起表单已填写</td><td>点「保存」</td><td>显示绿色「保存成功」提示，2 秒后自动消失</td><td>表单状态保持，可继续操作</td></tr>
+      <tr><td>信息发起提交</td><td>董事参考信息发起表单已填写</td><td>点「提交」</td><td>显示绿色「提交成功」提示，2 秒后自动消失</td><td>表单状态保持，可继续操作</td></tr>
+      <tr><td>信息发起保存</td><td>董事参考信息发起表单已填写</td><td>点「保存」</td><td>显示绿色「保存成功」提示，2 秒后自动消失</td><td>表单状态保持，可继续操作</td></tr>
+      <tr><td>审批提交</td><td>审批详情页已选择结果/意见</td><td>点「提交」</td><td>根据结果显示「审批通过」或「已驳回」提示，2 秒后自动消失</td><td>停留在审批详情页</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>设计基底与原型特有调整</h2>
+  <h3>采用的 DESIGN.md</h3>
+  <p><code>src/themes/sinopec-workbench/DESIGN.md</code> —— 中国石化集团董事会工作台设计系统。</p>
+
+  <h3>继承方式</h3>
+  <ul>
+    <li>颜色、字体、圆角、阴影、间距全部走主题 CSS 变量 <code>--swb-*</code>。</li>
+    <li>通用组件（TopNav、Pagination）从主题导入。</li>
+    <li>卡片：白底、6px 圆角、极浅阴影、24px 内边距。</li>
+    <li>磁贴：72px 高、8px 圆角、浅色渐变背景、左侧图标、hover 阴影 + 微缩放。</li>
+    <li>表格：表头 <code>#fafafa</code>、52px 行高、行间无分割线、hover 浅蓝背景。</li>
+    <li>分类 tab：按钮组样式，选中项蓝底白字。</li>
+  </ul>
+
+  <h3>本原型特有调整</h3>
+  <ul>
+    <li>发起申请磁贴从原型的 6 个图标文字块简化为统一磁贴组件；「制度发起」采用品牌蓝底白字的强调态，其余磁贴保留浅色渐变。</li>
+    <li>常用系统磁贴使用蓝/绿/琥珀渐变，与发起申请磁贴风格一致。</li>
+    <li>待办事项区分左侧一级页签（待办 / 已办）与右侧二级页签（公文 / 董事会事务 / 会议，无「全部」）；待办与已办下均展示这三个业务页签；默认进入「待办-公文」。</li>
+    <li>会议发起表单、会议发起待办审批、会议材料归档发起、调研发起与信息发起以内嵌页面形式接入 <code>home-pilot</code>，与首页共用同一份入口、主题和样式文件；相关表单/详情样式由 <code>home-pilot/style.css</code> 统一维护。</li>
+    <li>会议列表与会议材料归档详情、信息列表与信息详情从 <code>meeting-pilot</code> 与 <code>info-pilot</code> 迁移合并至 <code>home-pilot</code>，作为 <code>meeting-list</code>、<code>meeting-detail</code>、<code>info-list</code>、<code>info-detail</code> 四个 Hash 页面，样式与 mock 数据统一收归 <code>home-pilot</code> 维护。</li>
+    <li>调研发起页、董事参考信息发起页与会议发起页均采用左右两栏布局：左侧为带标签的表单，右侧为「填写意见」与「提交流程」操作边栏，部室负责人与提醒方式使用复选框。</li>
+    <li>董事参考信息发起页的左侧表单字段包括名称、类别（月报 / 季报 / 专报 / 专项报告 / 工作安排 / 其他）、密级（无 / 普通商密 / 内部）、日期、情况简述（200 字限制）与附件上传。</li>
+    <li>会议发起页左侧表单以「通知类型」单选切换三种业务场景：会议安排（文件名称 + 附件）、议案材料（文件名称 + 密级 + 会议类型多选 + 会议日期 + 情况简述 + 附件）、会议记录（文件名称 + 密级 + 情况简述 + 附件）；情况简述限制 500 字。</li>
+    <li>会议列表顶部增加分类标签（全部 / 董事会 / 各专业委员会），与搜索区组合过滤。</li>
+    <li>信息列表采用 Chip Tab 做类型筛选，表格增至 7 列并支持名称/类型/时间列排序；详情页改为顶部横向 tab，流程跟踪拆分为 6 组记录表。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>实施边界</h2>
+  <ul>
+    <li><strong>本轮会做</strong>：更新 <code>src/prototypes/home-pilot/</code> 的入口、页面组件、mock 数据、页面样式与主规格；使用主题组件与变量；实现磁贴、分类 tab、表格、分页及交互；将会议发起表单、会议发起待办审批、会议材料归档发起、调研发起与董事参考信息发起以内嵌页面形式接入首页；新增制度列表页并通过顶部导航「制度」进入；新增调研列表页与调研详情页并通过顶部导航「调研」进入；将 <code>meeting-pilot</code> 的会议列表与会议材料归档详情、<code>info-pilot</code> 的信息列表与信息详情合并为 <code>home-pilot</code> 的 <code>meeting-list</code>、<code>meeting-detail</code>、<code>info-list</code>、<code>info-detail</code> 四个页面；顶部导航「会议」「信息」改为进入 <code>home-pilot</code> 内部对应页面；合并后删除 <code>src/prototypes/meeting-pilot/</code> 与 <code>src/prototypes/info-pilot/</code> 目录；通过 <code>check-app-ready.mjs</code> 与浏览器验收。</li>
+    <li><strong>本轮不做</strong>：不修改 <code>src/prototypes/html/</code>；不新增依赖；不做真实后端；不做入口页；非会议/调研/信息类磁贴点击后暂不跳转；附件下载为占位按钮。</li>
+    <li><strong>验收重点</strong>：视觉符合 DESIGN.md；模块与字段与原页面一致；顶部导航「首页」「制度」「调研」「会议」「信息」可点击并正确跳转/高亮，「议案」「我的发起」禁用置灰；待办事项左侧「待办 / 已办」与右侧「公文 / 董事会事务 / 会议」两层页签切换正常，默认进入「待办-公文」；制度列表分类 tab、名称搜索、时间范围、查询/重置、分页可用；调研列表关键词搜索、调研时间范围、查询/重置、分页可用，标题与「查看」可进入详情，详情返回可回到列表；会议列表分类标签、名称搜索、时间范围、状态筛选、查询/重置、分页可用，点击名称/编辑进入归档详情，详情返回可回到列表；信息列表 chip 筛选、名称/日期查询、排序、分页可用，点击数据行进入详情，详情返回可回到列表，基本信息/流程跟踪/流程图 tab 切换正常；会议发起、调研发起、信息发起磁贴与会议待办标题可正确进入内嵌页面；内嵌页面返回可回到首页；会议发起页按通知类型动态切换左侧字段，右侧填写意见与提交流程渲染正确，提交/保存提示正常；调研发起与董事参考信息发起表单字段、右侧填写意见与提交流程渲染正确；预览链接可打开；控制台无报错。</li>
+  </ul>
+  <a class="preview-link" href="http://localhost:51720/prototypes/home-pilot/">预览链接（dev 服务器）</a>
+</section>
+
+</div>
+</body>
+</html>

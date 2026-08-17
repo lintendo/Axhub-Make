@@ -180,7 +180,7 @@ describe('appendCanvasGenerationPromptSettings', () => {
     expect(prompt).not.toContain('当前文件就是画布文件地址');
   });
 
-  it('appends requirements exploration guidance for prototype start settings only when enabled', () => {
+  it('appends shared requirements alignment guidance for prototype starts only when enabled', () => {
     const prompt = appendPrototypeStartPromptSettings({
       prompt: '做一个会员增长工作台',
       settings: {
@@ -189,8 +189,9 @@ describe('appendCanvasGenerationPromptSettings', () => {
     });
 
     expect(prompt).toContain('原型生成设置');
-    expect(prompt).toContain('使用 $requirements-exploration 对当前需求做探索和完善');
+    expect(prompt).toContain('rules/requirements-alignment-guide.md');
     expect(prompt).toContain('先补齐目标用户、核心任务、范围、关键流程和验收口径');
+    expect(prompt).not.toContain('$requirements-exploration');
     expect(prompt).not.toContain('画布协作说明');
 
     const defaultPrompt = appendPrototypeStartPromptSettings({
@@ -199,7 +200,7 @@ describe('appendCanvasGenerationPromptSettings', () => {
     });
 
     expect(defaultPrompt).toBe('做一个会员增长工作台');
-    expect(defaultPrompt).not.toContain('$requirements-exploration');
+    expect(defaultPrompt).not.toContain('rules/requirements-alignment-guide.md');
   });
 
   it('appends image start settings without canvas workspace instructions', () => {
@@ -229,14 +230,14 @@ describe('appendCanvasGenerationPromptSettings', () => {
       prompt: '写一份会员增长 PRD',
       settings: {
         format: 'html',
-        templateName: 'write-prd.md',
+        templateName: 'templates/prd.md',
       },
     });
 
     expect(prompt).toContain('写一份会员增长 PRD');
     expect(prompt).toContain('文档生成设置');
     expect(prompt).toContain('- 文档格式：HTML');
-    expect(prompt).toContain('- 文档模板：resources/templates/write-prd.md');
+    expect(prompt).toContain('- 文档模板：templates/prd.md');
     expect(prompt).not.toContain('请按以下模板组织内容');
     expect(prompt).not.toContain('# PRD 模板');
     expect(prompt).not.toContain('## 验收标准');
@@ -244,7 +245,28 @@ describe('appendCanvasGenerationPromptSettings', () => {
     expect(prompt).not.toContain('canvas-workspace');
   });
 
-  it('appends selected HTML visual spec skill and requirements exploration guidance for document starts', () => {
+  it('allows Markdown and HTML templates for HTML output but rejects HTML templates for Markdown output', () => {
+    const htmlWithHtmlTemplate = appendDocumentStartPromptSettings({
+      prompt: '生成视觉报告',
+      settings: {
+        format: 'html',
+        templateName: 'templates/prototype-spec.html',
+      },
+    });
+    const markdownWithHtmlTemplate = appendDocumentStartPromptSettings({
+      prompt: '生成 Markdown 报告',
+      settings: {
+        format: 'md',
+        templateName: 'templates/prototype-spec.html',
+      },
+    });
+
+    expect(htmlWithHtmlTemplate).toContain('- 文档模板：templates/prototype-spec.html');
+    expect(markdownWithHtmlTemplate).toContain('- 文档格式：Markdown');
+    expect(markdownWithHtmlTemplate).not.toContain('templates/prototype-spec.html');
+  });
+
+  it('appends selected HTML visual spec skill and PRD planning guidance for document starts', () => {
     const prompt = appendDocumentStartPromptSettings({
       prompt: '写一份会员增长 PRD',
       settings: {
@@ -256,15 +278,16 @@ describe('appendCanvasGenerationPromptSettings', () => {
           skillName: 'guizang-ppt-skill',
           githubUrl: 'https://github.com/op7418/guizang-ppt-skill',
         },
-        needsRequirementsAnalysis: true,
+        usePrdPlanning: true,
       },
     });
 
     expect(prompt).toContain('文档生成设置');
     expect(prompt).toContain('- 文档格式：HTML');
     expect(prompt).toContain('- HTML 视觉主题：Guizang · 瑞士国际主义。网格、直角色块、发丝线、高饱和锚点色，适合事实、产品、分析和方法论。使用技能 guizang-ppt-skill（https://github.com/op7418/guizang-ppt-skill，若已安装可忽略；若未安装，请在线读取该 GitHub 技能说明）。使用 guizang-ppt-skill 的 Style B 瑞士国际主义：网格、直角色块、发丝线和高饱和锚点色。');
-    expect(prompt).toContain('使用 $requirements-exploration 对当前需求做探索和完善');
-    expect(prompt).toContain('先补齐目标用户、核心任务、范围、关键流程和验收口径');
+    expect(prompt).toContain('使用 $plan-prds');
+    expect(prompt).toContain('不要预设 PRD 数量');
+    expect(prompt).not.toContain('$requirements-exploration');
     expect(prompt).not.toContain('画布协作说明');
   });
 
@@ -291,13 +314,13 @@ describe('appendCanvasGenerationPromptSettings', () => {
       prompt: '整理需求',
       settings: {
         format: 'md',
-        templateName: 'write-prd.md',
+        templateName: 'templates/prd.md',
       },
     });
 
     expect(prompt).toContain('文档生成设置');
     expect(prompt).toContain('- 文档格式：Markdown');
-    expect(prompt).toContain('- 文档模板：resources/templates/write-prd.md');
+    expect(prompt).toContain('- 文档模板：templates/prd.md');
     expect(prompt).not.toContain('请按以下模板组织内容');
   });
 

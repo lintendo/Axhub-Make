@@ -1,4 +1,5 @@
 import PresentationToolbar from './PresentationToolbar';
+import ResponsiveSidebarTriggerButton from '../sidebar/ResponsiveSidebarTriggerButton';
 import ContentAreaView from './ContentAreaView';
 import UiReviewPanel from './UiReviewPanel';
 import type {
@@ -26,19 +27,16 @@ export default function PresentationArea(rawProps: PresentationAreaProps) {
     const isPrototypeStartDraft = isPreviewContentMode && props.prototypeStartDraftActive === true && !props.selectedItem;
     const isResourceStartDraft = props.contentMode === 'doc' && props.resourceStartDraftActive === true && !props.selectedDoc;
     const isThemeStartDraft = props.contentMode === 'theme' && props.themeStartDraftActive === true && !props.selectedTheme;
-    const isPrototypeStartPlaceholder = isPreviewContentMode && props.selectedItem?.placeholder === true && props.viewMode === 'demo';
     const shouldShowPresentationToolbar = !isCanvasMode
         && !isResourceFolderPreview
         && !isPrototypeStartDraft
         && !isResourceStartDraft
-        && !isThemeStartDraft
-        && !isPrototypeStartPlaceholder;
+        && !isThemeStartDraft;
     const shouldShowAssistantPanel = props.reviewPanelOpen
         && props.viewMode !== 'canvas'
         && !isPrototypeStartDraft
         && !isResourceStartDraft
-        && !isThemeStartDraft
-        && !isPrototypeStartPlaceholder;
+        && !isThemeStartDraft;
 
     return (
         <div className="relative flex flex-col flex-1 h-full min-h-0 min-w-0 bg-background">
@@ -96,6 +94,14 @@ export default function PresentationArea(rawProps: PresentationAreaProps) {
                     ideAvailability={props.ideAvailability}
                     quickEditAvailable={props.quickEditAvailable}
                     quickEditActive={props.quickEditActive}
+                    prototypeAnnotationSessionActive={props.prototypeAnnotationSessionActive}
+                    prototypeAnnotationEnabled={props.prototypeAnnotationEnabled}
+                    prototypeAnnotationEnableLoading={props.prototypeAnnotationEnableLoading}
+                    prototypeAnnotationPromptCopying={props.prototypeAnnotationPromptCopying}
+                    handleOpenPrototypeAnnotationSession={props.handleOpenPrototypeAnnotationSession}
+                    handleCheckPrototypeAnnotationEnabled={props.handleCheckPrototypeAnnotationEnabled}
+                    handleEnablePrototypeAnnotation={props.handleEnablePrototypeAnnotation}
+                    handleCopyPrototypeAnnotationPrompt={props.handleCopyPrototypeAnnotationPrompt}
                     docEditState={props.docEditState}
                     markdownPromptCopying={props.markdownPromptCopying}
                     quickEditRuntimeStatus={props.quickEditRuntimeStatus}
@@ -118,10 +124,26 @@ export default function PresentationArea(rawProps: PresentationAreaProps) {
                     reviewPanelOpen={props.reviewPanelOpen}
                     onReviewPanelToggle={props.handleReviewPanelToggle}
                     onOpenAISettings={props.onOpenAISettings}
+                    commentaryVoiceVisible={props.commentaryVoiceVisible}
+                    onToggleCommentaryVoice={props.onToggleCommentaryVoice}
                 />
-            ) : null}
+            ) : (
+                <div className="ax-sidebar-compact-fallback-trigger">
+                    <ResponsiveSidebarTriggerButton
+                        collapsedOnly
+                        collapsed={props.collapsed}
+                        setCollapsed={props.setCollapsed}
+                        className="bg-background/90 shadow-sm"
+                    />
+                </div>
+            )}
             <div className="flex flex-1 min-h-0">
                 <div className="flex-1 min-h-0 relative">
+                    {isPreviewContentMode && props.commentaryVoiceEntry ? (
+                        <div className="absolute bottom-4 right-4 z-40">
+                            {props.commentaryVoiceEntry}
+                        </div>
+                    ) : null}
                     <ContentAreaView
                         containerRef={props.containerRef}
                         previewIframeRef={props.previewIframeRef}
@@ -141,6 +163,7 @@ export default function PresentationArea(rawProps: PresentationAreaProps) {
                         handleChangePreviewScaleMode={props.handleChangePreviewScaleMode}
                         handleChangeSplitPreviewWidth={props.handleChangeSplitPreviewWidth}
                         handleChangeSplitPreviewHeight={props.handleChangeSplitPreviewHeight}
+                        handlePreviewContainerSizeChange={props.handlePreviewContainerSizeChange}
                         quickEditActive={props.quickEditActive}
                         onRunPrototypePanePromptAction={props.handleRunPrototypePanePromptAction}
                         currentDevice={props.currentDevice}
@@ -153,7 +176,6 @@ export default function PresentationArea(rawProps: PresentationAreaProps) {
                         elementIframeSize={props.elementIframeSize}
                         setElementIframeSize={props.setElementIframeSize}
                         viewMode={props.viewMode}
-                        setViewMode={props.setViewMode}
                         onEnterSelectedPrototypePreview={props.handleEnterSelectedPrototypePreview}
                         contentMode={props.contentMode}
                         docsItems={props.docsItems}
@@ -183,6 +205,7 @@ export default function PresentationArea(rawProps: PresentationAreaProps) {
                         excalidrawPropertyPanelPosition={props.excalidrawPropertyPanelPosition}
                         setExcalidrawPropertyPanelPosition={props.setExcalidrawPropertyPanelPosition}
                         bridgeConnected={props.bridgeConnected}
+                        conversationUiEnabled={props.conversationUiEnabled}
                         assistantVisible={props.assistantVisible}
                         onToggleAssistant={props.onToggleAssistant}
                         onAddToContext={props.onAddCanvasElementToContext}
@@ -200,6 +223,7 @@ export default function PresentationArea(rawProps: PresentationAreaProps) {
                         agentAvailability={props.agentAvailability}
                         webAgentPanelOpen={props.webAgentPanelOpen}
                         aiPanelMode={props.aiPanelMode}
+                        externalOpenMenu={props.externalOpenMenu}
                         onOpenProjectInIDE={props.handleOpenProjectInIDE}
                         onOpenAcpWebAgent={props.onOpenAcpWebAgent}
                         onOpenImageAiPanel={props.onOpenImageAiPanel}
@@ -211,16 +235,19 @@ export default function PresentationArea(rawProps: PresentationAreaProps) {
                         assistantApiBaseUrl={props.assistantApiBaseUrl}
                         assistantProjectPath={props.assistantProjectPath}
                         preferredPromptClient={props.preferredPromptClient}
+                        preferredModel={props.preferredModel}
+                        canvasPromptClient={props.canvasPromptClient}
+                        canvasModel={props.canvasModel}
                         prototypes={props.prototypes}
                         themes={props.themes}
                         defaultThemeName={props.defaultThemeName}
                         onOpenPrototypeCreateDialog={props.onOpenPrototypeCreateDialog}
                         onOpenAISettings={props.onOpenAISettings}
-                        onCreatePrototypeForDraftStart={props.onCreatePrototypeForDraftStart}
                         onUploadResourceFiles={props.onUploadResourceFiles}
                         onCreateResourceCanvasFile={props.onCreateResourceCanvasFile}
                         onCreateDrawioResourceFile={props.onCreateDrawioResourceFile}
                         onOpenDesignImport={props.onOpenDesignImport}
+                        onRefreshThemes={props.onRefreshThemes}
                         onRefreshPrototypes={props.onRefreshPrototypes}
                         agentRunConcurrency={props.agentRunConcurrency}
                         onSubmitCanvasAssistantPrompt={props.onSubmitCanvasAssistantPrompt}

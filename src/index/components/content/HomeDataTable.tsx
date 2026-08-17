@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { decodeCsvBytes } from '@/data/utils/csvEncoding';
 import { useAppDialog } from '../dialogs/AppDialogProvider';
+import { requireProjectScope, withProjectScope } from '../../services/projectScope';
 import { cn } from '@/lib/utils';
 
 interface DataRecord {
@@ -15,6 +16,7 @@ interface DataRecord {
 }
 
 interface HomeDataTableProps {
+    projectId: string;
     fileName: string;
     tableName: string;
 }
@@ -75,7 +77,7 @@ function renderCellValue(value: any): string {
     return String(value);
 }
 
-export default function HomeDataTable({ fileName, tableName }: HomeDataTableProps) {
+export default function HomeDataTable({ projectId, fileName, tableName }: HomeDataTableProps) {
     const appDialog = useAppDialog();
     const [loading, setLoading] = useState(false);
     const [records, setRecords] = useState<DataRecord[]>([]);
@@ -84,11 +86,15 @@ export default function HomeDataTable({ fileName, tableName }: HomeDataTableProp
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const buildDataUrl = useCallback(
+        (url: string) => withProjectScope(url, requireProjectScope(projectId)),
+        [projectId],
+    );
 
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await fetch(`/api/data/${encodeURIComponent(fileName)}`);
+            const response = await fetch(buildDataUrl(`/api/data/${encodeURIComponent(fileName)}`));
             if (!response.ok) {
                 throw new Error('加载数据失败');
             }
@@ -100,7 +106,7 @@ export default function HomeDataTable({ fileName, tableName }: HomeDataTableProp
         } finally {
             setLoading(false);
         }
-    }, [fileName]);
+    }, [buildDataUrl, fileName]);
 
     useEffect(() => {
         void loadData();
@@ -168,7 +174,7 @@ export default function HomeDataTable({ fileName, tableName }: HomeDataTableProp
         const toastId = toast.loading('正在保存...');
         try {
             const response = await fetch(
-                `/api/data/${encodeURIComponent(fileName)}/${encodeURIComponent(String(editingId))}`,
+                buildDataUrl(`/api/data/${encodeURIComponent(fileName)}/${encodeURIComponent(String(editingId))}`),
                 {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -201,7 +207,7 @@ export default function HomeDataTable({ fileName, tableName }: HomeDataTableProp
         const toastId = toast.loading('正在删除...');
         try {
             const response = await fetch(
-                `/api/data/${encodeURIComponent(fileName)}/${encodeURIComponent(String(id))}`,
+                buildDataUrl(`/api/data/${encodeURIComponent(fileName)}/${encodeURIComponent(String(id))}`),
                 { method: 'DELETE' },
             );
             if (!response.ok) {
@@ -221,7 +227,7 @@ export default function HomeDataTable({ fileName, tableName }: HomeDataTableProp
     const handleExportCsv = async () => {
         const toastId = toast.loading('正在导出...');
         try {
-            const response = await fetch(`/api/data/${encodeURIComponent(fileName)}/export`);
+            const response = await fetch(buildDataUrl(`/api/data/${encodeURIComponent(fileName)}/export`));
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}));
                 throw new Error(data?.error || '导出失败');
@@ -244,7 +250,7 @@ export default function HomeDataTable({ fileName, tableName }: HomeDataTableProp
         try {
             const buffer = await file.arrayBuffer();
             const csvData = decodeCsvBytes(new Uint8Array(buffer)).text;
-            const response = await fetch(`/api/data/${encodeURIComponent(fileName)}/import`, {
+            const response = await fetch(buildDataUrl(`/api/data/${encodeURIComponent(fileName)}/import`), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ csvData }),

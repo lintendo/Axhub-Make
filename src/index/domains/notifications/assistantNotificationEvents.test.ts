@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createNotificationDiagnostics } from './notificationDiagnostics';
 import { createAssistantNotificationTracker } from './assistantNotificationEvents';
 
 const running = {
@@ -20,7 +21,8 @@ const completed = {
 
 describe('assistant notification events', () => {
   it('reports one completed notification after an armed compatible terminal run', () => {
-    const tracker = createAssistantNotificationTracker();
+    const diagnostics = createNotificationDiagnostics({ enabled: true });
+    const tracker = createAssistantNotificationTracker(diagnostics);
 
     expect(tracker.consume(running)).toBeNull();
     expect(tracker.consume(completed)).toEqual({
@@ -30,6 +32,14 @@ describe('assistant notification events', () => {
       eventId: 'assistant:thread-1:1',
     });
     expect(tracker.consume(completed)).toBeNull();
+    expect(diagnostics.snapshot()).toMatchObject([{
+      stage: 'assistant.intent.created',
+      details: {
+        threadId: 'thread-1',
+        outcome: 'completed',
+        eventId: 'assistant:thread-1:1',
+      },
+    }]);
   });
 
   it('uses a new event id for each terminal run in the same thread', () => {
@@ -41,7 +51,7 @@ describe('assistant notification events', () => {
     expect(tracker.consume(completed)?.eventId).toBe('assistant:thread-1:2');
   });
 
-  it('does not notify for initial history, streaming messages, or aborted runs', () => {
+  it('does not notify for initial history, malformed updates, or aborted runs', () => {
     const tracker = createAssistantNotificationTracker();
 
     expect(tracker.consume(completed)).toBeNull();
@@ -93,17 +103,131 @@ describe('assistant notification events', () => {
     });
   });
 
-  it('ignores historical terminal metadata until the current head is finalized', () => {
+  it('settles an armed ACP 0.1.11 run from its post-run messages event', () => {
     const tracker = createAssistantNotificationTracker();
 
     expect(tracker.consume({
       type: 'acp.event',
       payload: {
         kind: 'thread.runtime.changed',
-        threadId: 'thread-3',
+        threadId: 'thread-legacy',
         runtime: { runState: 'running', isRunning: true },
       },
     })).toBeNull();
+    expect(tracker.consume({
+      type: 'acp.event',
+      payload: {
+        kind: 'thread.messages.changed',
+        threadId: 'thread-legacy',
+        messageCount: 2,
+        changedAt: '2026-07-27T01:00:00.000Z',
+      },
+    })).toEqual({
+      source: 'assistant-thread',
+      scopeKey: 'thread-legacy',
+      outcome: 'completed',
+      eventId: 'assistant:thread-legacy:1',
+    });
+  });
+
+  it('uses explicit finalized assistant notification metadata without requiring a running event', () => {
+    const tracker = createAssistantNotificationTracker();
+    const terminalMessage = {
+      type: 'acp.event',
+      eventId: 'message-completed',
+      payload: {
+        kind: 'thread.messages.changed',
+        threadId: 'thread-explicit',
+        notification: {
+          kind: 'run-terminal',
+          actor: 'assistant',
+          messageId: 'assistant-message-1',
+          runState: 'completed',
+          finalized: true,
+        },
+      },
+    };
+
+    expect(tracker.consume(terminalMessage)).toEqual({
+      source: 'assistant-thread',
+      scopeKey: 'thread-explicit',
+      outcome: 'completed',
+      eventId: 'assistant:thread-explicit:message:assistant-message-1:completed',
+    });
+    expect(tracker.consume({
+      ...terminalMessage,
+      eventId: 'message-completed-retry',
+    })).toBeNull();
+  });
+
+  it('uses explicit finalized assistant error metadata without requiring a running event', () => {
+    const tracker = createAssistantNotificationTracker();
+
+    expect(tracker.consume({
+      type: 'acp.event',
+      eventId: 'message-error',
+      payload: {
+        kind: 'thread.messages.changed',
+        threadId: 'thread-explicit-error',
+        notification: {
+          kind: 'run-terminal',
+          actor: 'assistant',
+          messageId: 'assistant-message-error',
+          runState: 'error',
+          finalized: true,
+        },
+      },
+    })).toEqual({
+      source: 'assistant-thread',
+      scopeKey: 'thread-explicit-error',
+      outcome: 'error',
+      eventId: 'assistant:thread-explicit-error:message:assistant-message-error:error',
+    });
+  });
+
+  it('deduplicates explicit terminal metadata after the same armed run already settled', () => {
+    const tracker = createAssistantNotificationTracker();
+
+    expect(tracker.consume(running)).toBeNull();
+    expect(tracker.consume(completed)).toMatchObject({
+      outcome: 'completed',
+      eventId: 'assistant:thread-1:1',
+    });
+    expect(tracker.consume({
+      type: 'acp.event',
+      eventId: 'messages-after-runtime-terminal',
+      payload: {
+        kind: 'thread.messages.changed',
+        threadId: 'thread-1',
+        notification: {
+          kind: 'run-terminal',
+          actor: 'assistant',
+          messageId: 'assistant-message-after-runtime-terminal',
+          runState: 'completed',
+          finalized: true,
+        },
+      },
+    })).toBeNull();
+  });
+
+  it('keeps generic message changes silent when no running event was observed', () => {
+    const tracker = createAssistantNotificationTracker();
+
+    expect(tracker.consume({
+      type: 'acp.event',
+      eventId: 'history-changed',
+      payload: {
+        kind: 'thread.messages.changed',
+        threadId: 'thread-history',
+        messageCount: 5,
+        changedAt: '2026-07-27T02:10:39.603Z',
+      },
+    })).toBeNull();
+  });
+
+  it('ignores historical terminal metadata until a current run has started', () => {
+    const tracker = createAssistantNotificationTracker();
+
     expect(tracker.consume({
       type: 'acp.event',
       payload: {
@@ -124,6 +248,14 @@ describe('assistant notification events', () => {
             content: {},
           },
         ],
+      },
+    })).toBeNull();
+    expect(tracker.consume({
+      type: 'acp.event',
+      payload: {
+        kind: 'thread.runtime.changed',
+        threadId: 'thread-3',
+        runtime: { runState: 'running', isRunning: true },
       },
     })).toBeNull();
     expect(tracker.consume({

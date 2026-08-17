@@ -28,6 +28,7 @@ import {
   WEB_EDITOR_V2_GUIDE_LINE_WIDTH,
   WEB_EDITOR_V2_INSERTION_LINE_WIDTH,
   WEB_EDITOR_V2_LOG_PREFIX,
+  WEB_EDITOR_V2_SELECTION_LINE_WIDTH,
 } from '../constants';
 import { Disposer } from '../utils/disposables';
 
@@ -138,7 +139,7 @@ export const OVERLAY_BOX_STYLES = {
   selection: {
     strokeColor: WEB_EDITOR_V2_COLORS.selected,
     fillColor: 'transparent',
-    lineWidth: 2,
+    lineWidth: WEB_EDITOR_V2_SELECTION_LINE_WIDTH,
     dashPattern: [],
   },
   inlineEditing: {

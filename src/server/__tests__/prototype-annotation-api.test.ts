@@ -7,6 +7,7 @@ import {
   cleanupProjectApiTestRoots,
   createTempRoot,
   registerProject,
+  scopeProjectApiUrl,
   setActiveProject,
   startTestServer,
   writeProjectMetadata,
@@ -42,7 +43,7 @@ describe('prototype annotation API', () => {
     const server = await startActivatedProjectServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/prototype-annotation?targetPath=prototypes/home`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation?targetPath=prototypes/home`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -63,7 +64,7 @@ describe('prototype annotation API', () => {
     const server = await startActivatedProjectServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/prototype-annotation?targetPath=prototypes/home`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation?targetPath=prototypes/home`), {
         headers: {
           Origin: 'http://localhost:51720',
         },
@@ -82,7 +83,7 @@ describe('prototype annotation API', () => {
     const server = await startActivatedProjectServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/prototype-annotation/node`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/node`), {
         method: 'OPTIONS',
         headers: {
           Origin: 'http://localhost:51720',
@@ -120,7 +121,7 @@ describe('prototype annotation API', () => {
     const server = await startActivatedProjectServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/prototype-annotation?targetPath=prototypes/home`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation?targetPath=prototypes/home`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -145,7 +146,7 @@ describe('prototype annotation API', () => {
     try {
       const indexPath = path.join(projectRoot, 'src/prototypes/home/index.tsx');
       const originalIndexSource = fs.readFileSync(indexPath, 'utf8');
-      const first = await fetch(`${server.origin}/api/prototype-annotation/enable`, {
+      const first = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/enable`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetPath: 'prototypes/home' }),
@@ -175,8 +176,14 @@ describe('prototype annotation API', () => {
       expect(nextIndexSource).toContain("import annotationSourceDocument from './annotation-source.json';");
       expect(nextIndexSource).toContain('<AnnotationViewer');
       expect(nextIndexSource).toContain('source={annotationSourceDocument as unknown as AnnotationSourceDocument}');
+      expect(nextIndexSource).toContain("new URLSearchParams(window.location.hash.replace(/^#/, '')).get('page')");
+      expect(nextIndexSource).toContain("new URLSearchParams(window.location.search.replace(/^\\?/, '')).get('page')");
+      expect(nextIndexSource).toContain("typeof pageId === 'string' && /^[a-z0-9-]+$/u.test(pageId)");
+      expect(nextIndexSource).toContain('onDirectoryRoute: (node) => {');
+      expect(nextIndexSource).toContain("typeof node.route === 'string' && /^[a-z0-9-]+$/u.test(node.route)");
+      expect(nextIndexSource).toContain('window.location.hash = `page=${node.route}`;');
 
-      const second = await fetch(`${server.origin}/api/prototype-annotation/enable`, {
+      const second = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/enable`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetPath: 'prototypes/home' }),
@@ -188,6 +195,122 @@ describe('prototype annotation API', () => {
         changedIndex: false,
       });
       expect(fs.readFileSync(indexPath, 'utf8')).toBe(nextIndexSource);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('creates a standard page directory from valid multi-page metadata', async () => {
+    const projectRoot = createTempRoot('axhub-make-prototype-annotation-');
+    writePrototypeProject(projectRoot);
+    const server = await startActivatedProjectServer(projectRoot);
+
+    try {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/enable`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetPath: 'prototypes/home',
+          pages: [
+            { id: 'home', title: ' 首页 ' },
+            { id: 'INVALID', title: '无效页面' },
+            { id: 'orders', title: '订单列表', group: '业务' },
+            { id: 'home', title: '重复首页' },
+            { id: 'empty-title', title: '   ' },
+          ],
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.source.directory).toEqual({
+        nodes: [{
+          type: 'folder',
+          id: 'directory-pages',
+          title: '页面',
+          defaultExpanded: true,
+          children: [
+            { type: 'route', id: 'route-home', title: '首页', route: 'home' },
+            { type: 'route', id: 'route-orders', title: '订单列表', route: 'orders' },
+          ],
+        }],
+      });
+      expect(JSON.parse(fs.readFileSync(
+        path.join(projectRoot, 'src/prototypes/home/annotation-source.json'),
+        'utf8',
+      )).directory).toEqual(body.source.directory);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it.each([
+    { label: 'missing page metadata', pages: undefined },
+    { label: 'a single valid page', pages: [{ id: 'home', title: '首页' }] },
+  ])('does not create a directory with $label', async ({ pages }) => {
+    const projectRoot = createTempRoot('axhub-make-prototype-annotation-');
+    writePrototypeProject(projectRoot);
+    const server = await startActivatedProjectServer(projectRoot);
+
+    try {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/enable`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetPath: 'prototypes/home',
+          ...(pages ? { pages } : {}),
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.source).not.toHaveProperty('directory');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('preserves an existing annotation directory when enabling repeatedly', async () => {
+    const projectRoot = createTempRoot('axhub-make-prototype-annotation-');
+    writePrototypeProject(projectRoot);
+    const sourcePath = path.join(projectRoot, 'src/prototypes/home/annotation-source.json');
+    const existingDirectory = {
+      nodes: [{ type: 'markdown', id: 'doc-overview', title: '说明', markdown: '# 说明' }],
+    };
+    fs.writeFileSync(sourcePath, `${JSON.stringify({
+      documentVersion: 1,
+      format: 'axhub-annotation-source',
+      data: {
+        version: 2,
+        prototypeName: 'home',
+        pageId: 'home',
+        nodes: [],
+        updatedAt: 1,
+      },
+      markdownMap: {},
+      assetMap: {},
+      directory: existingDirectory,
+    }, null, 2)}\n`, 'utf8');
+    const server = await startActivatedProjectServer(projectRoot);
+
+    try {
+      const request = () => fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/enable`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetPath: 'prototypes/home',
+          pages: [
+            { id: 'home', title: '首页' },
+            { id: 'orders', title: '订单' },
+          ],
+        }),
+      });
+      await request();
+      const response = await request();
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.source.directory).toEqual(existingDirectory);
     } finally {
       await server.close();
     }
@@ -209,7 +332,7 @@ describe('prototype annotation API', () => {
     const server = await startActivatedProjectServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/prototype-annotation/enable`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/enable`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetPath: 'prototypes/home' }),
@@ -266,7 +389,7 @@ describe('prototype annotation API', () => {
     const server = await startActivatedProjectServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/prototype-annotation/node`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/node`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -339,7 +462,7 @@ describe('prototype annotation API', () => {
     const server = await startActivatedProjectServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/prototype-annotation/node`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/node`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -400,13 +523,13 @@ describe('prototype annotation API', () => {
     const server = await startActivatedProjectServer(projectRoot);
 
     try {
-      const statusResponse = await fetch(`${server.origin}/api/prototype-annotation?targetPath=prototypes%2Fhome`);
+      const statusResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation?targetPath=prototypes%2Fhome`));
       const statusBody = await statusResponse.json();
 
       expect(statusResponse.status).toBe(200);
       expect(statusBody.source.markdownMap).toEqual({ hero: '旧内容' });
 
-      const writeResponse = await fetch(`${server.origin}/api/prototype-annotation/node`, {
+      const writeResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/node`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -458,7 +581,7 @@ describe('prototype annotation API', () => {
     const server = await startActivatedProjectServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/prototype-annotation/node`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/node`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -488,12 +611,12 @@ describe('prototype annotation API', () => {
     const server = await startActivatedProjectServer(projectRoot);
 
     try {
-      await fetch(`${server.origin}/api/prototype-annotation/enable`, {
+      await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/enable`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetPath: 'prototypes/home' }),
       });
-      const response = await fetch(`${server.origin}/api/prototype-annotation/node`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/node`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -555,7 +678,7 @@ describe('prototype annotation API', () => {
     const server = await startActivatedProjectServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/prototype-annotation/node`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/node`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -619,7 +742,7 @@ describe('prototype annotation API', () => {
     const server = await startActivatedProjectServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/prototype-annotation?targetPath=prototypes/home`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation?targetPath=prototypes/home`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -645,10 +768,10 @@ describe('prototype annotation API', () => {
     const server = await startActivatedProjectServer(projectRoot);
 
     try {
-      const escaped = await fetch(`${server.origin}/api/prototype-annotation?targetPath=prototypes/../home`);
+      const escaped = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation?targetPath=prototypes/../home`));
       expect(escaped.status).toBe(403);
 
-      const nonOfficial = await fetch(`${server.origin}/api/prototype-annotation?targetPath=prototypes/home`);
+      const nonOfficial = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation?targetPath=prototypes/home`));
       expect(nonOfficial.status).toBe(403);
       expect(await nonOfficial.json()).toMatchObject({
         error: 'Prototype annotation is limited to official src/prototypes templates',

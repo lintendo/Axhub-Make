@@ -12,6 +12,7 @@ import {
   PACKAGE_ROOT,
   REPO_ROOT,
   assertOk,
+  buildProjectApiUrl,
   createDefaultCanvasData,
   createEmbeddableElement,
   createImageElement,
@@ -82,6 +83,7 @@ try {
 
   const context = {
     origin: makeServer.origin,
+    projectId: 'smoke-client',
     projectRoot: project.projectRoot,
     mockAcp,
     mockS3,
@@ -187,7 +189,7 @@ function addStep(entry, name, details = {}) {
 }
 
 async function runAssistantChatJourney(context, entry) {
-  const runtime = await fetchJson(`${context.origin}/api/assistant/runtime?autoStart=false`);
+  const runtime = await fetchJson(buildProjectApiUrl(context.origin, '/api/assistant/runtime?autoStart=false', context.projectId));
   addStep(entry, 'assistant runtime is ready', {
     health: runtime.body.health,
     webBaseUrl: runtime.body.webBaseUrl,
@@ -212,7 +214,7 @@ async function runAssistantChatJourney(context, entry) {
 }
 
 async function runCreatePrototypeAndImageJourney(context, entry) {
-  const created = await fetchJson(`${context.origin}/api/prototypes/create-placeholder`, {
+  const created = await fetchJson(buildProjectApiUrl(context.origin, '/api/prototypes/create-placeholder', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({}),
@@ -233,7 +235,7 @@ async function runCreatePrototypeAndImageJourney(context, entry) {
     metadata.resources.prototypes,
   );
 
-  const imageRun = await postAiRun(context.origin, {
+  const imageRun = await postAiRun(context, {
     scene: 'image',
     prompt: '生成一张 smoke 测试图片 image',
     targetPath: `prototypes/${created.body.name}`,
@@ -314,7 +316,7 @@ async function runCanvasAiGenerationJourney(context, entry) {
     lastRetrieved: Date.now(),
   };
 
-  const put = await fetchJson(`${context.origin}/api/canvas/resources/${canvasApiPath}`, {
+  const put = await fetchJson(buildProjectApiUrl(context.origin, `/api/canvas/resources/${canvasApiPath}`, context.projectId), {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ content: canvas }),
@@ -322,14 +324,27 @@ async function runCanvasAiGenerationJourney(context, entry) {
   addStep(entry, 'canvas stores prototype image and drawio elements', put.body);
   assertOk(put.body.success === true, '画布保存失败', put.body);
 
-  const saved = await fetchJson(`${context.origin}/api/canvas/resources/${canvasApiPath}`);
+  const saved = await fetchJson(buildProjectApiUrl(context.origin, `/api/canvas/resources/${canvasApiPath}`, context.projectId));
   const elementTypes = saved.body.elements.map((element) => element.customData?.type || element.type);
   addStep(entry, 'canvas readback contains expected generated nodes', { elementTypes });
   assertOk(elementTypes.includes('embeddable'), '画布读回缺少原型节点', saved.body);
   assertOk(elementTypes.includes('image'), '画布读回缺少普通图片节点', saved.body);
   assertOk(elementTypes.includes('axhub-drawio'), '画布读回缺少 Drawio 节点', saved.body);
 
-  const aiRun = await postAiRun(context.origin, {
+  const prototypeSpecPath = path.join(
+    context.projectRoot,
+    'src/prototypes',
+    prototype.name,
+    '.spec/spec.md',
+  );
+  if (!fs.existsSync(prototypeSpecPath)) {
+    writeText(prototypeSpecPath, '# Smoke Prototype Spec\n\n用于验证画布 AI 生成链路。\n');
+  }
+  addStep(entry, 'prototype main spec is ready', {
+    path: path.relative(context.projectRoot, prototypeSpecPath).split(path.sep).join('/'),
+  });
+
+  const aiRun = await postAiRun(context, {
     scene: 'prototype',
     prompt: '在画布中生成原型和 drawio 图表',
     targetPath: `prototypes/${prototype.name}`,
@@ -349,7 +364,7 @@ async function runCanvasAiGenerationJourney(context, entry) {
 async function runCommentsAndExecutionJourney(context, entry) {
   const prototype = ensurePrototype(context);
   const document = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     kind: 'prototype-edit-comments',
     resource: {
       id: prototype.name,
@@ -359,18 +374,11 @@ async function runCommentsAndExecutionJourney(context, entry) {
       {
         id: 'comment-hero-title',
         label: '标题',
-        note: '把标题改成更明确的测试文案',
-        status: 'open',
+        comment: '把标题改成更明确的测试文案',
+        state: 'idle',
         createdAt: new Date().toISOString(),
       },
     ],
-    tasks: {
-      execute: {
-        id: 'execute-comment-hero-title',
-        status: 'pending',
-        commentIds: ['comment-hero-title'],
-      },
-    },
     images: [
       {
         id: 'hero-image',
@@ -379,7 +387,7 @@ async function runCommentsAndExecutionJourney(context, entry) {
       },
     ],
   };
-  const saved = await fetchJson(`${context.origin}/api/prototype-comments?targetPath=prototypes/${encodeURIComponent(prototype.name)}`, {
+  const saved = await fetchJson(buildProjectApiUrl(context.origin, `/api/prototype-comments?targetPath=prototypes/${encodeURIComponent(prototype.name)}`, context.projectId), {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ document }),
@@ -392,7 +400,7 @@ async function runCommentsAndExecutionJourney(context, entry) {
   assertOk(saved.body.ok === true, '批注保存失败', saved.body);
   assertOk(saved.body.document.images[0].assetPath, '批注图片没有落盘为 asset', saved.body.document.images);
 
-  const hydrated = await fetchJson(`${context.origin}/api/prototype-comments?targetPath=prototypes/${encodeURIComponent(prototype.name)}&hydrateImages=1`);
+  const hydrated = await fetchJson(buildProjectApiUrl(context.origin, `/api/prototype-comments?targetPath=prototypes/${encodeURIComponent(prototype.name)}&hydrateImages=1`, context.projectId));
   addStep(entry, 'prototype comments readback hydrates image assets', {
     exists: hydrated.body.exists,
     imageHasData: Boolean(hydrated.body.document?.images?.[0]?.data),
@@ -400,13 +408,12 @@ async function runCommentsAndExecutionJourney(context, entry) {
   assertOk(hydrated.body.exists === true, '批注读回失败', hydrated.body);
   assertOk(Boolean(hydrated.body.document?.images?.[0]?.data), '批注图片 hydrate 失败', hydrated.body.document?.images);
 
-  const execution = await postAiRun(context.origin, {
+  const execution = await postAiRun(context, {
     scene: 'prototype',
     prompt: '根据原型批注执行修改：把标题改成更明确的测试文案',
     targetPath: `prototypes/${prototype.name}`,
     context: {
       comments: hydrated.body.document.comments,
-      tasks: hydrated.body.document.tasks,
     },
     taskId: 'smoke-comment-task',
     runId: 'smoke-comment-run',
@@ -484,7 +491,7 @@ async function runMakeProjectRegistrationJourney(context, entry) {
 
 async function runExportAndCloudPublishJourney(context, entry) {
   const prototype = await ensureExportablePrototype(context);
-  const exportResponse = await fetch(`${context.origin}/api/export-html?path=${encodeURIComponent(`prototypes/${prototype.name}`)}&includeSource=1`);
+  const exportResponse = await fetch(buildProjectApiUrl(context.origin, `/api/export-html?path=${encodeURIComponent(`prototypes/${prototype.name}`)}&includeSource=1`, context.projectId));
   const exportBlob = await exportResponse.arrayBuffer();
   addStep(entry, 'HTML export archive downloads with source option', {
     status: exportResponse.status,
@@ -494,7 +501,7 @@ async function runExportAndCloudPublishJourney(context, entry) {
   assertOk(exportResponse.ok, 'HTML 导出请求失败', { status: exportResponse.status, text: Buffer.from(exportBlob).toString('utf8').slice(0, 300) });
   assertOk(exportBlob.byteLength > 100, 'HTML 导出包为空或过小', { byteLength: exportBlob.byteLength });
 
-  const config = await fetchJson(`${context.origin}/api/cloud-publishing/config`, {
+  const config = await fetchJson(buildProjectApiUrl(context.origin, '/api/cloud-publishing/config', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -517,7 +524,7 @@ async function runExportAndCloudPublishJourney(context, entry) {
   assertOk(config.body.targets?.s3?.configured === true, 'S3 发布配置未保存为可用', config.body);
 
   context.mockS3.reset();
-  const publish = await fetchJson(`${context.origin}/api/cloud-publishing/publish`, {
+  const publish = await fetchJson(buildProjectApiUrl(context.origin, '/api/cloud-publishing/publish', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ target: 's3', path: `prototypes/${prototype.name}` }),
@@ -530,7 +537,7 @@ async function runExportAndCloudPublishJourney(context, entry) {
   assertOk(context.mockS3.requests.some((request) => request.path.endsWith('/smoke-home/index.html')), 'S3 mock 未收到 index.html', context.mockS3.requests);
   assertOk(context.mockS3.requests.some((request) => request.path.includes('/smoke-home/source/')), 'includeSource 未上传源码文件', context.mockS3.requests);
 
-  const latest = await fetchJson(`${context.origin}/api/cloud-publishing/latest?path=${encodeURIComponent(`prototypes/${prototype.name}`)}`);
+  const latest = await fetchJson(buildProjectApiUrl(context.origin, `/api/cloud-publishing/latest?path=${encodeURIComponent(`prototypes/${prototype.name}`)}`, context.projectId));
   addStep(entry, 'latest cloud publish URL is recorded per resource', latest.body.targets);
   assertOk(latest.body.targets?.s3?.url === publish.body.url, 'latest 未读回刚发布的 S3 URL', latest.body);
   assertOk(latest.body.targets?.s3?.path === `src/prototypes/${prototype.name}`, 'latest 未记录规范化资源路径', latest.body);
@@ -539,14 +546,14 @@ async function runExportAndCloudPublishJourney(context, entry) {
 async function runLibraryImportsJourney(context, entry) {
   const restoreFetch = installLibraryFetchMock(context.tempRoot);
   try {
-    const templates = await fetchJson(`${context.origin}/api/template-library`);
+    const templates = await fetchJson(buildProjectApiUrl(context.origin, '/api/template-library', context.projectId));
     addStep(entry, 'template library lists remote fixture', {
       count: templates.body.templates?.length,
       first: templates.body.templates?.[0]?.id,
     });
     assertOk(templates.body.templates?.some((item) => item.id === 'smoke-template'), '模板库 fixture 未列出', templates.body);
 
-    const importedTemplate = await fetchJson(`${context.origin}/api/template-library/import`, {
+    const importedTemplate = await fetchJson(buildProjectApiUrl(context.origin, '/api/template-library/import', context.projectId), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ templateId: 'smoke-template' }),
@@ -555,7 +562,7 @@ async function runLibraryImportsJourney(context, entry) {
     assertOk(importedTemplate.body.success === true, '模板导入失败', importedTemplate.body);
     assertOk(fs.existsSync(path.join(context.projectRoot, 'src/prototypes/smoke-template/index.tsx')), '模板原型文件未落盘');
 
-    const themes = await fetchJson(`${context.origin}/api/theme-library`);
+    const themes = await fetchJson(buildProjectApiUrl(context.origin, '/api/theme-library', context.projectId));
     const designSystem = themes.body.designSystems?.find((item) => item.id === 'smoke-design') || themes.body.designSystems?.[0];
     addStep(entry, 'theme library lists fixture design system', {
       count: themes.body.designSystems?.length,
@@ -563,7 +570,7 @@ async function runLibraryImportsJourney(context, entry) {
     });
     assertOk(designSystem?.id, '设计系统库没有可导入条目', themes.body);
 
-    const importedTheme = await fetchJson(`${context.origin}/api/theme-library/import`, {
+    const importedTheme = await fetchJson(buildProjectApiUrl(context.origin, '/api/theme-library/import', context.projectId), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ designSystemId: designSystem.id }),
@@ -581,7 +588,7 @@ async function runLibraryImportsJourney(context, entry) {
 }
 
 async function runResourceCrudJourney(context, entry) {
-  const upload = await uploadMarkdownDoc(context.origin, 'Smoke Spec.md', '# Smoke Spec\n\n用于脚本回归。\n');
+  const upload = await uploadMarkdownDoc(context, 'Smoke Spec.md', '# Smoke Spec\n\n用于脚本回归。\n');
   const docName = upload.body.files?.[0]?.name;
   addStep(entry, 'document upload writes file and metadata', {
     docName,
@@ -589,13 +596,13 @@ async function runResourceCrudJourney(context, entry) {
   });
   assertOk(upload.status === 201 && docName, '文档上传失败', upload.body);
 
-  const copiedDoc = await fetchJson(`${context.origin}/api/docs/${encodeURIComponent(docName)}/copy`, {
+  const copiedDoc = await fetchJson(buildProjectApiUrl(context.origin, `/api/docs/${encodeURIComponent(docName)}/copy`, context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ displayName: 'Smoke Spec Copy' }),
   });
   assertOk(copiedDoc.status === 201, '文档复制失败', copiedDoc.body);
-  const renamedDoc = await fetchJson(`${context.origin}/api/docs/${encodeURIComponent(copiedDoc.body.name)}`, {
+  const renamedDoc = await fetchJson(buildProjectApiUrl(context.origin, `/api/docs/${encodeURIComponent(copiedDoc.body.name)}`, context.projectId), {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ newBaseName: 'smoke-spec-renamed' }),
@@ -606,18 +613,18 @@ async function runResourceCrudJourney(context, entry) {
   });
   assertOk(renamedDoc.body.name === 'smoke-spec-renamed.md', '文档重命名结果不正确', renamedDoc.body);
 
-  const table = await fetchJson(`${context.origin}/api/data/tables`, {
+  const table = await fetchJson(buildProjectApiUrl(context.origin, '/api/data/tables', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ tableName: 'Smoke Orders', fileName: 'smoke-orders' }),
   });
-  const imported = await fetchJson(`${context.origin}/api/data/smoke-orders/import`, {
+  const imported = await fetchJson(buildProjectApiUrl(context.origin, '/api/data/smoke-orders/import', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ csvData: 'id,name,total\n1,Alice,12\n2,Bob,34\n' }),
   });
-  const records = await fetchJson(`${context.origin}/api/data/smoke-orders`);
-  const exported = await fetch(`${context.origin}/api/data/smoke-orders/export`);
+  const records = await fetchJson(buildProjectApiUrl(context.origin, '/api/data/smoke-orders', context.projectId));
+  const exported = await fetch(buildProjectApiUrl(context.origin, '/api/data/smoke-orders/export', context.projectId));
   const exportedCsv = await exported.text();
   addStep(entry, 'data table import export round-trips records', {
     fileName: table.body.fileName,
@@ -626,17 +633,17 @@ async function runResourceCrudJourney(context, entry) {
   assertOk(imported.body.recordCount === 2 && records.body.length === 2, '数据表导入未读回记录', { imported: imported.body, records: records.body });
   assertOk(exportedCsv.includes('"Alice"') && exportedCsv.includes('"Bob"'), '数据表 CSV 导出缺少记录', exportedCsv);
 
-  const theme = await fetchJson(`${context.origin}/api/themes`, {
+  const theme = await fetchJson(buildProjectApiUrl(context.origin, '/api/themes', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ displayName: 'Smoke Theme', name: 'smoke-theme', design: '# Smoke Theme\n' }),
   });
-  const contents = await fetchJson(`${context.origin}/api/themes/get-contents`, {
+  const contents = await fetchJson(buildProjectApiUrl(context.origin, '/api/themes/get-contents', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ themeName: theme.body.name }),
   });
-  const sync = await fetchJson(`${context.origin}/api/themes/sync-design`, {
+  const sync = await fetchJson(buildProjectApiUrl(context.origin, '/api/themes/sync-design', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ themeName: theme.body.name }),
@@ -648,9 +655,9 @@ async function runResourceCrudJourney(context, entry) {
   assertOk(contents.body.design.includes('Smoke Theme'), '主题内容未读回 DESIGN.md', contents.body);
   assertOk(sync.body.success === true && fs.existsSync(path.join(context.projectRoot, 'DESIGN.md')), '默认设计同步失败', sync.body);
 
-  await fetchJson(`${context.origin}/api/docs/${encodeURIComponent(renamedDoc.body.name)}`, { method: 'DELETE' });
-  await fetchJson(`${context.origin}/api/data/tables/smoke-orders`, { method: 'DELETE' });
-  await fetchJson(`${context.origin}/api/themes/${encodeURIComponent(theme.body.name)}`, { method: 'DELETE' });
+  await fetchJson(buildProjectApiUrl(context.origin, `/api/docs/${encodeURIComponent(renamedDoc.body.name)}`, context.projectId), { method: 'DELETE' });
+  await fetchJson(buildProjectApiUrl(context.origin, '/api/data/tables/smoke-orders', context.projectId), { method: 'DELETE' });
+  await fetchJson(buildProjectApiUrl(context.origin, `/api/themes/${encodeURIComponent(theme.body.name)}`, context.projectId), { method: 'DELETE' });
   const metadata = readJson(path.join(context.projectRoot, '.axhub/make/project.json'));
   const renamedDocPath = path.join(context.projectRoot, 'src/resources', renamedDoc.body.path || renamedDoc.body.name);
   const dataTablePath = path.join(context.projectRoot, 'src/resources/data/smoke-orders.json');
@@ -671,8 +678,8 @@ async function runGitVersioningJourney(context, entry) {
   const sourcePath = path.join(context.projectRoot, 'src/prototypes', prototype.name, 'index.tsx');
   fs.appendFileSync(sourcePath, '\nexport const smokeGitChange = true;\n', 'utf8');
 
-  const status = await fetchJson(`${context.origin}/api/git/status`);
-  const diff = await fetchJson(`${context.origin}/api/git/diff?path=${encodeURIComponent(`prototypes/${prototype.name}`)}`);
+  const status = await fetchJson(buildProjectApiUrl(context.origin, '/api/git/status', context.projectId));
+  const diff = await fetchJson(buildProjectApiUrl(context.origin, `/api/git/diff?path=${encodeURIComponent(`prototypes/${prototype.name}`)}`, context.projectId));
   addStep(entry, 'git status and diff expose prototype changes', {
     hasChanges: status.body.hasChanges,
     diffLength: diff.body.diff?.length || 0,
@@ -680,14 +687,14 @@ async function runGitVersioningJourney(context, entry) {
   assertOk(status.body.available === true && status.body.hasChanges === true, 'Git status 未报告变更', status.body);
   assertOk(String(diff.body.diff || '').includes('smokeGitChange'), 'Git diff 未包含变更内容', diff.body);
 
-  const committed = await fetchJson(`${context.origin}/api/git/commit`, {
+  const committed = await fetchJson(buildProjectApiUrl(context.origin, '/api/git/commit', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ path: `prototypes/${prototype.name}`, message: 'smoke git change' }),
   });
   const newHash = git(context.projectRoot, ['rev-parse', 'HEAD']);
-  const history = await fetchJson(`${context.origin}/api/git/history?path=${encodeURIComponent(`prototypes/${prototype.name}`)}`);
-  const version = await fetchJson(`${context.origin}/api/git/build-version`, {
+  const history = await fetchJson(buildProjectApiUrl(context.origin, `/api/git/history?path=${encodeURIComponent(`prototypes/${prototype.name}`)}`, context.projectId));
+  const version = await fetchJson(buildProjectApiUrl(context.origin, '/api/git/build-version', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ path: `prototypes/${prototype.name}`, commitHash: initialHash }),
@@ -702,11 +709,12 @@ async function runGitVersioningJourney(context, entry) {
   assertOk(history.body.commits?.some((commit) => commit.hash === newHash), 'Git history 未包含新提交', history.body);
   assertOk(version.body.hasPrototype === true && version.body.prototypeUrl, 'Git version 构建未生成原型文件', version.body);
 
-  const versionFile = await fetch(`${context.origin}${version.body.prototypeUrl}`);
+  const versionEntryPath = `/api/git/version-file/${encodeURIComponent(version.body.versionId)}/prototypes/${encodeURIComponent(prototype.name)}/index.tsx`;
+  const versionFile = await fetch(buildProjectApiUrl(context.origin, versionEntryPath, context.projectId));
   const versionText = await versionFile.text();
   assertOk(versionFile.ok && !versionText.includes('smokeGitChange'), '版本文件不是初始提交内容', versionText.slice(0, 300));
 
-  await fetchJson(`${context.origin}/api/git/restore`, {
+  await fetchJson(buildProjectApiUrl(context.origin, '/api/git/restore', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ path: `prototypes/${prototype.name}`, commitHash: initialHash }),
@@ -724,7 +732,7 @@ async function runReviewAndDesignDecisionsJourney(context, entry) {
   const sourcePath = path.join(context.projectRoot, 'src/prototypes', prototype.name, 'index.tsx');
 
   writeText(sourcePath, createInvalidReviewPrototypeSource());
-  const defaultReview = await fetchJson(`${context.origin}/api/code-review`, {
+  const defaultReview = await fetchJson(buildProjectApiUrl(context.origin, '/api/code-review', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ path: targetPath }),
@@ -742,7 +750,7 @@ async function runReviewAndDesignDecisionsJourney(context, entry) {
 
   writeText(sourcePath, createAxureReviewPrototypeSource());
   writeText(path.join(context.projectRoot, 'src/prototypes', prototype.name, 'style.css'), '@import "tailwindcss";\n.smoke-review { min-height: 100vh; }\n');
-  const axureReview = await fetchJson(`${context.origin}/api/code-review`, {
+  const axureReview = await fetchJson(buildProjectApiUrl(context.origin, '/api/code-review', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -761,7 +769,7 @@ async function runReviewAndDesignDecisionsJourney(context, entry) {
   assertOk(axureReview.body.passed === true, '合规 Axure 源码未通过代码评审', axureReview.body);
   assertOk(axureReview.body.summary?.blockingErrors === 0, '合规 Axure 源码仍存在阻断问题', axureReview.body);
 
-  const axurePreview = await fetchJson(`${context.origin}/api/axure-api-preview`, {
+  const axurePreview = await fetchJson(buildProjectApiUrl(context.origin, '/api/axure-api-preview', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ path: targetPath }),
@@ -786,7 +794,7 @@ async function runReviewAndDesignDecisionsJourney(context, entry) {
     axurePreview.body,
   );
 
-  const theme = await fetchJson(`${context.origin}/api/themes`, {
+  const theme = await fetchJson(buildProjectApiUrl(context.origin, '/api/themes', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -796,9 +804,9 @@ async function runReviewAndDesignDecisionsJourney(context, entry) {
     }),
   });
   patchSmokeThemeDecisionMetadata(context, theme.body.name);
-  const themes = await fetchJson(`${context.origin}/api/themes`);
+  const themes = await fetchJson(buildProjectApiUrl(context.origin, '/api/themes', context.projectId));
   const candidate = themes.body.find((item) => item.name === theme.body.name);
-  const contents = await fetchJson(`${context.origin}/api/themes/get-contents`, {
+  const contents = await fetchJson(buildProjectApiUrl(context.origin, '/api/themes/get-contents', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ themeName: theme.body.name }),
@@ -821,9 +829,9 @@ async function runReviewAndDesignDecisionsJourney(context, entry) {
   writeText(prototypeReviewFile, createPrototypeReviewMarkdown(prototype.name));
 
   const [decisionReadback, uiReviewReadback, prototypeReviewReadback] = await Promise.all([
-    fetchText(`${context.origin}/api/markdown-file?path=${encodeURIComponent(path.relative(context.projectRoot, decisionFile).split(path.sep).join('/'))}`),
-    fetchText(`${context.origin}/api/markdown-file?path=${encodeURIComponent(path.relative(context.projectRoot, uiReviewFile).split(path.sep).join('/'))}`),
-    fetchText(`${context.origin}/api/markdown-file?path=${encodeURIComponent(path.relative(context.projectRoot, prototypeReviewFile).split(path.sep).join('/'))}`),
+    fetchText(buildProjectApiUrl(context.origin, `/api/markdown-file?path=${encodeURIComponent(path.relative(context.projectRoot, decisionFile).split(path.sep).join('/'))}`, context.projectId)),
+    fetchText(buildProjectApiUrl(context.origin, `/api/markdown-file?path=${encodeURIComponent(path.relative(context.projectRoot, uiReviewFile).split(path.sep).join('/'))}`, context.projectId)),
+    fetchText(buildProjectApiUrl(context.origin, `/api/markdown-file?path=${encodeURIComponent(path.relative(context.projectRoot, prototypeReviewFile).split(path.sep).join('/'))}`, context.projectId)),
   ]);
   addStep(entry, 'review and design decision artifacts are readable from spec paths', {
     decisionPath: path.relative(context.projectRoot, decisionFile).split(path.sep).join('/'),
@@ -834,7 +842,7 @@ async function runReviewAndDesignDecisionsJourney(context, entry) {
   assertOk(uiReviewReadback.includes('# UI Review') && uiReviewReadback.includes('## 核心元件'), 'UI Review 产物不符合基础模板', uiReviewReadback);
   assertOk(prototypeReviewReadback.includes('# Prototype Review') && prototypeReviewReadback.includes('## 完整性与项目对齐'), 'Prototype Review 产物不符合基础模板', prototypeReviewReadback);
 
-  await fetchJson(`${context.origin}/api/themes/${encodeURIComponent(theme.body.name)}`, { method: 'DELETE' });
+  await fetchJson(buildProjectApiUrl(context.origin, `/api/themes/${encodeURIComponent(theme.body.name)}`, context.projectId), { method: 'DELETE' });
 }
 
 function ensurePrototype(context) {
@@ -955,7 +963,7 @@ function createMarkerBackedMakeClientProject({ root, id, name, assistantOrigin }
     },
   });
   writeJson(path.join(root, '.axhub/make/client.json'), {
-    schemaVersion: 1,
+    schemaVersion: 2,
     kind: 'axhub-make-client',
     repository: 'smoke',
     project: { id, name },
@@ -973,7 +981,7 @@ export default function ImportedHome() {
 }
 `);
   writeJson(path.join(root, '.axhub/make/project.json'), {
-    schemaVersion: 1,
+    schemaVersion: 2,
     project: { id, name },
     resources: {
       prototypes: [
@@ -1023,14 +1031,14 @@ export default function ImportedHome() {
   return root;
 }
 
-async function uploadMarkdownDoc(origin, filename, content) {
+async function uploadMarkdownDoc(context, filename, content) {
   const boundary = `----axhub-smoke-${Date.now()}`;
   const body = Buffer.concat([
     Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: text/markdown\r\n\r\n`, 'utf8'),
     Buffer.from(content, 'utf8'),
     Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8'),
   ]);
-  return fetchJson(`${origin}/api/docs/upload`, {
+  return fetchJson(buildProjectApiUrl(context.origin, '/api/docs/upload', context.projectId), {
     method: 'POST',
     headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
     body,
@@ -1326,7 +1334,7 @@ export default function SmokeDesignPreview() {
   return {
     tarballPath,
     templateIndex: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       templates: [
         {
           id: 'smoke-template',
@@ -1341,7 +1349,7 @@ export default function SmokeDesignPreview() {
       ],
     },
     themeIndex: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       designSystems: [
         {
           id: 'smoke-design',
@@ -1401,11 +1409,11 @@ async function postMockAcpChat(origin, body) {
   return readSseResponse(response);
 }
 
-async function postAiRun(origin, body) {
-  const response = await fetch(`${origin}/api/ai/runs`, {
+async function postAiRun(context, body) {
+  const response = await fetch(buildProjectApiUrl(context.origin, '/api/ai/runs', context.projectId), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, projectId: context.projectId }),
   });
   if (!response.ok) {
     throw new Error(`AI run 请求失败: ${response.status} ${await response.text()}`);

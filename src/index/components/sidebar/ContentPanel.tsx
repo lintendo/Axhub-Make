@@ -66,19 +66,20 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SidebarTab } from './IconNavigation';
 import { ItemData, SidebarTreeNode, SidebarTreeTab, ViewMode } from '../../types';
-import type { SelectedResourceFolder, UploadedResourceFile } from '../../types/index-page.types';
+import type { PromptExecutionMeta, SelectedResourceFolder, UploadedResourceFile } from '../../types/index-page.types';
 import type { IDEAvailabilityMap, MainIDEPreference } from '../../../common/ide';
 import type { RuntimeAgentAvailability } from '../../../common/agent';
 import type { AcpProvider } from '@/common/assistant-context/types';
 import type { ThemeResourceItem } from '../../domains/resources/resource.types';
 import OpenInDropdown from './OpenInDropdown';
 import type { ProjectListItem, ResourceWriteCapabilities } from '../../services/projectResources';
-import { hasExplicitLocalPath } from '../../utils/localPath';
+import { getPrototypeLocalBasePath, hasExplicitLocalPath } from '../../utils/localPath';
 import { ASSISTANT_CONTEXT_DRAG_MIME, buildAssistantContextDragPayload } from '../../domains/assistant/assistantContextDrag';
 import { buildAssistantContextItemsFromResource } from '../../domains/assistant/assistantContextPayload';
 import { getClipboardImageFiles } from '../../domains/shared/clipboardImages';
 import { createSidebarTreeItemLookup, resolveSidebarTreeItem } from '../../utils/sidebarTree';
 import { sidebarApi } from '../../services/sidebar.api';
+import { requireProjectScope, withProjectScope } from '../../services/projectScope';
 import { apiService } from '../../services/api';
 import { buildItemUrl, buildLANItemUrl } from '../../utils/url';
 import { makeClientTemplateMirrorDownloadUrl, makeClientTemplatePrimaryDownloadUrl } from '../../../common/makeClientTemplate';
@@ -148,9 +149,10 @@ interface ContentPanelProps {
     onOpenAcpWebAgent?: (targetPath?: string, provider?: AcpProvider) => void | Promise<void>;
     onOpenImageAiPanel?: () => void | Promise<void>;
     onOpenWebAgentInPanel?: (url: string) => boolean | void | Promise<boolean | void>;
-    onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+    onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
     webAgentPanelOpen?: boolean;
     aiPanelMode?: 'general-ai' | 'image-ai' | null;
+    externalOpenMenu?: boolean;
     onCloseAiPanel?: () => void;
     onCloseWebAgentPanel?: () => void;
     onPreferredIDEChange?: (ide: MainIDEPreference) => void;
@@ -1050,7 +1052,7 @@ interface ProjectSetupDialogProps {
         projectName?: string;
     }) => Promise<unknown>;
     assistantOpen?: boolean;
-    onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+    onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
 }
 
 function ProjectSetupDialog({
@@ -1736,6 +1738,7 @@ export default function ContentPanel({
     onExecutePrompt,
     webAgentPanelOpen,
     aiPanelMode,
+    externalOpenMenu = true,
     onCloseAiPanel,
     onCloseWebAgentPanel,
     onPreferredIDEChange,
@@ -1842,16 +1845,14 @@ export default function ContentPanel({
         try {
             const targetFolder = String(options?.targetFolder || '').trim();
             const formData = new FormData();
-            if (activeProjectId) {
-                formData.append('projectId', activeProjectId);
-            }
+            formData.append('projectId', requireProjectScope(activeProjectId).projectId);
             if (targetFolder) {
                 formData.append('targetFolder', targetFolder);
             }
             for (const file of Array.from(files)) {
                 formData.append('file', file, file.name);
             }
-            const response = await fetch('/api/docs/upload', {
+            const response = await fetch(withProjectScope('/api/docs/upload', requireProjectScope(activeProjectId)), {
                 method: 'POST',
                 body: formData,
             });
@@ -2446,7 +2447,12 @@ export default function ContentPanel({
             return;
         }
         try {
-            await sidebarApi.openResourceInSystem(normalizedPath, dataTab === 'themes' ? 'themes' : 'docs', kind);
+            await sidebarApi.openResourceInSystem(
+                normalizedPath,
+                requireProjectScope(activeProjectId),
+                dataTab === 'themes' ? 'themes' : 'docs',
+                kind,
+            );
             toast.success('已打开所在目录');
         } catch (error: any) {
             toast.error(error?.message || '打开本地文件系统失败');
@@ -2460,12 +2466,14 @@ export default function ContentPanel({
         const isPrototypeItem = dataTab === 'prototypes';
         const isDefaultDesign = isThemeItem && defaultThemeName === item.name;
         const showOpenResourceDirectoryAction = dataTab === 'docs';
-        const showLocalPathActions = hasExplicitLocalPath(item);
+        const prototypeLocalBasePath = isPrototypeItem ? getPrototypeLocalBasePath(item) : '';
+        const showLocalPathActions = isPrototypeItem ? Boolean(prototypeLocalBasePath) : hasExplicitLocalPath(item);
         const localShareUrl = buildItemUrl(item, 'demo')?.toString() || '';
         const lanShareUrl = buildLANItemUrl(item, 'demo');
         const lanTokenKey = `${activeProjectId || ''}:${item.name}:demo`;
         const lanTokenUrl = lanTokenUrls[lanTokenKey] || '';
         const hasShareUrl = Boolean(localShareUrl);
+        const showPrototypeAccessLinks = isPrototypeItem && item.previewDisabled !== true && hasShareUrl;
         const showLANShareGroup = Boolean(lanShareUrl);
         const canDownloadPrototypeZip = isPrototypeItem && showLocalPathActions && Boolean(handleDownloadItemSource);
         const canDownloadDesignZip = isThemeItem && showLocalPathActions && Boolean(handleDownloadThemeZip);
@@ -2616,7 +2624,7 @@ export default function ContentPanel({
                         </DropdownMenuItem>
                     </>
                 ) : null}
-                {isPrototypeItem ? (
+                {showPrototypeAccessLinks ? (
                     <DropdownMenuSub>
                         <DropdownMenuSubTrigger className="gap-2">
                             <Globe className="mr-2 h-4 w-4" />
@@ -2678,15 +2686,17 @@ export default function ContentPanel({
                         </DropdownMenuSubContent>
                     </DropdownMenuSub>
                 ) : null}
-                <DropdownMenuSeparator />
                 {canDeleteItem ? (
-                    <DropdownMenuItem
-                        onClick={() => handleDeleteItem(item)}
-                        className="text-destructive focus:text-destructive"
-                    >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        删除
-                    </DropdownMenuItem>
+                    <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                            onClick={() => handleDeleteItem(item)}
+                            className="text-destructive focus:text-destructive"
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            删除
+                        </DropdownMenuItem>
+                    </>
                 ) : null}
                     </DropdownMenuContent>
                 </DropdownMenu>
@@ -3040,6 +3050,13 @@ export default function ContentPanel({
             return <div className="py-8 text-center text-[12px] text-muted-foreground">加载中...</div>;
         }
         if (displayTree.length === 0) {
+            if (dataTab === 'themes' && !searchText.trim()) {
+                return (
+                    <div className="px-4 py-8 text-center text-[12px] leading-5 text-muted-foreground">
+                        暂无内容，创建设计规范，统一原型的视觉与文案风格
+                    </div>
+                );
+            }
             if (dataTab === 'docs' && !searchText.trim()) {
                 return (
                     <div
@@ -3152,8 +3169,9 @@ export default function ContentPanel({
                         </DropdownMenu>
                     </TooltipProvider>
 
-                    <div className="flex items-center gap-1">
-                        <OpenInDropdown
+                    {externalOpenMenu ? (
+                        <div className="flex items-center gap-1">
+                            <OpenInDropdown
                             handleOpenProjectInIDE={handleOpenProjectInIDE}
                             preferredIDE={preferredIDE}
                             activeProjectId={activeProjectId}
@@ -3170,8 +3188,9 @@ export default function ContentPanel({
                             onCloseWebAgentPanel={onCloseWebAgentPanel}
                             onPreferredIDEChange={onPreferredIDEChange}
                             onOpenAISettings={onOpenAISettings}
-                        />
-                    </div>
+                            />
+                        </div>
+                    ) : null}
                 </div>
 
                 <div className="px-2 pb-2">

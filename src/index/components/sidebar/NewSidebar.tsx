@@ -1,8 +1,8 @@
 import React from 'react';
 import type { SidebarTab } from './IconNavigation';
 import ContentPanel from './ContentPanel';
+import ResponsiveSidebarShell from './ResponsiveSidebarShell';
 import { ItemData, SidebarTreeTab } from '../../types';
-import { cn } from '@/lib/utils';
 import type {
     NewSidebarLegacyProps,
     NewSidebarProps,
@@ -104,9 +104,13 @@ export default function NewSidebar(rawProps: NewSidebarProps) {
         onSidebarTreePersist,
         webAgentPanelOpen,
         aiPanelMode,
+        externalOpenMenu,
     } = resolveNewSidebarProps(rawProps);
 
     const handleSidebarTabChange = (tab: SidebarTab) => {
+        if (tab === sidebarTab) {
+            return;
+        }
         onSidebarTabChange(tab);
         if (tab === 'prototype') {
             handleTabChange('prototypes');
@@ -182,12 +186,7 @@ export default function NewSidebar(rawProps: NewSidebarProps) {
     const versionHandler = currentTreeTab === 'docs' ? handleDocVersionManagement : handleVersionManagement;
 
     return (
-        <div
-            className={cn(
-                'flex flex-col h-full min-h-0 bg-background border-r border-border transition-all duration-300',
-                collapsed ? 'w-0 overflow-hidden border-none' : 'w-[240px]',
-            )}
-        >
+        <ResponsiveSidebarShell collapsed={collapsed}>
             <ContentPanel
                 activeTab={sidebarTab}
                 viewMode={viewMode}
@@ -257,6 +256,7 @@ export default function NewSidebar(rawProps: NewSidebarProps) {
                 onExecutePrompt={onExecutePrompt}
                 webAgentPanelOpen={webAgentPanelOpen}
                 aiPanelMode={aiPanelMode}
+                externalOpenMenu={externalOpenMenu}
                 onCloseAiPanel={onCloseAiPanel}
                 onCloseWebAgentPanel={onCloseWebAgentPanel}
                 onPreferredIDEChange={onPreferredIDEChange}
@@ -274,6 +274,6 @@ export default function NewSidebar(rawProps: NewSidebarProps) {
                 defaultThemeName={defaultThemeName}
                 onSetDefaultTheme={onSetDefaultTheme}
             />
-        </div>
+        </ResponsiveSidebarShell>
     );
 }

@@ -9,6 +9,7 @@ dist/
 !vendor/**/dist/**
 build/
 **/build/
+client/output/
 admin/
 **/admin/
 coverage/
@@ -67,6 +68,7 @@ vite.config.*.timestamp-*
 **/.drawio-tmp/
 automation-reports/
 **/automation-reports/
+/midscene/
 midscene_run/
 **/.sessions/
 temp/

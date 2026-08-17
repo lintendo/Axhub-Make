@@ -1,0 +1,170 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 31,
+  "pageId": "j6bz4o",
+  "pageName": "更换手机",
+  "sitemapPath": "我的 / 设置 / 更换手机",
+  "requestedPath": "更换手机.html",
+  "resolvedUrl": "http://127.0.0.1:32768/21.00.03/%E6%9B%B4%E6%8D%A2%E6%89%8B%E6%9C%BA.html",
+  "dataUrl": "http://127.0.0.1:32768/21.00.03/files/%E6%9B%B4%E6%8D%A2%E6%89%8B%E6%9C%BA/data.js",
+  "generationDate": "2026-08-14T13:00:03.218Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 绑定新手机号\n- paragraph: 绑定\n- textbox: 请输入手机号\n- paragraph: 请输入您要绑定的新手机号码，绑定成功后可用此\n- paragraph: 号码的登录康宝宝\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "031-change-phone-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "导航",
+    "2",
+    "背景",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [
+    {
+      "scope": "page:更换手机 / Group / Text field",
+      "label": "",
+      "type": "Text field",
+      "visible": true
+    }
+  ],
+  "panels": [
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:更换手机 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:更换手机 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "漏填错填提示",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 手机号码格式错误",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:更换手机 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "漏填错填提示",
+      "condition": "",
+      "action": "wait",
+      "description": "Wait 1500 ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:更换手机 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "漏填错填提示",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 手机号码格式错误",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:更换手机 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "验证通过",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 输入验证码 in Current window",
+      "target": "输入验证码.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

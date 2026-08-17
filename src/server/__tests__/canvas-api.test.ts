@@ -20,6 +20,17 @@ const GIF_DATA_URL = `data:image/gif;base64,${Buffer.from('GIF89a').toString('ba
 const JPEG_DATA_URL = `data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xd9]).toString('base64')}`;
 const WEBP_DATA_URL = `data:image/webp;base64,${Buffer.from('RIFFxxxxWEBP').toString('base64')}`;
 const SVG_DATA_URL = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>').toString('base64')}`;
+const nativeFetch = globalThis.fetch.bind(globalThis);
+const canvasProjectIdByOrigin = new Map<string, string>();
+
+async function fetch(input: string | URL, init?: RequestInit): Promise<Response> {
+  const url = new URL(String(input));
+  const projectId = canvasProjectIdByOrigin.get(url.origin);
+  if (projectId && url.pathname.startsWith('/api/canvas')) {
+    url.searchParams.set('projectId', projectId);
+  }
+  return nativeFetch(url, init);
+}
 
 class FakeCanvasSocket extends EventEmitter {
   readonly sentMessages: any[] = [];
@@ -154,12 +165,15 @@ async function startActiveCanvasTestServer(projectRoot: string) {
     metadataPath: getProjectMetadataPath(projectRoot),
   });
   registry.setActiveProject(projectId);
-  return startTestServer(projectRoot, registryHome);
+  const server = await startTestServer(projectRoot, registryHome);
+  canvasProjectIdByOrigin.set(server.origin, projectId);
+  return server;
 }
 
 describe('canvas API', () => {
   afterEach(() => {
     getCanvasBridgeHub().destroy();
+    canvasProjectIdByOrigin.clear();
     cleanupProjectApiTestRoots();
   });
 
@@ -219,15 +233,15 @@ describe('canvas API', () => {
       expect(saved.files['resource-image-file']).toMatchObject({
         mimeType: 'image/png',
         id: 'Resource Image File',
-        path: 'app.assets/images/resource-image-file.png',
+        path: '.assets/flows/app.excalidraw/images/resource-image-file.png',
       });
-      const assetPath = path.join(resourcesDir, 'flows', 'app.assets', 'images', 'resource-image-file.png');
+      const assetPath = path.join(resourcesDir, '.assets', 'flows', 'app.excalidraw', 'images', 'resource-image-file.png');
       expect(fs.existsSync(assetPath)).toBe(true);
 
       const hydrated = await fetch(`${server.origin}/api/canvas/resources/${encodeURIComponent('flows/app.excalidraw')}`)
         .then((response) => response.json());
       expect(hydrated.files['resource-image-file']).toMatchObject({
-        path: 'app.assets/images/resource-image-file.png',
+        path: '.assets/flows/app.excalidraw/images/resource-image-file.png',
         dataURL: PNG_DATA_URL,
       });
     } finally {
@@ -516,7 +530,7 @@ describe('canvas API', () => {
       expect(saved.files['image-file-1']).toMatchObject({
         mimeType: 'image/png',
         id: 'image-file-1',
-        path: 'app.assets/images/image-file-1.png',
+        path: '.assets/flows/app.excalidraw/images/image-file-1.png',
         created: 1778751138363,
         lastRetrieved: 1778751138363,
       });
@@ -526,8 +540,9 @@ describe('canvas API', () => {
         projectRoot,
         'src',
         'resources',
+        '.assets',
         'flows',
-        'app.assets',
+        'app.excalidraw',
         'images',
         'image-file-1.png',
       );
@@ -542,7 +557,7 @@ describe('canvas API', () => {
       expect(hydrated.files['image-file-1']).toMatchObject({
         mimeType: 'image/png',
         id: 'image-file-1',
-        path: 'app.assets/images/image-file-1.png',
+        path: '.assets/flows/app.excalidraw/images/image-file-1.png',
         dataURL: PNG_DATA_URL,
       });
     } finally {
@@ -582,21 +597,21 @@ describe('canvas API', () => {
       expect(saved.files.jpeg).toMatchObject({
         mimeType: 'image/jpeg',
         id: 'Hero Photo',
-        path: 'app.assets/images/hero-photo.jpg',
+        path: '.assets/flows/app.excalidraw/images/hero-photo.jpg',
       });
       expect(saved.files.gif).toMatchObject({
         mimeType: 'image/gif',
         id: 'Loop Clip',
-        path: 'app.assets/images/loop-clip.gif',
+        path: '.assets/flows/app.excalidraw/images/loop-clip.gif',
       });
       expect(saved.files.webp).toMatchObject({
         mimeType: 'image/webp',
         id: 'Web Preview',
-        path: 'app.assets/images/web-preview.webp',
+        path: '.assets/flows/app.excalidraw/images/web-preview.webp',
       });
-      expect(fs.existsSync(path.join(projectRoot, 'src', 'resources', 'flows', 'app.assets', 'images', 'hero-photo.jpg'))).toBe(true);
-      expect(fs.existsSync(path.join(projectRoot, 'src', 'resources', 'flows', 'app.assets', 'images', 'loop-clip.gif'))).toBe(true);
-      expect(fs.existsSync(path.join(projectRoot, 'src', 'resources', 'flows', 'app.assets', 'images', 'web-preview.webp'))).toBe(true);
+      expect(fs.existsSync(path.join(projectRoot, 'src', 'resources', '.assets', 'flows', 'app.excalidraw', 'images', 'hero-photo.jpg'))).toBe(true);
+      expect(fs.existsSync(path.join(projectRoot, 'src', 'resources', '.assets', 'flows', 'app.excalidraw', 'images', 'loop-clip.gif'))).toBe(true);
+      expect(fs.existsSync(path.join(projectRoot, 'src', 'resources', '.assets', 'flows', 'app.excalidraw', 'images', 'web-preview.webp'))).toBe(true);
     } finally {
       await server.close();
     }
@@ -659,7 +674,7 @@ describe('canvas API', () => {
       expect(saved.files['generated-image-file']).toMatchObject({
         mimeType: 'image/png',
         id: 'generated-image-file',
-        path: 'app.assets/images/generated-image-file.png',
+        path: '.assets/flows/app.excalidraw/images/generated-image-file.png',
       });
       expect(saved.files['generated-image-file']).not.toHaveProperty('dataURL');
       expect(saved.files['axhub-ai-image-placeholder-v2']).toMatchObject({
@@ -671,8 +686,9 @@ describe('canvas API', () => {
         projectRoot,
         'src',
         'resources',
+        '.assets',
         'flows',
-        'app.assets',
+        'app.excalidraw',
         'images',
         'generated-image-file.png',
       ))).toBe(true);
@@ -734,7 +750,7 @@ describe('canvas API', () => {
       expect(saved.files['legacy-image-file']).toMatchObject({
         mimeType: 'image/png',
         id: 'legacy-image-file',
-        path: 'legacy.assets/images/legacy-image-file.png',
+        path: '.assets/boards/legacy.excalidraw/images/legacy-image-file.png',
         created: 1778751138363,
         lastRetrieved: 1778751138363,
       });
@@ -744,8 +760,9 @@ describe('canvas API', () => {
         projectRoot,
         'src',
         'resources',
+        '.assets',
         'boards',
-        'legacy.assets',
+        'legacy.excalidraw',
         'images',
         'legacy-image-file.png',
       );
@@ -760,7 +777,7 @@ describe('canvas API', () => {
       expect(hydrated.files['legacy-image-file']).toMatchObject({
         mimeType: 'image/png',
         id: 'legacy-image-file',
-        path: 'legacy.assets/images/legacy-image-file.png',
+        path: '.assets/boards/legacy.excalidraw/images/legacy-image-file.png',
         dataURL: PNG_DATA_URL,
       });
     } finally {
@@ -813,8 +830,9 @@ describe('canvas API', () => {
         projectRoot,
         'src',
         'resources',
+        '.assets',
         'flows',
-        'app.assets',
+        'app.excalidraw',
         'images',
         'image-file-1.png',
       ))).toBe(false);
@@ -831,7 +849,7 @@ describe('canvas API', () => {
 
     try {
       const encodedCanvas = encodeResourceCanvasPath('flows/app.excalidraw');
-      const screenshotPath = path.join(projectRoot, 'src', 'resources', 'flows', 'app.assets', 'screenshot.png');
+      const screenshotPath = path.join(projectRoot, 'src', 'resources', '.assets', 'flows', 'app.excalidraw', 'screenshot.png');
       expect(fs.existsSync(screenshotPath)).toBe(false);
 
       const putResponse = await fetch(`${server.origin}/api/canvas/resources/${encodedCanvas}/screenshot`, {
@@ -850,17 +868,20 @@ describe('canvas API', () => {
         success: true,
         changed: true,
         resourcePath: 'flows/app.excalidraw',
-        path: 'src/resources/flows/app.assets/screenshot.png',
-        screenshotUrl: expect.stringMatching(/^\/api\/canvas\/resources\/flows\/app\.excalidraw\/app\.assets\/screenshot\.png\?v=\d+$/u),
-        apiScreenshotUrl: expect.stringMatching(/^\/api\/canvas\/resources\/flows\/app\.excalidraw\/app\.assets\/screenshot\.png\?v=\d+$/u),
+        path: 'src/resources/.assets/flows/app.excalidraw/screenshot.png',
         width: 320,
         height: 180,
       });
+      const screenshotUrl = new URL(putBody.screenshotUrl, server.origin);
+      expect(screenshotUrl.pathname).toBe('/api/canvas/resources/flows/app.excalidraw/asset/screenshot.png');
+      expect(screenshotUrl.searchParams.get('v')).toMatch(/^\d+$/u);
+      expect(screenshotUrl.searchParams.get('projectId')).toBe(path.basename(projectRoot));
+      expect(putBody.apiScreenshotUrl).toBe(putBody.screenshotUrl);
       expect(fs.existsSync(screenshotPath)).toBe(true);
       const written = fs.readFileSync(screenshotPath);
       expect(written.subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
 
-      const getResponse = await fetch(`${server.origin}/api/canvas/resources/${encodedCanvas}/app.assets/screenshot.png`);
+      const getResponse = await fetch(`${server.origin}/api/canvas/resources/${encodedCanvas}/asset/screenshot.png`);
       expect(getResponse.status).toBe(200);
       expect(getResponse.headers.get('content-type')).toBe('image/png');
       expect(Buffer.from(await getResponse.arrayBuffer())).toEqual(written);
@@ -874,13 +895,13 @@ describe('canvas API', () => {
       await expect(unchangedResponse.json()).resolves.toMatchObject({
         success: true,
         changed: false,
-        path: 'src/resources/flows/app.assets/screenshot.png',
+        path: 'src/resources/.assets/flows/app.excalidraw/screenshot.png',
       });
 
-      const missingResponse = await fetch(`${server.origin}/api/canvas/resources/${encodedCanvas}/app.assets/missing.png`);
+      const missingResponse = await fetch(`${server.origin}/api/canvas/resources/${encodedCanvas}/asset/missing.png`);
       expect(missingResponse.status).toBe(404);
 
-      const wrongMethodResponse = await fetch(`${server.origin}/api/canvas/resources/${encodedCanvas}/app.assets/screenshot.png`, {
+      const wrongMethodResponse = await fetch(`${server.origin}/api/canvas/resources/${encodedCanvas}/asset/screenshot.png`, {
         method: 'POST',
       });
       expect(wrongMethodResponse.status).toBe(405);
@@ -897,9 +918,9 @@ describe('canvas API', () => {
 
     try {
       const encodedCanvas = encodeResourceCanvasPath('flows/app.excalidraw');
-      const elementScreenshotPath = path.join(projectRoot, 'src', 'resources', 'flows', 'app.assets', 'embed-embed-1.png');
-      const pageScreenshotPath = path.join(projectRoot, 'src', 'resources', 'flows', 'app.assets', 'page-order-detail.png');
-      const latestScreenshotPath = path.join(projectRoot, 'src', 'resources', 'flows', 'app.assets', 'screenshot.png');
+      const elementScreenshotPath = path.join(projectRoot, 'src', 'resources', '.assets', 'flows', 'app.excalidraw', 'embed-embed-1.png');
+      const pageScreenshotPath = path.join(projectRoot, 'src', 'resources', '.assets', 'flows', 'app.excalidraw', 'page-order-detail.png');
+      const latestScreenshotPath = path.join(projectRoot, 'src', 'resources', '.assets', 'flows', 'app.excalidraw', 'screenshot.png');
 
       const elementResponse = await fetch(`${server.origin}/api/canvas/resources/${encodedCanvas}/screenshot`, {
         method: 'POST',
@@ -916,8 +937,8 @@ describe('canvas API', () => {
         success: true,
         changed: true,
         fileName: 'embed-embed-1.png',
-        path: 'src/resources/flows/app.assets/embed-embed-1.png',
-        latestPath: 'src/resources/flows/app.assets/screenshot.png',
+        path: 'src/resources/.assets/flows/app.excalidraw/embed-embed-1.png',
+        latestPath: 'src/resources/.assets/flows/app.excalidraw/screenshot.png',
       });
       expect(fs.existsSync(elementScreenshotPath)).toBe(true);
       expect(fs.readFileSync(latestScreenshotPath)).toEqual(fs.readFileSync(elementScreenshotPath));
@@ -937,8 +958,8 @@ describe('canvas API', () => {
         success: true,
         changed: true,
         fileName: 'page-order-detail.png',
-        path: 'src/resources/flows/app.assets/page-order-detail.png',
-        latestPath: 'src/resources/flows/app.assets/screenshot.png',
+        path: 'src/resources/.assets/flows/app.excalidraw/page-order-detail.png',
+        latestPath: 'src/resources/.assets/flows/app.excalidraw/screenshot.png',
         width: 393,
         height: 852,
       });
@@ -991,7 +1012,7 @@ describe('canvas API', () => {
       });
       expect(missingCanvasResponse.status).toBe(404);
       expect(fs.existsSync(path.join(projectRoot, 'src', 'outside.assets', 'screenshot.png'))).toBe(false);
-      expect(fs.existsSync(path.join(projectRoot, 'src', 'resources', 'flows', 'app.assets', 'outside.png'))).toBe(false);
+      expect(fs.existsSync(path.join(projectRoot, 'src', 'resources', '.assets', 'flows', 'app.excalidraw', 'outside.png'))).toBe(false);
     } finally {
       await server.close();
     }

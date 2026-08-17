@@ -30,8 +30,10 @@ import {
 } from './generationArtifactHistoryStore';
 import { buildMarkdownFileUrl } from '../../utils/markdownPreview';
 import { cn } from '@/lib/utils';
+import { withProjectScope } from '../../services/projectScope';
 
 interface GenerationHistoryPopoverProps {
+  projectId: string;
   targetPath?: string;
   container?: HTMLElement | null;
   onInsertArtifact?: (artifact: GenerationArtifactRecord) => void;
@@ -100,7 +102,7 @@ function isImageLikePath(value: string): boolean {
   return /\.(png|jpe?g|gif|webp|bmp|ico|avif|svg)(?:$|[?#])/iu.test(value);
 }
 
-function buildArtifactHistoryAssetUrl(targetPath: string | undefined, assetPath: string): string {
+function buildArtifactHistoryAssetUrl(projectId: string, targetPath: string | undefined, assetPath: string): string {
   const normalizedTargetPath = stringField(targetPath);
   const normalizedAssetPath = assetPath.replace(/\\/g, '/').replace(/^\/+/u, '');
   if (!normalizedTargetPath || !normalizedAssetPath.startsWith('generation-assets/')) return '';
@@ -108,20 +110,20 @@ function buildArtifactHistoryAssetUrl(targetPath: string | undefined, assetPath:
     targetPath: normalizedTargetPath,
     assetPath: normalizedAssetPath,
   });
-  return `/api/ai/artifact-history/assets?${params.toString()}`;
+  return withProjectScope(`/api/ai/artifact-history/assets?${params.toString()}`, { projectId });
 }
 
-function resolveArtifactPreviewUrl(artifact: GenerationArtifactRecord, targetPath?: string): string {
+function resolveArtifactPreviewUrl(artifact: GenerationArtifactRecord, projectId: string, targetPath?: string): string {
   const url = stringField(artifact.assetRef?.url)
     || stringField(artifact.target.url)
     || stringField(artifact.target.uri)
     || stringField(artifact.target.href);
   if (url && url !== 'data:image/svg+xml') return url;
-  const assetUrl = buildArtifactHistoryAssetUrl(targetPath, stringField(artifact.assetRef?.assetPath));
+  const assetUrl = buildArtifactHistoryAssetUrl(projectId, targetPath, stringField(artifact.assetRef?.assetPath));
   if (assetUrl) return assetUrl;
   const path = stringField(artifact.target.path);
   if (artifact.kind === 'image' && path && isImageLikePath(path)) {
-    return buildMarkdownFileUrl(path);
+    return buildMarkdownFileUrl(path, projectId);
   }
   return url;
 }
@@ -246,6 +248,7 @@ function GenerationHistoryTriggerButton({
 }
 
 export default function GenerationHistoryPopover({
+  projectId,
   targetPath,
   container,
   onInsertArtifact,
@@ -261,8 +264,8 @@ export default function GenerationHistoryPopover({
   useEffect(() => store.subscribe(setState), [store]);
 
   useEffect(() => {
-    void store.configure({ targetPath });
-  }, [store, targetPath]);
+    void store.configure({ projectId, targetPath });
+  }, [projectId, store, targetPath]);
 
   useEffect(() => {
     setFailedPreviewUrls({});
@@ -366,7 +369,7 @@ export default function GenerationHistoryPopover({
               ) : entries.map((artifact) => {
                 const displayTitle = displayArtifactTitle(artifact);
                 const displayPrompt = displayArtifactPrompt(artifact);
-                const previewUrl = resolveArtifactPreviewUrl(artifact, targetPath);
+                const previewUrl = resolveArtifactPreviewUrl(artifact, projectId, targetPath);
                 const showImagePreview = canShowImagePreview(artifact, previewUrl) && !failedPreviewUrls[previewUrl];
                 const time = formatTime(artifact.updatedAt || artifact.createdAt);
                 return (

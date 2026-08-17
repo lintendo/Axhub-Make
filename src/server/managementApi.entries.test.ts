@@ -37,41 +37,39 @@ describe('entries compatibility API', () => {
       } as IncomingMessage,
       res,
       { runtimeOrigin: '' } as any,
-      '/api/entries.json',
       {
-        getActiveProjectContext: () => ({
-          project: {
-            id: 'demo-project',
-            root: '/tmp/demo-project',
-          },
-          metadata: {
-            resources: {
-              prototypes: [
-                {
-                  id: 'untitled',
-                  name: 'untitled',
-                  title: 'Untitled',
-                  clientUrl: '/prototypes/untitled',
-                  filePath: 'src/prototypes/untitled/index.tsx',
-                  absoluteFilePath: '/tmp/demo-project/src/prototypes/untitled/index.tsx',
-                  placeholder: true,
-                  placeholderGuide: {
-                    kind: 'prototype-empty',
-                    title: 'Empty prototype',
-                    description: 'Describe what to create.',
-                    steps: [],
-                    tips: [],
-                  },
+        project: {
+          id: 'demo-project',
+          root: '/tmp/demo-project',
+        },
+        metadata: {
+          resources: {
+            prototypes: [
+              {
+                id: 'untitled',
+                name: 'untitled',
+                title: 'Untitled',
+                clientUrl: '/prototypes/untitled',
+                filePath: 'src/prototypes/untitled/index.tsx',
+                absoluteFilePath: '/tmp/demo-project/src/prototypes/untitled/index.tsx',
+                placeholder: true,
+                placeholderGuide: {
+                  kind: 'prototype-empty',
+                  title: 'Empty prototype',
+                  description: 'Describe what to create.',
+                  steps: [],
+                  tips: [],
                 },
-              ],
-              docs: [],
-              themes: [],
-              data: [],
-              templates: [],
-            },
-          } as any,
-        }),
+              },
+            ],
+            docs: [],
+            themes: [],
+            data: [],
+            templates: [],
+          },
+        } as any,
       },
+      '/api/entries.json',
     );
 
     expect(handled).toBe(true);
@@ -96,34 +94,32 @@ describe('entries compatibility API', () => {
       } as IncomingMessage,
       res,
       { runtimeOrigin: '' } as any,
-      '/api/entries.json',
       {
-        getActiveProjectContext: () => ({
-          project: {
-            id: 'demo-project',
-            root: '/tmp/demo-project',
+        project: {
+          id: 'demo-project',
+          root: '/tmp/demo-project',
+        },
+        metadata: {
+          resources: {
+            prototypes: [
+              {
+                id: 'untitled',
+                name: 'untitled',
+                title: 'Untitled',
+                clientUrl: '/prototypes/untitled',
+                filePath: 'src/prototypes/untitled/index.tsx',
+                absoluteFilePath: '/tmp/demo-project/src/prototypes/untitled/index.tsx',
+                generationStatus: 'waiting',
+              },
+            ],
+            docs: [],
+            themes: [],
+            data: [],
+            templates: [],
           },
-          metadata: {
-            resources: {
-              prototypes: [
-                {
-                  id: 'untitled',
-                  name: 'untitled',
-                  title: 'Untitled',
-                  clientUrl: '/prototypes/untitled',
-                  filePath: 'src/prototypes/untitled/index.tsx',
-                  absoluteFilePath: '/tmp/demo-project/src/prototypes/untitled/index.tsx',
-                  generationStatus: 'waiting',
-                },
-              ],
-              docs: [],
-              themes: [],
-              data: [],
-              templates: [],
-            },
-          } as any,
-        }),
+        } as any,
       },
+      '/api/entries.json',
     );
 
     const body = readBody();
@@ -134,5 +130,47 @@ describe('entries compatibility API', () => {
     });
     expect(body.prototypes[0]).not.toHaveProperty('placeholder');
     expect(body.prototypes[0]).not.toHaveProperty('placeholderGuide');
+  });
+
+  it('rewrites loopback runtime links to the LAN request hostname', () => {
+    const { res, readBody } = createJsonResponse();
+
+    const handled = handleEntriesCompatibilityApi(
+      {
+        url: '/api/entries.json',
+        method: 'GET',
+        headers: { host: '192.168.1.42:53817' },
+      } as IncomingMessage,
+      res,
+      { runtimeOrigin: 'http://localhost:51720' } as any,
+      {
+        project: {
+          id: 'demo-project',
+          root: '/tmp/demo-project',
+        },
+        metadata: {
+          resources: {
+            prototypes: [
+              {
+                id: 'home',
+                name: 'home',
+                clientUrl: '/prototypes/home?mode=review#summary',
+              },
+            ],
+            docs: [],
+            themes: [],
+            data: [],
+            templates: [],
+          },
+        } as any,
+      },
+      '/api/entries.json',
+    );
+
+    expect(handled).toBe(true);
+    expect(readBody().prototypes[0]).toMatchObject({
+      clientUrl: 'http://192.168.1.42:51720/prototypes/home?mode=review#summary',
+      previewUrl: 'http://192.168.1.42:51720/prototypes/home?mode=review#summary',
+    });
   });
 });

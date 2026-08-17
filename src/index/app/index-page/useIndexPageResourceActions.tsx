@@ -4,6 +4,7 @@ import type { SelectedResourceFolder, UploadedResourceFile } from '../../types/i
 import PromptActionButton from '../../components/PromptActionButton';
 import { openDrawioResourceEditor } from '../../domains/drawio/drawioResourceEditor';
 import { sidebarApi } from '../../services/sidebar.api';
+import { requireProjectScope } from '../../services/projectScope';
 import { hasExplicitLocalPath } from '../../utils/localPath';
 import { removeDocsSidebarTreeItem, sanitizeSidebarTree } from '../../utils/sidebarTree';
 import {
@@ -29,6 +30,8 @@ import {
     ensureStringArray,
     getLocalBasePathForItem,
     getLocalPathForItem,
+    getPrototypeBasePathForItem,
+    getProjectRelativeResourcePathForItem,
     withResourceProject,
     withResourceProjectBody,
 } from './resourceActions.helpers';
@@ -255,7 +258,6 @@ export function useIndexPageResourceActions(params: any) {
     const [selectedTheme, setSelectedTheme] = useState<any>(null);
     const [selectedDataTable, setSelectedDataTable] = useState<any>(null);
     const [themeCreateDialogVisible, setThemeCreateDialogVisible] = useState(false);
-    const [initialThemeDialogTab, setInitialThemeDialogTab] = useState<'import' | 'onlineSelect'>('import');
     const [versionDialogVisible, setVersionDialogVisible] = useState(false);
     const [currentVersionItem, setCurrentVersionItem] = useState<ItemData | null>(null);
     const [docReferencePromptDialog, setDocReferencePromptDialog] = useState<any>(null);
@@ -297,12 +299,14 @@ export function useIndexPageResourceActions(params: any) {
     useEffect(() => {
         setSelectedTemplate((previous) => {
             if (!previous) {
-                return templateAssets[0] ? normalizeTemplateItem(templateAssets[0]) : null;
+                return templateAssets[0] ? normalizeTemplateItem(templateAssets[0], activeProjectId) : null;
             }
             const matchedTemplate = templateAssets.find((item: any) => item.name === previous.name);
-            return matchedTemplate ? normalizeTemplateItem(matchedTemplate) : (templateAssets[0] ? normalizeTemplateItem(templateAssets[0]) : null);
+            return matchedTemplate
+                ? normalizeTemplateItem(matchedTemplate, activeProjectId)
+                : (templateAssets[0] ? normalizeTemplateItem(templateAssets[0], activeProjectId) : null);
         });
-    }, [templateAssets]);
+    }, [activeProjectId, templateAssets]);
 
     useEffect(() => {
         setSelectedCanvas((previous) => (
@@ -442,6 +446,7 @@ export function useIndexPageResourceActions(params: any) {
             hide();
         }
     }, [
+        activeProjectId,
         buildResourceBody,
         buildResourceUrl,
         docsItems,
@@ -479,7 +484,10 @@ export function useIndexPageResourceActions(params: any) {
             setSelectedResourceFolder(null);
             setSelectedDoc(createdDoc);
             await openDrawioResourceEditor({
-                resource: createdDoc,
+                resource: {
+                    ...createdDoc,
+                    projectId: requireProjectScope(activeProjectId).projectId,
+                },
                 kind: 'doc',
                 messageApi,
                 onSaved: reloadDocsItems,
@@ -531,12 +539,12 @@ export function useIndexPageResourceActions(params: any) {
             return;
         }
         try {
-            await sidebarApi.openResourceInSystem(normalizedPath, 'docs', 'folder');
+            await sidebarApi.openResourceInSystem(normalizedPath, requireProjectScope(activeProjectId), 'docs', 'folder');
             messageApi.success('已打开目录');
         } catch (error: any) {
             messageApi.error(error?.message || '打开目录失败');
         }
-    }, [messageApi]);
+    }, [activeProjectId, messageApi]);
 
     const setSelectedDocAndClearFolder = useCallback<React.Dispatch<React.SetStateAction<ItemData | null>>>((nextValue) => {
         setSelectedResourceFolder(null);
@@ -560,7 +568,6 @@ export function useIndexPageResourceActions(params: any) {
 
     const clearThemeCreateDialogState = useCallback(() => {
         setThemeCreateDialogVisible(false);
-        setInitialThemeDialogTab('import');
     }, []);
 
     const handleThemeCreateCancel = useCallback(() => {
@@ -571,7 +578,7 @@ export function useIndexPageResourceActions(params: any) {
         const nextValue = defaultThemeName === themeName ? null : themeName;
         setDefaultThemeName(nextValue);
         try {
-            const currentConfigResponse = await fetch('/api/config');
+            const currentConfigResponse = await fetch(buildResourceUrl('/api/config'));
             const currentConfig = currentConfigResponse.ok ? await currentConfigResponse.json() : {};
             const config = {
                 ...currentConfig,
@@ -580,7 +587,7 @@ export function useIndexPageResourceActions(params: any) {
                     defaultTheme: nextValue,
                 },
             };
-            const response = await fetch('/api/config', {
+            const response = await fetch(buildResourceUrl('/api/config'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(config),
@@ -589,7 +596,7 @@ export function useIndexPageResourceActions(params: any) {
                 const payload = await response.json().catch(() => ({}));
                 throw new Error(payload?.error || '设置默认设计失败');
             }
-            const syncResponse = await fetch('/api/themes/sync-design', {
+            const syncResponse = await fetch(buildResourceUrl('/api/themes/sync-design'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ themeName: nextValue || '' }),
@@ -603,45 +610,45 @@ export function useIndexPageResourceActions(params: any) {
             setDefaultThemeName(defaultThemeName);
             messageApi.error(error?.message || '设置默认设计失败');
         }
-    }, [defaultThemeName, messageApi]);
+    }, [buildResourceUrl, defaultThemeName, messageApi]);
 
     const handleReorderThemes = useCallback(async (orderedNames: string[]) => {
         const nextOrder = ensureStringArray(orderedNames);
         setThemes((previous: any[]) => sortResourceItemsByOrder(previous, nextOrder, (item: any) => item.name));
         setResourceOrders((previous: any) => ({ ...previous, themes: nextOrder }));
         try {
-            await sidebarApi.saveResourceOrder('themes', nextOrder);
+            await sidebarApi.saveResourceOrder('themes', nextOrder, requireProjectScope(activeProjectId));
         } catch (error: any) {
             messageApi.error(error?.message || '保存主题排序失败');
         }
-    }, [messageApi, setResourceOrders, setThemes]);
+    }, [activeProjectId, messageApi, setResourceOrders, setThemes]);
 
     const handleReorderDataTables = useCallback(async (orderedFileNames: string[]) => {
         const nextOrder = ensureStringArray(orderedFileNames);
         setDataTables((previous: any[]) => sortResourceItemsByOrder(previous, nextOrder, (item: any) => item.fileName));
         setResourceOrders((previous: any) => ({ ...previous, data: nextOrder }));
         try {
-            await sidebarApi.saveResourceOrder('data', nextOrder);
+            await sidebarApi.saveResourceOrder('data', nextOrder, requireProjectScope(activeProjectId));
         } catch (error: any) {
             messageApi.error(error?.message || '保存数据表排序失败');
         }
-    }, [messageApi, setDataTables, setResourceOrders]);
+    }, [activeProjectId, messageApi, setDataTables, setResourceOrders]);
 
     const handleReorderTemplates = useCallback(async (orderedNames: string[]) => {
         const nextOrder = ensureStringArray(orderedNames);
         setTemplateAssets((previous: any[]) => sortResourceItemsByOrder(previous, nextOrder, (item: any) => item.name));
         setResourceOrders((previous: any) => ({ ...previous, templates: nextOrder }));
         try {
-            await sidebarApi.saveResourceOrder('templates', nextOrder);
+            await sidebarApi.saveResourceOrder('templates', nextOrder, requireProjectScope(activeProjectId));
         } catch (error: any) {
             messageApi.error(error?.message || '保存模板排序失败');
         }
-    }, [messageApi, setResourceOrders, setTemplateAssets]);
+    }, [activeProjectId, messageApi, setResourceOrders, setTemplateAssets]);
 
     const handleDownloadZipByPath = useCallback(async (targetPath: string, fallbackFileName: string) => {
         const hide = messageApi.loading('正在导出 ZIP...', 0);
         try {
-            const baseUrl = `/api/zip?path=${encodeURIComponent(targetPath)}`;
+            const baseUrl = buildResourceUrl(`/api/zip?path=${encodeURIComponent(targetPath)}`);
             const probeResponse = await fetch(`${baseUrl}&probe=1`);
             if (!probeResponse.ok) {
                 const payload = await probeResponse.json().catch(() => ({} as any));
@@ -659,7 +666,7 @@ export function useIndexPageResourceActions(params: any) {
         } finally {
             hide();
         }
-    }, [messageApi]);
+    }, [buildResourceUrl, messageApi]);
 
     const handleDownloadThemeZip = useCallback((item: any) => {
         if (!hasExplicitLocalPath(item)) {
@@ -686,7 +693,7 @@ export function useIndexPageResourceActions(params: any) {
         if (!trimmedName || trimmedName === (item.displayName || item.name)) return;
         const hide = messageApi.loading('正在重命名主题...', 0);
         try {
-            const response = await fetch(`/api/themes/${encodeURIComponent(item.name)}`, {
+            const response = await fetch(buildResourceUrl(`/api/themes/${encodeURIComponent(item.name)}`), {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ displayName: trimmedName }),
@@ -707,7 +714,7 @@ export function useIndexPageResourceActions(params: any) {
         } finally {
             hide();
         }
-    }, [appDialog, messageApi, setThemes]);
+    }, [appDialog, buildResourceUrl, messageApi, setThemes]);
 
     const handleDeleteThemeResource = useCallback(async (item: any) => {
         const confirmed = await appDialog.confirm({
@@ -721,7 +728,7 @@ export function useIndexPageResourceActions(params: any) {
         if (!confirmed) return;
         const hide = messageApi.loading('正在删除主题...', 0);
         try {
-            const response = await fetch(`/api/themes/${encodeURIComponent(item.name)}`, {
+            const response = await fetch(buildResourceUrl(`/api/themes/${encodeURIComponent(item.name)}`), {
                 method: 'DELETE',
             });
             if (!response.ok) {
@@ -732,14 +739,14 @@ export function useIndexPageResourceActions(params: any) {
             setSelectedTheme((previous: any) => (previous?.name === item.name ? null : previous));
             const nextOrder = resourceOrders.themes.filter((name: string) => name !== item.name);
             setResourceOrders((previous: any) => ({ ...previous, themes: nextOrder }));
-            void sidebarApi.saveResourceOrder('themes', nextOrder).catch(() => undefined);
+            void sidebarApi.saveResourceOrder('themes', nextOrder, requireProjectScope(activeProjectId)).catch(() => undefined);
             messageApi.success('主题删除成功');
         } catch (error: any) {
             messageApi.error(error?.message || '主题删除失败');
         } finally {
             hide();
         }
-    }, [appDialog, messageApi, resourceOrders.themes, setResourceOrders, setThemes]);
+    }, [activeProjectId, appDialog, buildResourceUrl, messageApi, resourceOrders.themes, setResourceOrders, setThemes]);
 
     const handleRenameDataTableResource = useCallback(async (item: any, nextName?: string) => {
         const nextNameInput = typeof nextName === 'string'
@@ -758,7 +765,7 @@ export function useIndexPageResourceActions(params: any) {
         if (!trimmedName || trimmedName === item.tableName) return;
         const hide = messageApi.loading('正在重命名数据表...', 0);
         try {
-            const response = await fetch(`/api/data/tables/${encodeURIComponent(item.fileName)}`, {
+            const response = await fetch(buildResourceUrl(`/api/data/tables/${encodeURIComponent(item.fileName)}`), {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ tableName: trimmedName }),
@@ -779,7 +786,7 @@ export function useIndexPageResourceActions(params: any) {
         } finally {
             hide();
         }
-    }, [appDialog, messageApi, setDataTables]);
+    }, [appDialog, buildResourceUrl, messageApi, setDataTables]);
 
     const handleDeleteDataTableResource = useCallback(async (item: any) => {
         const confirmed = await appDialog.confirm({
@@ -793,7 +800,7 @@ export function useIndexPageResourceActions(params: any) {
         if (!confirmed) return;
         const hide = messageApi.loading('正在删除数据表...', 0);
         try {
-            const response = await fetch(`/api/data/tables/${encodeURIComponent(item.fileName)}`, {
+            const response = await fetch(buildResourceUrl(`/api/data/tables/${encodeURIComponent(item.fileName)}`), {
                 method: 'DELETE',
             });
             if (!response.ok) {
@@ -804,14 +811,14 @@ export function useIndexPageResourceActions(params: any) {
             setSelectedDataTable((previous: any) => (previous?.fileName === item.fileName ? null : previous));
             const nextOrder = resourceOrders.data.filter((name: string) => name !== item.fileName);
             setResourceOrders((previous: any) => ({ ...previous, data: nextOrder }));
-            void sidebarApi.saveResourceOrder('data', nextOrder).catch(() => undefined);
+            void sidebarApi.saveResourceOrder('data', nextOrder, requireProjectScope(activeProjectId)).catch(() => undefined);
             messageApi.success('数据表删除成功');
         } catch (error: any) {
             messageApi.error(error?.message || '数据表删除失败');
         } finally {
             hide();
         }
-    }, [appDialog, messageApi, resourceOrders.data, setDataTables, setResourceOrders]);
+    }, [activeProjectId, appDialog, buildResourceUrl, messageApi, resourceOrders.data, setDataTables, setResourceOrders]);
 
     const handleRenameTemplateResource = useCallback(async (item: any, nextNameOverride?: string) => {
         const currentName = item.name;
@@ -889,7 +896,7 @@ export function useIndexPageResourceActions(params: any) {
                 name: renamedName,
                 path: renamedPath,
                 absoluteFilePath: renamedAbsoluteFilePath,
-            });
+            }, activeProjectId);
             setSelectedTemplate((previous) => previous?.name === currentName ? renamedTemplate : previous);
             setTemplateAssets((previous: any[]) => previous.map((template) => (
                 template.name === currentName
@@ -904,7 +911,7 @@ export function useIndexPageResourceActions(params: any) {
             )));
             setResourceOrders((previous: any) => {
                 const nextOrder = replaceDocNameInSelections(previous.templates, currentName, renamedName);
-                void sidebarApi.saveResourceOrder('templates', nextOrder).catch(() => undefined);
+                void sidebarApi.saveResourceOrder('templates', nextOrder, requireProjectScope(activeProjectId)).catch(() => undefined);
                 return { ...previous, templates: nextOrder };
             });
             messageApi.success('模板重命名成功');
@@ -914,6 +921,7 @@ export function useIndexPageResourceActions(params: any) {
             hide();
         }
     }, [
+        activeProjectId,
         appDialog,
         buildResourceBody,
         buildResourceUrl,
@@ -943,12 +951,12 @@ export function useIndexPageResourceActions(params: any) {
                     name: duplicatedName,
                     path: String(payload?.path || '').trim() || undefined,
                     absoluteFilePath: String(payload?.absoluteFilePath || '').trim() || undefined,
-                }));
+                }, activeProjectId));
                 setResourceOrders((previous: any) => {
                     const nextOrder = previous.templates.includes(duplicatedName)
                         ? previous.templates
                         : [duplicatedName, ...previous.templates];
-                    void sidebarApi.saveResourceOrder('templates', nextOrder).catch(() => undefined);
+                    void sidebarApi.saveResourceOrder('templates', nextOrder, requireProjectScope(activeProjectId)).catch(() => undefined);
                     return { ...previous, templates: nextOrder };
                 });
             }
@@ -958,7 +966,7 @@ export function useIndexPageResourceActions(params: any) {
         } finally {
             hide();
         }
-    }, [buildResourceBody, buildResourceUrl, messageApi, reloadSidebarAssets, setResourceOrders]);
+    }, [activeProjectId, buildResourceBody, buildResourceUrl, messageApi, reloadSidebarAssets, setResourceOrders]);
 
     const handleDeleteTemplateResource = useCallback(async (item: any) => {
         const hideChecking = messageApi.loading('正在检查模板引用...', 0);
@@ -1015,7 +1023,7 @@ export function useIndexPageResourceActions(params: any) {
             setSelectedTemplate((previous) => previous?.name === item.name ? null : previous);
             const nextOrder = resourceOrders.templates.filter((name: string) => name !== item.name);
             setResourceOrders((previous: any) => ({ ...previous, templates: nextOrder }));
-            void sidebarApi.saveResourceOrder('templates', nextOrder).catch(() => undefined);
+            void sidebarApi.saveResourceOrder('templates', nextOrder, requireProjectScope(activeProjectId)).catch(() => undefined);
             messageApi.success('模板删除成功');
         } catch (error: any) {
             messageApi.error(error?.message || '模板删除失败');
@@ -1048,12 +1056,12 @@ export function useIndexPageResourceActions(params: any) {
     }, [messageApi]);
 
     const handleTemplateVersionManagement = useCallback((item: any) => {
-        setCurrentVersionItem(normalizeTemplateItem(item));
+        setCurrentVersionItem(normalizeTemplateItem(item, activeProjectId));
         setVersionDialogVisible(true);
-    }, []);
+    }, [activeProjectId]);
 
     const handleDownloadItemSource = useCallback((item: ItemData) => {
-        const localBasePath = getLocalBasePathForItem(item);
+        const localBasePath = getPrototypeBasePathForItem(item);
         if (!localBasePath) {
             messageApi.warning('当前资源未声明本地文件路径，无法导出源码');
             return;
@@ -1062,7 +1070,7 @@ export function useIndexPageResourceActions(params: any) {
     }, [handleDownloadZipByPath, messageApi]);
 
     const handleRenameItem = useCallback(async (item: ItemData, nextNameOverride?: string) => {
-        const localBasePath = getLocalBasePathForItem(item);
+        const localBasePath = getPrototypeBasePathForItem(item);
         if (!localBasePath) {
             messageApi.warning('当前资源未声明本地文件路径，无法重命名');
             return;
@@ -1108,7 +1116,7 @@ export function useIndexPageResourceActions(params: any) {
                     prototypes: normalizedTree,
                 }));
                 try {
-                    await sidebarApi.saveSidebarTree('prototypes', normalizedTree);
+                    await sidebarApi.saveSidebarTree('prototypes', normalizedTree, requireProjectScope(activeProjectId));
                 } catch {
                     messageApi.warning('原型已重命名，但侧边栏名称保存失败，刷新后可能需要重新命名');
                 }
@@ -1131,7 +1139,7 @@ export function useIndexPageResourceActions(params: any) {
     }, [appDialog, buildResourceBody, buildResourceUrl, data.prototypes, loadData, loadSidebarTree, messageApi, setSelectedItem, setSidebarTrees, sidebarTrees.prototypes]);
 
     const handleDuplicateItem = useCallback(async (item: ItemData) => {
-        const localBasePath = getLocalBasePathForItem(item);
+        const localBasePath = getPrototypeBasePathForItem(item);
         if (!localBasePath) {
             messageApi.warning('当前资源未声明本地文件路径，无法创建副本');
             return;
@@ -1176,7 +1184,7 @@ export function useIndexPageResourceActions(params: any) {
         preferredIDE?: any,
         ideAvailabilityOverride?: any,
     ) => {
-        const localBasePath = getLocalBasePathForItem(item);
+        const localBasePath = getPrototypeBasePathForItem(item);
         if (!localBasePath) {
             messageApi.warning('当前资源未声明本地文件路径，无法删除');
             return;
@@ -1364,7 +1372,7 @@ export function useIndexPageResourceActions(params: any) {
                         name: renamedDocName,
                         path: renamedPath,
                         absoluteFilePath: renamedAbsoluteFilePath,
-                    }));
+                    }, activeProjectId));
                 }
                 return mapped;
             })();
@@ -1380,7 +1388,7 @@ export function useIndexPageResourceActions(params: any) {
                 const normalizedTree = sanitizeSidebarTree('docs', remappedTree, optimisticDocs);
                 setSidebarTrees((previous: any) => ({ ...previous, docs: normalizedTree }));
                 try {
-                    await sidebarApi.saveSidebarTree('docs', normalizedTree);
+                    await sidebarApi.saveSidebarTree('docs', normalizedTree, requireProjectScope(activeProjectId));
                 } catch {
                 }
             }
@@ -1513,7 +1521,7 @@ export function useIndexPageResourceActions(params: any) {
 
     const handleCopyDocPath = useCallback(async (item: ItemData) => {
         try {
-            const localPath = getLocalPathForItem(item);
+            const localPath = getProjectRelativeResourcePathForItem(item);
             if (!localPath) {
                 messageApi.warning('当前资源未声明本地文件路径，无法复制路径');
                 return;
@@ -1533,7 +1541,6 @@ export function useIndexPageResourceActions(params: any) {
     const handleImportThemeResource = useCallback(() => {
         setSidebarTab('assets');
         setResourceSection('themes');
-        setInitialThemeDialogTab('import');
         setThemeCreateDialogVisible(true);
     }, [setResourceSection, setSidebarTab]);
 
@@ -1579,7 +1586,7 @@ export function useIndexPageResourceActions(params: any) {
 
     const handleCreateFolder = useCallback(async (tab: SidebarTreeTab) => {
         try {
-            const response = await sidebarApi.createSidebarFolder(tab);
+            const response = await sidebarApi.createSidebarFolder(tab, requireProjectScope(activeProjectId));
             const items = getSidebarTabItems(tab);
             const nextTree = sanitizeSidebarTree(tab, Array.isArray(response.tree) ? response.tree : [], items);
             setSidebarTrees((previous: Record<SidebarTreeTab, SidebarTreeNode[]>) => ({ ...previous, [tab]: nextTree }));
@@ -1588,7 +1595,24 @@ export function useIndexPageResourceActions(params: any) {
             messageApi.error(error?.message || '新建文件夹失败');
             return null;
         }
-    }, [getSidebarTabItems, messageApi, setSidebarTrees]);
+    }, [activeProjectId, getSidebarTabItems, messageApi, setSidebarTrees]);
+
+    const prepareImageAiResourceFolder = useCallback(async (folderPath: string) => {
+        try {
+            const response = await sidebarApi.ensureSidebarFolder(folderPath, requireProjectScope(activeProjectId));
+            const items = getSidebarTabItems('docs');
+            const nextTree = sanitizeSidebarTree('docs', Array.isArray(response.tree) ? response.tree : [], items);
+            setSidebarTrees((previous: Record<SidebarTreeTab, SidebarTreeNode[]>) => ({ ...previous, docs: nextTree }));
+            handleSelectResourceFolder(response.folder, 'docs');
+            return {
+                folder: toSelectedResourceFolder(response.folder, 'docs'),
+                absolutePath: response.absolutePath,
+            };
+        } catch (error: any) {
+            messageApi.error(error?.message || '准备图片保存文件夹失败');
+            return null;
+        }
+    }, [activeProjectId, getSidebarTabItems, handleSelectResourceFolder, messageApi, setSidebarTrees]);
 
     const handleSidebarTreeChange = useCallback((tab: SidebarTreeTab, nextTree: SidebarTreeNode[]) => {
         const items = getSidebarTabItems(tab);
@@ -1601,7 +1625,7 @@ export function useIndexPageResourceActions(params: any) {
         const normalizedTree = sanitizeSidebarTree(tab, nextTree, items);
         setSidebarTrees((previous: Record<SidebarTreeTab, SidebarTreeNode[]>) => ({ ...previous, [tab]: normalizedTree }));
         try {
-            const response = await sidebarApi.saveSidebarTree(tab, normalizedTree);
+            const response = await sidebarApi.saveSidebarTree(tab, normalizedTree, requireProjectScope(activeProjectId));
             const latestItems = tab === 'docs'
                 ? await reloadDocsItems()
                 : getSidebarTabItems(tab);
@@ -1610,23 +1634,28 @@ export function useIndexPageResourceActions(params: any) {
         } catch (error: any) {
             messageApi.error(error?.message || '保存侧栏结构失败');
             try {
-                const response = await sidebarApi.getSidebarTree(tab);
+                const response = await sidebarApi.getSidebarTree(tab, requireProjectScope(activeProjectId));
                 const latestItems = getSidebarTabItems(tab);
                 const serverTree = sanitizeSidebarTree(tab, Array.isArray(response.tree) ? response.tree : [], latestItems);
                 setSidebarTrees((previous: Record<SidebarTreeTab, SidebarTreeNode[]>) => ({ ...previous, [tab]: serverTree }));
             } catch {
             }
         }
-    }, [getSidebarTabItems, messageApi, reloadDocsItems, setSidebarTrees]);
+    }, [activeProjectId, getSidebarTabItems, messageApi, reloadDocsItems, setSidebarTrees]);
 
     const handleVersionManagement = useCallback((item: ItemData) => {
-        setCurrentVersionItem(item);
+        const localBasePath = getPrototypeBasePathForItem(item);
+        if (!localBasePath) {
+            messageApi.warning('当前资源未声明本地文件路径，无法查看版本');
+            return;
+        }
+        setCurrentVersionItem({ ...item, filePath: localBasePath });
         setVersionDialogVisible(true);
-    }, []);
+    }, [messageApi]);
 
     const handleCopyItemPath = useCallback(async (item: ItemData) => {
         try {
-            const localPath = getLocalBasePathForItem(item);
+            const localPath = getPrototypeBasePathForItem(item);
             if (!localPath) {
                 messageApi.warning('当前资源未声明本地文件路径，无法复制路径');
                 return;
@@ -1670,8 +1699,6 @@ export function useIndexPageResourceActions(params: any) {
         setSelectedDataTable,
         themeCreateDialogVisible,
         setThemeCreateDialogVisible,
-        initialThemeDialogTab,
-        setInitialThemeDialogTab,
         versionDialogVisible,
         setVersionDialogVisible,
         currentVersionItem,
@@ -1684,6 +1711,7 @@ export function useIndexPageResourceActions(params: any) {
         clearThemeCreateDialogState,
         handleThemeCreateCancel,
         refreshSidebarAssets,
+        refreshDocsResources,
         handleCreateDialogUploadSuccess,
         handleReorderThemes,
         handleReorderDataTables,
@@ -1714,12 +1742,13 @@ export function useIndexPageResourceActions(params: any) {
         handleCreateDrawioResourceFile,
         handleCreatePlaceholderPrototype,
         handleCreateFolder,
+        prepareImageAiResourceFolder,
         handleProjectTitleChange: async (title: string) => {
             const nextTitle = title.trim();
             const previousTitle = projectTitle;
             setProjectTitle(nextTitle);
             try {
-                await sidebarApi.updateProjectTitle(nextTitle);
+                await sidebarApi.updateProjectTitle(nextTitle, requireProjectScope(activeProjectId));
                 await Promise.resolve(loadProjects?.());
             } catch (error: any) {
                 setProjectTitle(previousTitle);

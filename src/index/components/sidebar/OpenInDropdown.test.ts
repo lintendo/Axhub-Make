@@ -3,19 +3,124 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('OpenInDropdown source', () => {
+  it('loads the CodeBuddy and Qoder icons through host-safe asset URLs', () => {
+    const source = readFileSync(resolve(__dirname, './OpenInDropdown.tsx'), 'utf8');
+
+    expect(source).toContain("import { codeBuddyIconUrl, qoderIconUrl } from '../../assets/brand-icons/brandIconUrls';");
+    expect(source).toContain('src={codeBuddyIconUrl}');
+    expect(source).toContain('src={qoderIconUrl}');
+    expect(source).not.toContain('.svg?url');
+  });
+
+  it('routes only verified providers through desktop integration and directly opens the remaining apps', () => {
+    const source = readFileSync(resolve(__dirname, './OpenInDropdown.tsx'), 'utf8');
+    const registrySource = readFileSync(resolve(__dirname, './localAppOpenOptions.ts'), 'utf8');
+    const localAppHandler = source.slice(
+      source.indexOf('const handleLocalAppOption'),
+      source.indexOf('const handleIDEOption'),
+    );
+    const editorHandler = source.slice(
+      source.indexOf('const handleIDEOption'),
+      source.indexOf('const handleGuideToAISettings'),
+    );
+
+    expect(source).toContain("handleIntegratedOpen('cursor'");
+    expect(registrySource).toContain("codex: 'chatgpt'");
+    expect(registrySource).toContain("workbuddy: 'workbuddy'");
+    expect(registrySource).toContain("traework: 'traework'");
+    expect(registrySource).toContain("qoderwork: 'qoderwork'");
+    expect(source).toContain('apiService.openDesktopIntegration({');
+    expect(source).toContain('action,');
+    expect(source).toContain('<DesktopIntegrationRestartDialog');
+    expect(localAppHandler).toContain('const provider = INTEGRATED_LOCAL_APP_PROVIDERS[agent];');
+    expect(localAppHandler).toContain("void handleIntegratedOpen(provider, 'prepare');");
+    expect(localAppHandler).toContain('void handleOpenWithLocalApp(agent);');
+    expect(localAppHandler).not.toContain("handleIntegratedOpen('opencode'");
+    expect(editorHandler).toContain("ide === 'cursor'");
+    expect(editorHandler).toContain('handleOpenWithIDE(ide)');
+  });
+
+  it('keeps TRAEWORK clickable and reports that project selection remains manual', () => {
+    const source = readFileSync(resolve(__dirname, './OpenInDropdown.tsx'), 'utf8');
+    const localAppHandler = source.slice(
+      source.indexOf('const handleLocalAppOption'),
+      source.indexOf('const handleIDEOption'),
+    );
+    const localAppRenderer = source.slice(
+      source.indexOf('const renderLocalAppOption'),
+      source.indexOf('const renderLocalAppOpenOption'),
+    );
+    const inlineVariantSegment = source.slice(
+      source.indexOf("if (variant === 'inline-app-list')"),
+      source.indexOf("if (variant === 'placeholder-card')"),
+    );
+
+    expect(source).toContain("'WorkBuddy'");
+    expect(source).toContain("'TRAEWORK'");
+    expect(source).toContain("agent === 'workbuddy'");
+    expect(source).toContain("agent === 'traework'");
+    expect(source).toContain('LOCAL_APP_AGENT_APP_NAMES[agent]');
+    expect(source).toContain("traework: 'traework'");
+    expect(localAppHandler).not.toContain('supportsLocalAppProjectOpen');
+    expect(localAppHandler).not.toContain('TRAEWORK_PROJECT_OPEN_UNSUPPORTED_MESSAGE');
+    expect(localAppRenderer).not.toContain('disabled=');
+    expect(localAppRenderer).not.toContain('暂不支持');
+    expect(inlineVariantSegment).toContain('disabled={openLoading}');
+    expect(inlineVariantSegment).not.toContain('supportsLocalAppProjectOpen');
+    expect(inlineVariantSegment).not.toContain('暂不支持');
+  });
+
+  it('does not report a successful desktop open as failed when preference persistence fails', () => {
+    const source = readFileSync(resolve(__dirname, './OpenInDropdown.tsx'), 'utf8');
+    const integratedHandler = source.slice(
+      source.indexOf('const handleIntegratedOpen'),
+      source.indexOf('const handleLocalAppOption'),
+    );
+
+    expect(integratedHandler).toContain('let preferenceSaveFailed = false;');
+    expect(integratedHandler).toContain('preferenceSaveFailed = true;');
+    expect(integratedHandler).toContain("toast.warning('应用已打开，但保存默认打开方式失败');");
+    expect(integratedHandler).toContain('} else if (result.notice) {');
+    expect(integratedHandler).toContain('toast.warning(result.notice);');
+    expect(integratedHandler.indexOf('setPendingIntegratedProvider(null);')).toBeGreaterThan(
+      integratedHandler.indexOf('preferenceSaveFailed = true;'),
+    );
+  });
+
+  it('lists only the seven supported local app entries in help text', () => {
+    const source = readFileSync(resolve(__dirname, './OpenInDropdown.tsx'), 'utf8');
+    const localAppHelpSource = source.slice(
+      source.indexOf('const LOCAL_APP_GROUP_HELP'),
+      source.indexOf('const WEB_AGENT_GROUP_HELP'),
+    );
+
+    expect(localAppHelpSource).toContain("'QoderWork'");
+    expect(localAppHelpSource).toContain("'TRAE'");
+    expect(localAppHelpSource).not.toContain("'VS Code'");
+    expect(localAppHelpSource).not.toContain("'TRAE CN'");
+    expect(localAppHelpSource).not.toContain("'Windsurf'");
+    expect(localAppHelpSource).not.toContain("'Antigravity'");
+  });
+
   it('saves IDE preference through the server preferences API', () => {
     const source = readFileSync(resolve(__dirname, './OpenInDropdown.tsx'), 'utf8');
 
-    expect(source).toContain("import { apiService } from '../../services/api';");
+    expect(source).toContain('apiService,');
+    expect(source).toContain("from '../../services/api';");
     expect(source).toContain('apiService.saveServerPreferences');
+    expect(source).toContain('}, requireProjectScope(projectId));');
     expect(source).not.toContain("const configRes = await fetch('/api/config');");
     expect(source).not.toContain('const currentConfig = await configRes.json();');
   });
 
-  it('opens AI settings with actionable guidance when Web Agent cannot open', () => {
+  it('distinguishes an unavailable Web Agent action from a missing AI Agent preference', () => {
     const source = readFileSync(resolve(__dirname, './OpenInDropdown.tsx'), 'utf8');
     const guideSource = source.slice(
       source.indexOf('const handleGuideToAISettings = useCallback'),
+      source.indexOf('const handleUnavailableWebAgent'),
+    );
+    const unavailableSource = source.slice(
+      source.indexOf('const handleUnavailableWebAgent'),
       source.indexOf('const handleOpenWithWebAgent'),
     );
     const webHandlerSource = source.slice(
@@ -28,14 +133,16 @@ describe('OpenInDropdown source', () => {
     );
 
     expect(guideSource).toContain('onOpenAISettings?.();');
-    expect(guideSource).toContain("toast.warning('请先在 AI 设置中选择本地 AI Agent');");
-    expect(webHandlerSource).toContain('handleGuideToAISettings();');
+    expect(guideSource).toContain("toast.warning('请先在 AI 设置中配置对话 AI');");
+    expect(unavailableSource).toContain("toast.warning('当前页面请通过提示词卡片复制或执行操作');");
+    expect(unavailableSource).not.toContain('onOpenAISettings?.();');
+    expect(webHandlerSource).toContain('handleUnavailableWebAgent();');
+    expect(webHandlerSource).not.toContain('handleGuideToAISettings();');
     expect(defaultWebBranch).toContain('handleGuideToAISettings();');
-    expect(webHandlerSource).not.toContain("toast.warning('打开 Web Agent 失败');");
     expect(defaultWebBranch).not.toContain("toast.warning('打开 Web Agent 失败');");
   });
 
-  it('renders chat and image AI actions plus AI settings and nests CLI agents under the local app group', () => {
+  it('renders chat and image AI actions plus AI settings and only the fixed local app group', () => {
     const source = readFileSync(resolve(__dirname, './OpenInDropdown.tsx'), 'utf8');
     const onlineOptionsSource = source.slice(
       source.indexOf('const WEB_AI_OPEN_OPTION'),
@@ -49,7 +156,7 @@ describe('OpenInDropdown source', () => {
     expect(source).toContain('在本地应用中打开');
     expect(source).not.toContain("renderAgentGroup('在编辑器中打开'");
     expect(source).not.toContain("renderAgentGroup('在 CLI 中打开'");
-    expect(source).toContain('本地 CLI');
+    expect(source).not.toContain('本地 CLI');
     expect(source).toContain('在线打开');
     expect(source).not.toContain('打开 Web AI');
     expect(source).toContain('对话 AI');
@@ -68,8 +175,7 @@ describe('OpenInDropdown source', () => {
     expect(onlineGroupSource).not.toContain('visibleOnlineWebAgentOptions.map');
     expect(onlineGroupSource).not.toContain('renderOptionMeta');
     expect(source).toContain("title: '本地应用'");
-    expect(source).toContain("title: '本地 CLI'");
-    expect(source).toContain("'vscode'");
+    expect(source).not.toContain("title: '本地 CLI'");
     expect(source).not.toContain('Visual Studio Code');
     expect(source).not.toContain('Kiro');
     expect(source).not.toContain("'kiro'");
@@ -96,14 +202,9 @@ describe('OpenInDropdown source', () => {
     expect(source).not.toContain('未检测到可用的 Web Agent');
     expect(source).not.toContain('hasLocalAppMenuItems');
     expect(source).toContain('const renderAgentGroup =');
-    expect(source).toContain('const MAX_INLINE_LOCAL_APP_OPEN_OPTIONS = 5;');
-    expect(source).toContain('const LOCAL_APP_MORE_THRESHOLD = 5;');
-    expect(source).toContain('const localAppOpenOptions = [');
-    expect(source).toContain('...LOCAL_APP_AGENT_OPTIONS.map');
-    expect(source).toContain('...MAIN_IDE_OPTIONS.map');
-    expect(source).toContain('const shouldCollapseLocalAppOpenOptions = localAppOpenOptions.length > LOCAL_APP_MORE_THRESHOLD;');
-    expect(source).toContain('const inlineLocalAppOpenOptions = shouldCollapseLocalAppOpenOptions');
-    expect(source).toContain('const overflowLocalAppOpenOptions = shouldCollapseLocalAppOpenOptions');
+    expect(source).toContain('const localAppOpenOptions = LOCAL_APP_OPEN_OPTIONS;');
+    expect(source).toContain("from './localAppOpenOptions';");
+    expect(source).not.toContain('MAIN_IDE_OPTIONS');
     expect(source).toContain('LOCAL_APP_AGENT_OPTIONS');
     expect(source).not.toContain('getVisibleAgentOptions');
     expect(source).not.toContain('const visibleLocalAppAgentOptions =');
@@ -117,15 +218,12 @@ describe('OpenInDropdown source', () => {
     expect(source).toContain('window.location.href = result.url;');
     expect(source).toContain("void savePreference({ type: 'local-app', value: agent })");
     expect(source).toContain("if (openMethod.type === 'local-app')");
-    expect(source).toContain('<DropdownMenuSub>');
-    expect(source).toContain('<DropdownMenuSubTrigger');
-    expect(source).toContain('更多');
-    expect(source).toContain('MoreHorizontal');
-    expect(source).toContain('<MoreHorizontal className="h-3.5 w-3.5" />');
-    expect(source).not.toContain('<ChevronRight className="h-3.5 w-3.5" />');
-    expect(source).toContain('overflowLocalAppOpenOptions.map(renderLocalAppOpenOption)');
-    expect(source).toContain('CLI_AGENT_OPTIONS.map(renderCLIAgentOption)');
-    expect(source).toContain('const renderCLIAgentSubmenu =');
+    expect(source).not.toContain('<DropdownMenuSub>');
+    expect(source).not.toContain('更多');
+    expect(source).not.toContain('MoreHorizontal');
+    expect(source).toContain('<ChevronRight className="h-4 w-4" />');
+    expect(source).not.toContain('overflowLocalAppOpenOptions');
+    expect(source).not.toContain('renderCLIAgentSubmenu');
     expect(source).toContain('className="w-64 p-1.5"');
     expect(source).toContain('className="z-[3000] w-72 max-w-none whitespace-normal leading-5"');
     expect(source).toContain('renderGroupHelp(help)');
@@ -145,10 +243,9 @@ describe('OpenInDropdown source', () => {
     expect(source).toContain('activeProjectId?: string | null;');
     expect(source).toContain('targetProjectId?: string | null;');
     expect(source).toContain('targetPath?: string | null;');
-    expect(source).toContain('const projectId = targetProjectId?.trim() || activeProjectId?.trim() || undefined;');
+    expect(source).toContain("const projectId = targetProjectId?.trim() || activeProjectId?.trim() || '';");
     expect(source).toContain('const openTargetPath = targetPath?.trim() || undefined;');
     expect(source).toContain('handleOpenProjectInIDE(ide, openTargetPath, projectId)');
-    expect(source).toContain('apiService.openCLIAgent({ agent, projectId, targetPath: openTargetPath });');
     expect(source).toContain('projectId,');
     expect(source).toContain('targetPath: openTargetPath');
     expect(source).not.toContain('corsOrigin: window.location.origin');
@@ -157,7 +254,7 @@ describe('OpenInDropdown source', () => {
     expect(source).not.toContain("toast.warning('OpenCode 正在启动，已在侧边栏打开');");
     expect(source).not.toContain('void handleOpenWithOnlineWebAgent(option)');
     expect(source).toContain('void handleOpenWithWebAgent(storedWebOpenMethod.agent, storedWebOpenMethod.provider);');
-    expect(source).toContain('void handleOpenWithLocalApp(openMethod.value as LocalAppAgent);');
+    expect(source).toContain('handleLocalAppOption(openMethod.value as LocalAppAgent);');
     expect(source).not.toContain('<DropdownMenuLabel>{renderGroupLabel');
     expect(source).not.toContain('<DropdownMenuSeparator />');
     expect(source).not.toContain('visibleIDEOptions.length > 0');
@@ -202,13 +299,10 @@ describe('OpenInDropdown source', () => {
     expect(propsSource).not.toContain('agentAvailability,');
   });
 
-  it('places the online group before local apps and keeps local apps before existing IDE options', () => {
+  it('places the online group before the fixed local app provider registry', () => {
     const source = readFileSync(resolve(__dirname, './OpenInDropdown.tsx'), 'utf8');
     const agentTypesSource = readFileSync(resolve(__dirname, '../../../server/agentTypes.ts'), 'utf8');
-    const cliAgentOptionsSource = agentTypesSource.slice(
-      agentTypesSource.indexOf('export const CLI_AGENT_OPTIONS'),
-      agentTypesSource.indexOf('export const WEB_AGENT_OPTIONS'),
-    );
+    const registrySource = readFileSync(resolve(__dirname, './localAppOpenOptions.ts'), 'utf8');
     const localAppOptionsSource = agentTypesSource.slice(
       agentTypesSource.indexOf('export const LOCAL_APP_AGENT_OPTIONS'),
       agentTypesSource.indexOf('export type CLIAgent'),
@@ -220,29 +314,22 @@ describe('OpenInDropdown source', () => {
 
     const onlineIndex = source.indexOf("renderAgentGroup('在线打开'");
     const localAppGroupIndex = source.indexOf("renderAgentGroup('在本地应用中打开'");
-    const localAppOptionIndex = source.indexOf('...LOCAL_APP_AGENT_OPTIONS.map');
-    const editorIndex = source.indexOf('...MAIN_IDE_OPTIONS.map');
+    const localAppOptionIndex = source.indexOf('const localAppOpenOptions = LOCAL_APP_OPEN_OPTIONS;');
 
     expect(onlineIndex).toBeGreaterThan(-1);
     expect(localAppGroupIndex).toBeGreaterThan(-1);
     expect(localAppOptionIndex).toBeGreaterThan(-1);
-    expect(editorIndex).toBeGreaterThan(-1);
     expect(onlineIndex).toBeLessThan(localAppGroupIndex);
-    expect(localAppOptionIndex).toBeLessThan(editorIndex);
-    expect(cliAgentOptionsSource).toContain("{ value: 'codex', label: 'Codex' }");
-    expect(cliAgentOptionsSource).not.toContain("{ value: 'codex', label: 'ChatGPT' }");
     expect(localAppOptionsSource).toContain("{ value: 'codex', label: 'ChatGPT' }");
-    expect(localAppOptionsSource).not.toContain("{ value: 'codex', label: 'Codex' }");
     expect(localAppOptionsSource).toContain("{ value: 'opencode', label: 'OpenCode' }");
+    expect(localAppOptionsSource).toContain("{ value: 'qoderwork', label: 'QoderWork' }");
+    expect(localAppOptionsSource).toContain("{ value: 'trae', label: 'TRAE' }");
+    expect(registrySource).toContain("{ kind: 'ide', option: CURSOR_LOCAL_APP_OPTION }");
     expect(localAppNamesSource).toContain("codex: 'ChatGPT'");
   });
 
-  it('uses ChatGPT branding for the local app while retaining Codex branding for the CLI', () => {
+  it('uses shared product icons for WorkBuddy, QoderWork, TRAEWORK and TRAE', () => {
     const source = readFileSync(resolve(__dirname, './OpenInDropdown.tsx'), 'utf8');
-    const cliIconSource = source.slice(
-      source.indexOf('const getCLIAgentIcon'),
-      source.indexOf('const getLocalAppIcon'),
-    );
     const localAppIconSource = source.slice(
       source.indexOf('const getLocalAppIcon'),
       source.indexOf('const getWebAgentIcon'),
@@ -250,30 +337,26 @@ describe('OpenInDropdown source', () => {
 
     expect(source).toContain('OpenAI,');
     expect(source).not.toContain('const getOnlineWebAgentIcon');
-    expect(source).toContain("items: ['ChatGPT', 'OpenCode'");
-    expect(source).toContain("items: ['Codex', 'Claude Code', 'OpenCode']");
-    expect(cliIconSource).toContain("if (agent === 'codex') return <Codex.Color size={14} />;");
+    expect(source).toContain("items: ['ChatGPT', 'OpenCode', 'WorkBuddy', 'TRAEWORK', 'Cursor', 'QoderWork', 'TRAE']");
     expect(localAppIconSource).toContain("if (agent === 'codex') return <OpenAI size={14} />;");
+    expect(localAppIconSource).toContain("if (agent === 'workbuddy') return <img src={codeBuddyIconUrl}");
+    expect(localAppIconSource).toContain("if (agent === 'traework' || agent === 'trae') return <Trae.Color size={14} />;");
+    expect(localAppIconSource).toContain("if (agent === 'qoderwork') return <img src={qoderIconUrl}");
   });
 
-  it('keeps local app and CLI menus fixed regardless of local installation state', () => {
+  it('keeps the seven local app entries fixed regardless of local installation state', () => {
     const source = readFileSync(resolve(__dirname, './OpenInDropdown.tsx'), 'utf8');
 
-    expect(source).toContain('...LOCAL_APP_AGENT_OPTIONS.map');
-    expect(source).toContain('...MAIN_IDE_OPTIONS.map');
-    expect(source).toContain('CLI_AGENT_OPTIONS.map(renderCLIAgentOption)');
+    expect(source).toContain('LOCAL_APP_OPEN_OPTIONS');
+    expect(source).not.toContain('MAIN_IDE_OPTIONS');
+    expect(source).not.toContain('CLI_AGENT_OPTIONS');
     expect(source).not.toContain('getVisibleAgentOptions');
     expect(source).not.toContain('isIDEMissing');
     expect(source).not.toContain('未检测到可用的本地应用或编辑器');
     expect(source).not.toContain('未检测到可用的 CLI Agent');
-    expect(source).toContain("type LocalAppOpenOption =");
-    expect(source).toContain("kind: 'local-app';");
-    expect(source).toContain("kind: 'ide';");
-    expect(source).toContain('localAppOpenOptions.length > LOCAL_APP_MORE_THRESHOLD');
-    expect(source).toContain('localAppOpenOptions.slice(0, MAX_INLINE_LOCAL_APP_OPEN_OPTIONS)');
-    expect(source).toContain('localAppOpenOptions.slice(MAX_INLINE_LOCAL_APP_OPEN_OPTIONS)');
-    expect(source).toContain('inlineLocalAppOpenOptions.map(renderLocalAppOpenOption)');
-    expect(source).toContain('overflowLocalAppOpenOptions.map(renderLocalAppOpenOption)');
+    expect(source).toContain('type LocalAppOpenOption,');
+    expect(source).toContain('localAppOpenOptions.map(renderLocalAppOpenOption)');
+    expect(source).not.toContain('overflowLocalAppOpenOptions');
   });
 
   it('explicitly exposes local app options through the browser-safe common agent boundary', () => {
@@ -320,7 +403,7 @@ describe('OpenInDropdown source', () => {
     expect(helpDialogSource).toContain('选择工作空间');
     expect(helpDialogSource).toContain('方法二：新建项目');
     expect(helpDialogSource).toContain('选择当前 Make 项目目录');
-    expect(helpDialogSource).toContain('适用于 WorkBuddy、TRAE WORK 等未在列表中显示或打开失败的应用。');
+    expect(helpDialogSource).toContain('如果应用无法自动打开，请按以上方式手动选择当前 Make 项目目录。');
     expect(helpDialogSource).toContain('知道了');
     expect(helpDialogSource).toContain('DialogFooter');
     expect(helpDialogSource).toContain('rounded-[20px]');
@@ -454,17 +537,17 @@ describe('OpenInDropdown source', () => {
     expect(source).toContain("variant === 'inline-app-list'");
     expect(inlineVariantSegment).toContain('在应用中新建：');
     expect(inlineVariantSegment).toContain('localAppOpenOptions.map');
-    expect(inlineVariantSegment).toContain('setOpenHelpDialogOpen(true)');
-    expect(inlineVariantSegment).toContain('更多');
-    expect(inlineVariantSegment).toContain('<MoreHorizontal className="h-3.5 w-3.5" />');
-    expect(inlineVariantSegment).toContain('{renderOpenHelpDialog()}');
+    expect(inlineVariantSegment).not.toContain('setOpenHelpDialogOpen(true)');
+    expect(inlineVariantSegment).not.toContain('更多');
+    expect(inlineVariantSegment).not.toContain('<MoreHorizontal className="h-3.5 w-3.5" />');
+    expect(inlineVariantSegment).toContain('{renderDialogs()}');
     expect(inlineVariantSegment).toContain('flex w-full flex-col items-center gap-3 text-center');
     expect(inlineVariantSegment).toContain('gap-2');
     expect(inlineVariantSegment).toContain('h-7 items-center gap-1.5 rounded-md px-2');
     expect(inlineVariantSegment).not.toContain('h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5');
     expect(inlineVariantSegment).not.toContain('shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50');
-    expect(inlineVariantSegment).toContain('void handleOpenWithIDE(item.option.value as MainIDE)');
-    expect(inlineVariantSegment).toContain('void handleOpenWithLocalApp(item.option.value)');
+    expect(inlineVariantSegment).toContain('handleIDEOption(item.option.value as MainIDE)');
+    expect(inlineVariantSegment).toContain('handleLocalAppOption(item.option.value)');
     expect(inlineVariantSegment).not.toContain('renderAgentGroup');
     expect(inlineVariantSegment).not.toContain('ONLINE_WEB_AGENT_OPTIONS');
     expect(inlineVariantSegment).not.toContain('CLI_AGENT_OPTIONS');

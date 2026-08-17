@@ -42,6 +42,17 @@ describe('make-project metadata sync', () => {
     expect(packageJson.scripts?.['metadata:sync']).toBe('node scripts/sync-project-metadata.mjs');
   });
 
+  it('ships the React tweak adapter required by page-level option switching', () => {
+    const packageJson = JSON.parse(fs.readFileSync(path.join(makeProjectRoot, 'package.json'), 'utf8'));
+
+    expect(packageJson.dependencies?.['@axhub/commentary-react']).toBe('^1.0.0');
+    const exploreOptions = fs.readFileSync(
+      path.join(makeProjectRoot, '.agents/skills/explore-options/SKILL.md'),
+      'utf8',
+    );
+    expect(exploreOptions).toContain('只有把方案做成页面内可切换的 React tweak 时才需要');
+  });
+
   it('keeps reusable client package scripts runnable with npm alone outside the monorepo', () => {
     const packageJson = JSON.parse(fs.readFileSync(path.join(makeProjectRoot, 'package.json'), 'utf8'));
     const runtimeScripts = [
@@ -142,6 +153,25 @@ describe('make-project metadata sync', () => {
     });
     expect(JSON.stringify(metadata)).not.toContain(projectRoot);
     expect(JSON.stringify(metadata)).not.toContain('localhost:51720');
+  });
+
+  it('registers a prototype that has a main spec before its runtime entry exists', () => {
+    const projectRoot = createFixtureProject();
+    writeFile(path.join(projectRoot, 'src/prototypes/spec-only/.spec/spec.html'), '<h1>Spec Only</h1>\n');
+
+    const metadata = buildMakeProjectMetadata(projectRoot, {
+      clientOrigin: 'http://localhost:51720',
+    });
+    const prototype = metadata.resources.prototypes.find((item: any) => item.id === 'spec-only');
+
+    expect(prototype).toMatchObject({
+      id: 'spec-only',
+      clientUrl: 'http://localhost:51720/prototypes/spec-only',
+      previewDisabled: true,
+      specFilePath: 'src/prototypes/spec-only/.spec/spec.html',
+    });
+    expect(prototype).not.toHaveProperty('filePath');
+    expect(metadata.navigation.prototypes).toContain('spec-only');
   });
 
   it('restores generated empty prototype placeholders from source files during sync', () => {
@@ -328,26 +358,62 @@ export default function EditedPrototype() {
 
     expect(prototype).toMatchObject({
       pages: [
+        { id: 'overview', title: '总览' },
         { id: 'install-agent', title: '安装 Agent' },
         { id: 'choose-model', title: '选对模型' },
         { id: 'give-instructions', title: '给 AI 下达指令' },
         { id: 'create-prototype', title: '创建原型' },
         { id: 'edit-prototype', title: '编辑原型' },
         { id: 'publish-prototype', title: '发布原型' },
-        { id: 'advanced-guide', title: '进阶指导' },
+        { id: 'advanced-guide', title: '获取帮助' },
       ],
-      defaultPageId: 'install-agent',
+      defaultPageId: 'overview',
     });
+  });
+
+  it('describes Touch And Talk capability requirements with current Make terminology', () => {
+    const source = fs.readFileSync(
+      path.join(makeProjectRoot, 'src/prototypes/touch-and-talk-annotation-demo/index.tsx'),
+      'utf8',
+    );
+
+    expect(source).toContain("title: '批注能力条件'");
+    expect(source).toContain("summary: '从打开批注到告知 AI，目标是让一次局部修改在 30 秒内完成表达。'");
+    expect(source).toContain("['告知 AI', '把当前页面链接或原型名称告知 AI，即可持续处理批注。']");
+    expect(source).not.toContain("['复制提示词', '把当前页面批注整理成可独立交接的 AI 上下文，复制后即可交给其他 AI 工具继续处理。']");
+    expect(source).not.toContain("{ key: 'acpUi', label: '本地 ACP UI' }");
+    expect(source).toContain("{ key: 'executionAgent', label: '执行 Agent' }");
+    expect(source).toContain("{ key: 'commentarySkill', label: '批注技能' }");
+    expect(source).toContain("type CapabilityRequirement = '需要' | '不需要'");
+    expect(source).toContain("feature: '添加/编辑批注'");
+    expect(source).toContain("{ feature: '复制提示词', executionAgent: '不需要', commentarySkill: '不需要' }");
+    expect(source).toContain("{ feature: '文本和样式编辑', executionAgent: '不需要', commentarySkill: '不需要' }");
+    expect(source).not.toContain("feature: '多种批注方式'");
+    expect(source).not.toContain("feature: '粘贴图片或文案'");
+    expect(source).toContain("feature: 'AI 自动读取批注'");
+    expect(source).toContain("feature: 'AI 执行'");
+    expect(source).toContain("feature: '开启需求标注'");
+    expect(source).toContain("{ feature: '添加/编辑批注', executionAgent: '不需要', commentarySkill: '不需要' }");
+    expect(source).toContain("{ feature: 'AI 自动读取批注', executionAgent: '不需要', commentarySkill: '需要' }");
+    expect(source).toContain("{ feature: 'AI 执行', executionAgent: '需要', commentarySkill: '不需要' }");
+    expect(source).not.toContain('acpUi:');
+    expect(source).not.toContain('以下条件均以当前页面已启用 Axhub Runtime 批注为前提。');
+    expect(source).not.toContain('保存本地 HTML 修改');
+    expect(source).not.toContain("label: 'CLI Agent'");
+    expect(source).not.toContain("label: '配套 Skill'");
   });
 
   it('exposes the current official client prototypes without legacy template routes', () => {
     const metadata = buildMakeProjectMetadata(makeProjectRoot, {
       clientOrigin: 'http://localhost:51720',
     });
-    const annotationDemo = metadata.resources.prototypes.find((item: any) => item.id === 'annotation-demo');
-    const touchAndTalkDemo = metadata.resources.prototypes.find((item: any) => item.id === 'touch-and-talk-annotation-demo');
+    const templateManifest = JSON.parse(fs.readFileSync(path.join(makeProjectRoot, 'template-manifest.json'), 'utf8'));
+    const officialPrototypeIds = templateManifest.prototypes.map((prototype: any) => prototype.id);
+    const officialPrototypes = metadata.resources.prototypes.filter((item: any) => officialPrototypeIds.includes(item.id));
+    const annotationDemo = officialPrototypes.find((item: any) => item.id === 'annotation-demo');
+    const touchAndTalkDemo = officialPrototypes.find((item: any) => item.id === 'touch-and-talk-annotation-demo');
 
-    expect(metadata.resources.prototypes.map((item: any) => item.id)).toEqual([
+    expect(officialPrototypes.map((item: any) => item.id)).toEqual([
       'annotation-demo',
       'beginner-guide',
       'touch-and-talk-annotation-demo',
@@ -370,6 +436,7 @@ export default function EditedPrototype() {
         { id: 'quick-flow', title: '快速批注' },
         { id: 'voice-annotation', title: '语音批注' },
         { id: 'common-tips', title: '常用技巧' },
+        { id: 'capability-matrix', title: '能力条件' },
         { id: 'quick-execute', title: '快速执行' },
         { id: 'more-scenarios', title: '更多场景' },
       ],

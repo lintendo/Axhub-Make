@@ -15,6 +15,10 @@ describe('useAssistantBridge source', () => {
     expect(source).toContain('for (const delay of ACP_POST_MESSAGE_RETRY_DELAYS_MS) {');
     expect(source).toContain('targetWindow.postMessage(request, targetOrigin);');
     expect(source).toContain("successTypes: ['acp.ui.ready']");
+    expect(source).toContain("type: 'acp.subscribe',");
+    expect(source).toContain("successTypes: ['acp.query.result'],");
+    expect(source).toContain("data.payload?.kind !== 'subscription'");
+    expect(source).toContain('data.payload?.subscribedEvents');
     expect(source).toContain("successTypes: ['acp.runtime.result']");
     expect(source).toContain('const syncCanvasMcpConfigWithAck = useCallback((config: { makeOrigin?: string | null; token?: string | null } | null | undefined) => {');
     expect(source).toContain('...buildAcpCanvasMcpPostMessage(config, requestId),');

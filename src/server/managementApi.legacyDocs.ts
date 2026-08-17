@@ -17,11 +17,17 @@ interface LegacyDocsProjectContext {
 }
 
 interface LegacyDocsHandlers {
-  getActiveProjectContext: (options: ManagementApiOptions) => LegacyDocsProjectContext | null;
+  resolveProjectContext: (
+    req: IncomingMessage,
+    res: ServerResponse,
+    options: ManagementApiOptions,
+    mode: 'explicit-required',
+  ) => LegacyDocsProjectContext | null;
 }
 
-function buildMarkdownFileUrl(markdownPath: string): string {
-  return `/api/markdown-file?path=${encodeURIComponent(markdownPath)}`;
+function buildMarkdownFileUrl(projectId: string, markdownPath: string): string {
+  const params = new URLSearchParams({ projectId, path: markdownPath });
+  return `/api/markdown-file?${params.toString()}`;
 }
 
 function findProjectDocByRouteName(projectRoot: string, routeName: string) {
@@ -136,12 +142,16 @@ function handleLegacyDocsPreview(
   req: IncomingMessage,
   res: ServerResponse,
   options: ManagementApiOptions,
+  projectContext: LegacyDocsProjectContext | null,
   pathname: string,
+  url: URL,
   handlers: LegacyDocsHandlers,
 ): boolean {
   const assetsLegacyMatch = pathname.match(/^\/assets\/docs\/(.+)\/spec\.html$/u);
   if (assetsLegacyMatch) {
-    sendLegacyDocRedirect(res, `/docs/${assetsLegacyMatch[1]}`);
+    const projectId = String(url.searchParams.get('projectId') || '').trim();
+    const params = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+    sendLegacyDocRedirect(res, `/docs/${assetsLegacyMatch[1]}${params}`);
     return true;
   }
 
@@ -149,9 +159,9 @@ function handleLegacyDocsPreview(
     return false;
   }
 
-  const context = handlers.getActiveProjectContext(options);
+  const context = projectContext || handlers.resolveProjectContext(req, res, options, 'explicit-required');
   if (!context) {
-    return false;
+    return true;
   }
 
   const markdownMatch = pathname.match(/^\/docs\/(.+)\.md$/u);
@@ -170,7 +180,7 @@ function handleLegacyDocsPreview(
     return true;
   }
 
-  const markdownUrl = buildMarkdownFileUrl(doc.path);
+  const markdownUrl = buildMarkdownFileUrl(context.project.id, doc.path);
   const html = renderLegacyDocTemplate({
     adminRoot: options.adminRoot || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../dist/admin'),
     title: `Docs: ${doc.title || doc.name || doc.id}`,
@@ -196,11 +206,11 @@ export function handleLegacyDocsApi(
   req: IncomingMessage,
   res: ServerResponse,
   options: ManagementApiOptions,
-  activeProjectRoot: string | null,
+  projectContext: LegacyDocsProjectContext | null,
   pathname: string,
   url: URL,
   handlers: LegacyDocsHandlers,
 ): boolean {
-  return handleLegacyDocsPreview(req, res, options, pathname, handlers)
-    || (activeProjectRoot ? handleMarkdownFileApi(req, res, activeProjectRoot, pathname, url) : false);
+  return handleLegacyDocsPreview(req, res, options, projectContext, pathname, url, handlers)
+    || (projectContext ? handleMarkdownFileApi(req, res, projectContext.project.root, pathname, url) : false);
 }

@@ -86,16 +86,16 @@ interface AcpPostMessageRetryOptions<TResult> {
     mapResult?: (data: AcpPostMessageResponse) => TResult;
 }
 
-interface AcpHostReadyOptions {
-    events?: readonly string[];
-}
-
 function createAcpChatRequestId(): string {
     return `acp-chat-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function createAcpHostReadyRequestId(): string {
     return `acp-host-ready-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function createAcpSubscriptionRequestId(): string {
+    return `acp-subscribe-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function createAcpRuntimeConfigRequestId(): string {
@@ -216,13 +216,13 @@ export function useAssistantBridge(iframeSrc: string, bridgeOptions?: UseAssista
         });
     }, [resolveTargetOrigin]);
 
-    const requestHostReadyWithRetry = useCallback((options: AcpHostReadyOptions = {}) => (
+    const requestHostReadyWithRetry = useCallback(() => (
         postAcpRequestWithRetry({
             request: {
                 type: 'acp.host.ready',
                 requestId: createAcpHostReadyRequestId(),
                 payload: {
-                    events: Array.from(options.events || []),
+                    ui: { closeButton: false },
                 },
             },
             successTypes: ['acp.ui.ready'],
@@ -230,6 +230,31 @@ export function useAssistantBridge(iframeSrc: string, bridgeOptions?: UseAssista
             defaultErrorMessage: 'AI 助手握手失败',
         })
     ), [postAcpRequestWithRetry]);
+
+    const subscribeEventsWithRetry = useCallback(async (events: readonly string[]) => {
+        const requestedEvents = Array.from(new Set(events));
+        const acknowledged = await postAcpRequestWithRetry<boolean>({
+            request: {
+                type: 'acp.subscribe',
+                requestId: createAcpSubscriptionRequestId(),
+                payload: { events: requestedEvents },
+            },
+            successTypes: ['acp.query.result'],
+            errorTypes: ['acp.query.error'],
+            defaultErrorMessage: 'AI 助手事件订阅失败',
+            mapResult: (data) => {
+                if (data.payload?.ok !== true || data.payload?.kind !== 'subscription') return false;
+                const responseEvents = Array.isArray(data.payload?.subscribedEvents)
+                    ? data.payload.subscribedEvents.filter((event: unknown): event is string => typeof event === 'string')
+                    : [];
+                return requestedEvents.every((event) => responseEvents.includes(event));
+            },
+        });
+        if (!acknowledged) {
+            throw new Error('AI 助手事件订阅未确认');
+        }
+        return true;
+    }, [postAcpRequestWithRetry]);
 
     const syncContext = useCallback((context: AssistantContextV1, mode: 'replace' | 'append' = 'replace') => {
         const iframe = iframeRef.current;
@@ -497,7 +522,9 @@ export function useAssistantBridge(iframeSrc: string, bridgeOptions?: UseAssista
                 return {
                     ok: true,
                     canSend: Boolean(data.payload?.canSend),
-                    isRunning: Boolean(data.payload?.isRunning),
+                    ...(typeof data.payload?.isRunning === 'boolean'
+                        ? { isRunning: data.payload.isRunning }
+                        : {}),
                     textLength: Number(data.payload?.textLength || 0),
                     threadId: resultThreadId,
                 };
@@ -650,6 +677,7 @@ export function useAssistantBridge(iframeSrc: string, bridgeOptions?: UseAssista
         iframeLoaded,
         setIframeLoaded,
         requestHostReadyWithRetry,
+        subscribeEventsWithRetry,
         syncContext,
         syncContextWithAck,
         syncContextWithRetry,

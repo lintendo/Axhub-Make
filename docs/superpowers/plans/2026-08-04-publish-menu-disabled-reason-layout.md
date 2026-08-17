@@ -113,7 +113,7 @@ Expected: both Vite admin builds complete successfully.
 
 - [ ] **Step 6: Verify the menu visually**
 
-Start the admin dev server with `pnpm admin:dev`, open the existing project state that produces a missing Figma Make metadata reason, and inspect the publish menu at a desktop viewport and a narrow viewport. Confirm the action name stays on one line, the reason wraps within its own row, the Axure heading starts below it, and the menu remains inside the viewport.
+Start the integrated Make dev server with `pnpm server:dev -- --host 127.0.0.1 --no-open`, open the existing project state that produces a missing Figma Make metadata reason, and inspect the publish menu at a desktop viewport and a narrow viewport. Confirm the action name stays on one line, the reason wraps within its own row, the Axure heading starts below it, and the menu remains inside the viewport.
 
 - [ ] **Step 7: Review the final diff**
 

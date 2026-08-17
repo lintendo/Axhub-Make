@@ -1,0 +1,12 @@
+export declare const MAKE_CLIENT_TEMPLATE_ZIP_NAME = "axhub-make-client-template.zip";
+export declare const MAKE_CLIENT_TEMPLATE_LATEST_MANIFEST_NAME = "axhub-make-client-template.latest.json";
+export declare const DEFAULT_MAKE_CLIENT_TEMPLATE_VERSION = "0.1.18";
+export declare const DEFAULT_MAKE_CLIENT_TEMPLATE_RELEASE_NOTES = "# Axhub Make Client 0.1.18\n\n- \u66F4\u65B0\u5BA2\u6237\u7AEF\u5DE5\u4F5C\u89C4\u5219\u548C\u5185\u7F6E\u6280\u80FD\uFF0C\u5B8C\u5584\u539F\u578B\u5F00\u53D1\u4E0E\u622A\u56FE\u8FD8\u539F\u6D41\u7A0B\n- \u4E3A `screenshot-to-prototype` \u65B0\u589E rembg \u80CC\u666F\u79FB\u9664\u80FD\u529B\u548C\u91CD\u5EFA\u6E05\u5355\u6821\u9A8C\n- `check-app-ready` \u8FD4\u56DE Make \u7BA1\u7406\u7AEF\u6DF1\u94FE\uFF0C\u4FBF\u4E8E\u76F4\u63A5\u6253\u5F00\u76EE\u6807\u8D44\u6E90\n- \u652F\u6301\u4EC5\u5305\u542B\u4E3B\u89C4\u683C\u7684\u539F\u578B\u53C2\u4E0E\u9879\u76EE\u5143\u6570\u636E\u540C\u6B65\n- \u66F4\u65B0\u5185\u7F6E\u793A\u4F8B\u539F\u578B\u53CA\u76F8\u5173\u6807\u6CE8\u5185\u5BB9";
+export declare const PRIMARY_MAKE_CLIENT_TEMPLATE_RELEASE_REPOSITORY = "lintendo/Axhub-Make";
+export declare const GITEE_MAKE_CLIENT_TEMPLATE_RELEASE_BASE_URL = "https://gitee.com/axhub/Axhub-Make/releases/download";
+export declare const GITEE_MAKE_CLIENT_TEMPLATE_LATEST_RELEASE_TAG = "make-client-template-latest";
+export declare function makeClientTemplateReleaseTag(version?: string): string;
+export declare function makeClientTemplatePrimaryDownloadUrl(version?: string): string;
+export declare function makeClientTemplateMirrorDownloadUrl(version?: string): string;
+export declare function makeClientTemplatePrimaryManifestUrl(): string;
+export declare function makeClientTemplateMirrorManifestUrl(): string;

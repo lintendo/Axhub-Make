@@ -1,0 +1,422 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 30,
+  "pageId": "razp2t",
+  "pageName": "设置",
+  "sitemapPath": "我的 / 设置",
+  "requestedPath": "设置.html",
+  "resolvedUrl": "http://127.0.0.1:32768/21.00.02/%E8%AE%BE%E7%BD%AE.html",
+  "dataUrl": "http://127.0.0.1:32768/21.00.02/files/%E8%AE%BE%E7%BD%AE/data.js",
+  "generationDate": "2026-08-14T13:00:02.553Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 设置\n- paragraph: 微信\n- paragraph: 未绑定\n- paragraph: 手机号\n- paragraph: 188****8766\n- paragraph: QQ\n- paragraph: 未绑定\n- paragraph: 微博\n- paragraph: Alex\n- paragraph: 系统通知\n- paragraph: 检查新版本\n- paragraph: 清除缓存\n- paragraph: 207M\n- paragraph: 退出账号\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "030-settings-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "导航",
+    "1",
+    "toast",
+    "弹层",
+    "删除成功",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [],
+  "panels": [
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1",
+        "State2"
+      ]
+    },
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1",
+        "State2"
+      ]
+    },
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1",
+        "State2"
+      ]
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:设置 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:设置 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show/hide widget",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set (Dynamic panel) to&nbsp; to Next ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel / state:State1 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show/hide widget",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel / state:State1 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "wait",
+      "description": "Wait 1500 ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel / state:State1 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show/hide widget",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel / state:State1 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set (Dynamic panel) to&nbsp; to State2 ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel / state:State2 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show/hide widget",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 更换手机 in Current window",
+      "target": "更换手机.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:设置 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show/hide widget",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set (Dynamic panel) to&nbsp; to Next ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel / state:State1 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show/hide widget",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel / state:State1 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "wait",
+      "description": "Wait 1500 ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel / state:State1 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show/hide widget",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel / state:State1 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set (Dynamic panel) to&nbsp; to State2 ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel / state:State2 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show/hide widget",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group / Dynamic panel",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set (Dynamic panel) to&nbsp; to Next wrap ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show toast",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "wait",
+      "description": "Wait 1500 ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide toast",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 1fade none 500ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 弹层",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / 弹层 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹层fade none 300ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / 弹层 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 删除成功fade none 300ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / 弹层 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "wait",
+      "description": "Wait 1500 ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / 弹层 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 删除成功fade none 300ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:设置 / 弹层 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 登录 in Current window",
+      "target": "登录.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:设置 / 弹层 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹层fade none 300ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

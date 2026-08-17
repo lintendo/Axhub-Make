@@ -53,6 +53,7 @@ describe('AI run client', () => {
     })) as any;
 
     const result = await runAiStream({
+      projectId: 'project-b',
       scene: 'document',
       prompt: '写文档',
       runId: 'run-one',
@@ -95,6 +96,7 @@ describe('AI run client', () => {
     }));
     const requestBody = JSON.parse((globalThis.fetch as any).mock.calls[0][1].body);
     expect(requestBody).toMatchObject({
+      projectId: 'project-b',
       scene: 'document',
       prompt: '写文档',
       runId: 'run-one',
@@ -126,6 +128,7 @@ describe('AI run client', () => {
     )) as any;
 
     await runAiStream({
+      projectId: 'project-b',
       scene: 'direct',
       prompt: '优化提示词',
     });
@@ -150,6 +153,7 @@ describe('AI run client', () => {
     )) as any;
 
     await runAiStream({
+      projectId: 'project-b',
       scene: 'image',
       prompt: '测试图片配置',
       builtinToolSettings: {
@@ -189,6 +193,7 @@ describe('AI run client', () => {
     )) as any;
 
     await runAiStream({
+      projectId: 'project-b',
       scene: 'direct',
       prompt: '更新画布',
       mcpServers: [{
@@ -214,6 +219,31 @@ describe('AI run client', () => {
     });
   });
 
+  it('passes an explicit permission mode without adding MCP servers', async () => {
+    globalThis.fetch = vi.fn(async () => new Response(
+      sseEvent('run.completed', {
+        status: 'done',
+        output: 'ok',
+        artifacts: [],
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      },
+    )) as any;
+
+    await runAiStream({
+      projectId: 'project-b',
+      scene: 'direct',
+      prompt: '直接更新画布文件',
+      permissionMode: 'bypassPermissions',
+    });
+
+    const requestBody = JSON.parse((globalThis.fetch as any).mock.calls[0][1].body);
+    expect(requestBody.permissionMode).toBe('bypassPermissions');
+    expect(requestBody.mcpServers).toBeUndefined();
+  });
+
   it('passes the configured agent run concurrency to the AI runs API', async () => {
     globalThis.fetch = vi.fn(async () => new Response(
       sseEvent('run.completed', {
@@ -228,6 +258,7 @@ describe('AI run client', () => {
     )) as any;
 
     await runAiStream({
+      projectId: 'project-b',
       scene: 'direct',
       prompt: '批量批注',
       agentRunConcurrency: 4,
@@ -275,6 +306,7 @@ describe('AI run client', () => {
     })) as any;
 
     await expect(runAiStream({
+      projectId: 'project-b',
       scene: 'prototype',
       prompt: '生成页面',
     })).rejects.toMatchObject({
@@ -310,6 +342,7 @@ describe('AI run client', () => {
     })) as any;
 
     await expect(runAiStream({
+      projectId: 'project-b',
       scene: 'direct',
       prompt: '继续修改',
       threadId: 'thread-home',
@@ -321,5 +354,16 @@ describe('AI run client', () => {
         threadId: 'thread-home',
       }),
     });
+  });
+
+  it('rejects a project-scoped AI run before fetch when projectId is missing', async () => {
+    globalThis.fetch = vi.fn() as any;
+
+    await expect(runAiStream({
+      scene: 'direct',
+      prompt: '不应发送',
+    } as any)).rejects.toThrow('请先选择项目');
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

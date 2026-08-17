@@ -5,12 +5,14 @@ type DrawioResourceKind = 'doc' | 'template';
 interface DrawioResourceLike {
   name?: string;
   resourceId?: string;
-  projectId?: string;
+  projectId: string;
   specUrl?: string;
   previewUrl?: string;
   filePath?: string;
   absoluteFilePath?: string;
 }
+
+type DrawioResourceCandidate = Omit<DrawioResourceLike, 'projectId'> & { projectId?: string };
 
 interface DrawioMessageApi {
   success?: (content: string) => void;
@@ -189,7 +191,7 @@ async function readResponseMessage(response: Response): Promise<string> {
   }
 }
 
-export function isDrawioResource(resource: DrawioResourceLike | null | undefined): boolean {
+export function isDrawioResource(resource: DrawioResourceCandidate | null | undefined): boolean {
   if (!resource) return false;
   return [
     resource.name,
@@ -206,8 +208,7 @@ export function buildDrawioResourceApiUrl(resource: DrawioResourceLike | null | 
   const existingApiUrl = getApiResourceUrlFromValue(resource.specUrl, kind)
     || getApiResourceUrlFromValue(resource.previewUrl, kind);
   if (existingApiUrl) {
-    const projectId = String(resource.projectId || '').trim();
-    return projectId ? addQueryParam(existingApiUrl, 'projectId', projectId) : existingApiUrl;
+    return addQueryParam(existingApiUrl, 'projectId', resource.projectId);
   }
 
   const name = resolveDrawioResourceName(resource, kind);
@@ -215,8 +216,7 @@ export function buildDrawioResourceApiUrl(resource: DrawioResourceLike | null | 
   const baseUrl = kind === 'template'
     ? `/api/docs/templates/${encodeURIComponent(name)}`
     : `/api/docs/${encodeURIComponent(name)}`;
-  const projectId = String(resource.projectId || '').trim();
-  return projectId ? addQueryParam(baseUrl, 'projectId', projectId) : baseUrl;
+  return addQueryParam(baseUrl, 'projectId', resource.projectId);
 }
 
 export function buildDrawioResourceRawUrl(resource: DrawioResourceLike | null | undefined, kind: DrawioResourceKind): string {

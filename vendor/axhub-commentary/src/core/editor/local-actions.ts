@@ -7,7 +7,10 @@ import type {
   EditorSummariesService,
 } from './contracts';
 import type { EditorRuntimeState } from './state';
-import type { CommentaryClearEditsOptions } from '../../web-editor-types';
+import type {
+  CommentaryClearEditsOptions,
+  CommentaryClearEditsTarget,
+} from '../../web-editor-types';
 
 export function createLocalActionsService(options: {
   state: EditorRuntimeState;
@@ -71,22 +74,34 @@ export function createLocalActionsService(options: {
     }
   }
 
-  async function handleClearEdits(config: CommentaryClearEditsOptions = {}): Promise<void> {
+  async function handleClearEdits(
+    config: CommentaryClearEditsOptions = {},
+  ): Promise<CommentaryClearEditsTarget | null> {
     const tm = options.state.transactionManager;
     const clearsPrototype = config.scope === 'prototype';
+    let target: CommentaryClearEditsTarget = config.target ?? 'all';
 
     if (!config.skipConfirm) {
-      const confirmed = await options.feedback.confirm({
-        title: clearsPrototype ? '清空当前原型全部批注' : '清空全部编辑',
+      const result = await options.feedback.confirm({
+        title: clearsPrototype ? '清空当前原型批注' : '清空全部编辑',
         content: clearsPrototype
-          ? '确定要清空当前原型所有页面的批注吗？已保存的代码修改不受影响。'
+          ? '请选择清空当前原型所有页面的已完成批注，或清空全部批注。已保存的代码修改不受影响。'
           : '确定要清空所有待修改内容吗？已保存的修改不受影响。',
-        confirmText: '清空',
-        cancelText: '取消',
+        confirmText: clearsPrototype ? '清空已完成批注' : '清空',
+        ...(clearsPrototype ? { secondaryConfirmText: '清空所有批注' } : { cancelText: '取消' }),
         confirmTone: 'primary',
       });
 
-      if (!confirmed) return;
+      if (!result) return null;
+      target = result === 'secondary' ? 'all' : clearsPrototype ? 'completed' : 'all';
+    }
+
+    if (target === 'completed') {
+      await options.persistence.clearStorage(config.scope, target);
+      await options.persistence.restoreCachedChanges();
+      options.state.propertyPanel?.refresh();
+      options.onStatusChange?.();
+      return target;
     }
 
     if (tm) {
@@ -99,9 +114,10 @@ export function createLocalActionsService(options: {
     await options.changes.revertAllRecordedTweaks();
 
     options.changes.clearAllEditMeta();
-    options.persistence.clearStorage(config.scope);
+    await options.persistence.clearStorage(config.scope, target);
     options.state.propertyPanel?.refresh();
     options.onStatusChange?.();
+    return target;
   }
 
   async function handleClearElementEdits(element: Element): Promise<boolean> {
@@ -119,6 +135,11 @@ export function createLocalActionsService(options: {
     const hasTransactionChanges = Boolean(
       meta?.changeKinds.some((kind) => kind === 'text' || kind === 'style' || kind === 'class'),
     );
+    const deleteElementAnnotationLinks = meta
+      ? Array.from(options.state.deleteElementAnnotationsByTransactionId.values())
+        .filter((link) => link.parentElementKey === meta.elementKey && link.active)
+        .reverse()
+      : [];
 
     if (!hasNote && !hasImages && !hasRecordedChanges && !hasStaleDirtyMarker) {
       options.feedback.toast('info', '当前项没有可清空的待修改内容。');
@@ -131,6 +152,27 @@ export function createLocalActionsService(options: {
 
     if (hasTweakChanges) {
       await options.changes.revertRecordedTweakForElement(element);
+    }
+
+    if (deleteElementAnnotationLinks.length > 0) {
+      const restoreDeletedElement = options.state.transactionManager?.restoreDeletedElement;
+      if (!restoreDeletedElement) {
+        await options.feedback.alert({
+          title: '还原元素',
+          content: '当前无法还原已删除的元素，请使用 Cmd/Ctrl + Z 后再试。',
+          confirmText: '知道了',
+        });
+        return false;
+      }
+      for (const link of deleteElementAnnotationLinks) {
+        if (restoreDeletedElement(link.transactionId)) continue;
+        await options.feedback.alert({
+          title: '还原元素',
+          content: '已删除元素的原位置失效，暂时无法还原。',
+          confirmText: '知道了',
+        });
+        return false;
+      }
     }
 
     if (hasTransactionChanges && meta) {

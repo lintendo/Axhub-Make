@@ -4,6 +4,7 @@ export interface BuildEditorUrlOptions {
     width?: number;
     mobileMode?: boolean;
     hostToolbar?: boolean;
+    annotationSession?: boolean;
 }
 
 const STALE_AGENT_BRIDGE_QUERY_PARAMS = [
@@ -28,6 +29,7 @@ const STALE_AGENT_BRIDGE_QUERY_PARAMS = [
     'editorMobileMode',
     'mobileMode',
     'agentToolbar',
+    'annotationSession',
     'inspecta',
 ] as const;
 
@@ -54,6 +56,10 @@ export function appendEditorLaunchOptionsToUrl(
 
     if (options?.hostToolbar) {
         url.searchParams.set('agentToolbar', 'host');
+    }
+
+    if (options?.annotationSession) {
+        url.searchParams.set('annotationSession', '1');
     }
 
     return url;

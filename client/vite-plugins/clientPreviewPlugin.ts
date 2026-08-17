@@ -17,6 +17,7 @@ import {
   rewriteModuleSpecifiersInCode,
   type ModuleSpecifierSearchParam,
 } from './utils/moduleSpecifierQuery';
+import { handleLocalEditingApi, isLocalEditingApiRequest } from './localEditingApi';
 import { buildPreviewTitle, readEntryDisplayName } from './utils/previewTitle';
 
 type ResourceType = 'prototypes' | 'themes';
@@ -90,7 +91,9 @@ function getSearchParamFromRequestUrl(requestUrl: string, key: string): string {
 
 export function shouldInjectManagementRuntime(requestUrl: string | undefined): boolean {
   try {
-    return new URL(requestUrl || '/', 'http://localhost').searchParams.get('agentToolbar') === 'host';
+    const searchParams = new URL(requestUrl || '/', 'http://localhost').searchParams;
+    return searchParams.get('agentToolbar') === 'host'
+      && !searchParams.get('gitVersion')?.trim();
   } catch {
     return false;
   }
@@ -411,7 +414,56 @@ export function createManagementRuntimeLoaderSource(serverOrigin: string | null 
   const bootstrapUrl = serializeInlineScriptString(`${origin}/assets/dev-template-bootstrap.js`);
   const quickEditUrl = serializeInlineScriptString(`${origin}/runtime/quick-edit.js`);
 
-  return `window.__AXHUB_MANAGEMENT_RUNTIME_BOOTSTRAP__ ||= (async () => {
+  return `const earlyRuntimeErrorCaptureKey = '__AXHUB_EARLY_RUNTIME_ERROR_CAPTURE__';
+if (!window[earlyRuntimeErrorCaptureKey]) {
+  const queue = [];
+  let active = true;
+  const normalizeTarget = (target) => {
+    if (!target || target === window) return null;
+    const tagName = String(target.tagName || '').toUpperCase();
+    if (!tagName) return null;
+    return {
+      tagName,
+      src: String(target.src || ''),
+      href: String(target.href || ''),
+    };
+  };
+  const enqueue = (record) => {
+    if (queue.length >= 50) queue.shift();
+    queue.push(record);
+  };
+  const captureError = (event) => {
+    enqueue({
+      eventType: 'error',
+      error: event?.error,
+      message: event?.message,
+      filename: event?.filename,
+      lineno: event?.lineno,
+      colno: event?.colno,
+      target: normalizeTarget(event?.target),
+    });
+  };
+  const captureUnhandledRejection = (event) => {
+    enqueue({
+      eventType: 'unhandledrejection',
+      reason: event?.reason,
+      target: null,
+    });
+  };
+  window[earlyRuntimeErrorCaptureKey] = {
+    queue,
+    stop() {
+      if (!active) return;
+      active = false;
+      window.removeEventListener('error', captureError, true);
+      window.removeEventListener('unhandledrejection', captureUnhandledRejection, true);
+    },
+  };
+  window.addEventListener('error', captureError, true);
+  window.addEventListener('unhandledrejection', captureUnhandledRejection, true);
+}
+
+window.__AXHUB_MANAGEMENT_RUNTIME_BOOTSTRAP__ ||= (async () => {
   const reportError = (stage, error) => {
     const detail = error instanceof Error ? error.message : String(error);
     console.error('[Axhub] Management runtime bootstrap failed:', stage, error);
@@ -522,6 +574,8 @@ interface PreviewSource {
   importPath: string;
   stylePath: string;
   styleHref: string;
+  hackStylePath: string;
+  hackStyleHref: string;
 }
 
 function createDefaultPreviewSource(projectRoot: string, route: { type: ResourceType; name: string }): PreviewSource {
@@ -533,6 +587,8 @@ function createDefaultPreviewSource(projectRoot: string, route: { type: Resource
     importPath: `${routePath}/index.tsx`,
     stylePath: path.join(resourceDir, 'style.css'),
     styleHref: `${routePath}/style.css`,
+    hackStylePath: path.join(resourceDir, 'hack.css'),
+    hackStyleHref: `${routePath}/hack.css`,
   };
 }
 
@@ -584,6 +640,8 @@ function resolveGitVersionPreviewSource(
       importPath: toViteFsPath(entryPath),
       stylePath,
       styleHref: `${routePath}/style.css?${styleSearchParams.toString()}`,
+      hackStylePath: path.join(resourceDir, 'hack.css'),
+      hackStyleHref: `${routePath}/hack.css?${styleSearchParams.toString()}`,
     };
   }
 
@@ -848,10 +906,10 @@ function getHostHeaderHostname(hostHeader: string): string {
 
 function isLocalPreviewRequest(req: IncomingMessage): boolean {
   const forwardedFor = getHeaderValue(req.headers['x-forwarded-for']).split(',')[0]?.trim();
-  if (forwardedFor) {
+  const remoteAddress = req.socket?.remoteAddress || '';
+  if (forwardedFor && (!remoteAddress || isLocalPreviewAddress(remoteAddress))) {
     return isLocalPreviewAddress(forwardedFor);
   }
-  const remoteAddress = req.socket?.remoteAddress || '';
   if (remoteAddress && !isLocalPreviewAddress(remoteAddress)) {
     return false;
   }
@@ -1191,6 +1249,15 @@ export function clientPreviewPlugin(): Plugin {
     async configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         try {
+          if (
+            isLocalEditingApiRequest(req.url)
+            && await handleClientLanAccess(req, res, projectRoot)
+          ) {
+            return;
+          }
+          if (handleLocalEditingApi(req, res, projectRoot)) {
+            return;
+          }
           if (!req.url || req.method !== 'GET') {
             next();
             return;
@@ -1296,6 +1363,12 @@ export function clientPreviewPlugin(): Plugin {
             html = html.replace(
               '</head>',
               `  <link rel="stylesheet" href="${previewSource.styleHref}">\n</head>`,
+            );
+          }
+          if (fs.existsSync(previewSource.hackStylePath)) {
+            html = html.replace(
+              '</head>',
+              `  <link rel="stylesheet" href="${previewSource.hackStyleHref}">\n</head>`,
             );
           }
           html = replacePreviewLoaderPlaceholder(html, route.type, route.name, req.url);

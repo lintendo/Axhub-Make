@@ -452,7 +452,7 @@ git commit -m "feat: encode preview device dimensions in URLs"
 - Modify: `src/index/components/content/PresentationToolbar.test.ts`
 
 **Interfaces:**
-- Produces: `resolveAdaptiveDesktopPreviewConfig(intentConfig, previewWidth)`, optional `PreviewConfig.adaptiveDesktop`, and `handlePreviewContainerSizeChange(width)`.
+- Produces: `resolveAdaptiveDesktopPreviewConfig(intentConfig, previewWidth, lockedAdaptiveDesktop)`, optional `PreviewConfig.adaptiveDesktop`, `handlePreviewContainerSizeChange(width)`, and annotation-session viewport lock actions.
 - Consumes: the manual intent config from Task 3 and the existing content-area `ResizeObserver` measurement.
 
 - [ ] **Step 1: Write failing adaptive resolver and layout tests**
@@ -460,8 +460,8 @@ git commit -m "feat: encode preview device dimensions in URLs"
 Add tests:
 
 ```ts
-it('derives a fixed 1440x900 viewport below the desktop target', () => {
-  const effective = resolveAdaptiveDesktopPreviewConfig(createDefaultPreviewConfig(), 1200);
+it('derives a fixed 1440x900 viewport below the activation width', () => {
+  const effective = resolveAdaptiveDesktopPreviewConfig(createDefaultPreviewConfig(), 1279);
   expect(effective).toMatchObject({
     previewMode: 'single',
     singlePreset: 'custom',
@@ -472,7 +472,7 @@ it('derives a fixed 1440x900 viewport below the desktop target', () => {
 });
 
 it('preserves manual and wide default configurations', () => {
-  expect(resolveAdaptiveDesktopPreviewConfig(createDefaultPreviewConfig(), 1440).singlePreset).toBe('desktop');
+  expect(resolveAdaptiveDesktopPreviewConfig(createDefaultPreviewConfig(), 1280).singlePreset).toBe('desktop');
   expect(resolveAdaptiveDesktopPreviewConfig({ ...createDefaultPreviewConfig(), singlePreset: 'mobile' }, 500).singlePreset).toBe('mobile');
 });
 ```
@@ -496,20 +496,25 @@ Extend `PreviewConfig` with optional `adaptiveDesktop?: boolean`. Add:
 ```ts
 export const ADAPTIVE_DESKTOP_WIDTH = 1440;
 export const ADAPTIVE_DESKTOP_HEIGHT = 900;
+export const ADAPTIVE_DESKTOP_ACTIVATION_WIDTH = 1280;
 
 export function resolveAdaptiveDesktopPreviewConfig(
   intentConfig: PreviewConfig,
   previewWidth: number,
+  lockedAdaptiveDesktop: boolean | null = null,
 ): PreviewConfig {
   if (
     intentConfig.previewMode !== 'single'
     || intentConfig.singlePreset !== 'desktop'
-    || !Number.isFinite(previewWidth)
-    || previewWidth <= 0
-    || previewWidth >= ADAPTIVE_DESKTOP_WIDTH
   ) {
     return { ...intentConfig, adaptiveDesktop: false };
   }
+  const adaptiveDesktop = lockedAdaptiveDesktop ?? (
+    Number.isFinite(previewWidth)
+    && previewWidth > 0
+    && previewWidth < ADAPTIVE_DESKTOP_ACTIVATION_WIDTH
+  );
+  if (!adaptiveDesktop) return { ...intentConfig, adaptiveDesktop: false };
   return {
     ...intentConfig,
     singlePreset: 'custom',
@@ -529,8 +534,8 @@ Rename the hook's state to `previewIntentConfig`. Track `previewContainerWidth` 
 
 ```ts
 const previewConfig = useMemo(
-  () => resolveAdaptiveDesktopPreviewConfig(previewIntentConfig, previewContainerWidth),
-  [previewContainerWidth, previewIntentConfig],
+  () => resolveAdaptiveDesktopPreviewConfig(previewIntentConfig, previewContainerWidth, lockedAdaptiveDesktop),
+  [lockedAdaptiveDesktop, previewContainerWidth, previewIntentConfig],
 );
 ```
 
@@ -545,6 +550,8 @@ handlePreviewContainerSizeChange: (width: number) => void;
 ```
 
 that stores only finite positive integer changes.
+
+Expose `lockAdaptiveDesktopPreview()` and `unlockAdaptiveDesktopPreview()`. Editor entry captures the current automatic decision before collapsing the sidebar; editor exit releases it. Manual preview intent updates clear the lock so explicit device actions remain immediate.
 
 - [ ] **Step 5: Report preview width from the existing content measurement**
 
@@ -617,10 +624,10 @@ Expected: both commands exit 0. If the first command exposes known unrelated rep
 - [ ] **Step 3: Start the admin dev server**
 
 ```bash
-pnpm admin:dev --host 127.0.0.1
+pnpm server:dev -- --host 127.0.0.1 --no-open
 ```
 
-Use an available port and keep the server running for user verification.
+Keep the integrated server running on its configured management port for user verification.
 
 - [ ] **Step 4: Verify the wide desktop state in a browser**
 
@@ -638,7 +645,8 @@ At a workspace width below 1728px, and separately at 1920px with a visible 320px
 
 - Sidebar starts collapsed when no prior explicit choice exists.
 - Click still pins it expanded and consumes 240px.
-- A default desktop preview narrower than 1440px shows effective custom `1440x900` and remains readable through scaling.
+- A default desktop preview narrower than 1280px shows effective custom `1440x900` and remains readable through scaling; widths from 1280px upward remain fluid.
+- Entering annotation may collapse the sidebar but preserves the pre-entry automatic viewport decision until exit.
 - Long pages scroll inside the iframe rather than shrinking the entire document.
 
 - [ ] **Step 6: Verify URL reload behavior**

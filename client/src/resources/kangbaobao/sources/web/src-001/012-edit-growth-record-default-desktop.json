@@ -1,0 +1,207 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 12,
+  "pageId": "x5jvd9",
+  "pageName": "增加/编辑记录",
+  "sitemapPath": "首页 / 身高记录 / 增加/编辑记录",
+  "requestedPath": "增加_编辑记录.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.59.01/%E5%A2%9E%E5%8A%A0_%E7%BC%96%E8%BE%91%E8%AE%B0%E5%BD%95.html",
+  "dataUrl": "http://127.0.0.1:32768/20.59.01/files/%E5%A2%9E%E5%8A%A0_%E7%BC%96%E8%BE%91%E8%AE%B0%E5%BD%95/data.js",
+  "generationDate": "2026-08-14T12:59:01.298Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 新增生长记录\n- paragraph: 身高\n- textbox: 请输入身高\n- paragraph: cm\n- paragraph: 体重\n- paragraph: kg\n- textbox: 请输入体重\n- paragraph: 日期\n- paragraph: 2019/06/19\n- paragraph: 保存\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "012-edit-growth-record-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "导航",
+    "toast",
+    "弹层-选择日期",
+    "背景",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [
+    {
+      "scope": "page:增加/编辑记录 / Group / Group / Text field",
+      "label": "",
+      "type": "Text field",
+      "visible": true
+    },
+    {
+      "scope": "page:增加/编辑记录 / Group / Group / Text field",
+      "label": "",
+      "type": "Text field",
+      "visible": true
+    }
+  ],
+  "panels": [
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:增加/编辑记录 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:增加/编辑记录 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 弹层-选择日期",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:增加/编辑记录 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show toast",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:增加/编辑记录 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "wait",
+      "description": "Wait 1500 ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:增加/编辑记录 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide toast",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:增加/编辑记录 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:增加/编辑记录 / 弹层-选择日期 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹层-选择日期",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:增加/编辑记录 / 弹层-选择日期 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹层-选择日期",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

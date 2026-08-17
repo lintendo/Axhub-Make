@@ -9,6 +9,8 @@ import { formatLocalAppOpenFailureMessage } from '../../common/localAppOpenMessa
 import { PromptClientPreference } from '../types';
 import type { ExcalidrawPropertyPanelMode, ExcalidrawPropertyPanelPosition } from '../utils/excalidrawUiMode';
 import type { AssistantImageGenerationConfig } from '../domains/assistant/assistantAcpContext';
+import type { ProjectScope } from './projectScope';
+import { withProjectScope } from './projectScope';
 
 interface ConfigResponse {
     projectPath?: string | null;
@@ -20,11 +22,16 @@ interface ConfigResponse {
         defaultTheme?: string | null;
     };
     automation?: {
-        defaultPromptClient?: PromptClientPreference;
+        conversationPromptClient?: PromptClientPreference;
+        conversationModel?: string | null;
         defaultIDE?: MainIDEPreference;
+        injectLocalAiEntry?: boolean;
         annotationPromptClient?: PromptClientPreference;
         annotationModel?: string | null;
+        canvasPromptClient?: PromptClientPreference;
+        canvasModel?: string | null;
         agentRunConcurrency?: number;
+        autoClearCompletedComments?: boolean;
     };
     assistant?: {
         webBaseUrl?: string | null;
@@ -122,7 +129,6 @@ export interface MakeClientUpdateApplyResult {
 export type GitWorkspacePromptScene =
     | 'create-remote'
     | 'auth-failed'
-    | 'branch-management'
     | 'merge-required'
     | 'conflict-required'
     | 'push-rejected';
@@ -156,6 +162,35 @@ export interface GitWorkspaceCommitSummary {
     date: string;
 }
 
+export interface GitWorkspaceRemoteComparison {
+    available: boolean;
+    branch?: string;
+    targetRef?: string;
+    reason?: string;
+    localHead?: GitWorkspaceCommitSummary | null;
+    remoteHead?: GitWorkspaceCommitSummary | null;
+    aheadCount?: number;
+    behindCount?: number;
+    incomingCommits?: GitWorkspaceCommitSummary[];
+    outgoingCommits?: GitWorkspaceCommitSummary[];
+    incoming: {
+        totalFiles: number;
+        groups: GitWorkspaceChangeGroup[];
+    };
+    outgoing: {
+        totalFiles: number;
+        groups: GitWorkspaceChangeGroup[];
+    };
+}
+
+export interface GitWorkspaceBranchView {
+    branch: string;
+    remoteBranch?: string;
+    commit: GitWorkspaceCommitSummary | null;
+    recentCommits: GitWorkspaceCommitSummary[];
+    remoteComparison: GitWorkspaceRemoteComparison;
+}
+
 export interface GitWorkspaceStatusResponse {
     available: boolean;
     gitAvailable?: boolean;
@@ -181,26 +216,8 @@ export interface GitWorkspaceStatusResponse {
         localBranches: string[];
         remoteBranches: string[];
     };
-    remoteComparison?: {
-        available: boolean;
-        branch?: string;
-        targetRef?: string;
-        reason?: string;
-        localHead?: GitWorkspaceCommitSummary | null;
-        remoteHead?: GitWorkspaceCommitSummary | null;
-        aheadCount?: number;
-        behindCount?: number;
-        incomingCommits?: GitWorkspaceCommitSummary[];
-        outgoingCommits?: GitWorkspaceCommitSummary[];
-        incoming: {
-            totalFiles: number;
-            groups: GitWorkspaceChangeGroup[];
-        };
-        outgoing: {
-            totalFiles: number;
-            groups: GitWorkspaceChangeGroup[];
-        };
-    };
+    remoteComparison?: GitWorkspaceRemoteComparison;
+    branchView?: GitWorkspaceBranchView;
 }
 
 export interface GitWorkspaceActionResponse {
@@ -237,11 +254,16 @@ interface GetGitWorkspacePromptRequest {
 
 interface SaveServerPreferencesRequest {
     automation?: {
-        defaultPromptClient?: PromptClientPreference;
+        conversationPromptClient?: PromptClientPreference;
+        conversationModel?: string | null;
         defaultIDE?: MainIDEPreference;
+        injectLocalAiEntry?: boolean;
         annotationPromptClient?: PromptClientPreference;
         annotationModel?: string | null;
+        canvasPromptClient?: PromptClientPreference;
+        canvasModel?: string | null;
         agentRunConcurrency?: number;
+        autoClearCompletedComments?: boolean;
     };
     assistant?: {
         webBaseUrl?: string | null;
@@ -297,19 +319,15 @@ export interface AssistantRuntimeResponse {
 }
 
 interface GetAssistantRuntimeOptions {
+    projectId: string;
     autoStart?: boolean;
-    projectId?: string;
-}
-
-interface GetConfigOptions {
-    projectId?: string | null;
 }
 
 export type AssistantBootstrapMode = 'install_global' | 'start_existing' | 'restart_existing';
 
 interface AssistantBootstrapRequest {
+    projectId: string;
     mode: AssistantBootstrapMode;
-    projectId?: string;
 }
 
 interface AssistantBootstrapResponse {
@@ -320,8 +338,8 @@ interface AssistantBootstrapResponse {
 }
 
 interface OpenIDERequest {
+    projectId: string;
     ide: MainIDEPreference;
-    projectId?: string;
     targetPath?: string;
 }
 
@@ -335,22 +353,45 @@ interface OpenIDEResponse {
 }
 
 interface OpenCLIAgentRequest {
+    projectId: string;
     agent: CLIAgent;
-    projectId?: string;
     targetPath?: string;
 }
 
 interface OpenWebAgentRequest {
+    projectId: string;
     agent: WebAgent;
-    projectId?: string;
     targetPath?: string;
     corsOrigin?: string;
 }
 
 interface OpenLocalAppAgentRequest {
+    projectId: string;
     agent: LocalAppAgent;
-    projectId?: string;
     targetPath?: string;
+}
+
+export type DesktopIntegrationProvider = 'chatgpt' | 'cursor' | 'workbuddy' | 'traework' | 'qoderwork';
+export type DesktopIntegrationOpenAction = 'prepare' | 'restart' | 'normal';
+
+export interface DesktopIntegrationOpenRequest {
+    projectId: string;
+    provider: DesktopIntegrationProvider;
+    action: DesktopIntegrationOpenAction;
+    targetPath?: string;
+}
+
+export interface DesktopIntegrationOpenResponse {
+    success: true;
+    provider: DesktopIntegrationProvider;
+    status: 'opened' | 'restart-required';
+    mode?: 'integrated' | 'normal';
+    launched?: boolean;
+    reused?: boolean;
+    url?: string;
+    openInBrowser?: boolean;
+    noticeCode?: 'project-selection-required';
+    notice?: string;
 }
 
 interface OpenAgentResponse {
@@ -429,7 +470,7 @@ export interface ReviewReportDeleteResponse {
 }
 
 export interface ReviewReportSubmitPayload {
-    projectId?: string;
+    projectId: string;
     prototypeId: string;
     title?: string;
     reviewer?: string;
@@ -486,7 +527,7 @@ export interface ReviewAxhubSyncResult {
 }
 
 export interface ReviewReportScopeOptions {
-    projectId?: string;
+    projectId: string;
     prototypeId: string;
 }
 
@@ -801,29 +842,6 @@ function isLikelyHtmlFallback(text: string): boolean {
         || trimmed.includes('injectintoglobalhook');
 }
 
-function buildProjectScopedUrl(path: string, options?: GetConfigOptions): string {
-    const projectId = options?.projectId?.trim();
-    if (!projectId) {
-        return path;
-    }
-
-    const [pathname, rawQuery = ''] = path.split('?');
-    const query = new URLSearchParams(rawQuery);
-    query.set('projectId', projectId);
-    return `${pathname}?${query.toString()}`;
-}
-
-function getCurrentProjectIdFromUrl(): string {
-    if (typeof window === 'undefined') {
-        return '';
-    }
-    return new URLSearchParams(window.location.search).get('projectId')?.trim() || '';
-}
-
-function buildCurrentProjectScopedUrl(path: string): string {
-    return buildProjectScopedUrl(path, { projectId: getCurrentProjectIdFromUrl() });
-}
-
 function normalizeMakeApiOrigin(value: unknown): string {
     if (typeof value !== 'string') return '';
     const trimmed = value.trim().replace(/\/+$/u, '');
@@ -833,14 +851,24 @@ function normalizeMakeApiOrigin(value: unknown): string {
         return url.protocol === 'http:' || url.protocol === 'https:' ? url.origin : '';
     } catch {
         return '';
-    }
+  }
 }
 
-function buildMakeApiUrl(path: string): string {
+function readInjectedMakeApiOrigin(): string {
     const globals = typeof window === 'undefined'
         ? null
         : window as unknown as { __AXHUB_MAKE_API_ORIGIN__?: unknown };
-    const makeApiOrigin = normalizeMakeApiOrigin(globals?.__AXHUB_MAKE_API_ORIGIN__);
+    return normalizeMakeApiOrigin(globals?.__AXHUB_MAKE_API_ORIGIN__);
+}
+
+export function resolveMakeApiOrigin(): string {
+    const injectedOrigin = readInjectedMakeApiOrigin();
+    if (injectedOrigin) return injectedOrigin;
+    return typeof window === 'undefined' ? '' : normalizeMakeApiOrigin(window.location.origin);
+}
+
+function buildMakeApiUrl(path: string): string {
+    const makeApiOrigin = readInjectedMakeApiOrigin();
     if (!makeApiOrigin) {
         return path;
     }
@@ -857,9 +885,27 @@ async function readApiJsonResponse<T>(response: Response, fallbackMessage: strin
     return result as T;
 }
 
+export interface PrototypeAnnotationStatusResponse {
+    enabled: boolean;
+    exists: boolean;
+    source: unknown | null;
+    path: string;
+}
+
 export const apiService = {
-    async createPlaceholderPrototype(options?: GetConfigOptions): Promise<CreatePlaceholderPrototypeResponse> {
-        const response = await fetch(buildProjectScopedUrl('/api/prototypes/create-placeholder', options), {
+    async getPrototypeAnnotationStatus(
+        targetPath: string,
+        scope: ProjectScope,
+    ): Promise<PrototypeAnnotationStatusResponse> {
+        const response = await fetch(withProjectScope(
+            `/api/prototype-annotation?targetPath=${encodeURIComponent(targetPath)}`,
+            scope,
+        ), { cache: 'no-store' });
+        return readApiJsonResponse<PrototypeAnnotationStatusResponse>(response, '读取需求标注状态失败');
+    },
+
+    async createPlaceholderPrototype(scope: ProjectScope): Promise<CreatePlaceholderPrototypeResponse> {
+        const response = await fetch(withProjectScope('/api/prototypes/create-placeholder', scope), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
@@ -871,23 +917,11 @@ export const apiService = {
         return result;
     },
 
-    async startPlaceholderPrototypeGeneration(prototypeName: string) {
-        const encodedPrototypeName = encodeURIComponent(prototypeName);
-        const response = await fetch(`/api/prototypes/${encodedPrototypeName}/start-generation`, {
-            method: 'POST',
-        });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            throw new Error(result?.error || '进入原型等待生成态失败');
-        }
-        return result;
-    },
-
     /**
      * 删除组件或原型
      */
-    async deleteItem(path: string) {
-        const response = await fetch('/api/delete', {
+    async deleteItem(path: string, scope: ProjectScope) {
+        const response = await fetch(withProjectScope('/api/delete', scope), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -968,8 +1002,16 @@ export const apiService = {
         return '';
     },
 
-    async fetchExportIndexBundle(path: string): Promise<ExportIndexBundle> {
-        const response = await fetch(`/api/export-index-bundle?path=${encodeURIComponent(path)}`);
+    async fetchExportIndexBundle(
+        path: string,
+        scope: ProjectScope,
+        options: { includeImageAssets?: boolean } = {},
+    ): Promise<ExportIndexBundle> {
+        const query = new URLSearchParams({ path });
+        if (typeof options.includeImageAssets === 'boolean') {
+            query.set('includeImages', options.includeImageAssets ? 'true' : 'false');
+        }
+        const response = await fetch(withProjectScope(`/api/export-index-bundle?${query.toString()}`, scope));
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
             throw new Error(result?.error || '加载导出 bundle 失败');
@@ -977,8 +1019,8 @@ export const apiService = {
         return result;
     },
 
-    async fetchAxureExportCode(path: string) {
-        const response = await fetch(`/api/axure-export-code?path=${encodeURIComponent(path)}`);
+    async fetchAxureExportCode(path: string, scope: ProjectScope) {
+        const response = await fetch(withProjectScope(`/api/axure-export-code?path=${encodeURIComponent(path)}`, scope));
         if (!response.ok) {
             const result = await response.json().catch(() => ({}));
             throw new Error(result?.error || '加载 Axure 导出代码失败');
@@ -989,8 +1031,8 @@ export const apiService = {
     /**
      * 代码检查
      */
-    async reviewCode(path: string, options: ReviewCodeOptions = {}): Promise<ReviewResult> {
-        const response = await fetch('/api/code-review', {
+    async reviewCode(path: string, scope: ProjectScope, options: ReviewCodeOptions = {}): Promise<ReviewResult> {
+        const response = await fetch(withProjectScope('/api/code-review', scope), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1012,9 +1054,7 @@ export const apiService = {
 
     async listReviewReports(options: ReviewReportScopeOptions): Promise<ReviewReportListResponse> {
         const query = new URLSearchParams();
-        if (options.projectId?.trim()) {
-            query.set('projectId', options.projectId.trim());
-        }
+        query.set('projectId', options.projectId.trim());
         query.set('prototypeId', options.prototypeId);
         const response = await fetch(buildMakeApiUrl(`/api/review-reports?${query.toString()}`), { cache: 'no-store' });
         return readApiJsonResponse<ReviewReportListResponse>(response, '加载评审报告失败');
@@ -1022,9 +1062,7 @@ export const apiService = {
 
     async getReviewReport(options: ReviewReportDetailOptions): Promise<ReviewReportDetailResponse> {
         const query = new URLSearchParams();
-        if (options.projectId?.trim()) {
-            query.set('projectId', options.projectId.trim());
-        }
+        query.set('projectId', options.projectId.trim());
         query.set('prototypeId', options.prototypeId);
         const response = await fetch(buildMakeApiUrl(`/api/review-reports/${encodeURIComponent(options.reportId)}?${query.toString()}`), { cache: 'no-store' });
         return readApiJsonResponse<ReviewReportDetailResponse>(response, '加载评审报告详情失败');
@@ -1032,9 +1070,7 @@ export const apiService = {
 
     async checkReviewReportExists(options: ReviewReportDetailOptions): Promise<ReviewReportExistsResponse> {
         const query = new URLSearchParams();
-        if (options.projectId?.trim()) {
-            query.set('projectId', options.projectId.trim());
-        }
+        query.set('projectId', options.projectId.trim());
         query.set('prototypeId', options.prototypeId);
         query.set('reportId', options.reportId);
         const response = await fetch(buildMakeApiUrl(`/api/review-reports/exists?${query.toString()}`), { cache: 'no-store' });
@@ -1055,9 +1091,7 @@ export const apiService = {
 
     async uploadReviewReport(options: ReviewReportUploadOptions): Promise<ReviewReportUploadResult> {
         const formData = new FormData();
-        if (options.projectId?.trim()) {
-            formData.set('projectId', options.projectId.trim());
-        }
+        formData.set('projectId', options.projectId.trim());
         formData.set('prototypeId', options.prototypeId);
         if (options.title?.trim()) {
             formData.set('title', options.title.trim());
@@ -1084,19 +1118,15 @@ export const apiService = {
         return readApiJsonResponse<ReviewReportSubmitResult>(response, '提交评审报告失败');
     },
 
-    async getReviewLanSubmitConfig(projectId?: string, prototypeId?: string): Promise<ReviewLanSubmitConfig> {
+    async getReviewLanSubmitConfig(projectId: string, prototypeId: string): Promise<ReviewLanSubmitConfig> {
         const query = new URLSearchParams();
-        if (projectId?.trim()) {
-            query.set('projectId', projectId.trim());
-        }
-        if (prototypeId?.trim()) {
-            query.set('prototypeId', prototypeId.trim());
-        }
+        query.set('projectId', projectId.trim());
+        query.set('prototypeId', prototypeId.trim());
         const response = await fetch(buildMakeApiUrl(`/api/review-reports/lan-submit-config${query.toString() ? `?${query.toString()}` : ''}`), { cache: 'no-store' });
         return readApiJsonResponse<ReviewLanSubmitConfig>(response, '加载局域网提交配置失败');
     },
 
-    async updateReviewLanSubmitConfig(payload: { projectId?: string; prototypeId: string; lanSubmitEnabled: boolean }): Promise<ReviewLanSubmitConfig> {
+    async updateReviewLanSubmitConfig(payload: { projectId: string; prototypeId: string; lanSubmitEnabled: boolean }): Promise<ReviewLanSubmitConfig> {
         const response = await fetch(buildMakeApiUrl('/api/review-reports/lan-submit-config'), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -1105,19 +1135,15 @@ export const apiService = {
         return readApiJsonResponse<ReviewLanSubmitConfig>(response, '更新局域网提交配置失败');
     },
 
-    async getReviewAxhubConfig(projectId?: string, prototypeId?: string): Promise<ReviewAxhubConfig> {
+    async getReviewAxhubConfig(projectId: string, prototypeId: string): Promise<ReviewAxhubConfig> {
         const query = new URLSearchParams();
-        if (projectId?.trim()) {
-            query.set('projectId', projectId.trim());
-        }
-        if (prototypeId?.trim()) {
-            query.set('prototypeId', prototypeId.trim());
-        }
+        query.set('projectId', projectId.trim());
+        query.set('prototypeId', prototypeId.trim());
         const response = await fetch(buildMakeApiUrl(`/api/review-reports/axhub-config${query.toString() ? `?${query.toString()}` : ''}`), { cache: 'no-store' });
         return readApiJsonResponse<ReviewAxhubConfig>(response, '加载 Axhub 提交配置失败');
     },
 
-    async updateReviewAxhubConfig(payload: { projectId?: string; prototypeId: string; submitEnabled: boolean }): Promise<ReviewAxhubConfig> {
+    async updateReviewAxhubConfig(payload: { projectId: string; prototypeId: string; submitEnabled: boolean }): Promise<ReviewAxhubConfig> {
         const response = await fetch(buildMakeApiUrl('/api/review-reports/axhub-config'), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -1135,8 +1161,8 @@ export const apiService = {
         return readApiJsonResponse<ReviewAxhubSyncResult>(response, '同步 Axhub 评审报告失败');
     },
 
-    async getAxureApiPreview(path: string): Promise<AxureApiPreviewResponse> {
-        const response = await fetch('/api/axure-api-preview', {
+    async getAxureApiPreview(path: string, scope: ProjectScope): Promise<AxureApiPreviewResponse> {
+        const response = await fetch(withProjectScope('/api/axure-api-preview', scope), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1152,8 +1178,8 @@ export const apiService = {
         return result;
     },
 
-    async probeExportMake(targetPath: string): Promise<ExportMakeProbeResponse> {
-        const response = await fetch(`/api/export-make?path=${encodeURIComponent(targetPath)}&probe=1`);
+    async probeExportMake(targetPath: string, scope: ProjectScope): Promise<ExportMakeProbeResponse> {
+        const response = await fetch(withProjectScope(`/api/export-make?path=${encodeURIComponent(targetPath)}&probe=1`, scope));
         const result = await response.json();
         if (!response.ok) {
             throw new Error(result?.error || '加载 .fig 导出状态失败');
@@ -1161,8 +1187,8 @@ export const apiService = {
         return result;
     },
 
-    async getExportMakePrompt(targetPath: string): Promise<ExportMakePromptResponse> {
-        const response = await fetch(`/api/export-make?path=${encodeURIComponent(targetPath)}&prompt=1`);
+    async getExportMakePrompt(targetPath: string, scope: ProjectScope): Promise<ExportMakePromptResponse> {
+        const response = await fetch(withProjectScope(`/api/export-make?path=${encodeURIComponent(targetPath)}&prompt=1`, scope));
         const result = await response.json();
         if (!response.ok) {
             throw new Error(result?.error || '加载 .fig 导出 Prompt 失败');
@@ -1170,8 +1196,8 @@ export const apiService = {
         return result;
     },
 
-    async getCloudPublishingConfig(): Promise<CloudPublishingConfigResponse> {
-        const response = await fetch('/api/cloud-publishing/config');
+    async getCloudPublishingConfig(scope: ProjectScope): Promise<CloudPublishingConfigResponse> {
+        const response = await fetch(withProjectScope('/api/cloud-publishing/config', scope));
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
             throw createCloudPublishingApiError(result, '加载云服务发布配置失败');
@@ -1179,8 +1205,8 @@ export const apiService = {
         return result;
     },
 
-    async saveCloudPublishingConfig(payload: CloudPublishingConfigPayload): Promise<CloudPublishingConfigResponse> {
-        const response = await fetch('/api/cloud-publishing/config', {
+    async saveCloudPublishingConfig(payload: CloudPublishingConfigPayload, scope: ProjectScope): Promise<CloudPublishingConfigResponse> {
+        const response = await fetch(withProjectScope('/api/cloud-publishing/config', scope), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1194,11 +1220,10 @@ export const apiService = {
         return result;
     },
 
-    async getCloudPublishingLatest(path?: string, projectId?: string | null): Promise<CloudPublishingLatestResponse> {
+    async getCloudPublishingLatest(path: string | undefined, scope: ProjectScope): Promise<CloudPublishingLatestResponse> {
         const query = new URLSearchParams();
         if (path?.trim()) query.set('path', path.trim());
-        if (projectId?.trim()) query.set('projectId', projectId.trim());
-        const response = await fetch(`/api/cloud-publishing/latest${query.size ? `?${query.toString()}` : ''}`);
+        const response = await fetch(withProjectScope(`/api/cloud-publishing/latest${query.size ? `?${query.toString()}` : ''}`, scope));
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
             throw createCloudPublishingApiError(result, '加载最近发布地址失败');
@@ -1206,8 +1231,8 @@ export const apiService = {
         return result;
     },
 
-    async publishCloudTarget(payload: CloudPublishRequest): Promise<CloudPublishResponse> {
-        const response = await fetch('/api/cloud-publishing/publish', {
+    async publishCloudTarget(payload: CloudPublishRequest, scope: ProjectScope): Promise<CloudPublishResponse> {
+        const response = await fetch(withProjectScope('/api/cloud-publishing/publish', scope), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1305,7 +1330,7 @@ export const apiService = {
         return readApiJsonResponse<AxhubHostedReviewClearResult>(response, '清空 Axhub 评审报告失败');
     },
 
-    async publishAxhubHtmlProject(payload: { pid: number; path: string; projectId?: string | null }): Promise<AxhubPublishResponse> {
+    async publishAxhubHtmlProject(payload: { pid: number; path: string; projectId: string }): Promise<AxhubPublishResponse> {
         const response = await fetch('/api/axhub/publish', {
             method: 'POST',
             headers: {
@@ -1320,8 +1345,8 @@ export const apiService = {
         return result;
     },
 
-    async getConfig(options?: GetConfigOptions): Promise<ConfigResponse> {
-        const response = await fetch(buildProjectScopedUrl('/api/config', options));
+    async getConfig(scope: ProjectScope): Promise<ConfigResponse> {
+        const response = await fetch(withProjectScope('/api/config', scope));
         if (!response.ok) {
             throw new Error('加载配置失败');
         }
@@ -1360,8 +1385,8 @@ export const apiService = {
         return readApiJsonResponse<LanAccessShareUrlResponse>(response, '生成局域网短期链接失败');
     },
 
-    async getBootstrapConfig(options?: GetConfigOptions): Promise<ConfigResponse> {
-        const response = await fetch(buildProjectScopedUrl('/api/config/bootstrap', options));
+    async getBootstrapConfig(scope: ProjectScope): Promise<ConfigResponse> {
+        const response = await fetch(withProjectScope('/api/config/bootstrap', scope));
         if (!response.ok) {
             throw new Error('加载配置失败');
         }
@@ -1401,18 +1426,25 @@ export const apiService = {
         return result;
     },
 
-    async getGitWorkspaceStatus(options: { gitVersion?: string; path?: string } = {}): Promise<GitWorkspaceStatusResponse> {
+    async getGitWorkspaceStatus(options: {
+        gitVersion?: string;
+        path?: string;
+        branch?: string;
+        remoteBranch?: string;
+    }, scope: ProjectScope): Promise<GitWorkspaceStatusResponse> {
         const query = new URLSearchParams();
         if (options.gitVersion) query.set('gitVersion', options.gitVersion);
         if (options.path) query.set('path', options.path);
+        if (options.branch) query.set('branch', options.branch);
+        if (options.remoteBranch) query.set('remoteBranch', options.remoteBranch);
         const path = query.toString() ? `/api/git/workspace/status?${query.toString()}` : '/api/git/workspace/status';
-        const url = buildCurrentProjectScopedUrl(path);
+        const url = withProjectScope(path, scope);
         const response = await fetch(url, { cache: 'no-store' });
         return readApiJsonResponse<GitWorkspaceStatusResponse>(response, '加载版本状态失败');
     },
 
-    async initGitWorkspace(): Promise<GitWorkspaceActionResponse> {
-        const response = await fetch(buildCurrentProjectScopedUrl('/api/git/workspace/init'), {
+    async initGitWorkspace(scope: ProjectScope): Promise<GitWorkspaceActionResponse> {
+        const response = await fetch(withProjectScope('/api/git/workspace/init', scope), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
@@ -1420,8 +1452,8 @@ export const apiService = {
         return readApiJsonResponse<GitWorkspaceActionResponse>(response, '初始化本地仓库失败');
     },
 
-    async commitGitWorkspace(message: string, options: { path?: string } = {}): Promise<GitWorkspaceActionResponse> {
-        const response = await fetch(buildCurrentProjectScopedUrl('/api/git/workspace/commit'), {
+    async commitGitWorkspace(message: string, scope: ProjectScope, options: { path?: string } = {}): Promise<GitWorkspaceActionResponse> {
+        const response = await fetch(withProjectScope('/api/git/workspace/commit', scope), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message, ...(options.path ? { path: options.path } : {}) }),
@@ -1429,17 +1461,8 @@ export const apiService = {
         return readApiJsonResponse<GitWorkspaceActionResponse>(response, '提交版本失败');
     },
 
-    async switchGitWorkspaceBranch(branch: string): Promise<GitWorkspaceActionResponse> {
-        const response = await fetch(buildCurrentProjectScopedUrl('/api/git/workspace/branch'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ branch }),
-        });
-        return readApiJsonResponse<GitWorkspaceActionResponse>(response, '切换分支失败');
-    },
-
-    async setGitWorkspaceRemote(payload: SetGitWorkspaceRemoteRequest): Promise<GitWorkspaceActionResponse> {
-        const response = await fetch(buildCurrentProjectScopedUrl('/api/git/workspace/remote'), {
+    async setGitWorkspaceRemote(payload: SetGitWorkspaceRemoteRequest, scope: ProjectScope): Promise<GitWorkspaceActionResponse> {
+        const response = await fetch(withProjectScope('/api/git/workspace/remote', scope), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -1447,8 +1470,8 @@ export const apiService = {
         return readApiJsonResponse<GitWorkspaceActionResponse>(response, '连接在线仓库失败');
     },
 
-    async fetchGitWorkspace(): Promise<GitWorkspaceActionResponse> {
-        const response = await fetch(buildCurrentProjectScopedUrl('/api/git/workspace/fetch'), {
+    async fetchGitWorkspace(scope: ProjectScope): Promise<GitWorkspaceActionResponse> {
+        const response = await fetch(withProjectScope('/api/git/workspace/fetch', scope), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
@@ -1456,8 +1479,8 @@ export const apiService = {
         return readApiJsonResponse<GitWorkspaceActionResponse>(response, '刷新在线仓库状态失败');
     },
 
-    async syncDownGitWorkspace(): Promise<GitWorkspaceActionResponse> {
-        const response = await fetch(buildCurrentProjectScopedUrl('/api/git/workspace/sync-down'), {
+    async syncDownGitWorkspace(scope: ProjectScope): Promise<GitWorkspaceActionResponse> {
+        const response = await fetch(withProjectScope('/api/git/workspace/sync-down', scope), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
@@ -1465,8 +1488,8 @@ export const apiService = {
         return readApiJsonResponse<GitWorkspaceActionResponse>(response, '同步下来失败');
     },
 
-    async pushGitWorkspace(): Promise<GitWorkspaceActionResponse> {
-        const response = await fetch(buildCurrentProjectScopedUrl('/api/git/workspace/push'), {
+    async pushGitWorkspace(scope: ProjectScope): Promise<GitWorkspaceActionResponse> {
+        const response = await fetch(withProjectScope('/api/git/workspace/push', scope), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
@@ -1474,8 +1497,8 @@ export const apiService = {
         return readApiJsonResponse<GitWorkspaceActionResponse>(response, '同步到在线失败');
     },
 
-    async createGitWorkspaceRemoteRepository(payload: CreateGitWorkspaceRemoteRepositoryRequest): Promise<GitWorkspaceActionResponse> {
-        const response = await fetch(buildCurrentProjectScopedUrl('/api/git/workspace/create-remote-repository'), {
+    async createGitWorkspaceRemoteRepository(payload: CreateGitWorkspaceRemoteRepositoryRequest, scope: ProjectScope): Promise<GitWorkspaceActionResponse> {
+        const response = await fetch(withProjectScope('/api/git/workspace/create-remote-repository', scope), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -1483,8 +1506,8 @@ export const apiService = {
         return readApiJsonResponse<GitWorkspaceActionResponse>(response, '创建在线仓库失败');
     },
 
-    async getGitWorkspacePrompt(payload: GetGitWorkspacePromptRequest): Promise<GitWorkspaceActionResponse> {
-        const response = await fetch(buildCurrentProjectScopedUrl('/api/git/workspace/prompt'), {
+    async getGitWorkspacePrompt(payload: GetGitWorkspacePromptRequest, scope: ProjectScope): Promise<GitWorkspaceActionResponse> {
+        const response = await fetch(withProjectScope('/api/git/workspace/prompt', scope), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -1492,8 +1515,8 @@ export const apiService = {
         return readApiJsonResponse<GitWorkspaceActionResponse>(response, '生成 AI 提示词失败');
     },
 
-    async saveServerPreferences(payload: SaveServerPreferencesRequest) {
-        const response = await fetch('/api/config', {
+    async saveServerPreferences(payload: SaveServerPreferencesRequest, scope: ProjectScope) {
+        const response = await fetch(withProjectScope('/api/config', scope), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1508,16 +1531,13 @@ export const apiService = {
         return result;
     },
 
-    async getAssistantRuntime(options?: GetAssistantRuntimeOptions): Promise<AssistantRuntimeResponse> {
+    async getAssistantRuntime(options: GetAssistantRuntimeOptions): Promise<AssistantRuntimeResponse> {
         const query = new URLSearchParams();
-        if (options?.autoStart !== undefined) {
+        if (options.autoStart !== undefined) {
             query.set('autoStart', options.autoStart ? 'true' : 'false');
         }
-        if (options?.projectId?.trim()) {
-            query.set('projectId', options.projectId.trim());
-        }
         const suffix = query.toString();
-        const response = await fetch(`/api/assistant/runtime${suffix ? `?${suffix}` : ''}`);
+        const response = await fetch(withProjectScope(`/api/assistant/runtime${suffix ? `?${suffix}` : ''}`, { projectId: options.projectId }));
         if (!response.ok) {
             throw new Error('加载助手运行时配置失败');
         }
@@ -1525,7 +1545,7 @@ export const apiService = {
     },
 
     async bootstrapAssistant(payload: AssistantBootstrapRequest): Promise<AssistantBootstrapResponse> {
-        const response = await fetch('/api/assistant/bootstrap', {
+        const response = await fetch(withProjectScope('/api/assistant/bootstrap', { projectId: payload.projectId }), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1544,7 +1564,7 @@ export const apiService = {
     async openIDE(payload: OpenIDERequest): Promise<OpenIDEResponse> {
         let response: Response;
         try {
-            response = await fetch('/api/ide/open', {
+            response = await fetch(withProjectScope('/api/ide/open', { projectId: payload.projectId }), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1564,7 +1584,7 @@ export const apiService = {
     },
 
     async openCLIAgent(payload: OpenCLIAgentRequest): Promise<OpenAgentResponse> {
-        const response = await fetch('/api/agent/cli/open', {
+        const response = await fetch(withProjectScope('/api/agent/cli/open', { projectId: payload.projectId }), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1581,7 +1601,7 @@ export const apiService = {
     },
 
     async openWebAgent(payload: OpenWebAgentRequest): Promise<OpenAgentResponse> {
-        const response = await fetch('/api/agent/web/open', {
+        const response = await fetch(withProjectScope('/api/agent/web/open', { projectId: payload.projectId }), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1598,7 +1618,7 @@ export const apiService = {
     },
 
     async openLocalAppAgent(payload: OpenLocalAppAgentRequest): Promise<OpenAgentResponse> {
-        const response = await fetch('/api/agent/local-app/open', {
+        const response = await fetch(withProjectScope('/api/agent/local-app/open', { projectId: payload.projectId }), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1609,6 +1629,25 @@ export const apiService = {
         const result = await response.json();
         if (!response.ok) {
             throw new Error(result?.error || formatLocalAppOpenFailureMessage());
+        }
+
+        return result;
+    },
+
+    async openDesktopIntegration(
+        payload: DesktopIntegrationOpenRequest,
+    ): Promise<DesktopIntegrationOpenResponse> {
+        const response = await fetch(withProjectScope('/api/desktop-integration/open', { projectId: payload.projectId }), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(result?.error || '打开桌面应用失败');
         }
 
         return result;

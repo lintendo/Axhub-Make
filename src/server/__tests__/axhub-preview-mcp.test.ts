@@ -11,6 +11,7 @@ import {
   AXHUB_PREVIEW_MCP_PATH,
   AXHUB_PREVIEW_BRIDGE_CLIENT_ID_HEADER,
   AXHUB_PREVIEW_MCP_TOKEN_HEADER,
+  AXHUB_PREVIEW_VOICE_TOOLS_HEADER,
   handleAxhubPreviewMcp,
 } from '../axhubPreviewMcp.ts';
 
@@ -53,6 +54,7 @@ async function callMcp(body: unknown, options: {
   token?: string;
   headerToken?: string;
   bridgeClientId?: string;
+  voiceTools?: boolean;
   bridgeHub?: MockBridgeHub;
   captureOutputRoot?: string;
 } = {}) {
@@ -63,6 +65,9 @@ async function callMcp(body: unknown, options: {
   }
   if (options.bridgeClientId !== undefined) {
     headers[AXHUB_PREVIEW_BRIDGE_CLIENT_ID_HEADER] = options.bridgeClientId;
+  }
+  if (options.voiceTools === true) {
+    headers[AXHUB_PREVIEW_VOICE_TOOLS_HEADER] = '1';
   }
   const request = createRequest(body, headers);
 
@@ -159,6 +164,74 @@ describe('axhub preview MCP endpoint', () => {
         },
       },
     });
+  });
+
+  it('exposes all confirmation-free Chinese tools to an opted-in inner run', async () => {
+    const sendCommand = vi.fn(async () => ({ elements: [], nextCursor: null }));
+    const { json } = await callMcp({
+      jsonrpc: '2.0',
+      id: 'voice-tools',
+      method: 'tools/list',
+    }, {
+      headerToken: 'secret-token',
+      voiceTools: true,
+    });
+
+    const voiceTools = json.result.tools.slice(4);
+    expect(voiceTools.map((tool: any) => tool.name)).toEqual([
+      'axhub_make_capture_page',
+      'axhub_make_get_page_target',
+      'axhub_make_find_page_elements',
+      'axhub_make_get_page_structure',
+      'axhub_make_activate_page_element',
+      'axhub_make_create_comment',
+      'axhub_make_list_comments',
+      'axhub_make_execute_comment',
+      'axhub_make_get_comment_execution',
+      'axhub_make_cancel_comment_execution',
+      'axhub_make_delete_comment',
+    ]);
+    expect(voiceTools.every((tool: any) => /[\u3400-\u9fff]/u.test(tool.description))).toBe(true);
+    expect(JSON.stringify(voiceTools)).not.toMatch(/"targetId"|"taskId"|"prompt"/u);
+
+    await callMcp({
+      jsonrpc: '2.0',
+      id: 'voice-find',
+      method: 'tools/call',
+      params: {
+        name: 'axhub_make_find_page_elements',
+        arguments: { text: '保存', requestId: 'voice-request-1' },
+      },
+    }, {
+      headerToken: 'secret-token',
+      bridgeClientId: 'preview-voice',
+      voiceTools: true,
+      bridgeHub: { sendCommand },
+    });
+
+    expect(sendCommand).toHaveBeenCalledWith('axhub_make_find_page_elements', {
+      text: '保存',
+    }, {
+      requestId: 'voice-request-1',
+      clientId: 'preview-voice',
+    });
+
+    const denied = await callMcp({
+      jsonrpc: '2.0',
+      id: 'voice-create-denied',
+      method: 'tools/call',
+      params: {
+        name: 'axhub_make_create_comment',
+        arguments: { targetRef: 'page.1.1', content: '提高对比度' },
+      },
+    }, {
+      headerToken: 'secret-token',
+      bridgeClientId: 'preview-voice',
+      voiceTools: true,
+      bridgeHub: { sendCommand },
+    });
+    expect(denied.json.error).toMatchObject({ code: -32602 });
+    expect(sendCommand).toHaveBeenCalledTimes(1);
   });
 
   it('routes navigation calls to the preview bridge without capture file persistence', async () => {

@@ -9,6 +9,7 @@ describe('generateSvgContent', () => {
       width: 1440,
       height: 1583,
       includeConfig: 'code',
+      includeImageAssets: false,
       contentType: 'screenshot',
       isFullScreen: true,
       rawScreenshotUrl: 'data:image/png;base64,c2NyZWVuc2hvdA==',

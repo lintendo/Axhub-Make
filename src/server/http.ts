@@ -79,8 +79,12 @@ export function sendText(res: ServerResponse, text: string, contentType = 'text/
   res.end(text);
 }
 
+const jsonBodyReads = new WeakMap<IncomingMessage, Promise<unknown>>();
+
 export function readJsonBody<T = any>(req: IncomingMessage): Promise<T> {
-  return new Promise((resolve, reject) => {
+  const existing = jsonBodyReads.get(req);
+  if (existing) return existing as Promise<T>;
+  const reading = new Promise<T>((resolve, reject) => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk) => {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -99,6 +103,8 @@ export function readJsonBody<T = any>(req: IncomingMessage): Promise<T> {
     });
     req.on('error', reject);
   });
+  jsonBodyReads.set(req, reading);
+  return reading;
 }
 
 export interface SendFileOptions {

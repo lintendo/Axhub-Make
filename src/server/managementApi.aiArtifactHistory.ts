@@ -82,6 +82,7 @@ export interface GenerationTaskHistory {
 
 interface GenerationArtifactHistoryContext {
   project: {
+    id: string;
     root: string;
   };
   metadata: ProjectMetadata;
@@ -89,6 +90,7 @@ interface GenerationArtifactHistoryContext {
 
 type ResolvedGenerationArtifactHistory = {
   ok: true;
+  projectId: string;
   prototypeId: string;
   prototypeDir: string;
   specDir: string;
@@ -215,6 +217,7 @@ function resolveHistory(
   }
   return {
     ok: true,
+    projectId: context.project.id,
     prototypeId: normalized.id,
     prototypeDir,
     specDir,
@@ -320,8 +323,8 @@ function sanitizeMetadata(value: Record<string, unknown>): Record<string, unknow
   return output;
 }
 
-function createAssetUrl(targetPath: string, assetPath: string): string {
-  const params = new URLSearchParams({ targetPath, assetPath });
+function createAssetUrl(projectId: string, targetPath: string, assetPath: string): string {
+  const params = new URLSearchParams({ projectId, targetPath, assetPath });
   return `/api/ai/artifact-history/assets?${params.toString()}`;
 }
 
@@ -336,7 +339,7 @@ function persistArtifactImageAsset(
     return {
       ...(hasRecord((artifact as GenerationArtifactRecord).assetRef) ? (artifact as GenerationArtifactRecord).assetRef : {}),
       assetPath: existingAssetPath,
-      url: createAssetUrl(`prototypes/${resolved.prototypeId}`, existingAssetPath),
+      url: createAssetUrl(resolved.projectId, `prototypes/${resolved.prototypeId}`, existingAssetPath),
     };
   }
 
@@ -362,7 +365,7 @@ function persistArtifactImageAsset(
     mimeType: parsed.mimeType,
     sizeBytes: parsed.buffer.byteLength,
     hash: parsed.hash,
-    url: createAssetUrl(`prototypes/${resolved.prototypeId}`, assetPath),
+    url: createAssetUrl(resolved.projectId, `prototypes/${resolved.prototypeId}`, assetPath),
   };
 }
 

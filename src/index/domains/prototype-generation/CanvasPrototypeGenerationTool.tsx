@@ -40,8 +40,10 @@ import CanvasNodeTitleLabel, {
   CANVAS_NODE_TITLE_LABEL_OFFSET,
 } from '../../components/content/canvas-embeds/CanvasNodeTitleLabel';
 import { shouldFitElementIntoCanvasViewport } from '../../components/content/canvas-embeds/activePreviewViewport';
+import { withProjectScope } from '../../services/projectScope';
 
 interface CanvasPrototypeGenerationToolProps {
+  projectId: string;
   excalidrawAPI: any;
   containerRef: React.RefObject<HTMLDivElement>;
   canvasFilePath?: string;
@@ -192,8 +194,8 @@ function pickPrototypeFromArtifact(items: ItemData[], artifact: any, fallbackNam
   return pickCreatedPrototype(items, fallbackNames);
 }
 
-async function fetchProjectPrototypes(): Promise<ItemData[]> {
-  const response = await fetch('/api/entries.json');
+async function fetchProjectPrototypes(projectId: string): Promise<ItemData[]> {
+  const response = await fetch(withProjectScope('/api/entries.json', { projectId }));
   if (!response.ok) return [];
   const body = await response.json().catch(() => null);
   return Array.isArray(body?.prototypes) ? body.prototypes : [];
@@ -212,6 +214,7 @@ function providerToPromptClientPreference(provider: string | null | undefined): 
 }
 
 export default function CanvasPrototypeGenerationTool({
+  projectId,
   excalidrawAPI,
   containerRef,
   canvasFilePath,
@@ -248,6 +251,10 @@ export default function CanvasPrototypeGenerationTool({
   }, []);
 
   useEffect(() => getPrototypeGenerationTaskStore().subscribe(() => setTaskRevision((revision) => revision + 1)), []);
+
+  useEffect(() => {
+    void getPrototypeGenerationTaskStore().configure({ projectId, targetPath: canvasFilePath });
+  }, [canvasFilePath, projectId]);
 
   useEffect(() => {
     if (!hasRunningTask) return undefined;
@@ -518,7 +525,7 @@ export default function CanvasPrototypeGenerationTool({
     if (Array.isArray(refreshedFromHost)) {
       return refreshedFromHost;
     }
-    return fetchProjectPrototypes();
+    return fetchProjectPrototypes(projectId);
   }, [onRefreshPrototypes]);
 
   const replaceGeneratorWithPrototype = useCallback((generatorId: string, prototype: ItemData, task: PrototypeGenerationTaskRecord) => {
@@ -774,6 +781,7 @@ export default function CanvasPrototypeGenerationTool({
 
       {selectedInfo ? (
         <PrototypeGenerationComposer
+          projectId={projectId}
           placement={selectedInfo.composerPlacement}
           allowAttachments={true}
           assistantProjectPath={assistantProjectPath}

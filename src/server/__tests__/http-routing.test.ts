@@ -204,7 +204,7 @@ describe('make-server HTTP routing', () => {
     const server = await startRoutingServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/unknown-route`);
+      const response = await fetch(`${server.origin}/api/unknown-route?projectId=routing-project`);
       expect(response.status).toBe(404);
       expect(response.headers.get('content-type')).toContain('application/json');
       expect(await response.json()).toEqual({ error: 'Not found' });
@@ -278,7 +278,7 @@ describe('make-server HTTP routing', () => {
     const server = await startRoutingServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/prototypes/touch-and-talk-annotation-demo?agentToolbar=host`, {
+      const response = await fetch(`${server.origin}/prototypes/touch-and-talk-annotation-demo?projectId=routing-project&agentToolbar=host`, {
         headers: { accept: 'text/html' },
       });
       const body = await response.text();
@@ -286,7 +286,7 @@ describe('make-server HTTP routing', () => {
       expect(response.status).toBe(200);
       expect(response.headers.get('content-type')).toContain('text/html');
       expect(body).toContain('<title>Runtime Preview</title>');
-      expect(body).toContain('/prototypes/touch-and-talk-annotation-demo?agentToolbar=host');
+      expect(body).toContain('/prototypes/touch-and-talk-annotation-demo?projectId=routing-project&agentToolbar=host');
       expect(body).not.toContain('/src/index/index.tsx');
       expect(body).not.toContain('可以通过 npx -y @axhub/make@latest 启动管理页面。');
     } finally {
@@ -369,6 +369,13 @@ describe('make-server HTTP routing', () => {
       expect(body).toContain('<title>Selected Runtime</title>');
       expect(body).toContain('/prototypes/touch-and-talk-annotation-demo?projectId=selected-project&agentToolbar=host');
       expect(body).not.toContain('<title>Active Runtime</title>');
+
+      const runtimeWithoutProject = await fetch(
+        `${server.origin}/prototypes/touch-and-talk-annotation-demo/index.tsx`,
+        { headers: { accept: 'application/javascript' } },
+      );
+      expect(runtimeWithoutProject.status).toBe(503);
+      expect(await runtimeWithoutProject.text()).toContain('Runtime unavailable');
     } finally {
       await server.close();
     }
@@ -659,10 +666,10 @@ describe('make-server HTTP routing', () => {
     const server = await startRoutingServer(projectRoot);
 
     try {
-      const header = await openWebSocketUpgrade(server.origin, '/?token=vite-hmr');
+      const header = await openWebSocketUpgrade(server.origin, '/?projectId=routing-project&token=vite-hmr');
 
       expect(header).toContain('HTTP/1.1 101 Switching Protocols');
-      expect(header).toContain('X-Runtime-Path: /?token=vite-hmr');
+      expect(header).toContain('X-Runtime-Path: /?projectId=routing-project&token=vite-hmr');
     } finally {
       await server.close();
     }

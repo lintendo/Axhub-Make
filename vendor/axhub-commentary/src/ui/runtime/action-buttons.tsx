@@ -196,14 +196,20 @@ export function AgentToolbarIconButton(props: AgentToolbarIconButtonProps): Reac
 }
 
 export function AgentToolbarShell(props: AgentToolbarShellProps): React.ReactElement {
-  const { awake, children, dragHandleRef, fullWidth = false, style } = props;
+  const {
+    awake,
+    connected = awake,
+    children,
+    dragHandleRef,
+    fullWidth = false,
+    style,
+  } = props;
   const shellBorderColor = EDITOR_CHROME.toolbarShellBorder;
   const shellSurfaceShadow = EDITOR_CHROME.toolbarShellInset;
   const shellShadow = awake ? EDITOR_CHROME.toolbarGlow : EDITOR_CHROME.shadowCompact;
 
   return (
     <div
-      ref={dragHandleRef}
       className="we-runtime-prop-panel__drag-handle"
       style={{
         position: 'relative',
@@ -230,7 +236,7 @@ export function AgentToolbarShell(props: AgentToolbarShellProps): React.ReactEle
         }}
       />
       <AnimatePresence>
-        {awake ? (
+        {connected ? (
           <motion.div
             key="toolbar-ring"
             initial={{ opacity: 0 }}
@@ -283,6 +289,32 @@ export function AgentToolbarShell(props: AgentToolbarShellProps): React.ReactEle
           minWidth: fullWidth ? 0 : 'unset',
         }}
       >
+        <div
+          ref={dragHandleRef}
+          className="we-runtime-toolbar__drag-grip data-fullscreen-prevent-event-capture"
+          data-we-toolbar-drag-grip="true"
+          aria-hidden="true"
+          title="拖动工具栏"
+          style={{
+            color: EDITOR_CHROME.textMuted,
+          }}
+        >
+          <svg
+            width="8"
+            height="18"
+            viewBox="0 0 8 18"
+            fill="currentColor"
+            focusable="false"
+            style={{ display: 'block', pointerEvents: 'none' }}
+          >
+            <circle cx="2" cy="4" r="1.25" />
+            <circle cx="6" cy="4" r="1.25" />
+            <circle cx="2" cy="9" r="1.25" />
+            <circle cx="6" cy="9" r="1.25" />
+            <circle cx="2" cy="14" r="1.25" />
+            <circle cx="6" cy="14" r="1.25" />
+          </svg>
+        </div>
         {children}
       </div>
     </div>

@@ -86,6 +86,7 @@ export interface AssistantImageGenerationConfig {
   apiKey?: string | null;
   model?: string | null;
   savePathPattern?: string | null;
+  saveDirectory?: string | null;
   preservePrompt?: boolean | null;
   lastTest?: unknown;
 }
@@ -138,6 +139,7 @@ const ACP_PREVIEW_MCP_NAME = 'axhub-preview';
 const ACP_PREVIEW_MCP_PATH = '/api/mcp/axhub-preview';
 const ACP_PREVIEW_MCP_TOKEN_HEADER = 'x-axhub-preview-mcp-token';
 const ACP_PREVIEW_BRIDGE_CLIENT_ID_HEADER = 'x-axhub-preview-bridge-client-id';
+const ACP_PREVIEW_VOICE_TOOLS_HEADER = 'x-axhub-preview-voice-tools';
 const ACP_CANVAS_MCP_NAME = 'axhub-canvas';
 const ACP_CANVAS_MCP_PATH = '/api/mcp/axhub-canvas';
 const ACP_CANVAS_MCP_TOKEN_HEADER = 'x-axhub-canvas-mcp-token';
@@ -147,6 +149,8 @@ export interface AssistantPreviewMcpConfig {
   makeOrigin?: string | null;
   previewToken?: string | null;
   previewBridgeClientId?: string | null;
+  /** Restrict Make Commentary voice tools to explicitly opted-in direct runs. */
+  voiceTools?: boolean | null;
   includeCanvas?: boolean | null;
   canvasToken?: string | null;
 }
@@ -497,12 +501,14 @@ export function buildAcpImageGenerationPostMessage(
   }
 
   const savePathPattern = normalizeOptionalPostMessageString(config?.savePathPattern);
+  const saveDirectory = normalizeOptionalPostMessageString(config?.saveDirectory);
   const imageGenerationSettings = {
     ...(typeof config?.enabled === 'boolean' ? { enabled: config.enabled } : {}),
     baseUrl,
     apiKey,
     model,
     ...(savePathPattern ? { savePathPattern } : {}),
+    ...(saveDirectory ? { saveDirectory } : {}),
     ...(typeof config?.preservePrompt === 'boolean' ? { preservePrompt: config.preservePrompt } : {}),
   };
 
@@ -535,12 +541,14 @@ export function getAcpImageGenerationConfigSignature(
   }
 
   const savePathPattern = normalizeOptionalPostMessageString(config?.savePathPattern);
+  const saveDirectory = normalizeOptionalPostMessageString(config?.saveDirectory);
   const imageGenerationSettings = {
     ...(typeof config?.enabled === 'boolean' ? { enabled: config.enabled } : {}),
     baseUrl,
     apiKeyFingerprint: getImageGenerationSecretFingerprint(apiKey),
     model,
     ...(savePathPattern ? { savePathPattern } : {}),
+    ...(saveDirectory ? { saveDirectory } : {}),
     ...(typeof config?.preservePrompt === 'boolean' ? { preservePrompt: config.preservePrompt } : {}),
   };
 
@@ -556,7 +564,7 @@ export function getAcpImageGenerationConfigSignature(
   });
 }
 
-function buildPreviewMcpServers(config: AssistantPreviewMcpConfig | null | undefined, redactSecrets = false): unknown[] | null {
+export function buildAcpPreviewMcpServers(config: AssistantPreviewMcpConfig | null | undefined, redactSecrets = false): unknown[] | null {
   const makeOrigin = normalizeMakeOrigin(config?.makeOrigin);
   const previewToken = normalizeOptionalPostMessageString(config?.previewToken);
   if (!makeOrigin || !previewToken) {
@@ -571,6 +579,12 @@ function buildPreviewMcpServers(config: AssistantPreviewMcpConfig | null | undef
     previewHeaders.push({
       name: ACP_PREVIEW_BRIDGE_CLIENT_ID_HEADER,
       value: previewBridgeClientId,
+    });
+  }
+  if (config?.voiceTools === true) {
+    previewHeaders.push({
+      name: ACP_PREVIEW_VOICE_TOOLS_HEADER,
+      value: '1',
     });
   }
 
@@ -620,7 +634,7 @@ export function buildAcpPreviewMcpPostMessage(
   config: AssistantPreviewMcpConfig | null | undefined,
   requestId?: string,
 ): AcpPreviewMcpPostMessage {
-  const mcpServers = buildPreviewMcpServers(config, false);
+  const mcpServers = buildAcpPreviewMcpServers(config, false);
   if (!mcpServers) {
     return {
       type: 'acp.runtime.clear',
@@ -644,7 +658,7 @@ export function buildAcpPreviewMcpPostMessage(
 export function getAcpPreviewMcpConfigSignature(
   config: AssistantPreviewMcpConfig | null | undefined,
 ): string {
-  const mcpServers = buildPreviewMcpServers(config, true);
+  const mcpServers = buildAcpPreviewMcpServers(config, true);
   if (!mcpServers) {
     return JSON.stringify({
       type: 'acp.runtime.clear',

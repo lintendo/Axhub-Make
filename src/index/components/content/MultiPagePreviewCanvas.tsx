@@ -33,11 +33,7 @@ import {
     buildProjectPrototypeScreenshotIframeUrl,
     buildPrototypePageHashUrl,
 } from '../../app/index-page/previewActions.helpers';
-import {
-    derivePrototypePageScreenshotUrl,
-    persistPrototypeScreenshot,
-} from './canvas-embeds/screenshotPersistence';
-import { captureSameOriginIframeScreenshot } from './canvas-embeds/parentScreenshotCapture';
+import { captureMultiPageScreenshot, type MultiPageScreenshot } from './multiPageScreenshotCapture';
 import {
     activateMultiPageLiveSlot,
     resolveMultiPageCardPages,
@@ -55,7 +51,7 @@ interface MultiPagePreviewCanvasProps {
     previewUrl: string;
     iframeKey: React.Key;
     previewIframeRef: React.MutableRefObject<HTMLIFrameElement | null>;
-    onPreviewIframeLoad?: () => void;
+    onPreviewIframeLoad?: (iframe?: HTMLIFrameElement | null) => void;
     handleChangeMultiPageColumns: (columns: MultiPageColumns) => void;
     handleSelectPreviewSinglePreset: (preset: PreviewSinglePreset) => void;
     handleSelectCustomPreview: () => void;
@@ -74,60 +70,10 @@ function clampZoom(value: number): number {
     return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Number(value.toFixed(2))));
 }
 
-function appendVersion(url: string | undefined, version: number): string | undefined {
-    if (!url) return undefined;
-    try {
-        const parsed = new URL(url, window.location.origin);
-        parsed.searchParams.set('v', String(version));
-        return parsed.toString();
-    } catch {
-        return url;
-    }
-}
-
 function commitPositiveDraft(draft: string, onCommit: (value: number) => void) {
     const parsed = Number.parseInt(draft.trim(), 10);
     if (Number.isFinite(parsed) && parsed > 0) {
         onCommit(parsed);
-    }
-}
-
-async function capturePageScreenshotFromIframe({
-    iframe,
-    selectedItem,
-    previewUrl,
-    page,
-    width,
-    height,
-}: {
-    iframe: HTMLIFrameElement | null | undefined;
-    selectedItem: ItemData;
-    previewUrl: string;
-    page: MultiPagePreviewPage | undefined;
-    width: number;
-    height: number;
-}): Promise<boolean> {
-    if (!iframe?.contentWindow || !page) {
-        return false;
-    }
-
-    try {
-        const screenshot = await captureSameOriginIframeScreenshot({
-            iframe,
-            width,
-            height,
-        });
-        await persistPrototypeScreenshot({
-            previewUrl,
-            prototypeId: selectedItem.name,
-            pageId: page.id,
-            dataUrl: screenshot.dataUrl,
-            width: screenshot.width,
-            height: screenshot.height,
-        });
-        return true;
-    } catch {
-        return false;
     }
 }
 
@@ -152,15 +98,14 @@ export default function MultiPagePreviewCanvas({
     const loadScreenshotTimersRef = React.useRef<Record<string, number>>({});
     const isPanningRef = React.useRef(false);
     const panStartRef = React.useRef({ x: 0, y: 0, panX: 0, panY: 0 });
-    const activeSlotsRef = React.useRef<string[]>([]);
     const cardPagesRef = React.useRef<MultiPagePreviewPage[]>([]);
-    const selectedItemRef = React.useRef(selectedItem);
+    const captureGenerationRef = React.useRef(0);
     const capturedPageIdsRef = React.useRef<Set<string>>(new Set());
     const pendingHiddenPageCapturesRef = React.useRef<Set<string>>(new Set());
     const forceHiddenPageScreenshotIdsRef = React.useRef<Set<string>>(new Set());
-    const stalePageScreenshotIdsRef = React.useRef<Set<string>>(new Set());
     const [activeSlots, setActiveSlots] = React.useState<string[]>([]);
     const [cardStates, setCardStates] = React.useState<CardState[]>([]);
+    const [pageScreenshots, setPageScreenshots] = React.useState<Record<string, MultiPageScreenshot>>({});
     const [zoom, setZoom] = React.useState(1);
     const [pan, setPan] = React.useState({ x: 24, y: 24 });
     const [isSpacePressed, setIsSpacePressed] = React.useState(false);
@@ -169,8 +114,6 @@ export default function MultiPagePreviewCanvas({
     const [customWidthDraft, setCustomWidthDraft] = React.useState('');
     const [customHeightDraft, setCustomHeightDraft] = React.useState('');
     const [imageFailures, setImageFailures] = React.useState<Record<string, 'page'>>({});
-    const [screenshotVersion, setScreenshotVersion] = React.useState(0);
-    selectedItemRef.current = selectedItem;
     const pageOptions = React.useMemo(
         () => resolveMultiPageCardPages({ item: selectedItem }),
         [selectedItem],
@@ -192,13 +135,13 @@ export default function MultiPagePreviewCanvas({
     React.useEffect(() => {
         setCardStates(pageOptions.visiblePages.map((page) => ({ pageId: page.id })));
         setActiveSlots([]);
-        activeSlotsRef.current = [];
         iframeRefs.current = {};
         hiddenScreenshotIframeRefs.current = {};
+        captureGenerationRef.current += 1;
         capturedPageIdsRef.current = new Set();
         pendingHiddenPageCapturesRef.current = new Set();
         forceHiddenPageScreenshotIdsRef.current = new Set();
-        stalePageScreenshotIdsRef.current = new Set();
+        setPageScreenshots({});
         setImageFailures({});
         setShowCanvasHelpTip(true);
     }, [prototypeIdentityKey, visiblePageKey]);
@@ -242,48 +185,36 @@ export default function MultiPagePreviewCanvas({
         });
     }, []);
 
-    const getPageScreenshotUrl = React.useCallback((page: MultiPagePreviewPage) => appendVersion(
-        derivePrototypePageScreenshotUrl(screenshotPreviewUrl, selectedItem.name, page.id),
-        screenshotVersion,
-    ), [
-        screenshotPreviewUrl,
-        screenshotVersion,
-        selectedItem.name,
-    ]);
-
-    const shouldWaitForPersistedPageScreenshot = React.useCallback((page: MultiPagePreviewPage) => (
-        Boolean(getPageScreenshotUrl(page))
-        && imageFailures[page.id] === undefined
-        && !stalePageScreenshotIdsRef.current.has(page.id)
-    ), [
-        getPageScreenshotUrl,
-        imageFailures,
-    ]);
+    const recordCapturedScreenshot = React.useCallback((
+        page: MultiPagePreviewPage,
+        screenshot: MultiPageScreenshot,
+    ) => {
+        capturedPageIdsRef.current.add(page.id);
+        clearImageFailure(page.id);
+        setPageScreenshots((previous) => ({
+            ...previous,
+            [page.id]: screenshot,
+        }));
+    }, [clearImageFailure]);
 
     const requestPageScreenshot = React.useCallback((slotId: string, _reason: string) => {
         const slotIndex = Number.parseInt(slotId.replace(/^card-/, ''), 10);
         const page = cardPagesRef.current[slotIndex];
         const iframe = iframeRefs.current[slotId];
-        const item = selectedItemRef.current;
-        void capturePageScreenshotFromIframe({
+        const captureGeneration = captureGenerationRef.current;
+        void captureMultiPageScreenshot({
             iframe,
-            selectedItem: item,
-            previewUrl: screenshotPreviewUrl,
-            page,
             width: logicalWidth,
             height: logicalHeight,
-        }).then((success) => {
-            if (success && page) {
-                capturedPageIdsRef.current.add(page.id);
-                clearImageFailure(page.id);
-                setScreenshotVersion((version) => version + 1);
+        }).then((screenshot) => {
+            if (screenshot && page && captureGeneration === captureGenerationRef.current) {
+                recordCapturedScreenshot(page, screenshot);
             }
         });
     }, [
-        clearImageFailure,
         logicalHeight,
         logicalWidth,
-        screenshotPreviewUrl,
+        recordCapturedScreenshot,
     ]);
 
     const requestHiddenPageScreenshot = React.useCallback((
@@ -291,7 +222,6 @@ export default function MultiPagePreviewCanvas({
         iframe: HTMLIFrameElement | null | undefined,
         options?: { force?: boolean },
     ) => {
-        const item = selectedItemRef.current;
         const force = options?.force === true;
         if (
             !iframe?.contentWindow
@@ -301,37 +231,29 @@ export default function MultiPagePreviewCanvas({
             return;
         }
         pendingHiddenPageCapturesRef.current.add(page.id);
+        const captureGeneration = captureGenerationRef.current;
 
-        void capturePageScreenshotFromIframe({
+        void captureMultiPageScreenshot({
             iframe,
-            selectedItem: item,
-            previewUrl: screenshotPreviewUrl,
-            page,
             width: logicalWidth,
             height: logicalHeight,
-        }).then((success) => {
+        }).then((screenshot) => {
             pendingHiddenPageCapturesRef.current.delete(page.id);
             forceHiddenPageScreenshotIdsRef.current.delete(page.id);
-            if (success) {
-                capturedPageIdsRef.current.add(page.id);
-                clearImageFailure(page.id);
-                setScreenshotVersion((version) => version + 1);
+            if (screenshot && captureGeneration === captureGenerationRef.current) {
+                recordCapturedScreenshot(page, screenshot);
             }
         });
     }, [
-        clearImageFailure,
         logicalHeight,
         logicalWidth,
-        screenshotPreviewUrl,
+        recordCapturedScreenshot,
     ]);
 
     const requestMissingPageScreenshots = React.useCallback(() => {
         hiddenScreenshotPages.forEach((page) => {
             const forceRefresh = forceHiddenPageScreenshotIdsRef.current.has(page.id);
             if ((!forceRefresh && capturedPageIdsRef.current.has(page.id)) || pendingHiddenPageCapturesRef.current.has(page.id)) {
-                return;
-            }
-            if (!forceRefresh && shouldWaitForPersistedPageScreenshot(page)) {
                 return;
             }
             const iframe = hiddenScreenshotIframeRefs.current[page.id];
@@ -343,10 +265,9 @@ export default function MultiPagePreviewCanvas({
     }, [
         hiddenScreenshotPages,
         requestHiddenPageScreenshot,
-        shouldWaitForPersistedPageScreenshot,
     ]);
 
-    const persistSlotScreenshot = React.useCallback((slotId: string) => {
+    const captureSlotScreenshot = React.useCallback((slotId: string) => {
         requestPageScreenshot(slotId, 'exit-live');
     }, [requestPageScreenshot]);
 
@@ -356,33 +277,30 @@ export default function MultiPagePreviewCanvas({
         }
         const result = activateMultiPageLiveSlot(activeSlots, slotId);
         if (result.evictedSlot) {
-            persistSlotScreenshot(result.evictedSlot);
+            captureSlotScreenshot(result.evictedSlot);
         }
         const slotIndex = Number.parseInt(slotId.replace(/^card-/, ''), 10);
         const page = cardPagesRef.current[slotIndex];
         if (page) {
             forceHiddenPageScreenshotIdsRef.current.add(page.id);
             capturedPageIdsRef.current.delete(page.id);
-            stalePageScreenshotIdsRef.current.delete(page.id);
             const iframe = hiddenScreenshotIframeRefs.current[page.id];
             requestHiddenPageScreenshot(page, iframe, { force: true });
         }
-        activeSlotsRef.current = result.activeSlots;
         setActiveSlots(result.activeSlots);
     }, [
         activeSlots,
-        persistSlotScreenshot,
+        captureSlotScreenshot,
         requestHiddenPageScreenshot,
     ]);
 
     const handlePageChange = React.useCallback((slotIndex: number, pageId: string) => {
         const slotId = `card-${slotIndex}`;
         if (activeSlots.includes(slotId)) {
-            persistSlotScreenshot(slotId);
+            captureSlotScreenshot(slotId);
         }
         setActiveSlots((previous) => {
             const nextSlots = previous.filter((activeSlotId) => activeSlotId !== slotId);
-            activeSlotsRef.current = nextSlots;
             return nextSlots;
         });
         setCardStates((previous) => previous.map((cardState, index) => (
@@ -393,10 +311,10 @@ export default function MultiPagePreviewCanvas({
             delete next[pageId];
             return next;
         });
-    }, [activeSlots, persistSlotScreenshot]);
+    }, [activeSlots, captureSlotScreenshot]);
 
     const handleLiveIframeLoad = React.useCallback((slotId: string, page: MultiPagePreviewPage) => {
-        onPreviewIframeLoad?.();
+        onPreviewIframeLoad?.(iframeRefs.current[slotId]);
         if (!capturedPageIdsRef.current.has(page.id)) {
             window.clearTimeout(loadScreenshotTimersRef.current[slotId]);
             loadScreenshotTimersRef.current[slotId] = window.setTimeout(() => {
@@ -406,36 +324,6 @@ export default function MultiPagePreviewCanvas({
     }, [
         onPreviewIframeLoad,
         requestPageScreenshot,
-    ]);
-
-    const handleScreenshotImageLoad = React.useCallback((
-        pageId: string,
-        failure: 'page' | undefined,
-        event: React.SyntheticEvent<HTMLImageElement>,
-    ) => {
-        const image = event.currentTarget;
-        if (image.naturalWidth === logicalWidth && image.naturalHeight === logicalHeight) {
-            if (failure === undefined) {
-                stalePageScreenshotIdsRef.current.delete(pageId);
-                capturedPageIdsRef.current.add(pageId);
-            }
-            return;
-        }
-        if (failure === undefined) {
-            stalePageScreenshotIdsRef.current.add(pageId);
-            capturedPageIdsRef.current.delete(pageId);
-            const page = pageById.get(pageId);
-            const iframe = hiddenScreenshotIframeRefs.current[pageId];
-            if (page && iframe?.contentWindow) {
-                requestHiddenPageScreenshot(page, iframe);
-            }
-            return;
-        }
-    }, [
-        logicalHeight,
-        logicalWidth,
-        pageById,
-        requestHiddenPageScreenshot,
     ]);
 
     const handleFitView = React.useCallback(() => {
@@ -631,8 +519,11 @@ export default function MultiPagePreviewCanvas({
     }, [layout.columns, previewConfig.singlePreset, previewConfig.customWidth, previewConfig.customHeight]);
 
     React.useEffect(() => {
+        captureGenerationRef.current += 1;
         capturedPageIdsRef.current = new Set();
-        stalePageScreenshotIdsRef.current = new Set();
+        pendingHiddenPageCapturesRef.current = new Set();
+        forceHiddenPageScreenshotIdsRef.current = new Set();
+        setPageScreenshots({});
         setImageFailures({});
     }, [logicalHeight, logicalWidth]);
 
@@ -649,9 +540,9 @@ export default function MultiPagePreviewCanvas({
     ]);
 
     React.useEffect(() => () => {
+        captureGenerationRef.current += 1;
         Object.values(loadScreenshotTimersRef.current).forEach((timerId) => window.clearTimeout(timerId));
-        activeSlotsRef.current.forEach((slotId) => persistSlotScreenshot(slotId));
-    }, [persistSlotScreenshot]);
+    }, []);
 
     const handleSelectMultiPagePreset = React.useCallback((preset: PreviewSinglePreset) => {
         if (preset === 'custom') {
@@ -667,19 +558,17 @@ export default function MultiPagePreviewCanvas({
     ]);
 
     const renderScreenshotFallback = (page: MultiPagePreviewPage) => {
-        const pageScreenshotUrl = getPageScreenshotUrl(page);
         const failure = imageFailures[page.id];
-        const src = failure === undefined ? pageScreenshotUrl : undefined;
+        const src = failure === undefined ? pageScreenshots[page.id]?.dataUrl : undefined;
 
         if (src) {
             return (
                 <img
-                    key={`${src}-${logicalWidth}-${logicalHeight}`}
+                    key={`${page.id}-${logicalWidth}-${logicalHeight}`}
                     src={src}
                     alt={page.title}
                     className="h-full w-full object-cover"
                     draggable={false}
-                    onLoad={(event) => handleScreenshotImageLoad(page.id, failure, event)}
                     onError={() => setImageFailures((previous) => ({
                         ...previous,
                         [page.id]: 'page',

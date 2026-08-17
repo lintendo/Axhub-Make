@@ -196,6 +196,30 @@ describe('useIndexPageSidebarPropsBuilder', () => {
     expect(setViewMode).toHaveBeenCalledWith('demo');
   });
 
+  it('lands on the matching new-item start page when switching sidebar sections', () => {
+    const handleCreatePrototypeStartDraft = vi.fn();
+    const handleCreateResourceStartDraft = vi.fn();
+    const handleCreateThemeStartDraft = vi.fn();
+    const setSidebarTab = vi.fn();
+    const props = useIndexPageSidebarPropsBuilder(createBuilderParams({
+      deps: {
+        setSidebarTab,
+        handleCreatePrototypeStartDraft,
+        handleCreateResourceStartDraft,
+        handleCreateThemeStartDraft,
+      },
+    }));
+
+    props.actions.onSidebarTabChange('prototype');
+    props.actions.onSidebarTabChange('document');
+    props.actions.onSidebarTabChange('assets');
+
+    expect(handleCreatePrototypeStartDraft).toHaveBeenCalledTimes(1);
+    expect(handleCreateResourceStartDraft).toHaveBeenCalledTimes(1);
+    expect(handleCreateThemeStartDraft).toHaveBeenCalledTimes(1);
+    expect(setSidebarTab).not.toHaveBeenCalled();
+  });
+
   it('routes prototype page child clicks through parent selection and page id state', async () => {
     const handleMenuClick = vi.fn();
     const setSelectedPrototypePageId = vi.fn();
@@ -250,6 +274,38 @@ describe('useIndexPageSidebarPropsBuilder', () => {
     expect(props.state.aiPanelMode).toBeNull();
     expect(props.actions.onOpenAcpWebAgent).toBeUndefined();
     expect(props.actions.onOpenImageAiPanel).toBeUndefined();
+  });
+
+  it('removes conversation controls and the external open menu on the Codex surface', () => {
+    const props = useIndexPageSidebarPropsBuilder(createBuilderParams({
+      state: {
+        webAgentPanelOpen: true,
+        aiPanelMode: 'general-ai',
+        surfaceCapabilities: {
+          conversationUi: false,
+          externalOpenMenu: false,
+          directAiTools: true,
+        },
+      } as any,
+      deps: {
+        handleOpenAcpWebAgent: vi.fn(),
+        handleOpenImageAiPanel: vi.fn(),
+        handleOpenWebAgentInPanel: vi.fn(),
+        onExecutePrompt: vi.fn(),
+        onCloseAiPanel: vi.fn(),
+        onCloseWebAgentPanel: vi.fn(),
+      },
+    }));
+
+    expect(props.state.externalOpenMenu).toBe(false);
+    expect(props.state.webAgentPanelOpen).toBe(false);
+    expect(props.state.aiPanelMode).toBeNull();
+    expect(props.actions.onOpenAcpWebAgent).toBeUndefined();
+    expect(props.actions.onOpenImageAiPanel).toBeUndefined();
+    expect(props.actions.onOpenWebAgentInPanel).toBeUndefined();
+    expect(props.actions.onExecutePrompt).toBeUndefined();
+    expect(props.actions.onCloseAiPanel).toBeUndefined();
+    expect(props.actions.onCloseWebAgentPanel).toBeUndefined();
   });
 
   it('forwards uploaded document resources so the resource layer can select the new file', () => {

@@ -5,18 +5,26 @@ import { fileURLToPath } from 'node:url';
 
 import {
   getConfigPath,
+  maskVoiceAssistantSettings,
+  readVoiceAssistantSettings,
   resolveCodexLocalImageGenerationConfig,
+  type VoiceAssistantSecretPath,
+  type VoiceAssistantSettingsPatch,
+  writeVoiceAssistantSettingsPatch,
 } from './projectCore/index.ts';
 
 import { getLocalNetworkHosts, readJsonBody, sendJson, streamDirectoryAsZip } from './http.ts';
 import { syncProjectAgentInstructions } from './projectAgentInstructions.ts';
 import type { ManagementApiOptions } from './managementApi.ts';
+import {
+  sanitizeVoiceAssistantTestError,
+  testVoiceAssistantConfig,
+} from './voiceAssistantConfigTest.ts';
 
 const makePackageJsonPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../package.json');
 const AI_IMAGE_CONFIG_TEST_PROMPT = '生成一张用于验证图片生成配置的极简测试图片，内容为白底黑色文字 OK。';
 const AI_IMAGE_CONFIG_TEST_TIMEOUT_MS = 600_000;
 const EMPTY_AGENT_AVAILABILITY = { cli: {}, localApp: {}, web: {} };
-
 export function readMakeServerVersion(): string | null {
   return fs.existsSync(makePackageJsonPath)
     ? JSON.parse(fs.readFileSync(makePackageJsonPath, 'utf8')).version ?? null
@@ -140,6 +148,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function hasOwn(record: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+function getRegistryHome(options: ManagementApiOptions): string | undefined {
+  return options.registryPath
+    ? path.dirname(path.dirname(path.dirname(path.resolve(options.registryPath))))
+    : undefined;
 }
 
 function hasGeneratedImagePayload(value: unknown, depth = 0): boolean {
@@ -303,14 +317,87 @@ export function handleConfigApi(
     return true;
   }
 
+  if (pathname === '/api/config/voice-assistant') {
+    const registryHome = getRegistryHome(options);
+    const settingsOptions = registryHome ? { homeDir: registryHome } : {};
+    if (req.method === 'GET') {
+      try {
+        sendJson(res, {
+          settings: maskVoiceAssistantSettings(
+            readVoiceAssistantSettings(settingsOptions),
+          ),
+        });
+      } catch (error: any) {
+        sendJson(res, { error: error?.message || '读取语音助手配置失败' }, { status: 500 });
+      }
+      return true;
+    }
+    if (req.method === 'PUT') {
+      readJsonBody(req).then((body) => {
+        if (!isRecord(body)) throw new Error('Invalid request body');
+        const patch = body.patch === undefined
+          ? {}
+          : isRecord(body.patch)
+            ? body.patch as VoiceAssistantSettingsPatch
+            : null;
+        if (!patch) throw new Error('patch 必须是对象');
+        let clearSecrets: VoiceAssistantSecretPath[] = [];
+        if (body.clearSecrets !== undefined) {
+          if (!Array.isArray(body.clearSecrets) || body.clearSecrets.some((item) => typeof item !== 'string')) {
+            throw new Error('clearSecrets 必须是字符串数组');
+          }
+          clearSecrets = body.clearSecrets as VoiceAssistantSecretPath[];
+        }
+        const settings = writeVoiceAssistantSettingsPatch(patch, {
+          ...settingsOptions,
+          clearSecrets,
+        });
+        sendJson(res, { settings: maskVoiceAssistantSettings(settings) });
+      }).catch((error) => {
+        sendJson(res, { error: error?.message || '保存语音助手配置失败' }, { status: 400 });
+      });
+      return true;
+    }
+    sendJson(res, { error: 'Method not allowed' }, { status: 405 });
+    return true;
+  }
+
+  if (pathname === '/api/config/voice-assistant/test') {
+    if (req.method !== 'POST') {
+      sendJson(res, { error: 'Method not allowed' }, { status: 405 });
+      return true;
+    }
+    const registryHome = getRegistryHome(options);
+    const settingsOptions = registryHome ? { homeDir: registryHome } : {};
+    readJsonBody(req).then(async (body) => {
+      try {
+        const result = await testVoiceAssistantConfig({
+          body,
+          savedSettings: readVoiceAssistantSettings(settingsOptions),
+        });
+        sendJson(res, { success: true, message: result.message });
+      } catch (error: any) {
+        const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 502;
+        sendJson(res, {
+          success: false,
+          error: sanitizeVoiceAssistantTestError(error),
+        }, { status: statusCode });
+      }
+    }).catch((error) => {
+      sendJson(res, {
+        success: false,
+        error: sanitizeVoiceAssistantTestError(error),
+      }, { status: 400 });
+    });
+    return true;
+  }
+
   if (pathname === '/api/config/ai-image/codex-local') {
     if (req.method !== 'GET') {
       sendJson(res, { error: 'Method not allowed' }, { status: 405 });
       return true;
     }
-    const registryHome = options.registryPath
-      ? path.dirname(path.dirname(path.dirname(options.registryPath)))
-      : undefined;
+    const registryHome = getRegistryHome(options);
     const result = resolveCodexLocalImageGenerationConfig(registryHome ? { homeDir: registryHome } : undefined);
     sendJson(res, {
       success: true,

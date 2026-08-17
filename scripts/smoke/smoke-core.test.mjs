@@ -4,12 +4,21 @@ import { describe, it } from 'node:test';
 
 import {
   JOURNEY_DEFINITIONS,
+  buildProjectApiUrl,
   createSmokeOptions,
   createSmokeReportPath,
   shouldUseRealAi,
+  startMockAcpServer,
 } from './smoke-core.mjs';
 
 describe('make smoke runner configuration', () => {
+  it('builds explicitly project-scoped Admin API URLs', () => {
+    assert.equal(
+      buildProjectApiUrl('http://127.0.0.1:53817', '/api/git/diff?path=prototypes%2Fhome', 'smoke-client'),
+      'http://127.0.0.1:53817/api/git/diff?path=prototypes%2Fhome&projectId=smoke-client',
+    );
+  });
+
   it('keeps the critical Make journeys enabled by default', () => {
     assert.deepEqual(
       JOURNEY_DEFINITIONS.map((journey) => journey.id),
@@ -51,5 +60,27 @@ describe('make smoke runner configuration', () => {
     assert.equal(shouldUseRealAi({ env: { AXHUB_SMOKE_REAL_AI: '1' }, argv: [] }), true);
     assert.equal(shouldUseRealAi({ env: {}, argv: ['--real-ai'] }), true);
     assert.equal(shouldUseRealAi({ env: { AXHUB_SMOKE_REAL_AI: '1' }, argv: ['--mock-ai'] }), false);
+  });
+
+  it('exposes a browser-compatible CORS preflight from the mock ACP server', async () => {
+    const server = await startMockAcpServer();
+    try {
+      const origin = 'http://127.0.0.1:53817';
+      const response = await fetch(`${server.origin}/api/chat`, {
+        method: 'OPTIONS',
+        headers: {
+          Origin: origin,
+          'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'content-type',
+        },
+      });
+
+      assert.equal(response.status, 204);
+      assert.equal(response.headers.get('access-control-allow-origin'), origin);
+      assert.match(response.headers.get('access-control-allow-methods') || '', /POST/iu);
+      assert.match(response.headers.get('access-control-allow-headers') || '', /content-type/iu);
+    } finally {
+      await server.close();
+    }
   });
 });

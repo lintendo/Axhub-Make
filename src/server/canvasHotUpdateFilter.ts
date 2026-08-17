@@ -21,7 +21,8 @@ function cleanHotUpdatePath(filePath: string): string {
 
 function isResourceCanvasDataFile(filePath: string): boolean {
   return /(^|\/)src\/resources\/.+\.excalidraw$/u.test(filePath)
-    || /(^|\/)src\/resources\/.+\.assets\//u.test(filePath);
+    || /(^|\/)src\/resources\/.+\.assets\//u.test(filePath)
+    || /(^|\/)src\/resources\/\.assets\//u.test(filePath);
 }
 
 function isRemovedPrototypeCanvasDataFile(filePath: string): boolean {

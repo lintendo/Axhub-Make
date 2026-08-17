@@ -15,7 +15,10 @@
     "client/vite-plugins/utils/moduleSpecifierQuery.ts",
     "src/server/**/*",
     "src/common/makeClientTemplate.ts",
+    "src/common/documentTemplates.ts",
     "src/common/aiArtifactClassification.ts",
+    "src/index/domains/assistant/makeVoiceCommentPersistence.ts",
+    "src/index/domains/assistant/makeVoiceTools.ts",
     "src/chunking/excalidrawDevCjsInterop.ts",
     "src/chunking/manualChunks.ts",
     "src/chunking/adminAssetStamping.ts"

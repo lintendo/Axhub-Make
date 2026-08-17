@@ -3,6 +3,7 @@ import type { CanvasItem, DataType, ItemData, SidebarTreeNode, SidebarTreeTab } 
 import type { DataTableResourceItem, ThemeResourceItem } from '../../../types/index-page.types';
 import type { TemplateAssetOption } from '../../../types';
 import { sidebarApi } from '../../../services/sidebar.api';
+import { requireProjectScope, withProjectScope } from '../../../services/projectScope';
 import {
     DEFAULT_LOCAL_EXPORT_CAPABILITIES,
     DEFAULT_PROJECT_CAPABILITIES,
@@ -27,6 +28,7 @@ import { formatMakeClientProjectError } from '../../../utils/projectSetupErrors'
 
 interface MessageApi {
     error: (content: string) => void;
+    warning: (content: string) => void;
 }
 
 interface UseWorkspaceNavigationControllerOptions {
@@ -116,6 +118,23 @@ function readInitialProjectIdFromUrl(): string | null {
     }
 }
 
+function replaceBrowserProjectId(projectId: string | null): void {
+    if (typeof window === 'undefined') {
+        return;
+    }
+    try {
+        const url = new URL(window.location.href);
+        if (projectId) {
+            url.searchParams.set('projectId', projectId);
+        } else {
+            url.searchParams.delete('projectId');
+        }
+        window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+        // Keep project loading functional in restricted browser environments.
+    }
+}
+
 function isLANHostname(hostname: string): boolean {
     const normalized = String(hostname || '').trim().toLowerCase();
     if (!normalized) return false;
@@ -127,15 +146,7 @@ function isLANHostname(hostname: string): boolean {
 }
 
 function withActiveProjectParam(url: string, activeProjectId: string | null): string {
-    const normalizedProjectId = String(activeProjectId || '').trim();
-    if (!normalizedProjectId) {
-        return url;
-    }
-    const [path, query = ''] = url.split('?');
-    const params = new URLSearchParams(query);
-    params.set('projectId', normalizedProjectId);
-    const nextQuery = params.toString();
-    return nextQuery ? `${path}?${nextQuery}` : path;
+    return withProjectScope(url, requireProjectScope(activeProjectId));
 }
 
 export function useWorkspaceNavigationController({ messageApi }: UseWorkspaceNavigationControllerOptions) {
@@ -243,12 +254,19 @@ export function useWorkspaceNavigationController({ messageApi }: UseWorkspaceNav
             requestedProjectId
             && payload.projects.some((project) => project.id === requestedProjectId),
         );
+        if (requestedProjectId && !requestedProjectExists) {
+            messageApi.warning(payload.activeProjectId
+                ? '链接中的项目不存在或未注册，已切换到当前项目'
+                : '链接中的项目不存在或未注册，请重新选择项目');
+            replaceBrowserProjectId(payload.activeProjectId);
+            initialProjectIdRef.current = null;
+        }
         setProjects(payload.projects);
         setActiveProjectId(requestedProjectExists ? requestedProjectId : payload.activeProjectId);
         setProjectSetupRequired(payload.projects.length === 0);
         projectSetupRequiredRef.current = payload.projects.length === 0;
         return payload;
-    }, []);
+    }, [messageApi]);
 
     const probeProjectRuntimeStatus = useCallback(async (projectId: string | null): Promise<ProjectRuntimeStatus | null> => {
         if (!projectId) {
@@ -348,7 +366,11 @@ export function useWorkspaceNavigationController({ messageApi }: UseWorkspaceNav
             if (projectAccessDeniedRef.current) {
                 return;
             }
-            const response = await fetch('/api/entries.json');
+            if (!activeProjectId) {
+                setData({ components: [], prototypes: [] });
+                return;
+            }
+            const response = await fetch(withActiveProjectParam('/api/entries.json', activeProjectId));
             if (!response.ok) {
                 throw new Error('Failed to fetch data');
             }
@@ -362,7 +384,7 @@ export function useWorkspaceNavigationController({ messageApi }: UseWorkspaceNav
         } finally {
             setLoading(false);
         }
-    }, [loadProjectResources, messageApi]);
+    }, [activeProjectId, loadProjectResources, messageApi]);
 
     const resetProjectScopedState = useCallback(() => {
         loadedSidebarTreeTabsRef.current.clear();
@@ -656,7 +678,7 @@ export function useWorkspaceNavigationController({ messageApi }: UseWorkspaceNav
             ] = await Promise.all([
                 fetch(withActiveProjectParam('/api/docs', activeProjectId)),
                 fetch(withActiveProjectParam('/api/themes', activeProjectId)),
-                sidebarApi.getResourceOrder('themes').catch(() => null),
+                sidebarApi.getResourceOrder('themes', requireProjectScope(activeProjectId)).catch(() => null),
             ]);
 
             const themeOrder = Array.isArray(themeOrderResponse?.order) ? themeOrderResponse.order : [];
@@ -740,7 +762,7 @@ export function useWorkspaceNavigationController({ messageApi }: UseWorkspaceNav
 
         loadingSidebarTreeTabsRef.current.add(tab);
         try {
-            const response = await sidebarApi.getSidebarTree(tab);
+            const response = await sidebarApi.getSidebarTree(tab, requireProjectScope(activeProjectId));
             const nextTree = sanitizeSidebarTree(
                 tab,
                 Array.isArray(response.tree) ? response.tree : [],
@@ -762,31 +784,16 @@ export function useWorkspaceNavigationController({ messageApi }: UseWorkspaceNav
                 loadingSidebarTreeTabsRef.current.delete(tab);
             }
         }
-    }, [getSidebarTabItems, loading, sidebarAssetsLoaded]);
+    }, [activeProjectId, getSidebarTabItems, loading, sidebarAssetsLoaded]);
 
     useEffect(() => {
         void loadData();
     }, [loadData]);
 
     useEffect(() => {
-        if (activeProjectId) {
-            return undefined;
+        if (!activeProjectId) {
+            setProjectTitle(UNTITLED_PROJECT_LABEL);
         }
-        let canceled = false;
-        sidebarApi.getProjectTitle()
-            .then((title) => {
-                if (!canceled) {
-                    setProjectTitle(title);
-                }
-            })
-            .catch(() => {
-                if (!canceled) {
-                    setProjectTitle(UNTITLED_PROJECT_LABEL);
-                }
-            });
-        return () => {
-            canceled = true;
-        };
     }, [activeProjectId]);
 
     useEffect(() => {

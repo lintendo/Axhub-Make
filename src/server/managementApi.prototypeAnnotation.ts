@@ -34,6 +34,11 @@ type AnnotationSourceDocument = {
   directory?: unknown;
 };
 
+type PrototypeAnnotationPage = {
+  id: string;
+  title: string;
+};
+
 type ResolveResult =
   | {
       ok: true;
@@ -430,7 +435,19 @@ function createAnnotationViewerJsx(pageId: string, indent: string): string {
     `${indent}<AnnotationViewer`,
     `${indent}  source={annotationSourceDocument as unknown as AnnotationSourceDocument}`,
     `${indent}  options={{`,
-    `${indent}    currentPageId: ${pageIdLiteral},`,
+    `${indent}    currentPageId: (() => {`,
+    `${indent}      const hashPageId = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('page');`,
+    `${indent}      const searchPageId = new URLSearchParams(window.location.search.replace(/^\\?/, '')).get('page');`,
+    `${indent}      const pageId = hashPageId || searchPageId;`,
+    `${indent}      return typeof pageId === 'string' && /^[a-z0-9-]+$/u.test(pageId)`,
+    `${indent}        ? pageId`,
+    `${indent}        : ${pageIdLiteral};`,
+    `${indent}    })(),`,
+    `${indent}    onDirectoryRoute: (node) => {`,
+    `${indent}      if (typeof node.route === 'string' && /^[a-z0-9-]+$/u.test(node.route)) {`,
+    `${indent}        window.location.hash = \`page=\${node.route}\`;`,
+    `${indent}      }`,
+    `${indent}    },`,
     `${indent}    toolbarEdge: 'right',`,
     `${indent}    showToolbar: true,`,
     `${indent}    showThemeToggle: true,`,
@@ -503,6 +520,46 @@ function createNodeId(source: AnnotationSourceDocument): string {
 function normalizePrototypePageId(value: unknown): string {
   const normalized = typeof value === 'string' ? value.trim() : '';
   return PROTOTYPE_PAGE_ID_RE.test(normalized) ? normalized : '';
+}
+
+function normalizePrototypeAnnotationPages(input: unknown): PrototypeAnnotationPage[] {
+  if (!Array.isArray(input)) return [];
+  const pages: PrototypeAnnotationPage[] = [];
+  const seenIds = new Set<string>();
+  for (const item of input) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const record = item as Record<string, unknown>;
+    const id = normalizePrototypePageId(record.id);
+    const title = typeof record.title === 'string' ? record.title.trim() : '';
+    if (!id || !title || seenIds.has(id)) continue;
+    seenIds.add(id);
+    pages.push({ id, title });
+  }
+  return pages;
+}
+
+function fillPageDirectory(
+  source: AnnotationSourceDocument,
+  pages: PrototypeAnnotationPage[],
+): AnnotationSourceDocument {
+  if ('directory' in source || pages.length <= 1) return source;
+  return {
+    ...source,
+    directory: {
+      nodes: [{
+        type: 'folder',
+        id: 'directory-pages',
+        title: '页面',
+        defaultExpanded: true,
+        children: pages.map((page) => ({
+          type: 'route',
+          id: `route-${page.id}`,
+          title: page.title,
+          route: page.id,
+        })),
+      }],
+    },
+  };
 }
 
 function nodeMatchesRequestedPageId(node: Record<string, unknown>, pageId: string): boolean {
@@ -652,7 +709,10 @@ export function handlePrototypeAnnotationApi(
           sendCorsJson(res, { error: resolved.error }, { status: resolved.status });
           return;
         }
-        const source = readAnnotationSource(resolved);
+        const pages = normalizePrototypeAnnotationPages(
+          body && typeof body === 'object' ? (body as { pages?: unknown }).pages : undefined,
+        );
+        const source = fillPageDirectory(readAnnotationSource(resolved), pages);
         writeAnnotationSource(resolved, source);
         const changedIndex = ensureAnnotationViewerIntegration(resolved, source);
         sendCorsJson(res, {

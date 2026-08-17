@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildMakeAgentSurfaceConfig,
   buildMakeAgentSurfaceOpenOptions,
+  mapMakeAgentSurfaceInspection,
   resolveMakeAgentSurfaceHost,
 } from './agentSurfaceIntegration.ts';
 import * as integrationApi from './agentSurfaceIntegration.ts';
@@ -91,6 +92,26 @@ describe('Make agent surface integration', () => {
 
     expect(options.config.hosts?.traework).toEqual({
       appPath: '/Applications/TRAE SOLO CN.app/Contents/MacOS/Electron',
+    });
+  });
+
+  it('preserves a configuration-required inspection as an app path requirement', () => {
+    expect(mapMakeAgentSurfaceInspection('win32', {
+      code: 'configuration-required',
+      message: 'Multiple QoderWork installations were found.',
+      cdpPort: 9222,
+      reusedHost: false,
+      canLaunch: false,
+      processRunning: false,
+    })).toEqual({
+      platform: 'win32',
+      ready: false,
+      running: false,
+      installed: false,
+      integrationInstalled: true,
+      appPath: '',
+      appPathRequired: true,
+      detail: 'Multiple QoderWork installations were found.',
     });
   });
 

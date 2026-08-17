@@ -11,6 +11,9 @@ import {
 import {
   cleanupProjectApiTestRoots,
   createTempRoot,
+  registerProject,
+  scopeProjectApiUrl,
+  setActiveProject,
   startTestServer,
   writeProjectMetadata,
 } from './projects-api.helpers';
@@ -29,6 +32,60 @@ describe('make-server project export and bridge APIs', () => {
 
   it('exposes source-backed export handling from its domain module', () => {
     expect(handleSourceBackedExports).toBeTypeOf('function');
+  });
+
+  it('keeps generated Axure code URLs scoped to the explicitly exported project', async () => {
+    const projectARoot = createTempRoot('axhub-make-export-project-a-');
+    const projectBRoot = createTempRoot('axhub-make-export-project-b-');
+    const registryHome = createTempRoot('axhub-make-export-registry-');
+    const writeProject = (projectRoot: string, projectId: string, marker: string) => {
+      const sourcePath = path.join(projectRoot, 'src', 'prototypes', 'home', 'index.tsx');
+      fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+      fs.writeFileSync(sourcePath, `export default function Home() { return ${JSON.stringify(marker)}; }\n`, 'utf8');
+      writeProjectMetadata(projectRoot, {
+        project: { id: projectId, name: projectId },
+        resources: {
+          prototypes: [{
+            id: 'home',
+            name: 'home',
+            title: 'Home',
+            clientUrl: 'http://localhost:3000/home',
+            filePath: 'src/prototypes/home/index.tsx',
+          }],
+          docs: [],
+          themes: [],
+          data: [],
+          templates: [],
+        },
+      });
+    };
+    writeProject(projectARoot, 'project-a', 'project-a-source');
+    writeProject(projectBRoot, 'project-b', 'project-b-source');
+
+    const server = await startTestServer(projectARoot, registryHome);
+
+    try {
+      await registerProject(server.origin, projectARoot, 'project-a');
+      await registerProject(server.origin, projectBRoot, 'project-b');
+      await setActiveProject(server.origin, 'project-a');
+
+      const bundle = await fetch(scopeProjectApiUrl(projectBRoot, `${server.origin}/api/export-index-bundle?projectId=project-b&path=prototypes%2Fhome`))
+        .then(async (response) => ({ status: response.status, body: await response.json() }));
+
+      expect(bundle.status).toBe(200);
+      expect(bundle.body.projectId).toBe('project-b');
+      expect(bundle.body.entry.code).toContain('project-b-source');
+      expect(bundle.body.entry.code).not.toContain('project-a-source');
+      expect(bundle.body.entry.axureCodePath).toBe('/api/axure-export-code?projectId=project-b&path=prototypes%2Fhome');
+
+      const codeResponse = await fetch(`${server.origin}${bundle.body.entry.axureCodePath}`);
+      expect(codeResponse.status).toBe(200);
+      const code = await codeResponse.text();
+      expect(code).toContain('project-b-source');
+      expect(code).not.toContain('project-a-source');
+    } finally {
+      await server.close();
+    }
   });
 
   it('returns built runtime JS as the export index bundle without spec or export-code payloads', async () => {
@@ -81,7 +138,7 @@ describe('make-server project export and bridge APIs', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const bundle = await fetch(`${server.origin}/api/export-index-bundle?path=${encodeURIComponent('prototypes/home')}`)
+      const bundle = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/export-index-bundle?path=${encodeURIComponent('prototypes/home')}`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(bundle.status).toBe(200);
@@ -96,9 +153,61 @@ describe('make-server project export and bridge APIs', () => {
       // axureCode contains the Component bridge for the Axure runtime
       expect(bundle.body.entry.axureCode).toContain('UserComponent');
       expect(bundle.body.entry.axureCode).toContain('window.Component');
-      expect(bundle.body.entry.axureCodePath).toBe('/api/axure-export-code?path=prototypes%2Fhome');
+      expect(bundle.body.entry.axureCodePath).toBe('/api/axure-export-code?projectId=runtime-client&path=prototypes%2Fhome');
       expect(bundle.body).not.toHaveProperty('docs');
       expect(bundle.body).not.toHaveProperty('images');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('exports gray placeholders instead of image payloads when Axure images are disabled', async () => {
+    const projectRoot = createTempRoot();
+    const sourcePath = path.join(projectRoot, 'src', 'prototypes', 'placeholder-home', 'index.tsx');
+    const pngHeader = Buffer.alloc(24);
+    pngHeader.writeUInt32BE(800, 16);
+    pngHeader.writeUInt32BE(450, 20);
+    const originalDataUrl = `data:image/png;base64,${pngHeader.toString('base64')}`;
+    fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+    fs.writeFileSync(
+      sourcePath,
+      `const image = ${JSON.stringify(originalDataUrl)};\nexport default function Component() { return image; }\n`,
+      'utf8',
+    );
+
+    writeProjectMetadata(projectRoot, {
+      project: { id: 'placeholder-client', name: 'Placeholder Client' },
+      resources: {
+        prototypes: [{
+          id: 'placeholder-home',
+          name: 'placeholder-home',
+          title: 'Placeholder Home',
+          clientUrl: 'http://localhost:3000/placeholder-home',
+          filePath: 'src/prototypes/placeholder-home/index.tsx',
+        }],
+        docs: [],
+        themes: [],
+        data: [],
+        templates: [],
+      },
+    });
+
+    const server = await startTestServer(projectRoot);
+
+    try {
+      const bundle = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/export-index-bundle?path=${encodeURIComponent('prototypes/placeholder-home')}&includeImages=false`))
+        .then(async (response) => ({ status: response.status, body: await response.json() }));
+
+      expect(bundle.status).toBe(200);
+      expect(bundle.body.entry.axureCode).not.toContain(originalDataUrl);
+      expect(bundle.body.entry.axureCode).toContain('data:image/svg+xml;base64,');
+      expect(bundle.body.entry.axureCodePath).toBe('/api/axure-export-code?projectId=placeholder-client&path=prototypes%2Fplaceholder-home&includeImages=false');
+
+      const codeResponse = await fetch(`${server.origin}${bundle.body.entry.axureCodePath}`);
+      expect(codeResponse.status).toBe(200);
+      const code = await codeResponse.text();
+      expect(code).not.toContain(originalDataUrl);
+      expect(code).toContain('data:image/svg+xml;base64,');
     } finally {
       await server.close();
     }
@@ -137,7 +246,7 @@ describe('make-server project export and bridge APIs', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const bundle = await fetch(`${server.origin}/api/export-index-bundle?path=${encodeURIComponent('prototypes/home')}`)
+      const bundle = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/export-index-bundle?path=${encodeURIComponent('prototypes/home')}`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       // On-demand build succeeds even when pre-built artifact is missing
       expect(bundle.status).toBe(200);
@@ -188,7 +297,7 @@ describe('make-server project export and bridge APIs', () => {
 
     try {
       // On-demand build succeeds for index-bundle
-      const bundle = await fetch(`${server.origin}/api/export-index-bundle?path=${encodeURIComponent('prototypes/home')}`)
+      const bundle = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/export-index-bundle?path=${encodeURIComponent('prototypes/home')}`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(bundle.status).toBe(200);
       expect(bundle.body.entry.code).toContain('UserComponent');
@@ -196,7 +305,7 @@ describe('make-server project export and bridge APIs', () => {
       expect(bundle.body.meta.source).toBe('on-demand-build');
 
       // On-demand build also works for axure-export-code
-      const axureCode = await fetch(`${server.origin}/api/axure-export-code?path=${encodeURIComponent('prototypes/home')}`);
+      const axureCode = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/axure-export-code?path=${encodeURIComponent('prototypes/home')}`));
       expect(axureCode.status).toBe(200);
       const axureBody = await axureCode.text();
       expect(axureBody).toContain('UserComponent');
@@ -204,7 +313,7 @@ describe('make-server project export and bridge APIs', () => {
 
       // export-html now attempts actual build when source is available (not ADAPTER_REQUIRED)
       // In test environment without full node_modules/react, the build will fail with 500
-      const html = await fetch(`${server.origin}/api/export-html?path=${encodeURIComponent('prototypes/home')}`);
+      const html = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/export-html?path=${encodeURIComponent('prototypes/home')}`));
       // The response is no longer 424 ADAPTER_REQUIRED — it either succeeds (200 ZIP) or fails (500 build error)
       expect(html.status).not.toBe(424);
       expect([200, 500]).toContain(html.status);
@@ -249,7 +358,7 @@ describe('make-server project export and bridge APIs', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/axure-export-code?path=${encodeURIComponent('prototypes/hero')}`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/axure-export-code?path=${encodeURIComponent('prototypes/hero')}`));
       expect(response.status).toBe(200);
       expect(response.headers.get('content-type')).toContain('text/javascript');
 
@@ -290,7 +399,7 @@ describe('make-server project export and bridge APIs', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/axure-export-code?path=${encodeURIComponent('prototypes/hello')}`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/axure-export-code?path=${encodeURIComponent('prototypes/hello')}`));
       expect(response.status).toBe(200);
       expect(response.headers.get('content-type')).toContain('text/javascript');
 
@@ -329,7 +438,7 @@ describe('make-server project export and bridge APIs', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/axure-export-code?path=${encodeURIComponent('prototypes/missing')}`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/axure-export-code?path=${encodeURIComponent('prototypes/missing')}`));
       expect(response.status).toBe(424);
       const body = await response.json();
       expect(body).toMatchObject({
@@ -370,7 +479,7 @@ describe('make-server project export and bridge APIs', () => {
     });
 
     try {
-      const bridge = await fetch(`${server.origin}/api/axure-bridge/available`);
+      const bridge = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/axure-bridge/available`));
       const bridgeBody = await bridge.json();
       expect(bridge.status).toBe(200);
       if (bridgeBody.available === false) {
@@ -386,24 +495,24 @@ describe('make-server project export and bridge APIs', () => {
         expect(bridgeBody.available).toBe(true);
       }
 
-      const unsupportedProxy = await fetch(`${server.origin}/api/export/image-proxy?url=${encodeURIComponent('http://127.0.0.1:1/image.png')}`);
+      const unsupportedProxy = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/export/image-proxy?url=${encodeURIComponent('http://127.0.0.1:1/image.png')}`));
       expect(unsupportedProxy.status).toBe(200);
       expect(unsupportedProxy.headers.get('x-axhub-proxy-fallback')).toBe('placeholder');
       expect(unsupportedProxy.headers.get('x-axhub-proxy-reason')).toBe('unsupported-target-url');
       expect(await unsupportedProxy.text()).toContain('<svg');
 
-      const upstreamFailure = await fetch(`${server.origin}/api/export/image-proxy?url=${encodeURIComponent('https://example.invalid/missing.png')}`);
+      const upstreamFailure = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/export/image-proxy?url=${encodeURIComponent('https://example.invalid/missing.png')}`));
       expect(upstreamFailure.status).toBe(200);
       expect(upstreamFailure.headers.get('x-axhub-proxy-fallback')).toBe('placeholder');
       expect(upstreamFailure.headers.get('x-axhub-proxy-reason')).toBe('fetch-failed');
 
-      const allowedProxy = await fetch(`${server.origin}/api/export/image-proxy?url=${encodeURIComponent('https://assets.example.test/logo.png')}`);
+      const allowedProxy = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/export/image-proxy?url=${encodeURIComponent('https://assets.example.test/logo.png')}`));
       expect(allowedProxy.status).toBe(200);
       expect(allowedProxy.headers.get('content-type')).toContain('image/png');
       expect(allowedProxy.headers.get('x-axhub-proxy-fallback')).toBeNull();
       expect(new Uint8Array(await allowedProxy.arrayBuffer())).toEqual(new Uint8Array([137, 80, 78, 71]));
 
-      const copy = await fetch(`${server.origin}/api/axure-bridge/copyaxvg`, {
+      const copy = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/axure-bridge/copyaxvg`), {
         method: 'POST',
         body: 'hello',
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -462,7 +571,7 @@ describe('make-server project export and bridge APIs', () => {
     });
 
     try {
-      const available = await fetch(`${server.origin}/api/axure-bridge/available`)
+      const available = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/axure-bridge/available`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(available).toMatchObject({
         status: 200,
@@ -474,7 +583,7 @@ describe('make-server project export and bridge APIs', () => {
       });
       expect(availableAttempts).toBe(2);
 
-      const copy = await fetch(`${server.origin}/api/axure-bridge/copyaxvg`, {
+      const copy = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/axure-bridge/copyaxvg`), {
         method: 'POST',
         body: '{"widgets":[]}',
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -542,7 +651,7 @@ describe('make-server project export and bridge APIs', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const response = await fetch(`${server.origin}/api/axure-bridge/copyaxvg`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/axure-bridge/copyaxvg`), {
         method: 'POST',
         body: '{"widgets":[]}',
       });
@@ -585,7 +694,7 @@ describe('make-server project export and bridge APIs', () => {
     });
 
     try {
-      const response = await fetch(`${server.origin}/api/axure-bridge/available`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/axure-bridge/available`));
       const body = await response.json();
 
       expect(response.status).toBe(200);

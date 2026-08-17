@@ -416,6 +416,7 @@ export function normalizeProjectPrototypeResource(
     const clientUrl = pickString(resource.clientUrl);
     const filePath = pickString(resource.filePath);
     const absoluteFilePath = pickString(resource.absoluteFilePath);
+    const specFilePath = pickString(resource.specFilePath);
     const artifacts = resource.artifacts && typeof resource.artifacts === 'object' && !Array.isArray(resource.artifacts)
         ? resource.artifacts as Record<string, unknown>
         : undefined;
@@ -437,10 +438,11 @@ export function normalizeProjectPrototypeResource(
         clientUrl: clientUrl || undefined,
         filePath: filePath || undefined,
         absoluteFilePath: absoluteFilePath || undefined,
+        ...(specFilePath ? { specFilePath } : {}),
         artifacts,
         projectId: projectId || undefined,
         resourceId: name,
-        previewDisabled: !clientUrl,
+        previewDisabled: resource.previewDisabled === true || !clientUrl,
         placeholder,
         ...(placeholder ? { placeholderGuide: placeholderGuide || DEFAULT_PROTOTYPE_PLACEHOLDER_GUIDE } : {}),
         ...(generationStatus ? { generationStatus } : {}),
@@ -480,7 +482,9 @@ export function normalizeProjectDocResource(
     const itemName = directDocsFileUrl && docFileRouteName ? docFileRouteName : name;
     const markdownUrl = isMarkdown && contentEndpoint
         ? contentEndpoint
-        : directDocsFileUrl || buildMarkdownFileUrl(markdownPath) || contentEndpoint;
+        : directDocsFileUrl
+            || (projectId && markdownPath ? buildMarkdownFileUrl(markdownPath, projectId) : '')
+            || contentEndpoint;
     const shouldUseSpecTemplatePreview = isMarkdown || (!markdownPath && !directDocsFileUrl);
     const resourceRelativePath = getDocRelativePathFromResourcePath(markdownPath);
     const filePath = explicitFilePath

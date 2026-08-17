@@ -1,0 +1,207 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 23,
+  "pageId": "43ucha",
+  "pageName": "菜谱详情",
+  "sitemapPath": "菜谱 / 菜谱详情",
+  "requestedPath": "菜谱详情.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.59.48/%E8%8F%9C%E8%B0%B1%E8%AF%A6%E6%83%85.html",
+  "dataUrl": "http://127.0.0.1:32768/20.59.48/files/%E8%8F%9C%E8%B0%B1%E8%AF%A6%E6%83%85/data.js",
+  "generationDate": "2026-08-14T12:59:48.617Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 蛋花豆腐羹\n- paragraph\n- paragraph: 9555次浏览 2222人喜欢\n- paragraph: 主要食材：鸡蛋、南豆腐西红柿、玉米、胡萝卜等\n- paragraph: 第一步是，在锅中倒入适量的水，加热，然后把豆腐放入锅中焯一会去腥，捞起来晾凉之后，再切成小正方块。接着取1~2个鸡蛋，喜欢的就多取几个，统一打散到碗里搅拌，放在一边待会用。\n- paragraph: 做完以上步骤，准备工作就完成了。第二步是在锅中倒入适量的水和油，放入切好的豆腐块。如果你准备了玉米粒，也是这个时候放。\n- paragraph: 等到再煮一会，就把鸡蛋液倒入锅中，有西红柿的话，就一起放吧，再加点盐，过一会就能吃啦。\n- paragraph\n- paragraph: 已加载全部\n- paragraph: 蛋花豆腐羹\n- paragraph\n- paragraph: 2222人喜欢 40000人收藏\n- paragraph: 鸡蛋、南豆腐、西红柿、\n- paragraph: 玉米、胡萝卜\n- paragraph: 蛋花豆腐羹\n- paragraph\n- paragraph: 2222人喜欢 40000人收藏\n- paragraph: 鸡蛋、南豆腐、西红柿、\n- paragraph: 玉米、胡萝卜\n- paragraph: 蛋花豆腐羹\n- paragraph\n- paragraph: 2222人喜欢 40000人收藏\n- paragraph: 鸡蛋、南豆腐、西红柿、\n- paragraph: 玉米、胡萝卜\n- paragraph: 推荐菜谱\n- paragraph: 喜欢 1023\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "023-recipe-detail-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "背景",
+    "导航",
+    "弹窗",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [],
+  "panels": [
+    {
+      "scope": "page:菜谱详情 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    },
+    {
+      "scope": "page:菜谱详情 / Dynamic panel / state:State1 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    },
+    {
+      "scope": "page:菜谱详情 / Dynamic panel / state:State1 / Dynamic panel / state:State1 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1",
+        "State2"
+      ]
+    },
+    {
+      "scope": "page:菜谱详情 / 导航 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1",
+        "State2"
+      ]
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:菜谱详情 / Dynamic panel / state:State1 / Dynamic panel / state:State1 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 菜谱详情 in Current window",
+      "target": "菜谱详情.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:菜谱详情 / Dynamic panel / state:State1 / Dynamic panel / state:State1 / Dynamic panel",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set (Dynamic panel) to&nbsp; to Next wrap ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:菜谱详情 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:菜谱详情 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 弹窗",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:菜谱详情 / 导航 / Dynamic panel",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set (Dynamic panel) to&nbsp; to Next wrap ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:菜谱详情 / 弹窗",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹窗fade none 100ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

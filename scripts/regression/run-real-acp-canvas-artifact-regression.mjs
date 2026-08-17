@@ -203,9 +203,10 @@ function buildResourceCanvasApiUrl(baseUrl, resourcePath) {
 
 function appendProjectIdSearchParam(url, projectId) {
   const normalizedProjectId = String(projectId || '').trim();
-  if (normalizedProjectId) {
-    url.searchParams.set('projectId', normalizedProjectId);
+  if (!normalizedProjectId) {
+    throw new Error('Project-scoped regression request requires projectId');
   }
+  url.searchParams.set('projectId', normalizedProjectId);
   return url;
 }
 
@@ -438,8 +439,9 @@ async function resolveActiveProjectRoot(baseUrl, projectId) {
   return path.resolve(root);
 }
 
-async function createRecordingPrototype(baseUrl) {
-  const response = await fetch(new URL('/api/prototypes/create-placeholder', baseUrl), { method: 'POST' });
+async function createRecordingPrototype(baseUrl, projectId) {
+  const url = appendProjectIdSearchParam(new URL('/api/prototypes/create-placeholder', baseUrl), projectId);
+  const response = await fetch(url, { method: 'POST' });
   const payload = await response.json().catch(() => null);
   if (response.status !== 201 || !payload?.name) {
     throw new Error(`Failed to create recording prototype: ${JSON.stringify({ status: response.status, payload })}`);
@@ -1913,13 +1915,14 @@ async function waitForRealAcpCanvasElements(page, requiredArtifacts) {
   );
 }
 
-async function waitForGenerationHistory(baseUrl, prototypeName, requiredKinds = REQUIRED_ARTIFACT_KINDS, timeoutMs = 60_000) {
+async function waitForGenerationHistory(baseUrl, projectId, prototypeName, requiredKinds = REQUIRED_ARTIFACT_KINDS, timeoutMs = 60_000) {
   const deadline = Date.now() + timeoutMs;
   let latest = null;
   let latestCoverage = null;
   while (Date.now() < deadline) {
     const url = new URL('/api/ai/artifact-history', baseUrl);
     url.searchParams.set('targetPath', `prototypes/${prototypeName}`);
+    appendProjectIdSearchParam(url, projectId);
     latest = await fetchJson(url);
     const records = Array.isArray(latest?.artifacts) ? latest.artifacts : [];
     latestCoverage = summarizeArtifactKindCoverage(records, requiredKinds);
@@ -2221,7 +2224,7 @@ async function main() {
       logFile: path.join(artifactsRoot, 'acp-server.log'),
     });
 
-    canvasPrototype = await createRecordingPrototype(baseUrl);
+    canvasPrototype = await createRecordingPrototype(baseUrl, projectId);
 
     runtime = await waitForAssistantRuntimeReady(baseUrl, projectId);
     if (new URL(runtime.webBaseUrl).origin !== acpOrigin) {
@@ -2389,7 +2392,7 @@ async function main() {
     await refreshExternalDiagnostics();
     await capture(page, frames, frameDir, '7. canvas.excalidraw 已持久化四类真实产物元素，重开画布仍可显示');
 
-    history = await waitForGenerationHistory(baseUrl, canvasPrototype, requiredKinds);
+    history = await waitForGenerationHistory(baseUrl, projectId, canvasPrototype, requiredKinds);
     await refreshExternalDiagnostics();
     await capture(page, frames, frameDir, '8. 生成记录已写入当前资源画布，四类 artifact 可被历史接口读取');
     pageState = await getPageState(page);

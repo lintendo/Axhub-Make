@@ -223,6 +223,30 @@ describe('CLI App open controller', () => {
     expect(dependencies.openMakeAgentSurface).not.toHaveBeenCalled();
   });
 
+  it('requires --app-path when discovery finds multiple supported installations', async () => {
+    const stateDirectory = createStateDirectory();
+    const dependencies = createDependencies(stateDirectory, {
+      inspectMakeAgentSurfaceHost: vi.fn(async () => readyInspection({
+        ready: false,
+        running: false,
+        installed: false,
+        appPath: '',
+        appPathRequired: true,
+        detail: 'Multiple QoderWork installations were found.',
+      })),
+    });
+
+    await expect(openMakeCliApp({
+      app: 'qoderwork',
+      makeOrigin: 'http://127.0.0.1:53817',
+    }, dependencies)).resolves.toMatchObject({
+      ok: false,
+      code: 'app-path-required',
+      detail: 'Multiple QoderWork installations were found.',
+    });
+    expect(dependencies.openMakeAgentSurface).not.toHaveBeenCalled();
+  });
+
   it('maps graceful-exit failure to app-exit-timeout', async () => {
     const stateDirectory = createStateDirectory();
     const dependencies = createDependencies(stateDirectory, {

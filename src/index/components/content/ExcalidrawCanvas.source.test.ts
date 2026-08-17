@@ -18,7 +18,7 @@ describe('ExcalidrawCanvas source', () => {
     expect(encoderSource).toContain('.filter(Boolean)');
     expect(encoderSource).toContain('.map((segment) => encodeURIComponent(segment))');
     expect(encoderSource).toContain(".join('/')");
-    expect(source).toContain('new URL(`/api/canvas/resources/${encodeCanvasApiPath(resourceCanvasPath)}`, window.location.origin)');
+    expect(source).toContain('withProjectScope(`/api/canvas/resources/${encodeCanvasApiPath(resourceCanvasPath)}`, requireProjectScope(projectId))');
     expect(source).toContain('fetch(buildCanvasApiUrl(canvasName, activeProjectId, canvasFilePath))');
     expect(source).toContain('fetch(buildCanvasApiUrl(currentNameRef.current, activeProjectId, canvasFilePath))');
     expect(source).toContain('const url = buildCanvasApiUrl(currentNameRef.current, activeProjectId, canvasFilePath);');
@@ -27,12 +27,12 @@ describe('ExcalidrawCanvas source', () => {
     expect(source).not.toContain('new URL(`/api/canvas/${encodeCanvasApiPath(canvasName)}`, window.location.origin)');
   });
 
-  it('scopes canvas API requests to the active project when one is provided', () => {
+  it('requires the active project for every canvas API request', () => {
     const source = readSource();
 
-    expect(source).toContain('activeProjectId?: string | null;');
-    expect(source).toContain('function buildCanvasApiUrl(canvasName: string, projectId?: string | null, canvasFilePath?: string): string {');
-    expect(source).toContain('url.searchParams.set(\'projectId\', normalizedProjectId);');
+    expect(source).toContain('activeProjectId: string;');
+    expect(source).toContain('function buildCanvasApiUrl(canvasName: string, projectId: string, canvasFilePath?: string): string {');
+    expect(source).toContain('withProjectScope(`/api/canvas/resources/${encodeCanvasApiPath(resourceCanvasPath)}`, requireProjectScope(projectId))');
     expect(source).toContain('fetch(buildCanvasApiUrl(canvasName, activeProjectId, canvasFilePath))');
     expect(source).toContain('fetch(buildCanvasApiUrl(currentNameRef.current, activeProjectId, canvasFilePath))');
     expect(source).toContain('const url = buildCanvasApiUrl(currentNameRef.current, activeProjectId, canvasFilePath);');
@@ -44,11 +44,21 @@ describe('ExcalidrawCanvas source', () => {
     expect(source).toContain('function resolveResourceCanvasApiPath(canvasName: string, canvasFilePath?: string): string {');
     expect(source).toContain("const resourcesMarker = 'src/resources/';");
     expect(source).toContain("if (normalized.startsWith('resources/'))");
-    expect(source).toContain('new URL(`/api/canvas/resources/${encodeCanvasApiPath(resourceCanvasPath)}`, window.location.origin)');
+    expect(source).toContain('withProjectScope(`/api/canvas/resources/${encodeCanvasApiPath(resourceCanvasPath)}`, requireProjectScope(projectId))');
     expect(source).toContain('fetch(buildCanvasApiUrl(canvasName, activeProjectId, canvasFilePath))');
     expect(source).toContain('fetch(buildCanvasApiUrl(currentNameRef.current, activeProjectId, canvasFilePath))');
     expect(source).toContain('const url = buildCanvasApiUrl(currentNameRef.current, activeProjectId, canvasFilePath);');
     expect(source).toContain('const resourceCanvasPath = resolveResourceCanvasApiPath(canvasName, canvasFilePath);');
+  });
+
+  it('scopes embedded resource metadata reads before opening an editor', () => {
+    const source = readSource();
+
+    expect(source).toContain('async function openEmbedItemInEditor(detail: any, projectId: string)');
+    expect(source).toContain("fetch(withProjectScope('/api/entries.json', requireProjectScope(projectId)))");
+    expect(source).toContain("fetch(withProjectScope('/api/docs', requireProjectScope(projectId)))");
+    expect(source).toContain("fetch(withProjectScope('/api/config', requireProjectScope(projectId)))");
+    expect(source).toContain('openEmbedItemInEditor(detail, activeProjectId)');
   });
 
   it('renders the canvas search menu item with a search icon', () => {
@@ -147,7 +157,11 @@ describe('ExcalidrawCanvas source', () => {
   it('mounts the unified AI generation tool and wires explicit scene persistence', () => {
     const source = readSource();
 
-    expect(source).toContain("import CanvasAiGenerationTool, { type CanvasAiGenerationRequest, type CanvasAiGenerationResult } from '../../domains/ai-generation/CanvasAiGenerationTool';");
+    expect(source).toContain('import CanvasAiGenerationTool, {');
+    expect(source).toContain('type CanvasAiGenerationRequest,');
+    expect(source).toContain('type CanvasAiGenerationResult,');
+    expect(source).toContain('type CanvasViewportAiCapture,');
+    expect(source).toContain("} from '../../domains/ai-generation/CanvasAiGenerationTool';");
     expect(source).toContain("import {");
     expect(source).toContain("} from '../../domains/ai-generation/CanvasDirectRunOverlay';");
     expect(source).toContain("resolveCanvasDirectRunOverlayPosition");
@@ -161,10 +175,11 @@ describe('ExcalidrawCanvas source', () => {
     expect(source).not.toContain("removeCanvasDirectStatusElement");
     expect(source).toContain('<CanvasAiGenerationTool');
     expect(source).toContain('onSubmitCanvasAssistantPrompt?: (request: CanvasAiGenerationRequest) => Promise<CanvasAiGenerationResult | boolean> | CanvasAiGenerationResult | boolean;');
-    expect(source).toContain('assistantProjectPath={assistantProjectPath}');
+    expect(source).toContain('preferredModel={preferredModel}');
     expect(source).toContain('preferredPromptClient={preferredPromptClient}');
     expect(source).toContain('onSubmitCanvasAssistantPrompt={handleSubmitCanvasAssistantPromptWithArtifacts}');
-    expect(source).toContain('canvasDirectRunOverlayController={canvasDirectRunOverlayController}');
+    expect(source).toContain('captureViewport={captureCurrentCanvasViewport}');
+    expect(source).not.toContain('canvasDirectRunOverlayController={canvasDirectRunOverlayController}');
     expect(source).not.toContain('<CanvasDirectRunOverlay');
     expect(source).not.toContain('handleCanvasDrop');
     expect(source).not.toContain('onImageArtifact={handleCanvasImageArtifactEvent}');
@@ -219,6 +234,7 @@ describe('ExcalidrawCanvas source', () => {
     expect(source).toContain("const scene: CanvasAiScene = 'page';");
     expect(source).toContain('const statusTask = canvasDirectRunOverlayController.createStatusTask({');
     expect(source).toContain("source: 'annotation-prompt-card',");
+    expect(source).toContain("source: 'annotation-prompt-card',\n            sceneSettings,");
     expect(source).toContain('const startResult = controller.start(request);');
     expect(source).toContain('annotationActiveStatusTaskRunsRef.current.set(statusTask.id, {');
     expect(source).toContain('canvasDirectRunOverlayController.registerStatusTaskStopped(statusTask.id, () => {');
@@ -360,8 +376,9 @@ describe('ExcalidrawCanvas source', () => {
     );
 
     expect(submitHandlerSource).not.toContain("const shouldApplyReturnedArtifacts = request.source !== 'canvas-start';");
-    expect(submitHandlerSource).toContain('if (artifacts.length > 0 && excalidrawAPI) {');
-    expect(submitHandlerSource.indexOf('if (artifacts.length > 0 && excalidrawAPI) {')).toBeLessThan(
+    expect(submitHandlerSource).toContain("const shouldApplyReturnedArtifacts = request.source !== 'canvas-viewport';");
+    expect(submitHandlerSource).toContain('if (shouldApplyReturnedArtifacts && artifacts.length > 0 && excalidrawAPI) {');
+    expect(submitHandlerSource.indexOf('if (shouldApplyReturnedArtifacts && artifacts.length > 0 && excalidrawAPI) {')).toBeLessThan(
       submitHandlerSource.indexOf('applyGenerationArtifactsToCanvasElements({'),
     );
   });
@@ -539,9 +556,9 @@ describe('ExcalidrawCanvas source', () => {
     expect(source).toContain('return normalized.slice(markerIndex + resourcesMarker.length + 1);');
     expect(source).toContain('return `src/resources/${normalized.slice(\'resources/\'.length)}`;');
     expect(source).toContain('const targetPath = resolveCanvasGenerationTaskTargetPath(canvasName, canvasFilePath);');
-    expect(source).toContain('void getAiImageTaskStore().configure({ targetPath });');
-    expect(source).toContain('void getPrototypeGenerationTaskStore().configure({ targetPath });');
-    expect(source).toContain('}, [canvasName, canvasFilePath]);');
+    expect(source).toContain('void getAiImageTaskStore().configure({ projectId: activeProjectId, targetPath });');
+    expect(source).toContain('void getPrototypeGenerationTaskStore().configure({ projectId: activeProjectId, targetPath });');
+    expect(source).toContain('}, [activeProjectId, canvasName, canvasFilePath]);');
     expect(source).not.toContain('return `prototypes/${prototypePathMatch[1]}`;');
     expect(source).not.toContain("return `prototypes/${match[1]}`;");
     expect(source).not.toContain('resolveAiImageHistoryTargetPath');
@@ -640,7 +657,7 @@ describe('ExcalidrawCanvas source', () => {
     );
 
     expect(source).toContain('assistantApiBaseUrl?: string;');
-    expect(source).toContain('assistantProjectPath?: string;');
+    expect(source).not.toContain('assistantProjectPath?: string;');
     expect(source).toContain('preferredPromptClient?: PromptClientPreference;');
     expect(source).toContain('prototypes?: ItemData[];');
     expect(source).toContain('onRefreshPrototypes?: () => Promise<ItemData[]>;');
@@ -648,7 +665,8 @@ describe('ExcalidrawCanvas source', () => {
     expect(toolSegment).toContain('<CanvasAiGenerationTool');
     expect(toolSegment).toContain('canvasFilePath={canvasFilePath || canvasName}');
     expect(toolSegment).not.toContain('assistantApiBaseUrl={assistantApiBaseUrl}');
-    expect(toolSegment).toContain('assistantProjectPath={assistantProjectPath}');
+    expect(toolSegment).not.toContain('assistantProjectPath={assistantProjectPath}');
+    expect(toolSegment).toContain('preferredModel={preferredModel}');
     expect(toolSegment).toContain('preferredPromptClient={preferredPromptClient}');
     expect(toolSegment).not.toContain('prototypes={prototypes}');
     expect(toolSegment).not.toContain('onRefreshPrototypes={onRefreshPrototypes}');
@@ -657,15 +675,15 @@ describe('ExcalidrawCanvas source', () => {
     expect(toolSegment).not.toContain('containerRef={canvasContainerRef as React.RefObject<HTMLDivElement>}');
   });
 
-  it('destructures assistant project path before forwarding it into canvas tools', () => {
+  it('does not retain assistant project path after removing the canvas prompt composer', () => {
     const source = readSource();
     const propsStart = source.indexOf('export default function ExcalidrawCanvas({');
     const propsEnd = source.indexOf('}: ExcalidrawCanvasProps)', propsStart);
     const propsSource = source.slice(propsStart, propsEnd);
 
     expect(propsStart).toBeGreaterThanOrEqual(0);
-    expect(propsSource).toContain('assistantProjectPath,');
-    expect(source).toContain('assistantProjectPath={assistantProjectPath}');
+    expect(propsSource).not.toContain('assistantProjectPath,');
+    expect(source).not.toContain('assistantProjectPath={assistantProjectPath}');
   });
 
   it('does not consume placeholder start requests by inserting generator nodes into the canvas', () => {
@@ -805,6 +823,19 @@ describe('ExcalidrawCanvas source', () => {
     expect(source).toContain('maxZoom: 1.4,');
   });
 
+  it('keeps inactive embeds as ordinary canvas layers and accepts activation only from explicit requests', () => {
+    const source = readSource();
+
+    expect(source).toContain('AXHUB_EMBED_ACTIVATE_REQUESTED_EVENT');
+    expect(source).toContain('window.addEventListener(AXHUB_EMBED_ACTIVATE_REQUESTED_EVENT');
+    expect(source).toContain("excalidrawAPI.onStateChange('activeEmbeddable'");
+    expect(source).toContain("excalidrawAPI.onStateChange('activeTool'");
+    expect(source).toContain("excalidrawAPI.onStateChange('selectedElementIds'");
+    expect(source).toContain('AXHUB_EMBED_EXIT_PREVIEW_EVENT');
+    expect(source).toContain('activeEmbeddable: null');
+    expect(source).toContain('AXHUB_EMBED_ACTIVE_PREVIEW_CHANGED_EVENT');
+  });
+
   it('opens embedded resources through the shared IDE API helper', () => {
     const source = readSource();
 
@@ -831,10 +862,12 @@ describe('ExcalidrawCanvas source', () => {
     expect(source).toContain('await handleRefreshCanvasFromServer();');
     expect(source).toContain("case 'canvas_capture':");
     expect(source).toContain('await captureExcalidrawElements(excalidrawAPI, captureElements, {');
+    expect(source).toContain('await captureExcalidrawViewport(excalidrawAPI)');
+    expect(source).toContain('captureViewport={captureCurrentCanvasViewport}');
     expect(source).toContain("scope === 'rect'");
     expect(source).toContain('createCanvasCommandRectElement(');
     expect(source).toContain("scope === 'full'");
-    expect(source).toContain('exportPadding: scope === \'viewport\' || scope === \'rect\' ? 0 : 16,');
+    expect(source).toContain("exportPadding: scope === 'rect' ? 0 : 16,");
     expect(source).toContain("case 'canvas_insert_elements':");
     expect(source).toContain('resolveCanvasCommandInsertPosition(');
     expect(source).toContain('scheduleExplicitCanvasSave({ elements: nextElements, appState: excalidrawAPI.getAppState() });');
@@ -852,6 +885,24 @@ describe('ExcalidrawCanvas source', () => {
     expect(source).toContain('excalidrawAPI.scrollToContent(');
     expect(source).toContain('createCanvasCommandRectElement(targetRect, \'focus-rect\')');
     expect(source).toContain('CANVAS_COMMAND_UPDATE_ALLOWED_FIELDS');
+  });
+
+  it('saves the current canvas before capturing direct-file AI context', () => {
+    const source = readSource();
+    const captureSource = source.slice(
+      source.indexOf('const captureCurrentCanvasViewport = useCallback'),
+      source.indexOf('const handleSubmitCanvasAssistantPromptWithArtifacts', source.indexOf('const captureCurrentCanvasViewport = useCallback')),
+    );
+
+    expect(captureSource).toContain('const appState = excalidrawAPI.getAppState();');
+    expect(captureSource).toContain('const elements = excalidrawAPI.getSceneElements();');
+    expect(captureSource).toContain('await saveToServer(elements, appState);');
+    expect(captureSource).toContain("throw new Error('当前画布尚未保存完成');");
+    expect(captureSource).toContain('const viewportRect = getCanvasCommandViewportRect(appState);');
+    expect(captureSource).toContain('const visibleElements = getCanvasCommandElementsInRect(elements, viewportRect);');
+    expect(captureSource).toContain('dataUrl: capture.dataUrl,');
+    expect(captureSource).toContain('viewportRect,');
+    expect(captureSource).toContain('visibleElementIds: visibleElements.map((element) => String(element.id)),');
   });
 
   it('creates project-scoped deep links for newly inserted resource nodes', () => {

@@ -51,7 +51,7 @@ interface IndexDialogsProps {
     createDialog: {
         visible: boolean;
         activeTab: 'prototypes';
-        activeProjectId?: string | null;
+        activeProjectId: string;
         initialTab?: CreateDialogTab;
         initialUploadType?: PrototypeUploadType;
         targetPrototypeName?: string;
@@ -64,16 +64,14 @@ interface IndexDialogsProps {
     };
     createThemeDialog: {
         visible: boolean;
-        initialTab?: 'import' | 'onlineSelect';
+        activeProjectId: string;
         resourceWriteCapabilities: ResourceWriteCapabilities;
-        assistantOpen?: boolean;
         onClose: () => void;
-        onAfterCreatePromptAction: () => void;
-        onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
         onImportSuccess: () => Promise<void> | void;
     };
     exportDialog: {
         open: boolean;
+        projectId: string;
         preferencesStorageKey: string;
         imageConfig: ImageConfig;
         axureCopyOptions: AxureCopyOptions;
@@ -97,6 +95,7 @@ interface IndexDialogsProps {
     };
     figmaMakeExportDialog: {
         open: boolean;
+        projectId: string;
         itemName?: string;
         itemDisplayName?: string;
         targetPath?: string;
@@ -107,6 +106,7 @@ interface IndexDialogsProps {
     };
     cloudPublishSettingsDialog: {
         open: boolean;
+        projectId: string;
         initialTarget: Exclude<CloudPublishTarget, 'axhub'> | 'publish-settings';
         onOpenChange: (open: boolean) => void;
         onSaved?: (config: CloudPublishingConfigResponse) => void;
@@ -114,13 +114,15 @@ interface IndexDialogsProps {
     axhubPublishDialog: {
         open: boolean;
         targetPath: string;
-        projectId?: string | null;
+        projectId: string;
         onOpenChange: (open: boolean) => void;
         onPublished?: (result: AxhubPublishResponse) => void;
     };
+    settingsDialogProjectId: string;
     settingsDialogOpen: boolean;
     settingsDialogInitialTab: SettingsDialogInitialTab;
     settingsDialogAIContext: SettingsDialogAIContext | null;
+    conversationUiEnabled?: boolean;
     setSettingsDialogOpen: (open: boolean) => void;
     makeClientUpdateReminderVisible: boolean;
     onMakeClientUpdateReminderSeen: () => void;
@@ -154,9 +156,11 @@ export default function IndexDialogs({
     figmaMakeExportDialog,
     cloudPublishSettingsDialog,
     axhubPublishDialog,
+    settingsDialogProjectId,
     settingsDialogOpen,
     settingsDialogInitialTab,
     settingsDialogAIContext,
+    conversationUiEnabled,
     setSettingsDialogOpen,
     makeClientUpdateReminderVisible,
     onMakeClientUpdateReminderSeen,
@@ -304,17 +308,11 @@ export default function IndexDialogs({
                 <CreateThemeDialogContainer
                     state={{
                         visible: createThemeDialog.visible,
-                        initialTab: createThemeDialog.initialTab,
+                        activeProjectId: createThemeDialog.activeProjectId,
                         resourceWriteCapabilities: createThemeDialog.resourceWriteCapabilities,
-                        preferredPromptClient,
-                        preferredIDE,
-                        ideAvailability,
-                        assistantOpen: createThemeDialog.assistantOpen,
                     }}
                     actions={{
                         onClose: createThemeDialog.onClose,
-                        onAfterCreatePromptAction: createThemeDialog.onAfterCreatePromptAction,
-                        onExecutePrompt: createThemeDialog.onExecutePrompt,
                         onImportSuccess: createThemeDialog.onImportSuccess,
                     }}
                 />
@@ -325,6 +323,7 @@ export default function IndexDialogs({
                     <ExportModalContainer
                         state={{
                             open: exportDialog.open,
+                            projectId: exportDialog.projectId,
                             preferencesStorageKey: exportDialog.preferencesStorageKey,
                             imageConfig: exportDialog.imageConfig,
                             axureCopyOptions: exportDialog.axureCopyOptions,
@@ -375,6 +374,7 @@ export default function IndexDialogs({
                 <React.Suspense fallback={null}>
                     <FigmaMakeExportDialog
                         open={figmaMakeExportDialog.open}
+                        projectId={figmaMakeExportDialog.projectId}
                         onOpenChange={figmaMakeExportDialog.onOpenChange}
                         itemName={figmaMakeExportDialog.itemName}
                         itemDisplayName={figmaMakeExportDialog.itemDisplayName}
@@ -395,6 +395,7 @@ export default function IndexDialogs({
                 <React.Suspense fallback={null}>
                     <CloudPublishSettingsDialog
                         open={cloudPublishSettingsDialog.open}
+                        projectId={cloudPublishSettingsDialog.projectId}
                         initialTarget={cloudPublishSettingsDialog.initialTarget}
                         onOpenChange={cloudPublishSettingsDialog.onOpenChange}
                         onSaved={cloudPublishSettingsDialog.onSaved}
@@ -418,10 +419,13 @@ export default function IndexDialogs({
                 <React.Suspense fallback={null}>
                     <SettingsDialog
                         open={settingsDialogOpen}
+                        projectId={settingsDialogProjectId}
                         initialTab={settingsDialogInitialTab}
                         initialAcpRuntime={settingsDialogAIContext?.runtime}
                         initialAcpFailureSource={settingsDialogAIContext?.failureSource}
                         initialAcpFailureMessage={settingsDialogAIContext?.failureMessage}
+                        initialVoiceSection={settingsDialogAIContext?.voiceSection}
+                        conversationUiEnabled={conversationUiEnabled}
                         makeClientUpdateReminderVisible={makeClientUpdateReminderVisible}
                         onMakeClientUpdateReminderSeen={onMakeClientUpdateReminderSeen}
                         onClose={() => setSettingsDialogOpen(false)}
@@ -439,6 +443,7 @@ export default function IndexDialogs({
             {versionCollaborationDrawerOpen ? (
                 <React.Suspense fallback={null}>
                     <WorkspaceVersionCollaborationDrawer
+                        projectId={settingsDialogProjectId}
                         open={versionCollaborationDrawerOpen}
                         onOpenChange={setVersionCollaborationDrawerOpen}
                     />
@@ -448,6 +453,7 @@ export default function IndexDialogs({
             {versionDialogVisible ? (
                 <React.Suspense fallback={null}>
                     <VersionManager
+                        projectId={settingsDialogProjectId}
                         visible={versionDialogVisible}
                         onCancel={() => setVersionDialogVisible(false)}
                         item={currentVersionItem}

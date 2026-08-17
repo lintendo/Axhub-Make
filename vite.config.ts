@@ -360,6 +360,7 @@ export default defineConfig({
     ],
     alias: [
       { find: '@', replacement: path.resolve(__dirname, 'src') },
+      { find: /^next\/image$/, replacement: path.resolve(__dirname, 'src/compat/nextImage.tsx') },
       ...createVendorResolveAliases(),
       ...createPackageSingletonAliases(ASSISTANT_UI_SINGLETON_PACKAGES),
       { find: /^@axhub\/excalidraw\/index\.css$/, replacement: path.resolve(__dirname, 'vendor/axhub-excalidraw/dist/prod/index.css') },

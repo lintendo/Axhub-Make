@@ -1,0 +1,225 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 8,
+  "pageId": "wn0mtp",
+  "pageName": "修改宝宝信息",
+  "sitemapPath": "首页 / 修改宝宝信息",
+  "requestedPath": "修改宝宝信息.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.58.50/%E4%BF%AE%E6%94%B9%E5%AE%9D%E5%AE%9D%E4%BF%A1%E6%81%AF.html",
+  "dataUrl": "http://127.0.0.1:32768/20.58.50/files/%E4%BF%AE%E6%94%B9%E5%AE%9D%E5%AE%9D%E4%BF%A1%E6%81%AF/data.js",
+  "generationDate": "2026-08-14T12:58:50.355Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 梓宁宝宝\n- paragraph: 性别\n- paragraph: 女\n- paragraph: 宝宝头像\n- paragraph: 出生日期\n- paragraph: 2019/06/19\n- paragraph: 昵称\n- paragraph: 梓宁\n- paragraph: 身高\n- paragraph: 55cm\n- paragraph: 体重\n- paragraph: 15kg\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "008-edit-baby-info-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "导航",
+    "内容",
+    "头像",
+    "性别",
+    "弹层-选择日期",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [],
+  "panels": [
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:修改宝宝信息 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:修改宝宝信息 / 内容 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 性别",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:修改宝宝信息 / 内容 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 头像",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:修改宝宝信息 / 内容 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 弹层-选择日期",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:修改宝宝信息 / 内容 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 修改昵称 in Current window",
+      "target": "修改昵称.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:修改宝宝信息 / 内容 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 增加/编辑记录 in Current window",
+      "target": "增加_编辑记录.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:修改宝宝信息 / 内容 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 增加/编辑记录 in Current window",
+      "target": "增加_编辑记录.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:修改宝宝信息 / 头像",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 头像",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:修改宝宝信息 / 性别",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 性别",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:修改宝宝信息 / 弹层-选择日期 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹层-选择日期",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:修改宝宝信息 / 弹层-选择日期 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹层-选择日期",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

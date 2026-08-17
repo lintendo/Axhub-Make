@@ -1,8 +1,9 @@
 import React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import { App as AntApp, Input, message, Modal } from 'antd';
+import { App as AntApp, Button, Input, message, Modal } from 'antd';
 import type {
   AlertDialogOptions,
+  ConfirmDialogResult,
   ConfirmDialogOptions,
   EditorFeedbackService,
   PromptDialogOptions,
@@ -140,6 +141,7 @@ function showPromptModal(
         Modal,
         {
           open: true,
+          className: 'we-runtime-feedback-modal',
           title: options.title,
           okText: options.confirmText,
           cancelText: options.cancelText,
@@ -189,7 +191,7 @@ function showPromptModal(
 export function createFeedbackService(options: {
   getUiRoot: () => HTMLElement | null;
 }): EditorFeedbackService {
-  function confirm(dialog: ConfirmDialogOptions): Promise<boolean> {
+  function confirm(dialog: ConfirmDialogOptions): Promise<ConfirmDialogResult> {
     if (typeof window === 'undefined') {
       return Promise.resolve(Boolean(dialog.cancelText));
     }
@@ -199,7 +201,7 @@ export function createFeedbackService(options: {
 
     return new Promise((resolve) => {
       let settled = false;
-      const settle = (result: boolean) => {
+      const settle = (result: ConfirmDialogResult) => {
         if (settled) return;
         settled = true;
         resolve(result);
@@ -212,15 +214,19 @@ export function createFeedbackService(options: {
           content: dialog.content,
           okText: dialog.confirmText,
           cancelText: dialog.cancelText,
+          secondaryText: dialog.secondaryConfirmText,
           okType: dialog.confirmTone === 'primary' ? 'primary' : 'default',
           getContainer: () => container,
           onOk: () => settle(true),
+          onSecondary: () => settle('secondary'),
           onCancel: () => settle(false),
         });
         return;
       }
 
-      Modal.confirm({
+      let modalRef: ReturnType<typeof Modal.confirm> | null = null;
+      modalRef = Modal.confirm({
+        className: 'we-runtime-feedback-modal',
         title: dialog.title,
         content: dialog.content,
         okText: dialog.confirmText,
@@ -230,6 +236,25 @@ export function createFeedbackService(options: {
         closable: true,
         maskClosable: true,
         getContainer: () => container,
+        cancelButtonProps: dialog.cancelText ? undefined : { style: { display: 'none' } },
+        footer: dialog.secondaryConfirmText
+          ? (_originNode, { OkBtn }) => React.createElement(
+            React.Fragment,
+            null,
+            React.createElement(
+              Button,
+              {
+                key: 'secondary',
+                onClick: () => {
+                  settle('secondary');
+                  modalRef?.destroy();
+                },
+              },
+              dialog.secondaryConfirmText,
+            ),
+            React.createElement(OkBtn),
+          )
+          : undefined,
         onOk: () => settle(true),
         onCancel: () => settle(false),
       });
@@ -259,6 +284,7 @@ export function createFeedbackService(options: {
       }
 
       Modal.confirm({
+        className: 'we-runtime-feedback-modal',
         title: dialog.title,
         content: dialog.content,
         okText: dialog.confirmText,

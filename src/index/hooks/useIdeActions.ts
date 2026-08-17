@@ -7,6 +7,7 @@ import { openConfiguredIDEBeforeAction } from '../utils/ideAutomation';
 import { normalizeMarkdownResourceName } from '../utils/markdownResourcePath';
 import { buildObsidianOpenUrl } from '../utils/obsidian';
 import { getExplicitLocalPath, stripIndexFilePath } from '../utils/localPath';
+import { requireProjectScope, withProjectScope } from '../services/projectScope';
 
 type MarkdownResourceKind = 'doc' | 'template';
 
@@ -102,6 +103,7 @@ export function useIdeActions({
     const resolveMarkdownAbsoluteFilePath = useCallback(async (
         item: ItemData,
         kind: MarkdownResourceKind,
+        projectId: string | null | undefined,
     ): Promise<string> => {
         const currentAbsoluteFilePath = String((item as ItemData & { absoluteFilePath?: string }).absoluteFilePath || '').trim();
         if (currentAbsoluteFilePath) {
@@ -110,7 +112,7 @@ export function useIdeActions({
 
         try {
             const endpoint = kind === 'template' ? '/api/docs/templates' : '/api/docs';
-            const response = await fetch(endpoint);
+            const response = await fetch(withProjectScope(endpoint, requireProjectScope(projectId)));
             if (!response.ok) {
                 return '';
             }
@@ -196,7 +198,7 @@ export function useIdeActions({
 
             const openedByIDECommand = await openConfiguredIDEBeforeAction({
                 preferredIDE: resolveVisibleIDEPreference(preferredIDE, ideAvailability),
-                projectId: projectId?.trim() || activeProjectId?.trim() || undefined,
+                projectId: requireProjectScope(projectId?.trim() || activeProjectId).projectId,
                 targetPath,
             });
 
@@ -282,7 +284,11 @@ export function useIdeActions({
             return;
         }
 
-        const absoluteFilePath = await resolveMarkdownAbsoluteFilePath(effectiveItem, effectiveKind);
+        const absoluteFilePath = await resolveMarkdownAbsoluteFilePath(
+            effectiveItem,
+            effectiveKind,
+            resolveResourceProjectId(effectiveItem) || activeProjectId,
+        );
         const deeplinkUrl = buildObsidianOpenUrl(absoluteFilePath);
         if (!deeplinkUrl) {
             messageApi.warning(`当前${effectiveLabel}缺少绝对路径，无法在 Obsidian 中打开`);
@@ -292,7 +298,7 @@ export function useIdeActions({
         if (!openDeeplinkUrl(deeplinkUrl)) {
             messageApi.error(`无法在 Obsidian 中打开${effectiveLabel}`);
         }
-    }, [currentMarkdownResource.item, currentMarkdownResource.kind, messageApi, openDeeplinkUrl, resolveMarkdownAbsoluteFilePath]);
+    }, [activeProjectId, currentMarkdownResource.item, currentMarkdownResource.kind, messageApi, openDeeplinkUrl, resolveMarkdownAbsoluteFilePath]);
 
     const handleOpenSelectedThemeInIDE = useCallback(async (themeOverride?: ThemeResourceItem | null) => {
         const targetTheme = isEventLike(themeOverride) ? selectedTheme : (themeOverride ?? selectedTheme);
@@ -378,7 +384,7 @@ export function useIdeActions({
     ): Promise<boolean> => {
         return openConfiguredIDEBeforeAction({
             preferredIDE: ideOverride || preferredIDE,
-            projectId: projectIdOverride?.trim() || activeProjectId?.trim() || undefined,
+            projectId: requireProjectScope(projectIdOverride?.trim() || activeProjectId).projectId,
             targetPath: targetPath?.trim() || undefined,
         });
     }, [activeProjectId, preferredIDE]);

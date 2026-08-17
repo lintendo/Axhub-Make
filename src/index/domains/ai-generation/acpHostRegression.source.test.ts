@@ -1,9 +1,11 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+const localMidsceneConfigPath = resolve(__dirname, '../../../../midscene/acp-host-regression.yaml');
+
 function readRegressionScript() {
-  return readFileSync(resolve(__dirname, '../../../../midscene/acp-host-regression.yaml'), 'utf8');
+  return readFileSync(localMidsceneConfigPath, 'utf8');
 }
 
 function readRegressionRunner() {
@@ -18,7 +20,9 @@ function readMakePackageJson() {
   return readFileSync(resolve(__dirname, '../../../../package.json'), 'utf8');
 }
 
-describe('ACP host frontend regression script source', () => {
+const describeLocalMidsceneRegression = existsSync(localMidsceneConfigPath) ? describe : describe.skip;
+
+describeLocalMidsceneRegression('local ACP host frontend regression script source', () => {
   it('covers canvas AI artifact display order status and insertion process', () => {
     const source = readRegressionScript();
 
@@ -286,7 +290,9 @@ describe('ACP host frontend regression script source', () => {
     expect(runner).toContain('await getFreePort()');
     expect(runner).not.toContain('const baseUrl = baseEnv.AXHUB_MAKE_E2E_BASE_URL || baseEnv.AXHUB_MAKE_BASE_URL || DEFAULT_BASE_URL;');
   });
+});
 
+describe('real ACP canvas artifact regression source', () => {
   it('has a real ACP sidebar canvas artifact regression without a mock sidebar', () => {
     const runner = readRealCanvasArtifactRunner();
 

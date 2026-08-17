@@ -58,6 +58,9 @@ const options = useMemo<AnnotationViewerOptions>(() => ({
 {
   "documentVersion": 1,
   "format": "axhub-annotation-source",
+  "presentation": {
+    "layerSelectors": [".modal-layer[data-open=\"true\"]"]
+  },
   "data": {
     "version": 2,
     "prototypeName": "prototype-id",
@@ -72,6 +75,8 @@ const options = useMemo<AnnotationViewerOptions>(() => ({
   }
 }
 ```
+
+`layerSelectors` 应按实际 DOM 匹配当前活动且包含弹窗内容的层根，不要只选择遮罩节点。
 
 ## 目录
 
@@ -120,7 +125,7 @@ const options = useMemo<AnnotationViewerOptions>(() => ({
 - `markdown`：必须使用内联 `markdown` 字段；运行时不会通过 `markdownId` 自动去 `markdownMap` 查正文。
 - `route`：点击时调用 `options.onDirectoryRoute(node)`，运行时不替宿主跳转。
 
-`link.href` 中的相对路径只用于 annotation 目录数据。对用户发送验收或预览入口时，使用 ready 检查返回的完整 `targetUrl`，或按项目规则把相对路径补齐为当前 dev server 的完整 URL。
+`link.href` 中的相对路径只用于 annotation 目录数据。对用户发送验收或预览入口时，优先使用 ready 检查返回的完整 `serverUrl`；管理端不可用时才使用 `targetUrl`。
 
 route 回调示例：
 

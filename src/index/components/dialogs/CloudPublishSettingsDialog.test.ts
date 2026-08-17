@@ -7,6 +7,14 @@ function readDialogSource() {
 }
 
 describe('CloudPublishSettingsDialog source', () => {
+  it('loads and saves project-owned publishing config with explicit scope', () => {
+    const source = readDialogSource();
+
+    expect(source).toContain('projectId: string;');
+    expect(source).toContain('apiService.getCloudPublishingConfig({ projectId })');
+    expect(source).toContain('apiService.saveCloudPublishingConfig(payload, { projectId })');
+  });
+
   it('uses Axure-style top tabs with concise object storage first', () => {
     const source = readDialogSource();
     const s3TabIndex = source.indexOf('value="s3"');

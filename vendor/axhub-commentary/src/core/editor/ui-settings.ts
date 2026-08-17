@@ -2,7 +2,7 @@ import { isMobileDevice } from '../../utils/mobile-detect';
 
 export type WebEditorAgentProvider = 'claude' | 'codex' | 'opencode';
 export type WebEditorDesignAdjustmentTool = 'figma' | 'axure' | 'pencil';
-export type WebEditorInteractionProfile = 'design' | 'text-comment';
+export type WebEditorInteractionProfile = 'design' | 'text-comment' | 'annotation';
 export type CommentaryAgentProvider = WebEditorAgentProvider;
 export type CommentaryDesignAdjustmentTool = WebEditorDesignAdjustmentTool;
 export type CommentaryInteractionProfile = WebEditorInteractionProfile;
@@ -15,6 +15,10 @@ export interface WebEditorUiSettings {
   darkMode: boolean;
   /** When true, CSS is injected into the page to disable animations (carousels, typewriters, etc.) */
   disablePageAnimations: boolean;
+  /** Attach a contextual target screenshot to future element comment saves. */
+  captureTargetScreenshot: boolean;
+  /** Switch between element-level design comments and document text-selection comments. */
+  documentCommentMode: boolean;
   /** When true, the host page content scales down from the right edge to make room for the panel. */
   pageZoomEnabled: boolean;
   /** Maximum number of concurrent element-level Agent runs. */
@@ -29,6 +33,8 @@ export const DEFAULT_WEB_EDITOR_UI_SETTINGS: WebEditorUiSettings = {
   styleDesignEnabled: true,
   darkMode: false,
   disablePageAnimations: false,
+  captureTargetScreenshot: false,
+  documentCommentMode: false,
   pageZoomEnabled: false,
   agentRunConcurrency: 5,
 };
@@ -86,6 +92,11 @@ export function sanitizeWebEditorUiSettings(value: unknown): WebEditorUiSettings
         : Boolean(record.styleDesignEnabled),
     darkMode: Boolean(record.darkMode),
     disablePageAnimations: Boolean(record.disablePageAnimations),
+    captureTargetScreenshot:
+      record.captureTargetScreenshot === undefined
+        ? DEFAULT_WEB_EDITOR_UI_SETTINGS.captureTargetScreenshot
+        : Boolean(record.captureTargetScreenshot),
+    documentCommentMode: Boolean(record.documentCommentMode),
     pageZoomEnabled: Boolean(record.pageZoomEnabled),
   };
 }
@@ -94,7 +105,7 @@ export function applyInteractionProfileToUiSettings(
   settings: WebEditorUiSettings,
   profile: WebEditorInteractionProfile,
 ): WebEditorUiSettings {
-  if (profile !== 'text-comment') {
+  if (profile === 'design') {
     return settings;
   }
 

@@ -21,6 +21,7 @@ describe('make-server canvas hot-update filter', () => {
   it('identifies canvas data files', () => {
     expect(isCanvasHotUpdateFile('/project/src/resources/flows/home.excalidraw')).toBe(true);
     expect(isCanvasHotUpdateFile('/project/src/resources/flows/home.assets/screenshot.png')).toBe(true);
+    expect(isCanvasHotUpdateFile('/project/src/resources/.assets/flows/home.excalidraw/screenshot.png')).toBe(true);
     expect(isCanvasHotUpdateFile('/project/src/prototypes/home/canvas.excalidraw')).toBe(false);
     expect(isCanvasHotUpdateFile('/project/src/prototypes/home/canvas-assets/screenshot.png')).toBe(false);
     expect(isCanvasHotUpdateFile('/project/src/prototypes/home/annotation-source.json')).toBe(true);
@@ -53,6 +54,10 @@ describe('make-server canvas hot-update filter', () => {
     expect(await handleHotUpdate({
       file: '/project/src/resources/flows/home.assets/screenshot.png',
       modules: [{ id: 'screenshot' }],
+    })).toEqual([]);
+    expect(await handleHotUpdate({
+      file: '/project/src/resources/.assets/flows/home.excalidraw/screenshot.png',
+      modules: [{ id: 'central-screenshot' }],
     })).toEqual([]);
     expect(await handleHotUpdate({
       file: '/project/src/prototypes/home/.spec/generation-artifacts.json',

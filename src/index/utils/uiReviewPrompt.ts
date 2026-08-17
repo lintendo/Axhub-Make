@@ -2,10 +2,10 @@ import type { ItemData } from '../types';
 
 export const UI_REVIEW_RULE_PATH = 'rules/ui-review-guide.md';
 export const UI_REVIEW_FILE_NAME = 'ui-review.md';
-export const UI_REVIEW_REPORT_TEMPLATE_PATH = 'src/resources/templates/ui-review-report-template.md';
+export const UI_REVIEW_REPORT_TEMPLATE_PATH = 'templates/ui-review.md';
 export const PROTOTYPE_REVIEW_RULE_PATH = 'rules/prototype-review-guide.md';
 export const PROTOTYPE_REVIEW_FILE_NAME = 'prototype-review.md';
-export const PROTOTYPE_REVIEW_REPORT_TEMPLATE_PATH = 'src/resources/templates/prototype-review-report-template.md';
+export const PROTOTYPE_REVIEW_REPORT_TEMPLATE_PATH = 'templates/prototype-review.md';
 
 export type ReviewKind = 'design' | 'requirements';
 

@@ -44,7 +44,7 @@ describe('annotation direct API run threads', () => {
       },
       projectPath: '/workspace/make-client',
       projectScope: 'project-a',
-    } as any);
+    });
 
     expect(target).toMatchObject({
       projectScope: 'project-a',
@@ -103,6 +103,29 @@ describe('annotation direct API run threads', () => {
     });
   });
 
+  it('keeps a unique run id while reusing an explicitly supplied canvas session', () => {
+    const target = {
+      projectScope: 'project-a',
+      currentFilePath: 'src/resources/flows/home.excalidraw',
+      prototypePath: '',
+      conversationStorePath: '/workspace/project/.spec/acp/conversations.json',
+    };
+
+    const prepared = prepareAnnotationDirectRunThread({
+      target,
+      threadId: 'canvas-thread-1',
+      conversationId: 'canvas-conversation-1',
+      createRunId: () => 'canvas-run-2',
+    });
+
+    expect(prepared).toEqual({
+      runId: 'canvas-run-2',
+      threadId: 'canvas-thread-1',
+      conversationId: 'canvas-conversation-1',
+      target,
+    });
+  });
+
   it('submits three separate prompts into three independent conversations', async () => {
     const context = {
       currentFile: {
@@ -121,6 +144,7 @@ describe('annotation direct API run threads', () => {
         prompt,
         projectPath: '/workspace/project',
         projectScope: 'project-a',
+      projectId: 'project-a',
         provider: 'codex',
         preferredPromptClient: 'acp:codex',
         createRunId: () => runIds[runIndex++] || 'unexpected-run',
@@ -155,6 +179,7 @@ describe('annotation direct API run threads', () => {
       prompt: '把标题改得更清楚',
       projectPath: '/workspace/project',
       projectScope: 'project-a',
+      projectId: 'project-a',
       provider: 'codex',
       preferredPromptClient: 'acp:codex',
       createRunId: () => 'run-context',
@@ -183,6 +208,38 @@ describe('annotation direct API run threads', () => {
     expect(params.contextBundle).not.toHaveProperty('selectedElements');
   });
 
+  it('forwards the viewport screenshot and explicit session ids to the direct AI run', async () => {
+    await submitAnnotationPromptViaApi({
+      context: {
+        currentFile: {
+          path: 'src/resources/flows/home.excalidraw',
+          displayName: 'Home Canvas',
+        },
+        selectedElements: [],
+        extensions: {},
+      } as any,
+      prompt: '根据当前画布继续。',
+      projectPath: '/workspace/project',
+      projectScope: 'project-a',
+      projectId: 'project-a',
+      provider: 'codex',
+      preferredPromptClient: 'acp:codex',
+      threadId: 'canvas-thread-1',
+      conversationId: 'canvas-conversation-1',
+      referenceImages: ['data:image/png;base64,viewport'],
+      permissionMode: 'bypassPermissions',
+      createRunId: () => 'canvas-run-1',
+    });
+
+    expect(vi.mocked(runAiStream).mock.calls[0]?.[0]).toMatchObject({
+      runId: 'canvas-run-1',
+      threadId: 'canvas-thread-1',
+      conversationId: 'canvas-conversation-1',
+      referenceImages: ['data:image/png;base64,viewport'],
+      permissionMode: 'bypassPermissions',
+    });
+  });
+
   it('submits image generation settings for direct runs without preview or canvas MCP servers', async () => {
     await submitAnnotationPromptViaApi({
       context: {
@@ -196,6 +253,7 @@ describe('annotation direct API run threads', () => {
       prompt: '生成一张配图。',
       projectPath: '/workspace/project',
       projectScope: 'project-a',
+      projectId: 'project-a',
       provider: 'codex',
       preferredPromptClient: 'acp:codex',
       builtinToolSettings: {
@@ -232,6 +290,7 @@ describe('annotation direct API run threads', () => {
       prompt: '在当前画布新增一组流程节点。',
       projectPath: '/workspace/project',
       projectScope: 'project-a',
+      projectId: 'project-a',
       provider: 'codex',
       preferredPromptClient: 'acp:codex',
       mcpServers: [{
@@ -271,6 +330,7 @@ describe('annotation direct API run threads', () => {
       prompt: '批量调整。',
       projectPath: '/workspace/project',
       projectScope: 'project-a',
+      projectId: 'project-a',
       provider: 'codex',
       preferredPromptClient: 'acp:codex',
       agentRunConcurrency: 4,
@@ -294,6 +354,7 @@ describe('annotation direct API run threads', () => {
       prompt: '执行评审。',
       projectPath: '/workspace/project',
       projectScope: 'project-a',
+      projectId: 'project-a',
       provider: 'codex',
       preferredPromptClient: 'acp:codex',
       scene: 'prototype-review-direct',
@@ -322,6 +383,7 @@ describe('annotation direct API run threads', () => {
       prompt: '调整按钮文案。',
       projectPath: '/workspace/project',
       projectScope: 'project-a',
+      projectId: 'project-a',
       provider: 'codex',
       preferredPromptClient: 'acp:codex',
       createRunId: () => 'run-friendly-start',
@@ -346,6 +408,7 @@ describe('annotation direct API run threads', () => {
       prompt: '把卡片标题调短。',
       projectPath: '/workspace/project',
       projectScope: 'project-a',
+      projectId: 'project-a',
       provider: 'codex',
       preferredPromptClient: 'acp:codex',
       signal: controller.signal,

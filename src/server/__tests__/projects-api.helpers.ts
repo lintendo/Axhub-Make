@@ -158,6 +158,19 @@ export async function setActiveProject(origin: string, projectId: string) {
   return response.json();
 }
 
+export function scopeProjectApiUrl(projectRoot: string, rawUrl: string): string {
+  const metadata = JSON.parse(fs.readFileSync(getProjectMetadataPath(projectRoot), 'utf8'));
+  const projectId = String(metadata?.project?.id || '').trim();
+  if (!projectId) {
+    throw new Error(`Missing project id in ${getProjectMetadataPath(projectRoot)}`);
+  }
+  const url = new URL(rawUrl);
+  if (!url.searchParams.has('projectId')) {
+    url.searchParams.set('projectId', projectId);
+  }
+  return url.toString();
+}
+
 export function writeTable(projectRoot: string, fileName: string, tableName: string, records: any[]) {
   writeJson(path.join(projectRoot, 'src', 'resources', 'data', `${fileName}.json`), { tableName, records });
 }

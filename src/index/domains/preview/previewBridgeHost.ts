@@ -164,6 +164,12 @@ export interface UsePreviewBridgeHostOptions {
     context: PreviewHostContext;
     enabled?: boolean;
     onNavigate?: RunPreviewNavigateOptions['onNavigate'];
+    /** Handles opt-in Make Commentary tool calls forwarded from the existing preview MCP. */
+    onVoiceToolCommand?: (command: {
+        name: string;
+        input: unknown;
+        requestId: string;
+    }) => Promise<unknown> | unknown;
 }
 
 const PREVIEW_VIEWPORT_PRESETS: Record<PreviewViewportPreset, PreviewViewport> = {
@@ -1072,12 +1078,14 @@ async function executePreviewBridgeCommand(
 export function usePreviewBridgeHost(options: UsePreviewBridgeHostOptions): void {
     const contextRef = useRef(options.context);
     const onNavigateRef = useRef(options.onNavigate);
+    const onVoiceToolCommandRef = useRef(options.onVoiceToolCommand);
     const canvasSelectionRef = useRef<PreviewCanvasSelection | null>(options.context.canvasSelection || null);
     const lastDiagnosticsRef = useRef<PreviewDiagnostic[]>([]);
     const commandHandlerRef = useRef<((msg: PreviewBridgeMessage) => void) | null>(null);
     const socketRef = useRef<WebSocket | null>(null);
 
     onNavigateRef.current = options.onNavigate;
+    onVoiceToolCommandRef.current = options.onVoiceToolCommand;
     contextRef.current = {
         ...options.context,
         canvasSelection: canvasSelectionRef.current || options.context.canvasSelection || null,
@@ -1126,7 +1134,22 @@ export function usePreviewBridgeHost(options: UsePreviewBridgeHostOptions): void
             const requestId = String(msg.requestId || '');
             const command = String(msg.command || '');
             if (!ws || !requestId || !command) return;
-            void executePreviewBridgeCommand(command, msg.payload, contextRef.current, lastDiagnosticsRef, onNavigateRef.current)
+            const execute = command.startsWith('axhub_make_')
+                ? onVoiceToolCommandRef.current?.({ name: command, input: msg.payload, requestId })
+                : executePreviewBridgeCommand(command, msg.payload, contextRef.current, lastDiagnosticsRef, onNavigateRef.current);
+            if (!execute) {
+                const error = new Error(`Unsupported preview command: ${command}`);
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'preview.command.result',
+                        requestId,
+                        ok: false,
+                        error: normalizePreviewBridgeError(error),
+                    }));
+                }
+                return;
+            }
+            void Promise.resolve(execute)
                 .then((payload) => {
                     if (ws.readyState === WebSocket.OPEN) {
                         ws.send(JSON.stringify({

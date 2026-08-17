@@ -29,7 +29,7 @@ interface GitApiHandlers {
     req: IncomingMessage,
     res: ServerResponse,
     options: ManagementApiOptions,
-    mode: 'active-fallback',
+    mode: 'explicit-required',
   ) => GitProjectContext | null;
   findProjectResourceByPath: (metadata: GitProjectContext['metadata'], rawPath: string) => any | undefined;
   commandExecutor?: GitWorkspaceCommandExecutor;
@@ -44,7 +44,6 @@ export type GitWorkspaceCommandExecutor = (
 type GitWorkspacePromptScene =
   | 'create-remote'
   | 'auth-failed'
-  | 'branch-management'
   | 'merge-required'
   | 'conflict-required'
   | 'push-rejected';
@@ -841,8 +840,12 @@ async function getWorkspaceChangedFiles(projectRoot: string, executor?: GitWorks
   return parseGitPorcelainStatus(status.stdout);
 }
 
-async function getWorkspaceHeadFiles(projectRoot: string, executor?: GitWorkspaceCommandExecutor): Promise<WorkspaceChangedFile[]> {
-  const headFiles = await execGit(['diff-tree', '--root', '--no-commit-id', '--name-status', '-r', 'HEAD'], projectRoot, executor);
+async function getWorkspaceHeadFiles(
+  projectRoot: string,
+  executor?: GitWorkspaceCommandExecutor,
+  ref = 'HEAD',
+): Promise<WorkspaceChangedFile[]> {
+  const headFiles = await execGit(['diff-tree', '--root', '--no-commit-id', '--name-status', '-r', ref], projectRoot, executor);
   return parseGitNameStatus(headFiles.stdout);
 }
 
@@ -890,34 +893,42 @@ async function getWorkspaceVersionCommitList(
   }
 }
 
+function createUnavailableRemoteComparison(reason: string, branch = '') {
+  return {
+    available: false,
+    ...(branch ? { branch, targetRef: `${DEFAULT_REMOTE_NAME}/${branch}` } : {}),
+    reason,
+    incoming: { totalFiles: 0, groups: [] },
+    outgoing: { totalFiles: 0, groups: [] },
+  };
+}
+
 async function getWorkspaceRemoteComparison(
   projectRoot: string,
   metadata: GitProjectContext['metadata'],
   remote: WorkspaceGitRemoteConfig,
-  currentBranch: string,
+  localRef: string,
+  remoteBranch: string,
   executor?: GitWorkspaceCommandExecutor,
   scopePath?: string,
 ) {
   if (!remote.url) {
-    return {
-      available: false,
-      reason: 'remote-not-configured',
-      incoming: { totalFiles: 0, groups: [] },
-      outgoing: { totalFiles: 0, groups: [] },
-    };
+    return createUnavailableRemoteComparison('remote-not-configured');
+  }
+  if (!remoteBranch) {
+    return createUnavailableRemoteComparison('remote-branch-missing');
   }
 
-  const branch = remote.defaultBranch || currentBranch;
-  const targetRef = `${DEFAULT_REMOTE_NAME}/${branch}`;
+  const targetRef = `${DEFAULT_REMOTE_NAME}/${remoteBranch}`;
   try {
     await execGit(['rev-parse', '--verify', targetRef], projectRoot, executor);
   } catch {
-    const outgoing = filterWorkspaceChangedFilesByScope(await getWorkspaceHeadFiles(projectRoot, executor), scopePath);
-    const localHead = await getWorkspaceVersionCommit(projectRoot, 'HEAD', executor);
-    const outgoingCommits = await getWorkspaceVersionCommitList(projectRoot, 'HEAD', executor, scopePath);
+    const outgoing = filterWorkspaceChangedFilesByScope(await getWorkspaceHeadFiles(projectRoot, executor, localRef), scopePath);
+    const localHead = await getWorkspaceVersionCommit(projectRoot, localRef, executor);
+    const outgoingCommits = await getWorkspaceVersionCommitList(projectRoot, localRef, executor, scopePath);
     return {
       available: true,
-      branch,
+      branch: remoteBranch,
       targetRef,
       reason: 'remote-branch-missing',
       localHead,
@@ -932,19 +943,21 @@ async function getWorkspaceRemoteComparison(
   }
 
   try {
-    const incoming = await execGit(['diff', '--name-status', 'HEAD..' + targetRef], projectRoot, executor);
-    const outgoing = await execGit(['diff', '--name-status', targetRef + '..HEAD'], projectRoot, executor);
+    const incomingRange = `${localRef}..${targetRef}`;
+    const outgoingRange = `${targetRef}..${localRef}`;
+    const incoming = await execGit(['diff', '--name-status', incomingRange], projectRoot, executor);
+    const outgoing = await execGit(['diff', '--name-status', outgoingRange], projectRoot, executor);
     const incomingFiles = filterWorkspaceChangedFilesByScope(parseGitNameStatus(incoming.stdout), scopePath);
     const outgoingFiles = filterWorkspaceChangedFilesByScope(parseGitNameStatus(outgoing.stdout), scopePath);
     const [localHead, remoteHead, incomingCommits, outgoingCommits] = await Promise.all([
-      getWorkspaceVersionCommit(projectRoot, 'HEAD', executor),
+      getWorkspaceVersionCommit(projectRoot, localRef, executor),
       getWorkspaceVersionCommit(projectRoot, targetRef, executor),
-      getWorkspaceVersionCommitList(projectRoot, 'HEAD..' + targetRef, executor, scopePath),
-      getWorkspaceVersionCommitList(projectRoot, targetRef + '..HEAD', executor, scopePath),
+      getWorkspaceVersionCommitList(projectRoot, incomingRange, executor, scopePath),
+      getWorkspaceVersionCommitList(projectRoot, outgoingRange, executor, scopePath),
     ]);
     return {
       available: true,
-      branch,
+      branch: remoteBranch,
       targetRef,
       localHead,
       remoteHead,
@@ -956,14 +969,7 @@ async function getWorkspaceRemoteComparison(
       outgoing: createWorkspaceChangeSummary(metadata, outgoingFiles),
     };
   } catch (error: any) {
-    return {
-      available: false,
-      branch,
-      targetRef,
-      reason: error?.message || 'remote-comparison-unavailable',
-      incoming: { totalFiles: 0, groups: [] },
-      outgoing: { totalFiles: 0, groups: [] },
-    };
+    return createUnavailableRemoteComparison(error?.message || 'remote-comparison-unavailable', remoteBranch);
   }
 }
 
@@ -997,32 +1003,7 @@ function buildWorkspacePrompt(params: {
   const remoteUrl = params.remote?.url || '(未配置)';
   const repositoryName = params.repositoryName || '';
   const branch = params.currentBranch || '(未检测)';
-  const localBranches = params.branchOverview?.localBranches?.length
-    ? params.branchOverview.localBranches.map((item, index) => `${index + 1}. ${item}`).join('\n')
-    : '(未检测到本地分支)';
-  const remoteBranches = params.branchOverview?.remoteBranches?.length
-    ? params.branchOverview.remoteBranches.map((item, index) => `${index + 1}. ${item}`).join('\n')
-    : '(未检测到在线分支)';
   const reason = params.reason || '需要人工判断';
-
-  if (params.scene === 'branch-management') {
-    return [
-      '请帮我解释并处理 Axhub Make 项目的分支情况。',
-      '',
-      `项目路径：${params.projectRoot}`,
-      `当前分支：${branch}`,
-      `在线仓库：${remoteUrl}`,
-      '',
-      '本地分支：',
-      localBranches,
-      '',
-      '在线分支：',
-      remoteBranches,
-      '',
-      '请用普通用户能理解的语言说明当前有哪些分支、哪些可以切换、哪些可以合并或删除。',
-      '如果需要我选择，请告诉我可以简单回复序号或名称；在我确认前不要执行切换、合并或删除。',
-    ].join('\n');
-  }
 
   if (params.scene === 'create-remote') {
     return [
@@ -1160,7 +1141,7 @@ export function handleGitApi(
     return false;
   }
 
-  const context = handlers.resolveProjectContext(req, res, options, 'active-fallback');
+  const context = handlers.resolveProjectContext(req, res, options, 'explicit-required');
   if (!context) {
     return true;
   }
@@ -1211,6 +1192,20 @@ export function handleGitApi(
           return;
         }
         const currentBranch = await getWorkspaceCurrentBranch(projectRoot, executor);
+        const branchOverview = await getWorkspaceBranchOverview(projectRoot, executor);
+        const requestedBranch = requestedVersionRef
+          ? ''
+          : String(url.searchParams.get('branch') || '').trim();
+        const viewedBranch = requestedBranch || currentBranch;
+        if (requestedBranch && !branchOverview.localBranches.includes(viewedBranch)) {
+          sendJson(res, {
+            error: 'Branch does not exist',
+            code: 'BRANCH_NOT_FOUND',
+            projectId: context.project.id,
+            branchOverview,
+          }, { status: 404 });
+          return;
+        }
         const versionRef = requestedVersionRef || 'HEAD';
         const currentCommit = await getWorkspaceVersionCommit(projectRoot, versionRef, executor);
         if (requestedVersionRef && !currentCommit) {
@@ -1224,9 +1219,66 @@ export function handleGitApi(
           ? await getWorkspaceVersionChangedFiles(projectRoot, requestedVersionRef, executor)
           : await getWorkspaceChangedFiles(projectRoot, executor);
         const scopedChangedFiles = filterWorkspaceChangedFilesByScope(changedFiles, scopedGitPath);
-        const branchOverview = await getWorkspaceBranchOverview(projectRoot, executor);
         const remote = await resolveWorkspaceRemote(projectRoot, executor);
-        const remoteComparison = await getWorkspaceRemoteComparison(projectRoot, context.metadata, remote, currentBranch, executor, scopedGitPath);
+        const remoteBranchNames = branchOverview.remoteBranches
+          .map((branch) => branch.replace(/^remotes\//u, ''))
+          .filter((branch) => branch.startsWith(`${DEFAULT_REMOTE_NAME}/`))
+          .map((branch) => branch.slice(`${DEFAULT_REMOTE_NAME}/`.length))
+          .filter((branch) => branch && branch !== 'HEAD');
+        const requestedRemoteBranch = String(requestedVersionRef ? '' : url.searchParams.get('remoteBranch') || '')
+          .trim()
+          .replace(/^remotes\//u, '')
+          .replace(/^origin\//u, '');
+        const viewedRemoteBranch = requestedRemoteBranch
+          || (remoteBranchNames.includes(viewedBranch) ? viewedBranch : '');
+        const operationRemoteBranch = remote.defaultBranch || currentBranch;
+        const remoteComparison = await getWorkspaceRemoteComparison(
+          projectRoot,
+          context.metadata,
+          remote,
+          'HEAD',
+          operationRemoteBranch,
+          executor,
+          scopedGitPath,
+        );
+        let branchView;
+        if (!requestedVersionRef) {
+          const hasExplicitLocalView = Boolean(requestedBranch || viewedBranch !== currentBranch);
+          const hasExplicitRemoteView = Boolean(
+            hasExplicitLocalView
+            || requestedRemoteBranch
+            || viewedRemoteBranch !== operationRemoteBranch,
+          );
+          const remoteBranchExists = Boolean(
+            viewedRemoteBranch && remoteBranchNames.includes(viewedRemoteBranch),
+          );
+          const viewedRemoteComparison = !remote.url
+            ? createUnavailableRemoteComparison('remote-not-configured')
+            : !viewedRemoteBranch || !remoteBranchExists
+              ? createUnavailableRemoteComparison('remote-branch-missing', viewedRemoteBranch)
+              : hasExplicitRemoteView
+                ? await getWorkspaceRemoteComparison(
+                    projectRoot,
+                    context.metadata,
+                    remote,
+                    viewedBranch,
+                    viewedRemoteBranch,
+                    executor,
+                    scopedGitPath,
+                  )
+                : remoteComparison;
+          branchView = {
+            branch: viewedBranch,
+            ...(viewedRemoteBranch ? { remoteBranch: viewedRemoteBranch } : {}),
+            commit: hasExplicitLocalView
+              ? await getWorkspaceVersionCommit(projectRoot, viewedBranch, executor)
+              : currentCommit,
+            recentCommits: hasExplicitLocalView
+              ? await getWorkspaceVersionCommitList(projectRoot, viewedBranch, executor, scopedGitPath, 20)
+              : recentCommits,
+            remoteComparison: viewedRemoteComparison,
+          };
+        }
         sendJson(res, {
           ...availability,
           projectId: context.project.id,
@@ -1241,6 +1293,7 @@ export function handleGitApi(
           remote,
           branchOverview,
           remoteComparison,
+          ...(branchView ? { branchView } : {}),
         });
         return;
       }
@@ -1306,54 +1359,6 @@ export function handleGitApi(
       const currentBranch = await getWorkspaceCurrentBranch(projectRoot, executor);
       const remote = await resolveWorkspaceRemote(projectRoot, executor);
       const branchOverview = await getWorkspaceBranchOverview(projectRoot, executor);
-
-      if (pathname === '/api/git/workspace/branch' && method === 'POST') {
-        const targetBranch = String((body as any)?.branch || '').trim();
-        if (!targetBranch) {
-          sendJson(res, { error: 'Missing branch parameter' }, { status: 400 });
-          return;
-        }
-        if (!branchOverview.localBranches.includes(targetBranch)) {
-          sendJson(res, { error: 'Branch does not exist', code: 'BRANCH_NOT_FOUND', branchOverview }, { status: 400 });
-          return;
-        }
-        if (targetBranch === currentBranch) {
-          sendJson(res, {
-            success: true,
-            projectId: context.project.id,
-            currentBranch,
-            branchOverview,
-          });
-          return;
-        }
-        const changedFiles = await getWorkspaceChangedFiles(projectRoot, executor);
-        if (changedFiles.length > 0) {
-          const prompt = buildWorkspacePrompt({
-            scene: 'branch-management',
-            projectRoot,
-            currentBranch,
-            remote,
-            branchOverview,
-            reason: '当前项目还有未提交的变更，切换分支可能覆盖或混合内容',
-          });
-          sendJson(res, {
-            error: 'Local changes must be committed before switching branches',
-            code: 'DIRTY_WORKTREE',
-            promptScene: 'branch-management',
-            prompt,
-            projectId: context.project.id,
-          }, { status: 409 });
-          return;
-        }
-        await execGit(['switch', targetBranch], projectRoot, executor);
-        sendJson(res, {
-          success: true,
-          projectId: context.project.id,
-          currentBranch: targetBranch,
-          branchOverview: await getWorkspaceBranchOverview(projectRoot, executor),
-        });
-        return;
-      }
 
       if (pathname === '/api/git/workspace/commit' && method === 'POST') {
         const message = String((body as any)?.message || '').trim();
@@ -1569,16 +1574,15 @@ export function handleGitApi(
       }
 
       if (pathname === '/api/git/workspace/prompt' && method === 'POST') {
-        const scene = String((body as any)?.scene || 'branch-management') as GitWorkspacePromptScene;
+        const scene = String((body as any)?.scene || 'merge-required') as GitWorkspacePromptScene;
         const allowedScenes: GitWorkspacePromptScene[] = [
           'create-remote',
           'auth-failed',
-          'branch-management',
           'merge-required',
           'conflict-required',
           'push-rejected',
         ];
-        const promptScene = allowedScenes.includes(scene) ? scene : 'branch-management';
+        const promptScene = allowedScenes.includes(scene) ? scene : 'merge-required';
         sendJson(res, {
           success: true,
           scene: promptScene,

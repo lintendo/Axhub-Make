@@ -73,4 +73,10 @@ describe('IndexDialogs source', () => {
         expect(source).toContain('onMakeClientUpdateAvailabilityChange,');
         expect(source).toContain('onMakeClientUpdateAvailabilityChange={onMakeClientUpdateAvailabilityChange}');
     });
+
+    it('forwards the requested voice settings section into the existing settings dialog', () => {
+        const source = readIndexDialogsSource();
+
+        expect(source).toContain('initialVoiceSection={settingsDialogAIContext?.voiceSection}');
+    });
 });

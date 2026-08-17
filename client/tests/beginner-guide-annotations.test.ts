@@ -31,7 +31,7 @@ describe('beginner guide annotation updates', () => {
     expect(source).not.toContain('或 Claude Code 这类 CLI');
     expect(source).toContain('<h4>在 Make 首页打开 Agent 软件</h4>');
     expect(source).toContain('<h4>在 Agent 软件中打开 Make 项目</h4>');
-    expect(source).toContain('如果你用 WorkBuddy、TRAE Work、ChatGPT 这类工具，请在新建项目时，把这个目录加入进去。');
+    expect(source).toContain('无论是 WorkBuddy、TRAE、Cursor、Claude Code、Codex 还是 ChatGPT，把这个目录加入进去即可。');
   });
 
   it('updates and orders the recommended models', () => {
@@ -39,10 +39,10 @@ describe('beginner guide annotation updates', () => {
     const expectedOrder = [
       'GPT-5.6',
       'Claude Opus 4.8',
-      'Grok 4.5',
-      'GLM-5.2',
-      'Kimi K2.7',
+      'Grok 4.6',
       'DeepSeek V4 Pro',
+      'Kimi K3.0',
+      'GLM-5.2',
     ];
 
     expectedOrder.forEach((model, index) => {
@@ -56,6 +56,8 @@ describe('beginner guide annotation updates', () => {
     expect(models).toContain("feature: '适合处理复杂问题和任务，性价比高'");
     expect(models).toContain("feature: '综合能力强，速度快，性价比高'");
     expect(models).not.toContain('UI/UX 设计能力优秀，其他一般');
+    expect(models).not.toContain('Grok 4.5');
+    expect(models).not.toContain('Kimi K2.7');
     expect(models).not.toContain('GPT-5.5');
     expect(models).not.toContain('Gemini 3.1 Pro');
   });
@@ -76,8 +78,18 @@ describe('beginner guide annotation updates', () => {
     expect(source).toContain('接受 AI 的不稳定性');
     expect(source).toContain('Vibe Coding / Vibe Design');
     expect(source).toContain('效果不确定性');
-    expect(source).toContain('同一个提示词，也可能得到不同结果。');
+    expect(source).toContain('同一提示词，可能得到不同结果。人来判断并保留。');
     expect(source).toContain('时间不确定性');
-    expect(source).toContain('平均效率提升');
+    expect(source).toContain('长期看平均效率');
+  });
+
+  it('replaces the advanced chapter with help options', () => {
+    expect(source).toContain("{ id: 'advanced-guide', title: '获取帮助' }");
+    expect(source).toContain("title: '获取帮助'");
+    expect(source).toContain('https://axhub.im/');
+    expect(source).toContain('请读取这个文档，并按里面的要求指导我使用 Axhub Make：');
+    expect(source).toContain('https://raw.githubusercontent.com/lintendo/Axhub-Make/main/docs/guide-users-with-axhub-make.md');
+    expect(source).not.toContain('进阶指导不是新手必须马上学的内容');
+    expect(source).not.toContain("import onlineImportModalImage from './assets/online-import-modal.png';");
   });
 });

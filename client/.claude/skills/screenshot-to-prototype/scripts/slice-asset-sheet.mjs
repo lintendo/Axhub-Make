@@ -22,7 +22,7 @@ function parseArgs(argv) {
 function usage() {
   return [
     'Usage:',
-    '  node scripts/slice-asset-sheet.mjs --input sheet.png --output-dir assets --grid 4x3 --names icon-a,banner-b --manifest assets/asset-manifest.json',
+    '  node scripts/slice-asset-sheet.mjs --input sheet.png --output-dir candidates --grid 4x3 --names icon-a,banner-b --manifest candidates/candidate-manifest.json',
     '',
     'Options:',
     '  --input       Source transparent PNG sheet',
@@ -63,7 +63,7 @@ function main() {
 
   const inputPath = path.resolve(String(args.input));
   const outputDir = path.resolve(String(args['output-dir']));
-  const manifestPath = path.resolve(String(args.manifest || path.join(outputDir, 'asset-manifest.json')));
+  const manifestPath = path.resolve(String(args.manifest || path.join(outputDir, 'candidate-manifest.json')));
   const padding = Math.max(0, Number(args.padding ?? 1));
   const { columns, rows } = parseGrid(args.grid);
   const names = String(args.names || '').split(',').map((item) => item.trim()).filter(Boolean);

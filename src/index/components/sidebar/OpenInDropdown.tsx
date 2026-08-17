@@ -7,15 +7,14 @@ import {
     Microsoft,
     OpenAI,
     OpenCode,
-    Qoder,
     Trae,
     Windsurf,
 } from '@lobehub/icons';
-import { Check, ChevronDown, ChevronRight, CircleHelp, ImageIcon, Loader2, MoreHorizontal, Settings, Sparkles, SquareTerminal } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, CircleHelp, ImageIcon, Loader2, Settings, Sparkles, SquareTerminal } from 'lucide-react';
+import { codeBuddyIconUrl, qoderIconUrl } from '../../assets/brand-icons/brandIconUrls';
 import {
     getVisibleIDEOptions,
     IDEAvailabilityMap,
-    MAIN_IDE_OPTIONS,
     MainIDE,
     MainIDEPreference,
     resolveVisibleIDEPreference,
@@ -24,7 +23,6 @@ import {
     type OpenMethod,
 } from '../../../common/ide';
 import {
-    CLI_AGENT_OPTIONS,
     LOCAL_APP_AGENT_APP_NAMES,
     LOCAL_APP_AGENT_OPTIONS,
     type CLIAgent,
@@ -40,16 +38,24 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
-    DropdownMenuSub,
-    DropdownMenuSubContent,
-    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { apiService } from '../../services/api';
+import {
+    apiService,
+    type DesktopIntegrationOpenAction,
+    type DesktopIntegrationProvider,
+} from '../../services/api';
+import { requireProjectScope } from '../../services/projectScope';
 import { cn } from '@/lib/utils';
 import type { AcpProvider } from '@/common/assistant-context/types';
+import DesktopIntegrationRestartDialog from './DesktopIntegrationRestartDialog';
+import {
+    INTEGRATED_LOCAL_APP_PROVIDERS,
+    LOCAL_APP_OPEN_OPTIONS,
+    type LocalAppOpenOption,
+} from './localAppOpenOptions';
 
 interface OpenInDropdownProps {
     handleOpenProjectInIDE: (ideOverride?: MainIDEPreference, targetPath?: string, projectId?: string) => boolean | Promise<boolean>;
@@ -78,22 +84,12 @@ interface OpenInDropdownProps {
 const LOCAL_APP_GROUP_HELP = [
     {
         title: '本地应用',
-        items: ['ChatGPT', 'OpenCode', 'Cursor', 'TRAE', 'vscode', 'TRAE CN', 'Windsurf', 'Qoder', 'Antigravity'],
-    },
-    {
-        title: '本地 CLI',
-        items: ['Codex', 'Claude Code', 'OpenCode'],
+        items: ['ChatGPT', 'OpenCode', 'WorkBuddy', 'TRAEWORK', 'Cursor', 'QoderWork', 'TRAE'],
     },
 ] as const;
 const WEB_AGENT_GROUP_HELP = '打开浏览器内置的 Web AI 面板。';
-const MAX_INLINE_LOCAL_APP_OPEN_OPTIONS = 5;
-const LOCAL_APP_MORE_THRESHOLD = 5;
 
 type GroupHelp = string | typeof LOCAL_APP_GROUP_HELP;
-
-type LocalAppOpenOption =
-    | { kind: 'local-app'; option: (typeof LOCAL_APP_AGENT_OPTIONS)[number] }
-    | { kind: 'ide'; option: (typeof MAIN_IDE_OPTIONS)[number] };
 
 const WEB_AI_OPEN_OPTION = {
     label: '对话 AI',
@@ -102,6 +98,21 @@ const WEB_AI_OPEN_OPTION = {
 
 const IMAGE_AI_OPEN_OPTION = {
     label: '生图 AI',
+};
+
+const INTEGRATED_PROVIDER_LABELS: Record<DesktopIntegrationProvider, string> = {
+    chatgpt: 'ChatGPT',
+    cursor: 'Cursor',
+    workbuddy: 'WorkBuddy',
+    traework: 'TRAEWORK',
+    qoderwork: 'QoderWork',
+};
+
+const INTEGRATED_PROVIDER_LOCAL_APPS: Partial<Record<DesktopIntegrationProvider, LocalAppAgent>> = {
+    chatgpt: 'codex',
+    workbuddy: 'workbuddy',
+    traework: 'traework',
+    qoderwork: 'qoderwork',
 };
 
 const resolveStoredWebOpenMethod = (method: OpenMethod) => {
@@ -142,6 +153,7 @@ export default function OpenInDropdown({
     const [hovered, setHovered] = useState(false);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [openHelpDialogOpen, setOpenHelpDialogOpen] = useState(false);
+    const [pendingIntegratedProvider, setPendingIntegratedProvider] = useState<DesktopIntegrationProvider | null>(null);
 
     const handleDropdownOpenChange = useCallback((open: boolean) => {
         setDropdownOpen(open);
@@ -149,18 +161,8 @@ export default function OpenInDropdown({
 
     const visibleIDEOptions = getVisibleIDEOptions(ideAvailability);
     const activeOpenIDE = resolveVisibleIDEPreference(preferredIDE, ideAvailability) || visibleIDEOptions[0].value;
-    const localAppOpenOptions = [
-        ...LOCAL_APP_AGENT_OPTIONS.map((option) => ({ kind: 'local-app' as const, option })),
-        ...MAIN_IDE_OPTIONS.map((option) => ({ kind: 'ide' as const, option })),
-    ] satisfies LocalAppOpenOption[];
-    const shouldCollapseLocalAppOpenOptions = localAppOpenOptions.length > LOCAL_APP_MORE_THRESHOLD;
-    const inlineLocalAppOpenOptions = shouldCollapseLocalAppOpenOptions
-        ? localAppOpenOptions.slice(0, MAX_INLINE_LOCAL_APP_OPEN_OPTIONS)
-        : localAppOpenOptions;
-    const overflowLocalAppOpenOptions = shouldCollapseLocalAppOpenOptions
-        ? localAppOpenOptions.slice(MAX_INLINE_LOCAL_APP_OPEN_OPTIONS)
-        : [];
-    const projectId = targetProjectId?.trim() || activeProjectId?.trim() || undefined;
+    const localAppOpenOptions = LOCAL_APP_OPEN_OPTIONS;
+    const projectId = targetProjectId?.trim() || activeProjectId?.trim() || '';
     const openTargetPath = targetPath?.trim() || undefined;
 
     // Resolve the current open method from preferredIDE (which may contain `web:opencode` etc.)
@@ -181,7 +183,7 @@ export default function OpenInDropdown({
         if (ide === 'windsurf') return <Windsurf size={14} />;
         if (ide === 'vscode') return <Microsoft.Color size={14} />;
         if (ide === 'antigravity') return <Antigravity.Color size={14} />;
-        if (ide === 'qoder') return <Qoder.Color size={14} />;
+        if (ide === 'qoder') return <img src={qoderIconUrl} alt="" aria-hidden width={14} height={14} />;
         return <SquareTerminal className="h-3.5 w-3.5" />;
     };
 
@@ -195,6 +197,9 @@ export default function OpenInDropdown({
     const getLocalAppIcon = (agent: LocalAppAgent) => {
         if (agent === 'codex') return <OpenAI size={14} />;
         if (agent === 'opencode') return <OpenCode size={14} />;
+        if (agent === 'workbuddy') return <img src={codeBuddyIconUrl} alt="" aria-hidden width={14} height={14} />;
+        if (agent === 'traework' || agent === 'trae') return <Trae.Color size={14} />;
+        if (agent === 'qoderwork') return <img src={qoderIconUrl} alt="" aria-hidden width={14} height={14} />;
         return <SquareTerminal className="h-3.5 w-3.5" />;
     };
 
@@ -219,7 +224,7 @@ export default function OpenInDropdown({
             automation: {
                 defaultIDE: serialized as any,
             },
-        });
+        }, requireProjectScope(projectId));
         onPreferredIDEChange?.(serialized as any);
     };
 
@@ -269,7 +274,7 @@ export default function OpenInDropdown({
             if (result?.openInBrowser && result.url && typeof window !== 'undefined') {
                 window.location.href = result.url;
             }
-            toast.success('已在本地应用中打开');
+            toast.success(`已在 ${LOCAL_APP_AGENT_APP_NAMES[agent]} 中打开`);
         } catch {
             toast.warning(formatLocalAppOpenFailureMessage(LOCAL_APP_AGENT_APP_NAMES[agent]));
         } finally {
@@ -277,10 +282,83 @@ export default function OpenInDropdown({
         }
     };
 
+    const handleIntegratedOpen = async (
+        provider: DesktopIntegrationProvider,
+        action: DesktopIntegrationOpenAction,
+    ) => {
+        if (openLoading) return;
+        setOpenLoading(true);
+
+        try {
+            let preferenceSaveFailed = false;
+            const result = await apiService.openDesktopIntegration({
+                provider,
+                action,
+                projectId,
+                targetPath: openTargetPath,
+            });
+            if (result.status === 'restart-required') {
+                setPendingIntegratedProvider(provider);
+                return;
+            }
+            if (result.openInBrowser && result.url && typeof window !== 'undefined') {
+                window.location.href = result.url;
+            }
+            if (shouldUpdateDefaultOpenMethod) {
+                const localApp = INTEGRATED_PROVIDER_LOCAL_APPS[provider];
+                const preference: OpenMethod = localApp
+                    ? { type: 'local-app', value: localApp }
+                    : { type: 'ide', value: 'cursor' };
+                try {
+                    await savePreference(preference);
+                } catch {
+                    preferenceSaveFailed = true;
+                }
+            }
+            setPendingIntegratedProvider(null);
+            if (preferenceSaveFailed) {
+                toast.warning('应用已打开，但保存默认打开方式失败');
+            } else if (result.notice) {
+                toast.warning(result.notice);
+            } else {
+                toast.success(`已在 ${INTEGRATED_PROVIDER_LABELS[provider]} 中打开`);
+            }
+        } catch (error: any) {
+            const localApp = INTEGRATED_PROVIDER_LOCAL_APPS[provider];
+            const fallback = localApp
+                ? formatLocalAppOpenFailureMessage(LOCAL_APP_AGENT_APP_NAMES[localApp])
+                : '打开 Cursor 失败';
+            toast.warning(error?.message || fallback);
+        } finally {
+            setOpenLoading(false);
+        }
+    };
+
+    const handleLocalAppOption = (agent: LocalAppAgent) => {
+        const provider = INTEGRATED_LOCAL_APP_PROVIDERS[agent];
+        if (provider) {
+            void handleIntegratedOpen(provider, 'prepare');
+            return;
+        }
+        void handleOpenWithLocalApp(agent);
+    };
+
+    const handleIDEOption = (ide: MainIDE) => {
+        if (ide === 'cursor') {
+            void handleIntegratedOpen('cursor', 'prepare');
+            return;
+        }
+        void handleOpenWithIDE(ide);
+    };
+
     const handleGuideToAISettings = useCallback(() => {
         onOpenAISettings?.();
-        toast.warning('请先在 AI 设置中选择本地 AI Agent');
+        toast.warning('请先在 AI 设置中配置对话 AI');
     }, [onOpenAISettings]);
+
+    const handleUnavailableWebAgent = useCallback(() => {
+        toast.warning('当前页面请通过提示词卡片复制或执行操作');
+    }, []);
 
     const handleOpenWithWebAgent = async (agent: WebAgent, provider?: AcpProvider) => {
         if (openLoading) return;
@@ -296,7 +374,7 @@ export default function OpenInDropdown({
             return;
         }
 
-        handleGuideToAISettings();
+        handleUnavailableWebAgent();
     };
 
     const handleOpenWithImageAi = useCallback(async () => {
@@ -341,10 +419,10 @@ export default function OpenInDropdown({
             return;
         }
         if (openMethod.type === 'local-app') {
-            void handleOpenWithLocalApp(openMethod.value as LocalAppAgent);
+            handleLocalAppOption(openMethod.value as LocalAppAgent);
             return;
         }
-        void handleOpenWithIDE(activeOpenIDE as MainIDE);
+        handleIDEOption(activeOpenIDE as MainIDE);
     };
 
     const renderGroupHelp = (help: GroupHelp) => {
@@ -380,57 +458,30 @@ export default function OpenInDropdown({
         </div>
     );
 
-    const renderEditorOption = (option: (typeof MAIN_IDE_OPTIONS)[number]) => (
-        <DropdownMenuItem
-            key={option.value}
-            onClick={() => void handleOpenWithIDE(option.value as MainIDE)}
-            className="h-8 gap-2 px-2 text-[13px]"
-        >
-            <span className="flex h-4 w-4 items-center justify-center text-foreground">{getIDEIcon(option.value as MainIDE)}</span>
-            {option.label}
-        </DropdownMenuItem>
-    );
-
     const renderLocalAppOption = (option: (typeof LOCAL_APP_AGENT_OPTIONS)[number]) => (
         <DropdownMenuItem
             key={option.value}
-            onClick={() => void handleOpenWithLocalApp(option.value)}
+            onClick={() => handleLocalAppOption(option.value)}
             className="h-8 gap-2 px-2 text-[13px]"
         >
             <span className="flex h-4 w-4 items-center justify-center text-foreground">{getLocalAppIcon(option.value)}</span>
-            {option.label}
+            <span className="min-w-0 flex-1 truncate">{option.label}</span>
         </DropdownMenuItem>
     );
 
     const renderLocalAppOpenOption = (item: LocalAppOpenOption) => (
         item.kind === 'local-app'
             ? renderLocalAppOption(item.option)
-            : renderEditorOption(item.option)
-    );
-
-    const renderCLIAgentOption = (option: (typeof CLI_AGENT_OPTIONS)[number]) => (
-        <DropdownMenuItem
-            key={option.value}
-            onClick={() => void handleOpenWithCLIAgent(option.value)}
-            className="h-8 gap-2 px-2 text-[13px]"
-        >
-            <span className="flex h-4 w-4 items-center justify-center text-foreground">{getCLIAgentIcon(option.value)}</span>
-            {option.label}
-        </DropdownMenuItem>
-    );
-
-    const renderCLIAgentSubmenu = () => (
-        <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="h-8 gap-2 px-2 text-[13px]">
-                <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
-                    <SquareTerminal className="h-3.5 w-3.5" />
-                </span>
-                本地 CLI
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="z-[3000] w-56 p-1.5">
-                {CLI_AGENT_OPTIONS.map(renderCLIAgentOption)}
-            </DropdownMenuSubContent>
-        </DropdownMenuSub>
+            : (
+                <DropdownMenuItem
+                    key={item.option.value}
+                    onClick={() => handleIDEOption(item.option.value as MainIDE)}
+                    className="h-8 gap-2 px-2 text-[13px]"
+                >
+                    <span className="flex h-4 w-4 items-center justify-center text-foreground"><Cursor size={14} /></span>
+                    {item.option.label}
+                </DropdownMenuItem>
+            )
     );
 
     const renderAgentGroup = (
@@ -482,7 +533,7 @@ export default function OpenInDropdown({
                     </div>
 
                     <p className="mt-4 text-[12px] leading-5 text-muted-foreground">
-                        适用于 WorkBuddy、TRAE WORK 等未在列表中显示或打开失败的应用。
+                        如果应用无法自动打开，请按以上方式手动选择当前 Make 项目目录。
                     </p>
 
                     <DialogFooter className="mt-5 flex flex-row justify-end gap-2 sm:space-x-0">
@@ -493,6 +544,30 @@ export default function OpenInDropdown({
                 </div>
             </DialogContent>
         </Dialog>
+    );
+
+    const renderDialogs = () => (
+        <>
+            {renderOpenHelpDialog()}
+            <DesktopIntegrationRestartDialog
+                provider={pendingIntegratedProvider}
+                open={pendingIntegratedProvider !== null}
+                loading={openLoading}
+                onOpenChange={(open) => {
+                    if (!open) setPendingIntegratedProvider(null);
+                }}
+                onRestart={() => {
+                    if (pendingIntegratedProvider) {
+                        void handleIntegratedOpen(pendingIntegratedProvider, 'restart');
+                    }
+                }}
+                onOpenNormally={() => {
+                    if (pendingIntegratedProvider) {
+                        void handleIntegratedOpen(pendingIntegratedProvider, 'normal');
+                    }
+                }}
+            />
+        </>
     );
 
     const closeAiPanel = useCallback(() => {
@@ -579,21 +654,7 @@ export default function OpenInDropdown({
             ), false)}
             {renderAgentGroup('在本地应用中打开', LOCAL_APP_GROUP_HELP, (
                 <>
-                    {inlineLocalAppOpenOptions.map(renderLocalAppOpenOption)}
-                    {overflowLocalAppOpenOptions.length > 0 ? (
-                        <DropdownMenuSub>
-                            <DropdownMenuSubTrigger className="h-8 gap-2 px-2 text-[13px]">
-                                <span className="flex h-4 w-4 items-center justify-center text-muted-foreground">
-                                    <MoreHorizontal className="h-3.5 w-3.5" />
-                                </span>
-                                更多
-                            </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent className="z-[3000] w-56 p-1.5">
-                                {overflowLocalAppOpenOptions.map(renderLocalAppOpenOption)}
-                            </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-                    ) : null}
-                    {renderCLIAgentSubmenu()}
+                    {localAppOpenOptions.map(renderLocalAppOpenOption)}
                 </>
             ))}
             <DropdownMenuSeparator className="-mx-1 my-1.5" />
@@ -632,7 +693,7 @@ export default function OpenInDropdown({
                         {menuContent}
                     </DropdownMenu>
                 </TooltipProvider>
-                {renderOpenHelpDialog()}
+                {renderDialogs()}
             </>
         );
     }
@@ -659,7 +720,7 @@ export default function OpenInDropdown({
                         {menuContent}
                     </DropdownMenu>
                 </TooltipProvider>
-                {renderOpenHelpDialog()}
+                {renderDialogs()}
             </>
         );
     }
@@ -679,10 +740,10 @@ export default function OpenInDropdown({
                                     disabled={openLoading}
                                     onClick={() => {
                                         if (item.kind === 'ide') {
-                                            void handleOpenWithIDE(item.option.value as MainIDE);
+                                            handleIDEOption(item.option.value as MainIDE);
                                             return;
                                         }
-                                        void handleOpenWithLocalApp(item.option.value);
+                                        handleLocalAppOption(item.option.value);
                                     }}
                                 >
                                     <span className="flex h-3.5 w-3.5 items-center justify-center text-slate-500">
@@ -693,20 +754,10 @@ export default function OpenInDropdown({
                                     <span className="whitespace-nowrap">{item.option.label}</span>
                                 </button>
                             ))}
-                            <button
-                                type="button"
-                                className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
-                                onClick={() => setOpenHelpDialogOpen(true)}
-                            >
-                                <span className="flex h-3.5 w-3.5 items-center justify-center text-slate-500">
-                                    <MoreHorizontal className="h-3.5 w-3.5" />
-                                </span>
-                                <span className="whitespace-nowrap">更多</span>
-                            </button>
                         </div>
                     </div>
                 </TooltipProvider>
-                {renderOpenHelpDialog()}
+                {renderDialogs()}
             </>
         );
     }
@@ -751,7 +802,7 @@ export default function OpenInDropdown({
                         {menuContent}
                     </DropdownMenu>
                 </TooltipProvider>
-                {renderOpenHelpDialog()}
+                {renderDialogs()}
             </>
         );
     }
@@ -817,7 +868,7 @@ export default function OpenInDropdown({
                     {menuContent}
                 </DropdownMenu>
             </TooltipProvider>
-            {renderOpenHelpDialog()}
+            {renderDialogs()}
         </>
     );
 }

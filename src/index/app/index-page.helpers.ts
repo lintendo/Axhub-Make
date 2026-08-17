@@ -4,6 +4,7 @@ import type { CanvasItem, ItemData, SidebarTreeNode, SidebarTreeTab, TabType } f
 import {
     STORAGE_KEY_ASSISTANT_AUTO_OPEN_DISMISSED,
     STORAGE_KEY_ASSISTANT_AUTO_OPEN_PANEL_MODE,
+    STORAGE_KEY_COMMENTARY_VOICE_VISIBLE,
 } from '../constants';
 import { normalizeMarkdownResourceName } from '../utils/markdownResourcePath';
 import { buildMarkdownFileUrl, buildSpecTemplatePreviewUrl } from '../utils/markdownPreview';
@@ -90,8 +91,70 @@ export function parseDismissedStorageValue(value: string | null): boolean {
     return value === '1' || value === 'true';
 }
 
+export const ASSISTANT_PANEL_COMPACT_VIEWPORT_WIDTH = 768;
+
+export function resolveAssistantPanelOpenTarget(viewportWidth: number): 'iframe' | 'window' {
+    return Number.isFinite(viewportWidth) && viewportWidth <= ASSISTANT_PANEL_COMPACT_VIEWPORT_WIDTH
+        ? 'window'
+        : 'iframe';
+}
+
+export function shouldSuppressAssistantAutoOpenForProjectChange(
+    previousProjectId: string | null | undefined,
+    nextProjectId: string | null | undefined,
+    assistantVisible: boolean,
+): boolean {
+    const previousScope = String(previousProjectId || '').trim();
+    const nextScope = String(nextProjectId || '').trim();
+    return Boolean(
+        previousScope
+        && nextScope
+        && previousScope !== nextScope
+        && !assistantVisible,
+    );
+}
+
 type AssistantAutoOpenStorage = Pick<Storage, 'getItem' | 'setItem'>;
 type AssistantAutoOpenPanelMode = 'general-ai' | 'image-ai';
+type CommentaryVoiceStorage = Pick<Storage, 'getItem' | 'setItem'>;
+
+function getCommentaryVoiceStorage(): CommentaryVoiceStorage | null {
+    if (typeof window === 'undefined') {
+        return null;
+    }
+    try {
+        return window.localStorage;
+    } catch {
+        return null;
+    }
+}
+
+export function getCommentaryVoiceVisible(
+    storage: CommentaryVoiceStorage | null = getCommentaryVoiceStorage(),
+): boolean {
+    if (!storage) {
+        return false;
+    }
+    try {
+        return storage.getItem(STORAGE_KEY_COMMENTARY_VOICE_VISIBLE) === '1';
+    } catch {
+        return false;
+    }
+}
+
+export function setCommentaryVoiceVisible(
+    visible: boolean,
+    storage: CommentaryVoiceStorage | null = getCommentaryVoiceStorage(),
+): void {
+    if (!storage) {
+        return;
+    }
+    try {
+        storage.setItem(STORAGE_KEY_COMMENTARY_VOICE_VISIBLE, visible ? '1' : '0');
+    } catch {
+        // Ignore storage failures in private or embedded contexts.
+    }
+}
 
 function getAssistantAutoOpenStorage(): AssistantAutoOpenStorage | null {
     if (typeof window === 'undefined') {
@@ -146,7 +209,7 @@ export function getAssistantAutoOpenDismissed(
     try {
         const storedValue = storage.getItem(storageKey);
         if (storedValue === null) {
-            return false;
+            return true;
         }
         return parseDismissedStorageValue(storedValue);
     } catch {
@@ -467,7 +530,7 @@ export function findResourceItemByPathOrName(
 
 export function normalizeDocItem(
     doc: { name?: string; displayName?: string; path?: string; absoluteFilePath?: string; fileSize?: number },
-    projectId: string | null = null,
+    projectId: string | null,
 ): ItemData {
     const normalizedName = normalizeMarkdownResourceName('doc', String(doc?.name || '').trim());
     const sourcePath = String(doc?.path || '').trim();
@@ -483,7 +546,10 @@ export function normalizeDocItem(
     const directDocsFileUrl = buildDocsFileUrl(routeName, projectId);
     const itemName = directDocsFileUrl && routeName ? routeName : normalizedName;
     const displayName = getDocDisplayName(getDocFileName(itemName));
-    const markdownUrl = directDocsFileUrl || buildMarkdownFileUrl(absoluteFilePath || sourcePath);
+    const markdownPath = absoluteFilePath || sourcePath;
+    const markdownUrl = directDocsFileUrl || (projectId && markdownPath
+        ? buildMarkdownFileUrl(markdownPath, projectId)
+        : '');
     return {
         name: itemName,
         displayName: displayName || itemName,
@@ -492,6 +558,7 @@ export function normalizeDocItem(
         previewUrl: isMarkdown ? buildSpecTemplatePreviewUrl(markdownUrl) : markdownUrl,
         filePath: filePath || undefined,
         absoluteFilePath: absoluteFilePath || undefined,
+        projectId: projectId || undefined,
         resourceId: itemName || undefined,
         ...(openMode ? { openMode } : {}),
         ...(openMode === 'canvas' && filePath ? { canvasFilePath: filePath } : {}),
@@ -499,7 +566,7 @@ export function normalizeDocItem(
     };
 }
 
-export function normalizeDocsItems(docs: unknown, projectId: string | null = null): ItemData[] {
+export function normalizeDocsItems(docs: unknown, projectId: string | null): ItemData[] {
     if (!Array.isArray(docs)) {
         return [];
     }
@@ -511,13 +578,20 @@ export function normalizeDocsItems(docs: unknown, projectId: string | null = nul
         .filter((doc) => Boolean(doc.name));
 }
 
-export function normalizeTemplateItem(template: { name?: string; displayName?: string; path?: string; absoluteFilePath?: string }): ItemData {
+export function normalizeTemplateItem(
+    template: { name?: string; displayName?: string; path?: string; absoluteFilePath?: string },
+    projectId: string | null,
+): ItemData {
     const normalizedName = normalizeMarkdownResourceName('template', String(template?.name || '').trim());
     const displayName = getDocDisplayName(normalizedName);
     const sourcePath = String(template?.path || '').trim();
     const absoluteFilePath = String(template?.absoluteFilePath || '').trim();
-    const markdownUrl = buildMarkdownFileUrl(absoluteFilePath || sourcePath)
-        || (hasMarkdownExtension(normalizedName) ? `/api/docs/templates/${encodeURIComponent(normalizedName)}` : '');
+    const markdownPath = absoluteFilePath || sourcePath;
+    const markdownUrl = projectId && markdownPath
+        ? buildMarkdownFileUrl(markdownPath, projectId)
+        : projectId && hasMarkdownExtension(normalizedName)
+            ? withProjectIdQuery(`/api/docs/templates/${encodeURIComponent(normalizedName)}`, projectId)
+            : '';
     return {
         name: normalizedName,
         displayName: displayName || normalizedName,
@@ -526,6 +600,7 @@ export function normalizeTemplateItem(template: { name?: string; displayName?: s
         previewUrl: buildSpecTemplatePreviewUrl(markdownUrl),
         filePath: sourcePath || undefined,
         absoluteFilePath: absoluteFilePath || undefined,
+        projectId: projectId || undefined,
     };
 }
 

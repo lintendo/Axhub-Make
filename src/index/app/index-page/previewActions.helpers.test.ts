@@ -1,24 +1,215 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import * as helpers from './previewActions.helpers';
+import { createDefaultPreviewConfig } from '../../domains/device/preview-layout';
 import {
   buildCombinedPrototypePrompt,
   buildMainPreviewIframeUrl,
   buildProjectPrototypeIframeUrl,
   buildProjectPrototypeScreenshotIframeUrl,
   createDefaultHostToolbarState,
+  createPrototypeEditorVoiceBridgeResponse,
   getClientUrlOrigin,
+  isQuickEditRuntimeReadyForIframe,
   resolveActiveAnnotationDirectRunToolbarState,
   resolvePrototypeAnnotationTargetPath,
   resolveCurrentPublishResourcePath,
   resolveCurrentPreviewScreenshotSize,
+  resolveExportScreenshotViewportSize,
   resolveHostToolbarStateForDisplay,
+  resolveAnnotationActionEditingTargets,
   waitForHostToolbarActionState,
 } from './previewActions.helpers';
+
+describe('createDefaultHostToolbarState', () => {
+  it('keeps target screenshot capture unavailable and off before the runtime connects', () => {
+    expect(createDefaultHostToolbarState()).toMatchObject({
+      captureTargetScreenshotAvailable: false,
+      captureTargetScreenshot: false,
+    });
+  });
+});
 
 describe('previewActions.helpers', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('does not treat edits or terminal AI tasks as design decision data', () => {
+    const hasPrototypeDecisionData = (helpers as Record<string, unknown>)
+      .hasPrototypeDecisionData as undefined | ((
+        state: { propertyPanelVisible?: boolean; modifiedCount?: number; terminalTaskCount?: number } | null,
+        decisionDataCount?: number,
+      ) => boolean);
+
+    expect(typeof hasPrototypeDecisionData).toBe('function');
+    expect(hasPrototypeDecisionData?.({
+      propertyPanelVisible: false,
+      modifiedCount: 2,
+      terminalTaskCount: 1,
+    }, 0)).toBe(false);
+    expect(hasPrototypeDecisionData?.({ propertyPanelVisible: true }, 0)).toBe(true);
+    expect(hasPrototypeDecisionData?.({ propertyPanelVisible: false }, 1)).toBe(true);
+  });
+
+  it('creates structured-clone-safe voice responses with only contract fields', () => {
+    const target = {
+      targetRef: 'page.1.1',
+      label: 'button',
+      textExcerpt: '提交',
+      tagName: 'button',
+      role: 'button',
+      path: 'body > main > button',
+      childCount: 0,
+    };
+    const response = structuredClone(createPrototypeEditorVoiceBridgeResponse({
+      requestId: 'request-1',
+      success: true,
+      voiceTargets: { selected: target, hovered: null, preferred: target },
+      voiceCommentResult: {
+        applied: true,
+        targetRef: 'page.1.1',
+        commentId: 'comment-1',
+        target,
+      },
+    }));
+
+    expect(response).toEqual({
+      type: 'AXHUB_PROTOTYPE_EDITOR_STATE',
+      requestId: 'request-1',
+      success: true,
+      voiceTargets: { selected: target, hovered: null, preferred: target },
+      voiceCommentResult: {
+        applied: true,
+        targetRef: 'page.1.1',
+        commentId: 'comment-1',
+        target,
+      },
+    });
+    expect(response).not.toHaveProperty('debugState');
+    expect(response).not.toHaveProperty('voiceTarget');
+    expect(JSON.stringify(response)).not.toMatch(/locator|selector|outerHTML|innerHTML|attributes/u);
+  });
+
+  it('binds quick-edit runtime readiness to the current iframe identity', () => {
+    const readyIframe = {} as HTMLIFrameElement;
+    const replacementIframe = {} as HTMLIFrameElement;
+
+    expect(isQuickEditRuntimeReadyForIframe('ready', readyIframe, readyIframe)).toBe(true);
+    expect(isQuickEditRuntimeReadyForIframe('ready', readyIframe, replacementIframe)).toBe(false);
+    expect(isQuickEditRuntimeReadyForIframe('pending', readyIframe, readyIframe)).toBe(false);
+    expect(isQuickEditRuntimeReadyForIframe('ready', readyIframe, null)).toBe(false);
+  });
+
+  it('uses mobile annotation interaction only for phone-sized prototype previews', () => {
+    const resolveMobileMode = (helpers as Record<string, unknown>)
+      .resolvePrototypeEditorMobileMode as undefined | ((
+        resourceType: 'prototype' | 'theme',
+        pane: 'primary' | 'secondary',
+        previewConfig: ReturnType<typeof createDefaultPreviewConfig>,
+      ) => boolean);
+    const defaultConfig = createDefaultPreviewConfig();
+
+    expect(typeof resolveMobileMode).toBe('function');
+    expect(resolveMobileMode?.('prototype', 'primary', {
+      ...defaultConfig,
+      singlePreset: 'mobile',
+    })).toBe(true);
+    expect(resolveMobileMode?.('prototype', 'primary', {
+      ...defaultConfig,
+      singlePreset: 'tablet',
+    })).toBe(false);
+    expect(resolveMobileMode?.('prototype', 'primary', {
+      ...defaultConfig,
+      singlePreset: 'custom',
+      customWidth: 640,
+    })).toBe(true);
+    expect(resolveMobileMode?.('prototype', 'primary', {
+      ...defaultConfig,
+      singlePreset: 'custom',
+      customWidth: 1024,
+    })).toBe(false);
+    expect(resolveMobileMode?.('prototype', 'secondary', defaultConfig)).toBe(true);
+    expect(resolveMobileMode?.('theme', 'secondary', defaultConfig)).toBe(false);
+  });
+
+  it('maps cross-origin modified elements to top-level AI execution targets', () => {
+    const locatorA = { selectors: ['[data-card="a"]'], fingerprint: 'card-a', path: [0] };
+    const locatorB = { selectors: ['[data-card="b"]'], fingerprint: 'card-b', path: [1] };
+
+    expect(resolveAnnotationActionEditingTargets(
+      { type: 'send-to-agent' },
+      [
+        { commentId: 'comment-a', elementKey: 'card-a', locator: locatorA, label: 'Card A', note: 'A', imageCount: 0, changeKinds: [] },
+        { commentId: 'comment-b', elementKey: 'card-b', locator: locatorB, label: 'Card B', note: 'B', imageCount: 0, changeKinds: [] },
+      ],
+    )).toEqual([
+      { commentId: 'comment-a', elementKey: 'card-a', targetRef: { locator: locatorA, label: 'Card A' } },
+      { commentId: 'comment-b', elementKey: 'card-b', targetRef: { locator: locatorB, label: 'Card B' } },
+    ]);
+  });
+
+  it('keeps an explicit element action scoped to that element', () => {
+    const locatorA = { selectors: ['[data-card="a"]'], fingerprint: 'card-a', path: [0] };
+    const locatorB = { selectors: ['[data-card="b"]'], fingerprint: 'card-b', path: [1] };
+
+    expect(resolveAnnotationActionEditingTargets({
+      type: 'send-to-agent',
+      elementKey: 'card-a',
+      commentId: 'comment-a',
+      locator: locatorA,
+      label: 'Card A',
+    }, [{ elementKey: 'card-b', locator: locatorB, label: 'Card B', note: 'B', imageCount: 0, changeKinds: [] }]))
+      .toEqual([{ commentId: 'comment-a', elementKey: 'card-a', targetRef: { locator: locatorA, label: 'Card A' } }]);
+  });
+
+  it('recovers a saved comment id for an explicit element action', () => {
+    const locatorA = { selectors: ['[data-card="a"]'], fingerprint: 'card-a', path: [0] };
+
+    expect(resolveAnnotationActionEditingTargets({
+      type: 'send-to-agent',
+      elementKey: 'card-a',
+      locator: locatorA,
+      label: 'Card A',
+    }, [{
+      commentId: 'comment-a',
+      elementKey: 'card-a',
+      locator: locatorA,
+      label: 'Card A',
+      note: 'A',
+      imageCount: 0,
+      changeKinds: [],
+    }])).toEqual([{
+      commentId: 'comment-a',
+      elementKey: 'card-a',
+      targetRef: { locator: locatorA, label: 'Card A' },
+    }]);
+  });
+
+  it('resolves a persisted comment id to its live modified element', () => {
+    const locatorA = { selectors: ['[data-card="a"]'], fingerprint: 'card-a', path: [0] };
+    const locatorB = { selectors: ['[data-card="b"]'], fingerprint: 'card-b', path: [1] };
+
+    expect(resolveAnnotationActionEditingTargets({
+      type: 'send-to-agent',
+      commentId: 'comment-b',
+    }, [
+      { commentId: 'comment-a', elementKey: 'card-a', locator: locatorA, label: 'Card A', note: 'A', imageCount: 0, changeKinds: [] },
+      { commentId: 'comment-b', elementKey: 'card-b', locator: locatorB, label: 'Card B', note: 'B', imageCount: 0, changeKinds: [] },
+    ])).toEqual([
+      { commentId: 'comment-b', elementKey: 'card-b', targetRef: { locator: locatorB, label: 'Card B' } },
+    ]);
+  });
+
+  it('ignores blank modified element keys and keeps the first duplicate target', () => {
+    const firstLocator = { selectors: ['[data-card="first"]'], fingerprint: 'first', path: [0] };
+    const duplicateLocator = { selectors: ['[data-card="duplicate"]'], fingerprint: 'duplicate', path: [1] };
+
+    expect(resolveAnnotationActionEditingTargets(null, [
+      { elementKey: ' ', locator: null, label: '', note: '', imageCount: 0, changeKinds: [] },
+      { elementKey: 'card-a', locator: firstLocator, label: 'First', note: '', imageCount: 0, changeKinds: [] },
+      { elementKey: 'card-a', locator: duplicateLocator, label: 'Duplicate', note: '', imageCount: 0, changeKinds: [] },
+    ])).toEqual([{ elementKey: 'card-a', targetRef: { locator: firstLocator, label: 'First' } }]);
   });
 
   it('resolves relative client URLs against the runtime origin instead of the admin origin', () => {
@@ -140,6 +331,24 @@ describe('previewActions.helpers', () => {
     expect(url.searchParams.get('variant')).toBe('dark');
     expect(url.searchParams.get('agentToolbar')).toBe('host');
     expect(url.hash).toBe('#page=more-scenarios');
+  });
+
+  it('adds annotation session mode to prototype editor urls', () => {
+    vi.stubGlobal('window', {
+      location: {
+        origin: 'http://localhost:53817',
+      },
+      __RUNTIME_ORIGIN__: 'http://localhost:51720',
+    });
+
+    const url = new URL(buildProjectPrototypeIframeUrl({
+      name: 'annotation-demo',
+      clientUrl: 'http://localhost:51720/prototypes/annotation-demo',
+      previewUrl: 'http://localhost:51720/prototypes/annotation-demo',
+    }, { hostToolbar: true, annotationSession: true }));
+
+    expect(url.searchParams.get('agentToolbar')).toBe('host');
+    expect(url.searchParams.get('annotationSession')).toBe('1');
   });
 
   it('builds same-origin prototype screenshot iframe URLs from runtime-origin previews', () => {
@@ -399,6 +608,22 @@ describe('previewActions.helpers', () => {
     }, { width: 1920, height: 1080 })).toEqual({ width: 1280, height: 720 });
   });
 
+  it('resolves automatic Axure screenshot viewports from the current preview size', () => {
+    expect(resolveExportScreenshotViewportSize({
+      currentPreviewSize: { width: 1366, height: 820 },
+      configuredSize: { width: 500, height: 300 },
+      userSetDimensions: false,
+    })).toEqual({ width: 1366, height: 820, shouldSyncConfig: true });
+  });
+
+  it('preserves manually configured Axure screenshot viewport dimensions', () => {
+    expect(resolveExportScreenshotViewportSize({
+      currentPreviewSize: { width: 1366, height: 820 },
+      configuredSize: { width: 1024, height: 768 },
+      userSetDimensions: true,
+    })).toEqual({ width: 1024, height: 768, shouldSyncConfig: false });
+  });
+
   it('keeps a settled local AI connection visible after a wake action succeeds', () => {
     const sleepingState = createDefaultHostToolbarState();
     const awakeState = {
@@ -464,12 +689,16 @@ describe('previewActions.helpers', () => {
       ...createDefaultHostToolbarState(),
       visible: false,
       selectionModeActive: false,
+      captureTargetScreenshotAvailable: true,
+      captureTargetScreenshot: true,
     };
 
     const resolvedState = resolveHostToolbarStateForDisplay(null, hiddenHostState, false);
 
     expect(resolvedState?.visible).toBe(true);
     expect(resolvedState?.selectionModeActive).toBe(false);
+    expect(resolvedState?.captureTargetScreenshotAvailable).toBe(true);
+    expect(resolvedState?.captureTargetScreenshot).toBe(true);
   });
 
   it('keeps copy prompt disabled in the fallback toolbar state until an editor reports promptable edits', () => {
@@ -594,6 +823,90 @@ describe('previewActions.helpers', () => {
       enabled: false,
       saving: false,
     })).toBeNull();
+  });
+
+  it('captures only iframe-owned state needed after preview refresh', () => {
+    const createSnapshot = (helpers as Record<string, unknown>).createPreviewRefreshRestoreSnapshot;
+
+    expect(typeof createSnapshot).toBe('function');
+    const capture = createSnapshot as (params: {
+      prototypeEditorActive: boolean;
+      documentEditorActive: boolean;
+      prototypeEditorLaunchOptions: { hostToolbar: boolean };
+      selectionModeActive: boolean;
+      documentQuickEditMode: 'comment' | 'edit';
+      standalonePanelOpen: boolean;
+    }) => {
+      prototypeEditor: { hostToolbar: boolean; selectionModeActive: boolean } | null;
+      documentQuickEditMode: 'comment' | 'edit' | null;
+      standalonePanelOpen: boolean;
+    };
+
+    expect(capture({
+      prototypeEditorActive: true,
+      documentEditorActive: false,
+      prototypeEditorLaunchOptions: { hostToolbar: true },
+      selectionModeActive: true,
+      documentQuickEditMode: 'comment',
+      standalonePanelOpen: false,
+    })).toEqual({
+      prototypeEditor: { hostToolbar: true, selectionModeActive: true },
+      documentQuickEditMode: null,
+      standalonePanelOpen: false,
+    });
+
+    expect(capture({
+      prototypeEditorActive: false,
+      documentEditorActive: true,
+      prototypeEditorLaunchOptions: { hostToolbar: true },
+      selectionModeActive: false,
+      documentQuickEditMode: 'edit',
+      standalonePanelOpen: false,
+    })).toEqual({
+      prototypeEditor: null,
+      documentQuickEditMode: 'edit',
+      standalonePanelOpen: false,
+    });
+
+    expect(capture({
+      prototypeEditorActive: false,
+      documentEditorActive: false,
+      prototypeEditorLaunchOptions: { hostToolbar: true },
+      selectionModeActive: false,
+      documentQuickEditMode: 'comment',
+      standalonePanelOpen: true,
+    })).toEqual({
+      prototypeEditor: null,
+      documentQuickEditMode: null,
+      standalonePanelOpen: true,
+    });
+  });
+
+  it('restores the saved Markdown mode instead of accepting the transient disabled refresh status', () => {
+    const resolveStatus = (helpers as Record<string, unknown>).resolveDocumentRefreshRestoreStatus;
+
+    expect(typeof resolveStatus).toBe('function');
+    const resolveRefreshStatus = resolveStatus as (
+      pendingMode: 'comment' | 'edit' | null,
+      status: { enabled: boolean },
+    ) => { acceptStatus: boolean; restoreMode: 'comment' | 'edit' | null };
+
+    expect(resolveRefreshStatus('edit', { enabled: false })).toEqual({
+      acceptStatus: false,
+      restoreMode: 'edit',
+    });
+    expect(resolveRefreshStatus('comment', { enabled: false })).toEqual({
+      acceptStatus: false,
+      restoreMode: 'comment',
+    });
+    expect(resolveRefreshStatus('edit', { enabled: true })).toEqual({
+      acceptStatus: true,
+      restoreMode: null,
+    });
+    expect(resolveRefreshStatus(null, { enabled: false })).toEqual({
+      acceptStatus: true,
+      restoreMode: null,
+    });
   });
 
   it('does not expose host Space temporary interaction forwarding helpers', () => {

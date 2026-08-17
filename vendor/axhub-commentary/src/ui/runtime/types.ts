@@ -4,7 +4,10 @@ import type { ViewportRect } from '../../overlay/canvas-overlay';
 import type { PropertyPanel, PropertyPanelOptions, PropertyPanelTab } from '../property-panel';
 import type { FloatingPosition } from '../floating-drag';
 import type { CommentEntryMode } from '../selection-ui-mode';
-import type { CommentShortcutSettings, ModifierShortcutKey } from '../../core/editor/comment-shortcut-settings';
+import type {
+  CommentShortcutSettings,
+  ModifierShortcutKey,
+} from '../../core/editor/comment-shortcut-settings';
 import type { AgentProviderAvailability } from '../../core/editor/contracts';
 import type {
   WebEditorInteractionProfile,
@@ -19,6 +22,7 @@ import type {
   CommentaryHostToolbarAction,
   CommentaryHostToolbarState,
   CommentaryHostToolbarStateListener,
+  CommentarySkillOption,
   CommentaryToolbarMode,
 } from '../../web-editor-types';
 
@@ -148,7 +152,11 @@ export interface SharedAnnotationActions {
   onDeleteCurrentAnnotationNode?: () => Promise<void>;
 }
 
-export interface PropertyPanelViewProps extends SharedNoteActions, SharedTextActions, SharedImageActions, SharedAnnotationActions {
+export interface PropertyPanelViewProps
+  extends SharedNoteActions,
+    SharedTextActions,
+    SharedImageActions,
+    SharedAnnotationActions {
   options: PropertyPanelOptions;
   currentTarget: Element | null;
   uiMode: CommentEntryMode;
@@ -172,7 +180,7 @@ export interface PropertyPanelViewProps extends SharedNoteActions, SharedTextAct
   onSelectionModeActiveChange: (active: boolean) => void;
   onTargetChange: (element: Element | null) => void;
   onRefreshNoteState: () => void;
-  onInlineTextEditingChange?: (editing: boolean) => void;
+  onInlineTextEditingChange?: (editing: boolean, element?: HTMLElement | null) => void;
   onBlockingLayerOpenChange?: (open: boolean) => void;
   toolbarMode?: CommentaryToolbarMode;
   onHostToolbarStateChange?: (state: CommentaryHostToolbarState) => void;
@@ -185,7 +193,11 @@ export type {
   CommentaryToolbarMode,
 };
 
-export interface PromptCardViewProps extends SharedNoteActions, SharedTextActions, SharedImageActions, SharedAnnotationActions {
+export interface PromptCardViewProps
+  extends SharedNoteActions,
+    SharedTextActions,
+    SharedImageActions,
+    SharedAnnotationActions {
   options: BreadcrumbsOptions;
   currentTarget: Element | null;
   anchorRect: ViewportRect | null;
@@ -200,15 +212,19 @@ export interface PromptCardViewProps extends SharedNoteActions, SharedTextAction
   bubbleStyleEditorOpen: boolean;
   agentVisualState: 'sleeping' | 'awake';
   hideExecutionControls?: boolean;
+  hideCurrentElementExecutionAction?: boolean;
   hideContextAppendAction?: boolean;
   enabledSkillIds?: readonly string[] | null;
+  skillOptions?: readonly CommentarySkillOption[] | null;
   onBubbleStyleEditorOpenChange: (open: boolean) => void;
   onSendCurrentElementPromptToAgent?: (element: Element) => void | Promise<void>;
   onWakeAgent?: () => boolean | Promise<boolean>;
   onAgentVisualStateChange?: (state: 'sleeping' | 'awake') => void;
   getAgentBridgeConnected?: (() => boolean) | undefined;
   getHasReusableAgentConversation?: (() => boolean) | undefined;
-  getSendCurrentElementPromptToAgentBlockReason?: ((element: Element | null) => string | undefined) | undefined;
+  getSendCurrentElementPromptToAgentBlockReason?:
+    | ((element: Element | null) => string | undefined)
+    | undefined;
   canExportSelectionToDesignTool?: (
     tool: WebEditorDesignAdjustmentTool,
     element: Element | null,
@@ -228,7 +244,7 @@ export interface PromptCardViewProps extends SharedNoteActions, SharedTextAction
   onAnchorRectChange: (rect: ViewportRect | null) => void;
   onPromptCardVisibleChange?: (visible: boolean) => void;
   inlineTextEditing: boolean;
-  onInlineTextEditingChange: (editing: boolean) => void;
+  onInlineTextEditingChange: (editing: boolean, element?: HTMLElement | null) => void;
 }
 
 export interface ShortcutCaptureCardProps {
@@ -272,6 +288,8 @@ export interface AgentToolbarIconButtonProps {
 
 export interface AgentToolbarShellProps {
   awake: boolean;
+  /** Show the animated connection ring independently from Agent visual state. */
+  connected?: boolean;
   children: React.ReactNode;
   dragHandleRef?: React.Ref<HTMLDivElement>;
   fullWidth?: boolean;

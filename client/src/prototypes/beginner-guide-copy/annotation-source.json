@@ -1,0 +1,113 @@
+{
+  "documentVersion": 1,
+  "format": "axhub-annotation-source",
+  "data": {
+    "version": 2,
+    "prototypeName": "beginner-guide-copy",
+    "pageId": "beginner-guide-copy",
+    "nodes": [
+      {
+        "id": "external-tool-flow-state",
+        "index": 1,
+        "title": "外部工具精修流程状态",
+        "pageId": "overview",
+        "locator": {
+          "selectors": [
+            "[data-annotation-id=\"external-tool-flow-state\"]"
+          ],
+          "fingerprint": "div|data-annotation-id=external-tool-flow-state",
+          "path": []
+        },
+        "aiPrompt": "说明外部工具精修在正常流程和可选流程两种状态下的使用方式。",
+        "annotationText": "该环节支持两种流程状态：正常流程表示项目默认会进入外部工具继续精修；可选流程表示仅在项目需要时进入，也可以直接跳过。",
+        "hasMarkdown": false,
+        "color": "#D97706",
+        "images": [],
+        "controls": [
+          {
+            "type": "segmented",
+            "attributeId": "external_tool_flow_state",
+            "displayName": "流程状态",
+            "info": "切换外部工具精修在正常流程和可选流程之间的展示状态。",
+            "initialValue": "optional",
+            "options": [
+              {
+                "label": "正常流程",
+                "value": "normal"
+              },
+              {
+                "label": "可选流程",
+                "value": "optional"
+              }
+            ]
+          }
+        ],
+        "createdAt": 1786714426000,
+        "updatedAt": 1786714426000
+      }
+    ],
+    "updatedAt": 1786714426000
+  },
+  "markdownMap": {},
+  "assetMap": {},
+  "directory": {
+    "nodes": [
+      {
+        "type": "folder",
+        "id": "directory-pages",
+        "title": "页面",
+        "defaultExpanded": true,
+        "children": [
+          {
+            "type": "route",
+            "id": "route-overview",
+            "title": "总览",
+            "route": "overview"
+          },
+          {
+            "type": "route",
+            "id": "route-install-agent",
+            "title": "安装 Agent",
+            "route": "install-agent"
+          },
+          {
+            "type": "route",
+            "id": "route-choose-model",
+            "title": "选对模型",
+            "route": "choose-model"
+          },
+          {
+            "type": "route",
+            "id": "route-give-instructions",
+            "title": "给 AI 下达指令",
+            "route": "give-instructions"
+          },
+          {
+            "type": "route",
+            "id": "route-create-prototype",
+            "title": "创建原型",
+            "route": "create-prototype"
+          },
+          {
+            "type": "route",
+            "id": "route-edit-prototype",
+            "title": "编辑原型",
+            "route": "edit-prototype"
+          },
+          {
+            "type": "route",
+            "id": "route-publish-prototype",
+            "title": "发布原型",
+            "route": "publish-prototype"
+          },
+          {
+            "type": "route",
+            "id": "route-advanced-guide",
+            "title": "获取帮助",
+            "route": "advanced-guide"
+          }
+        ]
+      }
+    ]
+  }
+}

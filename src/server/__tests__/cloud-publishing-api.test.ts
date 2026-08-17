@@ -20,6 +20,7 @@ import { buildExportHtmlStaticFiles } from '../exportHtmlArchive.ts';
 import { startMakeServer } from '../index.ts';
 import { __cloudPublishingTestUtils } from '../managementApi.cloudPublishing.ts';
 import { buildOnDemand } from '../onDemandBuild.ts';
+import { scopeProjectApiUrl } from './projects-api.helpers.ts';
 
 vi.mock('../onDemandBuild.ts', () => ({
   buildOnDemand: vi.fn(async () => ({
@@ -134,7 +135,7 @@ async function startTestServer(projectRoot: string, extraOptions: Record<string,
     ...extraOptions,
   });
   try {
-    const response = await fetch(`${server.origin}/api/projects/make/register-existing`, {
+    const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/projects/make/register-existing`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ root: projectRoot }),
@@ -422,7 +423,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/export-html?path=${encodeURIComponent('prototypes/home')}`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/export-html?path=${encodeURIComponent('prototypes/home')}`));
       const body = new Uint8Array(await response.arrayBuffer());
       const entries = unzipSync(body);
       const paths = Object.keys(entries).sort();
@@ -455,7 +456,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/export-html?path=${encodeURIComponent('prototypes/home')}`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/export-html?path=${encodeURIComponent('prototypes/home')}`));
       const body = new Uint8Array(await response.arrayBuffer());
       const entries = unzipSync(body);
       const html = Buffer.from(entries['index.html']).toString('utf8');
@@ -635,7 +636,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const saveResponse = await fetch(`${server.origin}/api/cloud-publishing/config`, {
+      const saveResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -657,7 +658,7 @@ describe('cloud publishing API', () => {
       });
       expect(saveResponse.status).toBe(200);
 
-      const configResponse = await fetch(`${server.origin}/api/cloud-publishing/config`);
+      const configResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/config`));
       const config = await readJsonResponse(configResponse);
 
       expect(configResponse.status).toBe(200);
@@ -725,7 +726,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const configResponse = await fetch(`${server.origin}/api/cloud-publishing/config`);
+      const configResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/config`));
       const config = await readJsonResponse(configResponse);
 
       expect(configResponse.status).toBe(200);
@@ -751,7 +752,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const configResponse = await fetch(`${server.origin}/api/cloud-publishing/config`);
+      const configResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/config`));
       const config = await readJsonResponse(configResponse);
 
       expect(configResponse.status).toBe(200);
@@ -787,7 +788,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const saveResponse = await fetch(`${server.origin}/api/cloud-publishing/config`, {
+      const saveResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -833,7 +834,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'vercel', path: 'prototypes/home' }),
@@ -865,7 +866,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'vercel', path: 'prototypes/home' }),
@@ -902,7 +903,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'vercel', path: 'prototypes/home' }),
@@ -932,7 +933,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const saveResponse = await fetch(`${server.origin}/api/cloud-publishing/config`, {
+      const saveResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -944,7 +945,7 @@ describe('cloud publishing API', () => {
       });
       expect(saveResponse.status).toBe(200);
 
-      const configResponse = await fetch(`${server.origin}/api/cloud-publishing/config`);
+      const configResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/config`));
       const config = await readJsonResponse(configResponse);
 
       expect(configResponse.status).toBe(200);
@@ -966,7 +967,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'vercel', path: 'prototypes/home' }),
@@ -993,7 +994,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'vercel', path: '../outside' }),
@@ -1025,7 +1026,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot, { cloudPublishingCommandExecutor: commandMock });
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'github-pages', path: 'prototypes/home' }),
@@ -1059,7 +1060,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot, { cloudPublishingCommandExecutor: commandMock });
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'github-pages', path: 'prototypes/home' }),
@@ -1088,7 +1089,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'vercel', path: 'prototypes/home' }),
@@ -1152,7 +1153,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot, { cloudPublishingCommandExecutor: commandMock });
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'github-pages', path: 'prototypes/home' }),
@@ -1210,7 +1211,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot, { cloudPublishingCommandExecutor: commandMock });
 
     try {
-      const configResponse = await fetch(`${server.origin}/api/cloud-publishing/config`);
+      const configResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/config`));
       const config = await readJsonResponse(configResponse);
       expect(config.targets.githubPages).toMatchObject({
         configured: true,
@@ -1218,7 +1219,7 @@ describe('cloud publishing API', () => {
         missingFields: [],
       });
 
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'github-pages', path: 'prototypes/home' }),
@@ -1283,7 +1284,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'cloudflare-pages', path: 'prototypes/home' }),
@@ -1378,7 +1379,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'cloudflare-pages', path: 'prototypes/home' }),
@@ -1445,7 +1446,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const configResponse = await fetch(`${server.origin}/api/cloud-publishing/config`);
+      const configResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/config`));
       const config = await readJsonResponse(configResponse);
       expect(config.targets.cloudflarePages).toMatchObject({
         configured: true,
@@ -1453,7 +1454,7 @@ describe('cloud publishing API', () => {
         missingFields: [],
       });
 
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'cloudflare-pages', path: 'prototypes/home' }),
@@ -1515,7 +1516,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'cloudflare-pages', path: 'prototypes/home' }),
@@ -1532,7 +1533,7 @@ describe('cloud publishing API', () => {
         cssText: 'x'.repeat(26 * 1024 * 1024),
         metadata: { usesAnnotationRuntime: false },
       });
-      const tooLargeResponse = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const tooLargeResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'cloudflare-pages', path: 'prototypes/home' }),
@@ -1591,7 +1592,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/latest`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/latest`));
       const body = await readJsonResponse(response);
 
       expect(response.status).toBe(200);
@@ -1648,7 +1649,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/latest?path=${encodeURIComponent('src/prototypes/home')}`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/latest?path=${encodeURIComponent('src/prototypes/home')}`));
       const body = await readJsonResponse(response);
 
       expect(response.status).toBe(200);
@@ -1686,7 +1687,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/latest?path=${encodeURIComponent('themes/brand')}`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/latest?path=${encodeURIComponent('themes/brand')}`));
       const body = await readJsonResponse(response);
 
       expect(response.status).toBe(200);
@@ -1712,7 +1713,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 'vercel', path: 'themes/brand' }),
@@ -1757,7 +1758,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 's3', path: 'prototypes/home' }),
@@ -1797,7 +1798,7 @@ describe('cloud publishing API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(`${server.origin}/api/cloud-publishing/publish`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/cloud-publishing/publish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target: 's3', path: 'prototypes/home' }),

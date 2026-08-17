@@ -54,7 +54,7 @@ function getAssistantRuntimePageStore(): AssistantRuntimePageStore {
 }
 
 function resolveAssistantRuntimeProjectKey(projectId?: string | null): string {
-    return projectId?.trim() || '__active__';
+    return projectId?.trim() || '__none__';
 }
 
 function getAssistantRuntimeProjectStore(projectId?: string | null): AssistantRuntimeProjectStore {
@@ -94,7 +94,7 @@ function resolveAssistantRuntimeRequestKey(options?: { autoStart?: boolean }): A
     return options?.autoStart === false ? 'probe' : 'auto-start';
 }
 
-async function requestAssistantRuntime(projectId?: string | null, options?: { autoStart?: boolean }): Promise<AssistantRuntimeState> {
+async function requestAssistantRuntime(projectId: string, options?: { autoStart?: boolean }): Promise<AssistantRuntimeState> {
     const store = getAssistantRuntimeProjectStore(projectId);
     const requestKey = resolveAssistantRuntimeRequestKey(options);
     const existingRequest = store.requests[requestKey];
@@ -105,7 +105,7 @@ async function requestAssistantRuntime(projectId?: string | null, options?: { au
     const request = (async () => {
         const nextRuntime = await apiService.getAssistantRuntime({
             autoStart: options?.autoStart ?? true,
-            projectId: projectId?.trim() || undefined,
+            projectId,
         }) as AssistantRuntimeState;
         writeAssistantRuntime(projectId, nextRuntime);
         return nextRuntime;
@@ -124,6 +124,11 @@ async function ensureAssistantRuntimeInitialized(
     projectId: string | null | undefined,
     defaultRuntime: AssistantRuntimeState,
 ): Promise<AssistantRuntimeState> {
+    const normalizedProjectId = projectId?.trim() || '';
+    if (!normalizedProjectId) {
+        writeAssistantRuntime(projectId, defaultRuntime);
+        return defaultRuntime;
+    }
     const store = getAssistantRuntimeProjectStore(projectId);
 
     if (store.initialized && store.runtime) {
@@ -139,7 +144,7 @@ async function ensureAssistantRuntimeInitialized(
         return store.initialProbePromise;
     }
 
-    store.initialProbePromise = requestAssistantRuntime(projectId, { autoStart: false })
+    store.initialProbePromise = requestAssistantRuntime(normalizedProjectId, { autoStart: false })
         .catch(() => {
             writeAssistantRuntime(projectId, defaultRuntime);
             return defaultRuntime;
@@ -179,7 +184,12 @@ export function useAssistantRuntime({ defaultRuntime, projectId }: UseAssistantR
     }, [projectId]);
 
     const refreshRuntime = useCallback(async (options?: { autoStart?: boolean }) => {
-        return requestAssistantRuntime(projectId, {
+        const normalizedProjectId = projectId?.trim() || '';
+        if (!normalizedProjectId) {
+            writeAssistantRuntime(projectId, defaultRuntimeRef.current);
+            return defaultRuntimeRef.current;
+        }
+        return requestAssistantRuntime(normalizedProjectId, {
             autoStart: options?.autoStart ?? false,
         });
     }, [projectId]);

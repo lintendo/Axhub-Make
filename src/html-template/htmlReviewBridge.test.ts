@@ -44,10 +44,10 @@ function createHarness(
           source: 'flowchart LR\nA-->B',
           sourceHash: 'source-hash',
           sourcePath: diagramKind === 'mermaid'
-            ? 'src/resources/review/demo.assets/diagrams/mermaid-1.excalidraw'
+            ? 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.excalidraw'
             : 'src/resources/review/existing/architecture.drawio.svg',
           previewPath: diagramKind === 'mermaid'
-            ? 'src/resources/review/demo.assets/diagrams/mermaid-1.png'
+            ? 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.png'
             : 'src/resources/review/existing/architecture.drawio.svg',
         }],
       });
@@ -59,10 +59,10 @@ function createHarness(
         kind: diagramKind,
         sourceHash: 'source-hash',
         sourcePath: diagramKind === 'mermaid'
-          ? 'src/resources/review/demo.assets/diagrams/mermaid-1.excalidraw'
+          ? 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.excalidraw'
           : 'src/resources/review/existing/architecture.drawio.svg',
         previewPath: diagramKind === 'mermaid'
-          ? 'src/resources/review/demo.assets/diagrams/mermaid-1.png'
+          ? 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.png'
           : 'src/resources/review/existing/architecture.drawio.svg',
         summary: [],
         stale: false,
@@ -76,10 +76,10 @@ function createHarness(
         kind: diagramKind,
         sourceHash: 'source-hash',
         sourcePath: diagramKind === 'mermaid'
-          ? 'src/resources/review/demo.assets/diagrams/mermaid-1.excalidraw'
+          ? 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.excalidraw'
           : 'src/resources/review/existing/architecture.drawio.svg',
         previewPath: diagramKind === 'mermaid'
-          ? 'src/resources/review/demo.assets/diagrams/mermaid-1.png'
+          ? 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.png'
           : 'src/resources/review/existing/architecture.drawio.svg',
         summary: ['调整了支付流程方向'],
         stale: true,
@@ -157,6 +157,8 @@ describe('HTML review bridge', () => {
   it('normalizes Make resource ids and absolute preview paths to project-relative HTML paths', () => {
     expect(normalizeHtmlReviewDocumentPath('examples/demo.html')).toBe('src/resources/examples/demo.html');
     expect(normalizeHtmlReviewDocumentPath('src/resources/examples/demo.html')).toBe('src/resources/examples/demo.html');
+    expect(normalizeHtmlReviewDocumentPath('src/prototypes/order/.spec/spec.html')).toBe('src/prototypes/order/.spec/spec.html');
+    expect(normalizeHtmlReviewDocumentPath('templates/prototype-spec.html')).toBe('templates/prototype-spec.html');
     expect(normalizeHtmlReviewDocumentPath('/workspace/client/src/resources/examples/demo.html')).toBe('src/resources/examples/demo.html');
     expect(normalizeHtmlReviewDocumentPath('/api/markdown-file')).toBe('');
     expect(normalizeHtmlReviewDocumentPath('../demo.html')).toBe('');
@@ -191,7 +193,7 @@ describe('HTML review bridge', () => {
     const body = JSON.parse(String(post?.[1]?.body));
     expect(body).toMatchObject({ path: 'src/resources/review/demo.html', diagramKey: 'mermaid-1' });
     expect(body.excalidraw.elements).toEqual([{ id: 'shape-1' }]);
-    expect(popup.location.href).toContain('docPath=src%2Fresources%2Freview%2Fdemo.assets%2Fdiagrams%2Fmermaid-1.excalidraw');
+    expect(popup.location.href).toContain('docPath=src%2Fresources%2F.assets%2Freview%2Fdemo.html%2Fdiagrams%2Fmermaid-1.excalidraw');
     expect(popup.location.href).toContain('view=canvas');
     expect(setComment).not.toHaveBeenCalled();
   });
@@ -250,8 +252,8 @@ describe('HTML review bridge', () => {
         '图表修改：mermaid-1',
         '状态：已更新（原 HTML 图表源已变化）',
         '修改概览：调整了支付流程方向',
-        '源文件：src/resources/review/demo.assets/diagrams/mermaid-1.excalidraw',
-        '预览文件：src/resources/review/demo.assets/diagrams/mermaid-1.png',
+        '源文件：src/resources/.assets/review/demo.html/diagrams/mermaid-1.excalidraw',
+        '预览文件：src/resources/.assets/review/demo.html/diagrams/mermaid-1.png',
         '源版本：source-hash',
       ].join('\n'),
     });
@@ -269,8 +271,8 @@ describe('HTML review bridge', () => {
           diagrams: [{
             key: 'mermaid-1', kind: 'mermaid', documentIndex: 0,
             source: 'flowchart LR\nA-->B', sourceHash: 'source-hash',
-            sourcePath: 'src/resources/review/demo.assets/diagrams/mermaid-1.excalidraw',
-            previewPath: 'src/resources/review/demo.assets/diagrams/mermaid-1.png',
+            sourcePath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.excalidraw',
+            previewPath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.png',
           }],
         });
       }
@@ -279,8 +281,8 @@ describe('HTML review bridge', () => {
         return jsonResponse({
           sessionId: postCount === 1 ? 'session-old' : 'session-new',
           diagramKey: 'mermaid-1', kind: 'mermaid', sourceHash: 'source-hash',
-          sourcePath: 'src/resources/review/demo.assets/diagrams/mermaid-1.excalidraw',
-          previewPath: 'src/resources/review/demo.assets/diagrams/mermaid-1.png',
+          sourcePath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.excalidraw',
+          previewPath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.png',
           summary: [], stale: false,
           updatedAt: postCount === 1 ? '2026-07-12T00:00:00.000Z' : '2026-07-12T00:01:00.000Z',
         }, 201);
@@ -290,8 +292,8 @@ describe('HTML review bridge', () => {
         return jsonResponse({
           sessionId: isOld ? 'session-old' : 'session-new',
           diagramKey: 'mermaid-1', kind: 'mermaid', sourceHash: 'source-hash',
-          sourcePath: 'src/resources/review/demo.assets/diagrams/mermaid-1.excalidraw',
-          previewPath: 'src/resources/review/demo.assets/diagrams/mermaid-1.png',
+          sourcePath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.excalidraw',
+          previewPath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.png',
           summary: [isOld ? '旧修改' : '新修改'], stale: false,
           updatedAt: isOld ? '2026-07-12T00:00:00.000Z' : '2026-07-12T00:01:00.000Z',
         });
@@ -320,15 +322,15 @@ describe('HTML review bridge', () => {
         return jsonResponse({ diagrams: [{
           key: 'mermaid-1', kind: 'mermaid', documentIndex: 0,
           source: 'flowchart LR\nA-->B', sourceHash: 'source-hash',
-          sourcePath: 'src/resources/review/demo.assets/diagrams/mermaid-1.excalidraw',
-          previewPath: 'src/resources/review/demo.assets/diagrams/mermaid-1.png',
+          sourcePath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.excalidraw',
+          previewPath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.png',
         }] });
       }
       if (url.includes('/diagram-drafts') && !url.includes('/diagram-drafts/') && init?.method === 'POST') {
         return jsonResponse({
           sessionId: 'session-1', diagramKey: 'mermaid-1', kind: 'mermaid', sourceHash: 'source-hash',
-          sourcePath: 'src/resources/review/demo.assets/diagrams/mermaid-1.excalidraw',
-          previewPath: 'src/resources/review/demo.assets/diagrams/mermaid-1.png',
+          sourcePath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.excalidraw',
+          previewPath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.png',
           summary: [], stale: false, updatedAt: '2026-07-12T00:00:00.000Z',
         }, 201);
       }
@@ -342,8 +344,8 @@ describe('HTML review bridge', () => {
     bridge.dispose();
     resolveDraft?.(jsonResponse({
       sessionId: 'session-1', diagramKey: 'mermaid-1', kind: 'mermaid', sourceHash: 'source-hash',
-      sourcePath: 'src/resources/review/demo.assets/diagrams/mermaid-1.excalidraw',
-      previewPath: 'src/resources/review/demo.assets/diagrams/mermaid-1.png',
+      sourcePath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.excalidraw',
+      previewPath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.png',
       summary: ['不应写入'], stale: false, updatedAt: '2026-07-12T00:01:00.000Z',
     }));
     await refresh;
@@ -374,22 +376,22 @@ describe('HTML review bridge', () => {
           {
             key: 'mermaid-1', kind: 'mermaid', documentIndex: 0,
             source: 'flowchart LR\nA-->B', sourceHash: 'first-hash',
-            sourcePath: 'src/resources/review/demo.assets/diagrams/mermaid-1.excalidraw',
-            previewPath: 'src/resources/review/demo.assets/diagrams/mermaid-1.png',
+            sourcePath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.excalidraw',
+            previewPath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.png',
           },
           {
             key: 'mermaid-2', kind: 'mermaid', documentIndex: 1,
             source: 'flowchart LR\nC-->D', sourceHash: 'second-hash',
-            sourcePath: 'src/resources/review/demo.assets/diagrams/mermaid-2.excalidraw',
-            previewPath: 'src/resources/review/demo.assets/diagrams/mermaid-2.png',
+            sourcePath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-2.excalidraw',
+            previewPath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-2.png',
           },
         ] });
       }
       if (url.includes('/diagram-drafts/session-2')) {
         return jsonResponse({
           sessionId: 'session-2', diagramKey: 'mermaid-2', kind: 'mermaid', sourceHash: 'second-hash',
-          sourcePath: 'src/resources/review/demo.assets/diagrams/mermaid-2.excalidraw',
-          previewPath: 'src/resources/review/demo.assets/diagrams/mermaid-2.png',
+          sourcePath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-2.excalidraw',
+          previewPath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-2.png',
           summary: ['恢复第二张图'], stale: false, updatedAt: '2026-07-12T00:02:00.000Z',
         });
       }

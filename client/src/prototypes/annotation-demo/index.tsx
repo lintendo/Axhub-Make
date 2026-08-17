@@ -26,7 +26,6 @@ import {
 import { defineHashPageRoute, useHashPage } from '../../common/useHashPage';
 import agentReadAsset from './assets/agent-read.png';
 import aiSkillOpenAsset from './assets/ai-skill-open.png';
-import commentMenuOpenAsset from './assets/comment-menu-open.png';
 import documentEditAsset from './assets/document-edit.png';
 import makeAnnotationAsset from './assets/make-annotation.png';
 import manualEditCommentAsset from './assets/manual-edit-comment.png';
@@ -130,7 +129,7 @@ const chapters: Chapter[] = [
         id: 'generate-annotation',
         title: '开启标注',
         eyebrow: '05 · ENABLE',
-        summary: '你可以通过 AI 或者手动开启标注，推荐前者。',
+        summary: '从原型顶部的标注入口进入后，可以选择人工开启或 AI 开启，按当前任务确定标注的生成方式。',
         metrics: { wordCount: '约 280 字', readingTime: '约 1 分钟' },
         icon: Sparkles,
     },
@@ -138,7 +137,7 @@ const chapters: Chapter[] = [
         id: 'edit-comments',
         title: '编辑标注',
         eyebrow: '06 · EDIT',
-        summary: '编辑标注分为 AI 编辑和手动编辑。AI 可直接在对话里提出，也可先批注再执行；手动则用于补节点和改内容。',
+        summary: '从原型顶部的标注入口进入编辑状态后，可以在 AI 编辑与手动编辑之间切换，继续完善标注和文档。',
         metrics: { wordCount: '约 360 字', readingTime: '约 1 分钟' },
         icon: PencilLine,
     },
@@ -172,19 +171,14 @@ const comparisonRows: ComparisonRow[] = [
 
 const openAnnotationMethods = [
     {
-        title: '批注工具',
-        detail: '通过批注工具的技能可以新建标注',
+        title: '人工开启',
+        detail: '从原型顶部的标注入口进入后，选择手动开启，直接进入人工标注状态。',
         image: makeAnnotationAsset,
     },
     {
-        title: 'Agent 标注技能',
-        detail: '使用项目内置的技能，即可任意生成和编辑标注',
+        title: 'AI 开启',
+        detail: '从同一个顶部入口选择复制提示词给 AI，让 Agent 根据当前原型生成第一版标注。',
         image: aiSkillOpenAsset,
-    },
-    {
-        title: '批注模式更多菜单',
-        detail: '批注模式下，从更多菜单开启标注。',
-        image: commentMenuOpenAsset,
     },
 ];
 
@@ -210,32 +204,32 @@ const capabilityItems = [
 const editCommentGroups = [
     {
         title: 'AI 编辑',
-        detail: '把修改意图交给 AI 处理。',
+        detail: '从原型顶部的标注入口进入编辑状态后，把修改意图交给 AI 处理。',
         methods: [
             {
                 title: '对话框直接提',
-                detail: '在对话框直接跟 AI 提修改要求。',
+                detail: '进入编辑状态后，在对话框直接跟 AI 提修改要求。',
                 image: aiSkillOpenAsset,
             },
             {
                 title: '批注后通过 AI 执行',
-                detail: '先留下批注，再让 AI 按批注执行。',
+                detail: '进入编辑状态后，先留下批注，再让 AI 按批注执行。',
                 image: makeAnnotationAsset,
             },
         ],
     },
     {
         title: '手动编辑',
-        detail: '用于少量校正和补充。',
+        detail: '从同一顶部入口进入编辑状态后，用于少量校正和补充。',
         methods: [
             {
                 title: '编辑节点',
-                detail: '通过批注新增节点和编辑节点内容。',
+                detail: '选择页面元素后，直接新增节点或编辑节点内容。',
                 image: manualEditCommentAsset,
             },
             {
                 title: '编辑文档',
-                detail: '批注文章时直接编辑文档内容（需要 AI 关联文档）。',
+                detail: '选择目录中的文档节点后，直接编辑关联文档内容。',
                 image: documentEditAsset,
             },
         ],
@@ -336,7 +330,6 @@ const directoryMarkdownByPath: Record<string, string> = {
 
 const directoryMarkdownAssetTokens: Record<string, string> = {
     '__ANNOTATION_IMAGE_AI_SKILL_OPEN__': aiSkillOpenAsset,
-    '__ANNOTATION_IMAGE_COMMENT_MENU_OPEN__': commentMenuOpenAsset,
     '__ANNOTATION_IMAGE_AGENT_READ__': agentReadAsset,
     '__ANNOTATION_IMAGE_MANUAL_EDIT_COMMENT__': manualEditCommentAsset,
     '__ANNOTATION_IMAGE_DOCUMENT_EDIT__': documentEditAsset,

@@ -154,6 +154,8 @@ export function createWebEditorUiRuntime(options: WebEditorUiRuntimeOptions): We
     aiExecutionProviderOptions: [],
     darkMode: false,
     disablePageAnimations: false,
+    captureTargetScreenshotAvailable: false,
+    captureTargetScreenshot: false,
     pageZoomEnabled: false,
     copySkillInstallPromptDisabled: true,
     selectionModeActive: options.initialSelectionModeActive ?? true,
@@ -241,8 +243,8 @@ export function createWebEditorUiRuntime(options: WebEditorUiRuntimeOptions): We
           enterCommentInput(mode?: CommentEntryMode) {
             propertyPanelBridge.runOrQueue((api) => api.enterCommentInput?.(mode));
           },
-          enterInlineTextEdit() {
-            propertyPanelBridge.runOrQueue((api) => api.enterInlineTextEdit?.());
+          enterInlineTextEdit(element?: HTMLElement | null) {
+            propertyPanelBridge.runOrQueue((api) => api.enterInlineTextEdit?.(element));
           },
           getHostToolbarState() {
             return propertyPanelRef.current?.getHostToolbarState() ?? getFallbackHostToolbarState();
@@ -274,8 +276,8 @@ export function createWebEditorUiRuntime(options: WebEditorUiRuntimeOptions): We
         refresh() {
           breadcrumbsBridge.runOrQueue((api) => api.refresh());
         },
-        enterInlineTextEdit() {
-          breadcrumbsBridge.runOrQueue((api) => api.enterInlineTextEdit?.());
+        enterInlineTextEdit(element?: HTMLElement | null) {
+          breadcrumbsBridge.runOrQueue((api) => api.enterInlineTextEdit?.(element));
         },
         dispose,
       }

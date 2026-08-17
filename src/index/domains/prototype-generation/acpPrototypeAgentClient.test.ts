@@ -147,6 +147,7 @@ describe('ACP prototype agent client', () => {
     })) as any;
 
     const result = await runAcpPrototypeAgent({
+      projectId: 'project-b',
       provider: 'codex',
       prompt: '生成 CRM 原型',
       canvasFilePath: 'src/resources/flows/home.excalidraw',
@@ -175,13 +176,14 @@ describe('ACP prototype agent client', () => {
       }),
     ]);
     expect(websocketCtor).not.toHaveBeenCalled();
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/ai/runs', {
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/ai/runs?projectId=project-b', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: expect.any(String),
     });
     const requestBody = JSON.parse((globalThis.fetch as any).mock.calls[0][1].body);
     expect(requestBody).toMatchObject({
+      projectId: 'project-b',
       scene: 'prototype',
       targetPath: 'prototypes/home',
       generatorElementId: 'generator-1',
@@ -217,6 +219,7 @@ describe('ACP prototype agent client', () => {
     })) as any;
 
     await runAcpPrototypeAgent({
+      projectId: 'project-b',
       provider: 'codex',
       prompt: '按参考图生成原型',
       canvasFilePath: 'src/resources/flows/home.excalidraw',
@@ -258,6 +261,7 @@ describe('ACP prototype agent client', () => {
     };
 
     await runAcpPrototypeAgent({
+      projectId: 'project-b',
       provider: 'codex',
       prompt: '按上下文生成原型',
       canvasFilePath: 'src/resources/flows/home.excalidraw',
@@ -297,6 +301,7 @@ describe('ACP prototype agent client', () => {
     })) as any;
 
     await runAcpPrototypeAgent({
+      projectId: 'project-b',
       provider: 'codex',
       prompt: '生成官网首页',
       canvasFilePath: 'src/resources/flows/untitled-4.excalidraw',
@@ -324,6 +329,7 @@ describe('ACP prototype agent client', () => {
     })) as any;
 
     const result = await runAcpPrototypeAgent({
+      projectId: 'project-b',
       provider: 'codex',
       prompt: '生成失败案例',
       generatorElementId: 'generator-1',

@@ -80,7 +80,6 @@ export function buildInjectScript(options: AdminStaticOptions): string {
       localHost: '${escapeScriptString(shareHosts.localHost)}',
       lanHost: '${escapeScriptString(lanHost)}'
     };
-    window.__PROJECT_ROOT__ = '${escapeScriptString(options.projectRoot)}';
     window.__AXHUB_MAKE_API_ORIGIN__ = window.location.origin;
     window.__RUNTIME_ORIGIN__ = '${escapeScriptString(options.runtimeOrigin || '')}';
     window.__AXHUB_CANVAS_MCP_URL__ = '${AXHUB_CANVAS_MCP_PATH}';

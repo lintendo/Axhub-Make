@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "sourceViewport": {
+    "width": 863,
+    "height": 1823
+  },
+  "status": "accepted-with-light-deviations",
+  "reviewedAreas": [
+    "structure",
+    "spacing",
+    "typography",
+    "layer-order",
+    "special-visual-text",
+    "bitmap-assets",
+    "svg-assets",
+    "bottom-navigation"
+  ],
+  "resolvedFindings": [
+    {
+      "id": "review-layer-order",
+      "finding": "卡片背景覆盖了未设置 z-index 的图标和文字。",
+      "resolution": "素材统一提升到 z-index 4，文字统一提升到 z-index 5。"
+    },
+    {
+      "id": "review-header-color",
+      "finding": "顶部 CSS 渐变比源图亮，状态栏和徽标裁片出现底色块。",
+      "resolution": "按源图采样值将顶部渐变校准为 #0141a6 到 #013da4。"
+    },
+    {
+      "id": "review-hot-card-seams",
+      "finding": "热门服务卡片的装饰裁片包含原背景，出现矩形接缝。",
+      "resolution": "三枚装饰改为透明 SVG 重绘。"
+    },
+    {
+      "id": "review-banner-text",
+      "finding": "Banner 标题属于摄影、渐变和轮播状态的完整构图。",
+      "resolution": "保留在 Banner 位图中，OCR 仅用于语义校验，不重复叠加 HTML 文字。"
+    }
+  ],
+  "assetDecisions": [
+    {
+      "group": "hero-banner",
+      "decision": "reuse-clean-crop",
+      "reason": "源图区域完整且包含不可分割的城市摄影与展示文字。"
+    },
+    {
+      "group": "primary-icons",
+      "decision": "reuse-clean-crop",
+      "reason": "首版保留原像素以维持渐变、阴影和细节。"
+    },
+    {
+      "group": "hot-card-decorations",
+      "decision": "reconstruct-svg",
+      "reason": "几何结构简单，透明 SVG 比带背景裁片更干净。"
+    },
+    {
+      "group": "ordinary-copy-and-containers",
+      "decision": "html-css",
+      "reason": "保证文案可编辑，容器和分隔线可确定性复现。"
+    }
+  ],
+  "remainingDeviations": [
+    "浏览器 PingFang SC 与源截图字体栅格化存在轻微字宽和抗锯齿差异。",
+    "热门服务三枚低对比装饰为透明 SVG 近似，不逐像素复用原位图。"
+  ]
+}

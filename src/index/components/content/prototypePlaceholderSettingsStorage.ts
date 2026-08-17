@@ -18,7 +18,7 @@ export interface PrototypePlaceholderSettingsSnapshot {
   imageStartParams?: PlaceholderImageStartParams;
   documentFormat?: CanvasDocumentFormat | '';
   documentHtmlVisualSpec?: string;
-  documentNeedsRequirementsAnalysis?: boolean;
+  documentUsePrdPlanning?: boolean;
   selectedDocumentTemplateName?: string;
 }
 
@@ -100,7 +100,7 @@ function normalizeSnapshot(value: unknown): PrototypePlaceholderSettingsSnapshot
   const imageStartParams = normalizeImageStartParams(value.imageStartParams);
   const documentFormat = normalizeDocumentFormat(value.documentFormat);
   const documentHtmlVisualSpec = normalizeString(value.documentHtmlVisualSpec);
-  const documentNeedsRequirementsAnalysis = normalizeBoolean(value.documentNeedsRequirementsAnalysis);
+  const documentUsePrdPlanning = normalizeBoolean(value.documentUsePrdPlanning);
   const selectedDocumentTemplateName = normalizeString(value.selectedDocumentTemplateName);
 
   if (prototypeGenerationCount !== undefined) next.prototypeGenerationCount = prototypeGenerationCount;
@@ -109,7 +109,7 @@ function normalizeSnapshot(value: unknown): PrototypePlaceholderSettingsSnapshot
   if (imageStartParams) next.imageStartParams = imageStartParams;
   if (documentFormat !== undefined) next.documentFormat = documentFormat;
   if (documentHtmlVisualSpec) next.documentHtmlVisualSpec = documentHtmlVisualSpec;
-  if (documentNeedsRequirementsAnalysis !== undefined) next.documentNeedsRequirementsAnalysis = documentNeedsRequirementsAnalysis;
+  if (documentUsePrdPlanning !== undefined) next.documentUsePrdPlanning = documentUsePrdPlanning;
   if (selectedDocumentTemplateName) next.selectedDocumentTemplateName = selectedDocumentTemplateName;
 
   return next;

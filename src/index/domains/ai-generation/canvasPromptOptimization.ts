@@ -3,6 +3,7 @@ import type { CanvasAiScene, CanvasGenerationAttachmentPart } from '../shared/Ca
 import { runAiText } from './aiRunClient';
 
 export interface CanvasPromptOptimizationOptions {
+  projectId: string;
   prompt: string;
   scene: CanvasAiScene;
   sceneSettings?: unknown;
@@ -111,6 +112,7 @@ export async function optimizeCanvasPrompt(options: CanvasPromptOptimizationOpti
 
   const runId = createCanvasPromptOptimizationRunId();
   const result = await runAiText({
+    projectId: options.projectId,
     scene: 'direct',
     prompt: buildCanvasPromptOptimizationPrompt({
       ...options,

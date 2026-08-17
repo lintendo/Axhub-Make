@@ -19,6 +19,31 @@ function readVersionCardsSource() {
 }
 
 describe('VersionCollaborationPanel source', () => {
+  it('scopes every workspace and prototype Git request to the selected project', () => {
+    const panelSource = readPanelSource();
+    const managerSource = readVersionManagerSource();
+
+    expect(panelSource).toContain('projectId: string;');
+    expect(panelSource).toContain('apiService.getGitWorkspaceStatus({');
+    expect(panelSource).toContain('}, { projectId });');
+    expect(panelSource).toContain('apiService.initGitWorkspace({ projectId })');
+    expect(panelSource).toContain('apiService.commitGitWorkspace(message, { projectId })');
+    expect(panelSource).toContain('apiService.setGitWorkspaceRemote({ url }, { projectId })');
+    expect(panelSource).toContain('apiService.fetchGitWorkspace({ projectId })');
+    expect(panelSource).toContain('apiService.syncDownGitWorkspace({ projectId })');
+    expect(panelSource).toContain('apiService.pushGitWorkspace({ projectId })');
+    expect(panelSource).toContain('apiService.createGitWorkspaceRemoteRepository({ repositoryName, visibility }, { projectId })');
+
+    expect(managerSource).toContain("withProjectScope(`/api/git/history?path=${encodeURIComponent(targetPath)}`, projectScope)");
+    expect(managerSource).toContain("withProjectScope('/api/git/restore', projectScope)");
+    expect(managerSource).toContain('apiService.getGitWorkspaceStatus({ path: targetPath }, projectScope)');
+    expect(managerSource).toContain('apiService.commitGitWorkspace(commitMessage.trim(), projectScope, { path: targetPath })');
+    expect(managerSource).toContain("withProjectScope('/api/git/build-version', projectScope)");
+    expect(managerSource).toContain('apiService.fetchGitWorkspace(projectScope)');
+    expect(managerSource).toContain('apiService.syncDownGitWorkspace(projectScope)');
+    expect(managerSource).toContain('apiService.pushGitWorkspace(projectScope)');
+  });
+
   it('exports shared flat version section, info, and commit row primitives', () => {
     const cardsSource = readVersionCardsSource();
 
@@ -82,6 +107,22 @@ describe('VersionCollaborationPanel source', () => {
     expect(localPanelSource).toMatch(/status\?\.hasChanges \? \(\s*<>\s*<SectionCard title="更改文件">[\s\S]*?<ChangeItemList items=\{changeItems\} \/>[\s\S]*?<\/SectionCard>[\s\S]*?<SectionCard title="提交版本">/);
   });
 
+  it('shows current local changes and commit controls before version history', () => {
+    const source = readPanelSource();
+    const localPanelStart = source.indexOf('{showLocalPanel ? (');
+    const onlinePanelStart = source.indexOf('{showOnlinePanel ? (');
+    const localPanelSource = source.slice(localPanelStart, onlinePanelStart);
+    const currentChangesStart = localPanelSource.indexOf('{!status?.isHistoricalVersion && status?.hasChanges ? (');
+    const changeFilesIndex = localPanelSource.indexOf('<SectionCard title="更改文件">', currentChangesStart);
+    const commitVersionIndex = localPanelSource.indexOf('<SectionCard title="提交版本">', currentChangesStart);
+    const historyIndex = localPanelSource.indexOf('<SectionCard title="历史版本"');
+
+    expect(currentChangesStart).toBeGreaterThan(-1);
+    expect(changeFilesIndex).toBeGreaterThan(currentChangesStart);
+    expect(commitVersionIndex).toBeGreaterThan(changeFilesIndex);
+    expect(historyIndex).toBeGreaterThan(commitVersionIndex);
+  });
+
   it('keeps branch selection out of the connect-remote form', () => {
     const source = readPanelSource();
     const connectFormStart = source.indexOf("{onlineMode === 'connect' ? (");
@@ -106,6 +147,28 @@ describe('VersionCollaborationPanel source', () => {
     expect(onlineInfoSource).toContain('renderOnlineBranchSelect()');
   });
 
+  it('treats branch selectors as read-only status views', () => {
+    const panelSource = readPanelSource();
+
+    expect(panelSource).toContain("const [viewedBranch, setViewedBranch] = useState('');");
+    expect(panelSource).toContain("const [viewedRemoteBranch, setViewedRemoteBranch] = useState('');");
+    expect(panelSource).toContain('branch: historicalVersion ? undefined : requestedBranch || undefined');
+    expect(panelSource).toContain('remoteBranch: historicalVersion ? undefined : requestedRemoteBranch || undefined');
+    expect(panelSource).toContain('<InfoRow label="工作区分支">');
+    expect(panelSource).toContain('<InfoRow label="查看分支">');
+    expect(panelSource).toContain('const branchView = status?.branchView;');
+    expect(panelSource).toContain('branchView?.recentCommits');
+    expect(panelSource).toContain('branchView?.remoteComparison');
+    expect(panelSource).toContain('const canWriteViewedPair = Boolean(');
+    expect(panelSource).toContain("getActionErrorCode(error) === 'BRANCH_NOT_FOUND'");
+    expect(panelSource).toContain('查看的分支已不存在，已返回工作区分支');
+    expect(panelSource).toContain('!canWriteViewedPair');
+    expect(panelSource).not.toContain("| 'branch'");
+    expect(panelSource).not.toContain('handleSwitchBranch');
+    expect(panelSource).not.toContain('switchGitWorkspaceBranch');
+    expect(panelSource).not.toContain("() => apiService.setGitWorkspaceRemote({ url, defaultBranch: branch })");
+  });
+
   it('moves git management prompts into a dedicated skill tab', () => {
     const panelSource = readPanelSource();
     const drawerSource = readDrawerSource();
@@ -113,7 +176,7 @@ describe('VersionCollaborationPanel source', () => {
     expect(drawerSource).toContain('grid-cols-3');
     expect(drawerSource).toContain('<TabsTrigger value="skills"');
     expect(drawerSource).toContain('管理技能');
-    expect(drawerSource).toContain('<VersionCollaborationPanel activeTab="skills" />');
+    expect(drawerSource).toContain('<VersionCollaborationPanel projectId={projectId} activeTab="skills" />');
 
     expect(panelSource).toContain("export type VersionCollaborationTab = 'local' | 'online' | 'skills' | 'all';");
     expect(panelSource).toContain("const showSkillPanel = activeTab === 'skills' || activeTab === 'all';");
@@ -146,7 +209,8 @@ describe('VersionCollaborationPanel source', () => {
     const panelSource = readPanelSource();
 
     expect(panelSource).toContain('const historicalVersion = getHistoricalVersionFromLocation();');
-    expect(panelSource).toContain('apiService.getGitWorkspaceStatus({ gitVersion: historicalVersion })');
+    expect(panelSource).toContain('gitVersion: historicalVersion,');
+    expect(panelSource).toContain('branch: historicalVersion ? undefined : requestedBranch || undefined');
     expect(panelSource).toContain('<InfoRow label="版本">');
     expect(panelSource).toContain('function getWorkspaceVersionText(');
     expect(panelSource).toContain('status.currentCommit?.shortHash');
@@ -191,10 +255,11 @@ describe('VersionCollaborationPanel source', () => {
     const currentInfoSource = localPanelSource.slice(infoStart, historicalDetailsStart);
 
     expect(panelSource).toContain('VersionCommitRow');
-    expect(panelSource).toContain('const recentCommits = status?.recentCommits || [];');
+    expect(panelSource).toContain('const recentCommits = branchView?.recentCommits || status?.recentCommits || [];');
     expect(localPanelSource).toContain('<SectionCard title="历史版本" contentClassName="px-3.5 py-0">');
     expect(localPanelSource).toContain('<VersionCommitRow');
-    expect(localPanelSource).toContain('index === 0 && !status?.hasChanges');
+    expect(localPanelSource).toContain('index === 0');
+    expect(localPanelSource).toContain('分支最新');
     expect(currentInfoSource).not.toContain('<InfoRow label="版本">');
     expect(currentInfoSource).not.toContain('getWorkspaceVersionText(status)');
   });
@@ -306,7 +371,7 @@ describe('VersionCollaborationPanel source', () => {
     expect(source).toContain('previewReady: true,');
     expect(source).toContain("toast.success('历史版本已准备好，请再次点击预览');");
 
-    const buildRequestStart = source.indexOf("const response = await fetch('/api/git/build-version'");
+    const buildRequestStart = source.indexOf("const response = await fetch(withProjectScope('/api/git/build-version', projectScope)");
     const buildHandlerEnd = source.indexOf('const handleFetchRemote', buildRequestStart);
     const buildRequestSource = source.slice(buildRequestStart, buildHandlerEnd);
     expect(buildRequestStart).toBeGreaterThan(-1);
@@ -375,8 +440,8 @@ describe('VersionCollaborationPanel source', () => {
     expect(onlineTabSource).toContain('{showOnlineContent ? (');
     expect(onlineTabSource).toContain('{showOnlineIncoming ? (');
     expect(onlineTabSource).toContain('{showOnlineOutgoing ? (');
-    expect(panelSource).toContain("description={`从线上 ${status?.remoteComparison?.branch || onlineBranchValue || '当前'} 同步到本地，涉及 ${incomingTotal} 个文件。`}");
-    expect(panelSource).toContain("description={`推送到线上 ${status?.remoteComparison?.branch || onlineBranchValue || '当前'}，涉及 ${outgoingTotal} 个文件。`}");
+    expect(panelSource).toContain("description={`从线上 ${viewedRemoteComparison?.branch || onlineBranchValue || '当前'} 同步到本地，涉及 ${incomingTotal} 个文件。`}");
+    expect(panelSource).toContain("description={`推送到线上 ${viewedRemoteComparison?.branch || onlineBranchValue || '当前'}，涉及 ${outgoingTotal} 个文件。`}");
     expect(onlineTabSource).toContain("description={`从线上 ${workspaceStatus?.remoteComparison?.branch || '当前'} 同步整个项目，当前原型涉及 ${incomingTotal} 个文件。`}");
     expect(onlineTabSource).toContain("description={`推送整个项目到线上 ${workspaceStatus?.remoteComparison?.branch || '当前'}，当前原型涉及 ${outgoingTotal} 个文件。`}");
     expect(onlineTabSource).not.toContain('note=');

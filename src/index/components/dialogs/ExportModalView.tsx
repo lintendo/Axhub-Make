@@ -5,6 +5,7 @@ import { AxureCopyOptions, ImageConfig, TabType, PromptClientPreference } from '
 import { IDEAvailabilityMap, MainIDEPreference } from '../../../common/ide';
 import type { ExportAvailability } from '../../types/index-page.types';
 import { apiService } from '../../services/api';
+import { requireProjectScope } from '../../services/projectScope';
 import type {
     AxureApiListKey,
     AxureApiListPreview,
@@ -65,6 +66,7 @@ function statusText(status: AxureApiListPreview['parseStatus']): string {
 
 interface ExportModalProps {
     open: boolean;
+    projectId: string;
     preferencesStorageKey: string;
     onClose: () => void;
     imageConfig: ImageConfig;
@@ -94,6 +96,7 @@ interface ExportModalProps {
 
 export default function ExportModal({
     open,
+    projectId,
     preferencesStorageKey,
     onClose,
     imageConfig,
@@ -183,7 +186,7 @@ export default function ExportModal({
 
         setIsReviewing(true);
         try {
-            const result = await apiService.reviewCode(sourceTargetPath, {
+            const result = await apiService.reviewCode(sourceTargetPath, requireProjectScope(projectId), {
                 enforceComponentExportName: true,
                 mode: 'axure-export',
             });
@@ -253,7 +256,7 @@ export default function ExportModal({
         setIsLoadingAxureApi(true);
         setAxureApiError('');
         try {
-            const preview = await apiService.getAxureApiPreview(sourceTargetPath);
+            const preview = await apiService.getAxureApiPreview(sourceTargetPath, requireProjectScope(projectId));
             setAxureApiPreview(preview);
         } catch (error: any) {
             setAxureApiPreview(null);
@@ -631,6 +634,22 @@ export default function ExportModal({
                                         </Select>
                                     </div>
 
+                                    {imageConfig.includeConfig === 'code' ? (
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="space-y-0.5">
+                                                <div className="text-sm font-medium">导出图片素材</div>
+                                                <p className="text-xs text-muted-foreground">关闭后保留图片位置并使用浅灰占位</p>
+                                            </div>
+                                            <Switch
+                                                checked={imageConfig.includeImageAssets}
+                                                onCheckedChange={(checked) => {
+                                                    setImageConfig((prev) => ({ ...prev, includeImageAssets: checked }));
+                                                }}
+                                                aria-label="导出图片素材"
+                                            />
+                                        </div>
+                                    ) : null}
+
                                     {activeTab === 'prototypes' ? (
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="space-y-0.5">
@@ -747,7 +766,9 @@ export default function ExportModal({
                                         <div className="overflow-hidden rounded-md border">
                                             {AXURE_API_LIST_ORDER.map(({ key, title }, listIndex) => {
                                                 const listPreview = axureApiPreview.lists[key];
-                                                const showRaw = listPreview.parseStatus === 'raw' && listPreview.raw;
+                                                const showRaw = listPreview.parseStatus === 'raw' && Boolean(listPreview.raw);
+                                                const hasItems = listPreview.items.length > 0;
+                                                const showDetails = hasItems || listPreview.warnings.length > 0 || showRaw;
 
                                                 return (
                                                     <div key={key} className={listIndex === 0 ? '' : 'border-t'}>
@@ -758,30 +779,34 @@ export default function ExportModal({
                                                                 {listPreview.sourceKey ? <span>来源：{listPreview.sourceKey}</span> : null}
                                                             </div>
                                                         </div>
-                                                        <div className="space-y-2 px-3 py-3">
-                                                            {key === 'configList'
-                                                                ? renderConfigList(listPreview)
-                                                                : key === 'dataList'
-                                                                    ? renderDataList(listPreview)
-                                                                    : renderEventActionVarTable(key, listPreview)}
+                                                        {showDetails ? (
+                                                            <div className="space-y-2 px-3 py-3">
+                                                                {hasItems ? (
+                                                                    key === 'configList'
+                                                                        ? renderConfigList(listPreview)
+                                                                        : key === 'dataList'
+                                                                            ? renderDataList(listPreview)
+                                                                            : renderEventActionVarTable(key, listPreview)
+                                                                ) : null}
 
-                                                            {listPreview.warnings.length > 0 ? (
-                                                                <div className="rounded-md border border-amber-300/60 bg-amber-50/50 px-3 py-2 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/30 dark:text-amber-100">
-                                                                    {listPreview.warnings.map((warning, index) => (
-                                                                        <div key={`${key}-warning-${index}`}>- {warning}</div>
-                                                                    ))}
-                                                                </div>
-                                                            ) : null}
+                                                                {listPreview.warnings.length > 0 ? (
+                                                                    <div className="rounded-md border border-amber-300/60 bg-amber-50/50 px-3 py-2 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/30 dark:text-amber-100">
+                                                                        {listPreview.warnings.map((warning, index) => (
+                                                                            <div key={`${key}-warning-${index}`}>- {warning}</div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : null}
 
-                                                            {showRaw ? (
-                                                                <div className="space-y-1">
-                                                                    <div className="text-xs text-muted-foreground">结构化解析不完整，已回退原始片段：</div>
-                                                                    <pre className="max-h-48 overflow-auto rounded-md border bg-muted/30 p-2 font-mono text-xs">
-                                                                        {listPreview.raw}
-                                                                    </pre>
-                                                                </div>
-                                                            ) : null}
-                                                        </div>
+                                                                {showRaw ? (
+                                                                    <div className="space-y-1">
+                                                                        <div className="text-xs text-muted-foreground">结构化解析不完整，已回退原始片段：</div>
+                                                                        <pre className="max-h-48 overflow-auto rounded-md border bg-muted/30 p-2 font-mono text-xs">
+                                                                            {listPreview.raw}
+                                                                        </pre>
+                                                                    </div>
+                                                                ) : null}
+                                                            </div>
+                                                        ) : null}
                                                     </div>
                                                 );
                                             })}

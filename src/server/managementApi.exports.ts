@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createProjectCommunicationStore } from './projectCore/index.ts';
 
 import { wrapSourceAsAxureExportCode } from './axureExportCodeWrap.ts';
-import { buildOnDemand } from './onDemandBuild.ts';
+import { buildOnDemand, replaceEmbeddedImageAssets } from './onDemandBuild.ts';
 import { streamExportHtmlArchive } from './exportHtmlArchive.ts';
 import {
   createReviewSubmitInjectionOptions,
@@ -34,7 +34,7 @@ interface SourceBackedExportHandlers {
     req: IncomingMessage,
     res: ServerResponse,
     options: ManagementApiOptions,
-    mode: 'active-fallback',
+    mode: 'explicit-required',
   ) => SourceBackedExportContext | null;
   resolveSourceFileFromMetadata: (context: SourceBackedExportContext, targetPath: string) => string | null;
   getAxureArtifactPaths: (context: SourceBackedExportContext, targetPath: string) => {
@@ -147,12 +147,24 @@ export async function handleSourceBackedExports(
   if (pathname !== '/api/export-index-bundle' && pathname !== '/api/axure-export-code' && pathname !== '/api/export-html' && pathname !== '/api/export-make') {
     return false;
   }
-  const context = handlers.resolveProjectContext(req, res, options, 'active-fallback');
+  const context = handlers.resolveProjectContext(req, res, options, 'explicit-required');
   if (!context) {
     return true;
   }
   const targetPath = url.searchParams.get('path') || '';
   const includeSource = url.searchParams.get('includeSource') === '1' || url.searchParams.get('includeSource') === 'true';
+  const includeImagesParam = url.searchParams.get('includeImages');
+  const includeImageAssets = includeImagesParam === null
+    || includeImagesParam === '1'
+    || includeImagesParam === 'true';
+  const axureCodeParams = new URLSearchParams({
+    projectId: context.project.id,
+    path: targetPath,
+  });
+  if (includeImagesParam !== null) {
+    axureCodeParams.set('includeImages', includeImageAssets ? 'true' : 'false');
+  }
+  const axureCodePath = `/api/axure-export-code?${axureCodeParams.toString()}`;
   const sourceFile = handlers.resolveSourceFileFromMetadata(context, targetPath);
   const {
     resource,
@@ -165,7 +177,7 @@ export async function handleSourceBackedExports(
     // On-demand build: always build from source to guarantee freshness.
     if (sourceFile) {
       try {
-        const buildResult = await buildOnDemand(context.project.root, sourceFile);
+        const buildResult = await buildOnDemand(context.project.root, sourceFile, { includeImageAssets });
         const entryName = String(resource?.name || resource?.id || path.basename(path.dirname(sourceFile)));
         const cssInjection = buildResult.cssText.trim()
           ? `(function(){if(typeof document==='undefined')return;var s=document.createElement('style');s.textContent=${JSON.stringify(buildResult.cssText)};document.head.appendChild(s)})();\n`
@@ -178,7 +190,7 @@ export async function handleSourceBackedExports(
             displayName: String(resource?.title || resource?.name || resource?.id || entryName),
             code: buildResult.jsCode,
             axureCode,
-            axureCodePath: `/api/axure-export-code?path=${encodeURIComponent(targetPath)}`,
+            axureCodePath,
           },
           meta: {
             version: 1,
@@ -200,7 +212,8 @@ export async function handleSourceBackedExports(
     }
     // Fallback: pre-built artifact (when source is not available, e.g. third-party project)
     if (runtimeBuiltJsPath) {
-      const builtCode = fs.readFileSync(runtimeBuiltJsPath, 'utf8');
+      const rawBuiltCode = fs.readFileSync(runtimeBuiltJsPath, 'utf8');
+      const builtCode = includeImageAssets ? rawBuiltCode : replaceEmbeddedImageAssets(rawBuiltCode);
       const axureCode = wrapSourceAsAxureExportCode(builtCode);
       sendJson(res, {
         entry: {
@@ -209,7 +222,7 @@ export async function handleSourceBackedExports(
           displayName: String(resource?.title || resource?.name || resource?.id || path.basename(path.dirname(runtimeBuiltJsPath))),
           code: builtCode,
           axureCode,
-          axureCodePath: `/api/axure-export-code?path=${encodeURIComponent(targetPath)}`,
+          axureCodePath,
         },
         meta: {
           version: 1,
@@ -236,7 +249,7 @@ export async function handleSourceBackedExports(
     // On-demand build from source (always fresh).
     if (sourceFile) {
       try {
-        const buildResult = await buildOnDemand(context.project.root, sourceFile);
+        const buildResult = await buildOnDemand(context.project.root, sourceFile, { includeImageAssets });
         const cssInjection = buildResult.cssText.trim()
           ? `(function(){if(typeof document==='undefined')return;var s=document.createElement('style');s.textContent=${JSON.stringify(buildResult.cssText)};document.head.appendChild(s)})();\n`
           : '';
@@ -255,7 +268,8 @@ export async function handleSourceBackedExports(
     }
     // Fallback: pre-built artifact
     if (runtimeBuiltJsPath) {
-      const builtCode = fs.readFileSync(runtimeBuiltJsPath, 'utf8');
+      const rawBuiltCode = fs.readFileSync(runtimeBuiltJsPath, 'utf8');
+      const builtCode = includeImageAssets ? rawBuiltCode : replaceEmbeddedImageAssets(rawBuiltCode);
       const executableCode = wrapSourceAsAxureExportCode(builtCode);
       sendText(res, executableCode, 'text/javascript; charset=utf-8');
       return true;

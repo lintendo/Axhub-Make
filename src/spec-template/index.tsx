@@ -46,6 +46,10 @@ function enableDocumentEditor(options?: {
   markdownViewerRef.current?.enableDocumentEditor(options);
 }
 
+function setDocumentEditorContext(context: { projectId: string; documentPath: string; makeServerOrigin?: string }): void {
+  markdownViewerRef.current?.setContext(context);
+}
+
 function disableDocumentEditor(): void {
   markdownViewerRef.current?.disableDocumentEditor();
 }
@@ -62,6 +66,18 @@ function subscribeDocumentHostToolbarState(
 
 function runDocumentHostToolbarAction(action: CommentaryHostToolbarAction): Promise<boolean> {
   return markdownViewerRef.current?.runHostToolbarAction(action) ?? Promise.resolve(false);
+}
+
+function getDocumentCommentaryDebugState(): unknown | null {
+  return markdownViewerRef.current?.getDebugState() ?? null;
+}
+
+function getDocumentVoiceTarget(): unknown | null {
+  return markdownViewerRef.current?.getVoiceTarget() ?? null;
+}
+
+function refreshDocumentPersistedComments(deletedCommentIds?: readonly string[]): Promise<void> {
+  return markdownViewerRef.current?.refreshPersistedComments(deletedCommentIds) ?? Promise.resolve();
 }
 
 function renderViewer(props: React.ComponentProps<typeof MarkdownViewer>) {
@@ -239,6 +255,9 @@ if (typeof window !== 'undefined') {
         quickEditMode: 'none',
       };
     },
+    getCopyPromptText() {
+      return markdownViewerRef.current?.getCopyPromptText() ?? '';
+    },
     handleCopyPrompt() {
       return markdownViewerRef.current?.handleCopyPrompt() ?? Promise.reject(new Error('Markdown viewer is not ready'));
     },
@@ -246,10 +265,14 @@ if (typeof window !== 'undefined') {
       return markdownViewerRef.current?.saveCurrentDoc(options) ?? Promise.resolve(false);
     },
     enableDocumentEditor,
+    setContext: setDocumentEditorContext,
     disableDocumentEditor,
     getHostToolbarState: getDocumentHostToolbarState,
     subscribeHostToolbarState: subscribeDocumentHostToolbarState,
     runHostToolbarAction: runDocumentHostToolbarAction,
+    getDebugState: getDocumentCommentaryDebugState,
+    getVoiceTarget: getDocumentVoiceTarget,
+    refreshPersistedComments: refreshDocumentPersistedComments,
   };
   console.log('[Spec Template Bootstrap] 已挂载到全局');
 }

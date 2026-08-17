@@ -25,6 +25,16 @@ npx -y @axhub/make@latest
 
 启动后会自动打开管理页面。如果没有打开，复制终端里显示的地址到浏览器。
 
+## 本地开发
+
+管理端页面、服务端 API 和运行时注入必须通过完整开发服务器一起启动：
+
+```bash
+pnpm server:dev -- --host 127.0.0.1 --no-open
+```
+
+不要直接启动 Vite，也不要为浏览器验证创建独立的管理端前端服务；独立前端缺少 Make 服务端 API 和运行时注入，并会占用管理端口。
+
 ## CLI 启动与打开 AI 应用
 
 默认命令在当前终端前台启动 Make 并打开管理页面。需要命令完成后继续在后台运行时，使用：
@@ -55,6 +65,21 @@ npx -y @axhub/make@latest stop
 ```
 
 这套 `open` 流程是一次性启动与注入，不安装扩展、常驻 companion、LaunchAgent 或 Windows 计划任务。重复调用会更新并激活已有入口。
+
+## 从 Make 打开本地 AI 应用
+
+Make 左上角“打开 AI”菜单的指定目录启动统一委托给 `@axhub/agent-surface`。需要页面集成时，服务端只调用一次组合接口完成项目打开和入口注入：
+
+| 应用 | 指定目录方式 | 当前边界 |
+| --- | --- | --- |
+| ChatGPT / Codex | Codex 应用命令或项目深链 | 支持 Agent Surface 入口注入 |
+| Cursor Agents | 内置 desktop router 的 `--chat` 与目录参数 | 支持 Agent Surface 入口注入 |
+| WorkBuddy | `workbuddy://task?action=start&cwd=...` 任务深链 | 支持 Agent Surface 入口注入 |
+| TRAEWORK | 不支持自动传入目录；启动后手动选择 | 支持启动应用和 Agent Surface 入口注入，完成后提示手动选择目录 |
+| OpenCode | `opencode://open-project?directory=...` 项目深链 | 仅打开目录，不注入入口 |
+| QoderWork | QoderWork / QoderWork CN 应用的目录参数 | 支持打开目录并注入 Agent Surface 入口 |
+
+QoderWork 在 macOS 通过 Launch Services 启动，Make 不申请或依赖辅助功能权限；如果 QoderWork 为自身的全局快捷键请求权限，提示应归因于 QoderWork 而不是 `node`。Windows 启动必须传入探测或已保存的应用路径，并始终使用参数数组与 `shell: false`；QoderWork 直启 `.exe`，TRAEWORK 启动或注入时都不会附加项目目录。Windows 原生安装包的实际冒烟验证仍需在 Windows 机器上完成。
 
 ## 让 AI 帮你启动
 

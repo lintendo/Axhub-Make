@@ -52,6 +52,7 @@ type CloudPublishSettingsTab = ConfigurableCloudPublishTarget | 'publish-setting
 
 interface CloudPublishSettingsDialogProps {
     open: boolean;
+    projectId: string;
     initialTarget: CloudPublishSettingsTab;
     onOpenChange: (open: boolean) => void;
     onSaved?: (config: CloudPublishingConfigResponse) => void;
@@ -194,6 +195,7 @@ function FieldInput({
 
 export default function CloudPublishSettingsDialog({
     open,
+    projectId,
     initialTarget,
     onOpenChange,
     onSaved,
@@ -213,7 +215,7 @@ export default function CloudPublishSettingsDialog({
         if (!open) return;
         let cancelled = false;
         setLoading(true);
-        apiService.getCloudPublishingConfig()
+        apiService.getCloudPublishingConfig({ projectId })
             .then((config) => {
                 if (cancelled) return;
                 setForm(mergeConfig({
@@ -237,7 +239,7 @@ export default function CloudPublishSettingsDialog({
         return () => {
             cancelled = true;
         };
-    }, [open]);
+    }, [open, projectId]);
 
     const updateVercel = (field: keyof CloudPublishSettingsForm['vercel'], value: string) => {
         setForm((previous) => ({
@@ -344,7 +346,7 @@ export default function CloudPublishSettingsDialog({
         if (saving) return;
         setSaving(true);
         try {
-            const savedConfig = await apiService.saveCloudPublishingConfig(payload);
+            const savedConfig = await apiService.saveCloudPublishingConfig(payload, { projectId });
             toast.success('云服务发布设置已保存');
             onSaved?.(savedConfig);
             onOpenChange(false);

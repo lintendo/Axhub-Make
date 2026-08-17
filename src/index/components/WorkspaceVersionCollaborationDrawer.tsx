@@ -11,11 +11,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { VersionCollaborationPanel } from './VersionCollaborationPanel';
 
 interface WorkspaceVersionCollaborationDrawerProps {
+    projectId: string;
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }
 
 export default function WorkspaceVersionCollaborationDrawer({
+    projectId,
     open,
     onOpenChange,
 }: WorkspaceVersionCollaborationDrawerProps) {
@@ -53,13 +55,13 @@ export default function WorkspaceVersionCollaborationDrawer({
                     </SheetHeader>
 
                     <TabsContent value="local" className="m-0 min-h-0 flex-1 overflow-y-auto px-5 py-4.5">
-                        <VersionCollaborationPanel activeTab="local" />
+                        <VersionCollaborationPanel projectId={projectId} activeTab="local" />
                     </TabsContent>
                     <TabsContent value="online" className="m-0 min-h-0 flex-1 overflow-y-auto px-5 py-4.5">
-                        <VersionCollaborationPanel activeTab="online" />
+                        <VersionCollaborationPanel projectId={projectId} activeTab="online" />
                     </TabsContent>
                     <TabsContent value="skills" className="m-0 min-h-0 flex-1 overflow-y-auto px-5 py-4.5">
-                        <VersionCollaborationPanel activeTab="skills" />
+                        <VersionCollaborationPanel projectId={projectId} activeTab="skills" />
                     </TabsContent>
                 </Tabs>
             </SheetContent>

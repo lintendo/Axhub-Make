@@ -41,6 +41,8 @@ export interface EventModifiers {
 /** Selection event data */
 export interface SelectEvent {
   element: Element;
+  /** The innermost page element hit by the pointer before target resolution. */
+  initialElement?: Element;
   modifiers: EventModifiers;
   clientX: number;
   clientY: number;
@@ -49,6 +51,8 @@ export interface SelectEvent {
 /** Double-click event data for selected elements */
 export interface DoubleClickSelectedEvent {
   element: Element;
+  /** Raw page element path ordered from the innermost hit to outer ancestors. */
+  pathElements: readonly Element[];
   modifiers: EventModifiers;
   clientX: number;
   clientY: number;
@@ -279,6 +283,7 @@ export function createEventController(options: EventControllerOptions): EventCon
   let nativeTextSelectionClickCandidate: {
     pointerId: number;
     target: Element;
+    initialElement?: Element;
     modifiers: EventModifiers;
     startClientX: number;
     startClientY: number;
@@ -288,6 +293,7 @@ export function createEventController(options: EventControllerOptions): EventCon
   const TOUCH_TAP_THRESHOLD_PX = 15;
   let touchTapCandidate: {
     target: Element;
+    initialElement?: Element;
     modifiers: EventModifiers;
     clientX: number;
     clientY: number;
@@ -310,6 +316,38 @@ export function createEventController(options: EventControllerOptions): EventCon
       // Fallback to target check
     }
     return isOverlayElement(event.target);
+  }
+
+  function getPageElementPath(event: Event, fallback: Element): Element[] {
+    try {
+      if (typeof event.composedPath === 'function') {
+        const elements = event
+          .composedPath()
+          .filter(
+            (node): node is Element =>
+              node instanceof Element && node.isConnected && !isOverlayElement(node),
+          );
+        if (elements.length > 0) return elements;
+      }
+    } catch {
+      // Fall back to the stable selected element below.
+    }
+    return [fallback];
+  }
+
+  function getInitialSelectionElement(event: Event, target: Element): Element | undefined {
+    try {
+      if (typeof event.composedPath === 'function') {
+        const initialElement = event.composedPath().find(
+          (node): node is Element =>
+            node instanceof Element && node.isConnected && !isOverlayElement(node),
+        );
+        if (initialElement && initialElement !== target) return initialElement;
+      }
+    } catch {
+      // Fall back to the resolved selection target below.
+    }
+    return undefined;
   }
 
   /**
@@ -476,6 +514,7 @@ export function createEventController(options: EventControllerOptions): EventCon
       setMode('selecting');
       onSelect({
         element: candidate.target,
+        ...(candidate.initialElement ? { initialElement: candidate.initialElement } : {}),
         modifiers: candidate.modifiers,
         clientX: candidate.startClientX,
         clientY: candidate.startClientY,
@@ -739,15 +778,21 @@ export function createEventController(options: EventControllerOptions): EventCon
       return;
     }
 
-    blockPageEvent(event);
-
-    // In native text selection mode, skip all hover/drag logic
-    if (options.allowNativeTextSelection) return;
-
     // Update tracked position
     lastClientX = event.clientX;
     lastClientY = event.clientY;
     hasPointerPosition = true;
+
+    // Native text-comment mode must leave page events untouched so browser text
+    // selection still works, but it can still track the element under the pointer.
+    if (options.allowNativeTextSelection) {
+      if (mode === 'hover' || mode === 'selecting') {
+        scheduleHoverUpdate();
+      }
+      return;
+    }
+
+    blockPageEvent(event);
 
     // Dragging: forward pointer moves (only from matching event type)
     if (mode === 'dragging' && shouldProcessAsPrimaryPointer(event)) {
@@ -842,10 +887,12 @@ export function createEventController(options: EventControllerOptions): EventCon
       const modifiers = extractModifiers(event);
       const target = getTargetElementForSelection(event, event.clientX, event.clientY, modifiers);
       if (!target) return;
+      const initialElement = getInitialSelectionElement(event, target);
 
       nativeTextSelectionClickCandidate = {
         pointerId: getEventPointerId(event),
         target,
+        ...(initialElement ? { initialElement } : {}),
         modifiers,
         startClientX: event.clientX,
         startClientY: event.clientY,
@@ -877,7 +924,14 @@ export function createEventController(options: EventControllerOptions): EventCon
         dragCandidate = null;
         if (isTouch) {
           // Mobile: keep direct reselection via deferred touch-tap
-          touchTapCandidate = { target, modifiers, clientX: event.clientX, clientY: event.clientY };
+          const initialElement = getInitialSelectionElement(event, target);
+          touchTapCandidate = {
+            target,
+            ...(initialElement ? { initialElement } : {}),
+            modifiers,
+            clientX: event.clientX,
+            clientY: event.clientY,
+          };
           return;
         }
         // Desktop: deselect first — bubble card disappears, back to hover mode
@@ -887,11 +941,20 @@ export function createEventController(options: EventControllerOptions): EventCon
 
       if (target && selected && target === selected && !onStartDrag) {
         if (isTouch) {
-          touchTapCandidate = { target, modifiers, clientX: event.clientX, clientY: event.clientY };
+          const initialElement = getInitialSelectionElement(event, target);
+          touchTapCandidate = {
+            target,
+            ...(initialElement ? { initialElement } : {}),
+            modifiers,
+            clientX: event.clientX,
+            clientY: event.clientY,
+          };
           return;
         }
+        const initialElement = getInitialSelectionElement(event, target);
         onSelect({
           element: target,
+          ...(initialElement ? { initialElement } : {}),
           modifiers,
           clientX: event.clientX,
           clientY: event.clientY,
@@ -943,14 +1006,24 @@ export function createEventController(options: EventControllerOptions): EventCon
 
     // On mobile touch, defer selection to pointerup to avoid selecting during scroll
     if (isTouch) {
-      touchTapCandidate = { target, modifiers, clientX: event.clientX, clientY: event.clientY, nextMode: 'selecting' };
+      const initialElement = getInitialSelectionElement(event, target);
+      touchTapCandidate = {
+        target,
+        ...(initialElement ? { initialElement } : {}),
+        modifiers,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        nextMode: 'selecting',
+      };
       return;
     }
 
     // Transition to selecting mode
     setMode('selecting');
+    const initialElement = getInitialSelectionElement(event, target);
     onSelect({
       element: target,
+      ...(initialElement ? { initialElement } : {}),
       modifiers,
       clientX: event.clientX,
       clientY: event.clientY,
@@ -981,6 +1054,7 @@ export function createEventController(options: EventControllerOptions): EventCon
 
     onDoubleClickSelected({
       element: selected,
+      pathElements: getPageElementPath(event, selected),
       modifiers,
       clientX: event.clientX,
       clientY: event.clientY,
@@ -1049,6 +1123,7 @@ export function createEventController(options: EventControllerOptions): EventCon
         }
         onSelect({
           element: tap.target,
+          ...(tap.initialElement ? { initialElement: tap.initialElement } : {}),
           modifiers: tap.modifiers,
           clientX: tap.clientX,
           clientY: tap.clientY,

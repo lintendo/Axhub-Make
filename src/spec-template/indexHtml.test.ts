@@ -10,8 +10,8 @@ describe('spec-template HTML', () => {
     expect(html).toContain('/assets/vendor-editor.css');
     expect(html).toContain('/assets/spec-template-reset.css');
     expect(html).toContain('/assets/spec-template-styles.css');
-    expect(html).toContain('/assets/spec-template-vendor.css');
-    expect(html).not.toContain('/assets/vendor-antd.css');
+    expect(html).toContain('/assets/vendor-antd.css');
+    expect(html).not.toContain('/assets/spec-template-vendor.css');
     expect(html).not.toContain('/assets/simple-editor.css');
     expect(html).not.toContain('/assets/spec-template-bootstrap.css');
   });

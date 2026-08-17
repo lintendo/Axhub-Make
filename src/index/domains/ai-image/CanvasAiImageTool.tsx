@@ -40,6 +40,7 @@ import CanvasNodeTitleLabel, {
 import { shouldFitElementIntoCanvasViewport } from '../../components/content/canvas-embeds/activePreviewViewport';
 
 interface CanvasAiImageToolProps {
+  projectId: string;
   excalidrawAPI: any;
   containerRef: React.RefObject<HTMLDivElement>;
   assistantProjectPath?: string;
@@ -173,6 +174,7 @@ function clampComposerTop(anchorTop: number, containerHeight: number): number {
 }
 
 export default function CanvasAiImageTool({
+  projectId,
   excalidrawAPI,
   containerRef,
   assistantProjectPath,
@@ -731,6 +733,7 @@ export default function CanvasAiImageTool({
 
       {selectedInfo?.kind === 'generator' ? (
         <AiImageGenerationComposer
+          projectId={projectId}
           placement={selectedInfo.composerPlacement}
           canPasteReferenceImages={Boolean(copiedCanvasReferenceRef.current)}
           conversationId={String(selectedInfo.element.customData?.conversationId || '')}

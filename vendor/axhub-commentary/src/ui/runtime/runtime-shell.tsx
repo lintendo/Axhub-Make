@@ -15,11 +15,23 @@ import { useClipboardCommentPaste } from './runtime-effects/use-clipboard-commen
 import { useOutsideClickSelectionRestore } from './runtime-effects/use-outside-click-selection-restore';
 import {
   MAX_PROMPT_IMAGE_ATTACHMENTS,
+  createPromptImageAttachmentFromSvgText,
+  isStandardSvgText,
   mergePromptImageAttachments,
   readPromptImageAttachmentsFromDataTransferItems,
+  replaceUserPromptImageAttachments,
+  splitPromptImageAttachments,
 } from './image-attachments';
+import {
+  PROMPT_TEXT_LIMIT_MESSAGE,
+  isPromptTextChangeAllowed,
+} from './prompt-text-limit';
 import { notifyRuntimeMessage } from './runtime-feedback';
-import { insertPlainTextAtSelection } from './plain-text-selection';
+import {
+  insertLineBreakAtSelection,
+  insertPlainTextAtSelection,
+} from './plain-text-selection';
+import { writeEditableText } from '../../core/text-content';
 import type {
   SharedImageState,
   SharedAnnotationState,
@@ -28,23 +40,27 @@ import type {
   WebEditorUiAppProps,
 } from './types';
 import type { PromptImageAttachment } from '../../core/editor/state';
+import type {
+  CommentarySkillOption,
+} from '../../web-editor-types';
 import {
   DEFAULT_WEB_EDITOR_UI_SETTINGS,
   applyInteractionProfileToUiSettings,
   applyMobileSettingsOverride,
+  type WebEditorInteractionProfile,
   type WebEditorUiSettings,
   sanitizeWebEditorUiSettings,
 } from '../../core/editor/ui-settings';
 
 function normalizeRuntimeUiSettings(
   settings: unknown,
-  interactionProfile: 'design' | 'text-comment',
+  interactionProfile: WebEditorInteractionProfile,
 ): WebEditorUiSettings {
   const normalized = applyMobileSettingsOverride(
     applyInteractionProfileToUiSettings(sanitizeWebEditorUiSettings(settings), interactionProfile),
   );
 
-  if (interactionProfile === 'text-comment' || isMobileDevice()) {
+  if (interactionProfile !== 'design' || isMobileDevice()) {
     return normalized;
   }
 
@@ -102,7 +118,11 @@ function snapshotInlineStyle(element: HTMLElement, property: string): InlineStyl
   };
 }
 
-function restoreInlineStyle(element: HTMLElement, property: string, snapshot: InlineStyleSnapshot): void {
+function restoreInlineStyle(
+  element: HTMLElement,
+  property: string,
+  snapshot: InlineStyleSnapshot,
+): void {
   if (snapshot.value) {
     element.style.setProperty(property, snapshot.value, snapshot.priority);
     return;
@@ -122,6 +142,28 @@ function normalizeRuntimeSkillIds(value: unknown): string[] {
     result.push(id);
   }
 
+  return result;
+}
+
+function normalizeRuntimeSkillOptions(
+  value: readonly CommentarySkillOption[] | null | undefined,
+): CommentarySkillOption[] {
+  const result: CommentarySkillOption[] = [];
+  const seen = new Set<string>();
+  for (const item of value ?? []) {
+    const id = String(item.id ?? '').trim();
+    const label = String(item.label ?? '').trim();
+    if (!id || !label || seen.has(id)) continue;
+    seen.add(id);
+    result.push({
+      id,
+      label,
+      ...(item.description?.trim() ? { description: item.description.trim() } : {}),
+      ...(item.sourceUrl?.trim() ? { sourceUrl: item.sourceUrl.trim() } : {}),
+      ...(item.prompt?.trim() ? { prompt: item.prompt.trim() } : {}),
+      ...(item.custom === true ? { custom: true } : {}),
+    });
+  }
   return result;
 }
 
@@ -166,11 +208,12 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   const [propertyPanelOpen, setPropertyPanelOpen] = React.useState<boolean>(initialPropertyPanelOpen);
   const [bubbleStyleEditorOpen, setBubbleStyleEditorOpen] = React.useState(false);
   const [inlineTextEditing, setInlineTextEditing] = React.useState(false);
+  const [inlineTextTarget, setInlineTextTarget] = React.useState<HTMLElement | null>(null);
   const [blockingLayerOpen, setBlockingLayerOpen] = React.useState(false);
-  const commentarySkillSelectionManaged = Boolean(propertyPanelOptions?.commentarySkillOptions?.length);
-  const [commentarySkillSettingsConfigured, setCommentarySkillSettingsConfigured] = React.useState(
-    () => propertyPanelOptions?.commentarySkillSettingsConfigured === true,
-  );
+  const [commentarySkillOptions, setCommentarySkillOptions] = React.useState<
+    CommentarySkillOption[]
+  >(() => normalizeRuntimeSkillOptions(propertyPanelOptions?.commentarySkillOptions));
+  const commentarySkillSelectionManaged = commentarySkillOptions.length > 0;
   const [enabledCommentarySkillIds, setEnabledCommentarySkillIds] = React.useState<string[]>(() =>
     resolveRuntimeSkillIds(
       propertyPanelOptions?.commentarySelectedSkillIds,
@@ -216,6 +259,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   });
 
   const currentTargetRef = React.useRef<Element | null>(null);
+  const inlineTextTargetRef = React.useRef<HTMLElement | null>(null);
   const uiModeRef = React.useRef<CommentEntryMode>(initialUiMode);
   const noteStateRef = React.useRef<SharedNoteState>(noteState);
   const textStateRef = React.useRef<SharedTextState>(textState);
@@ -232,10 +276,18 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     selectionGuards.handlePromptSelectionInteractionLockChange,
   );
 
+  const finishInlineTextEditing = React.useCallback(() => {
+    promptSelectionInteractionLockChangeRef.current(false);
+    inlineTextTargetRef.current = null;
+    setInlineTextTarget(null);
+    setInlineTextEditing(false);
+  }, []);
+
   useFeedbackBridge();
 
   React.useEffect(() => {
-    promptSelectionInteractionLockChangeRef.current = selectionGuards.handlePromptSelectionInteractionLockChange;
+    promptSelectionInteractionLockChangeRef.current =
+      selectionGuards.handlePromptSelectionInteractionLockChange;
   }, [selectionGuards.handlePromptSelectionInteractionLockChange]);
 
   React.useEffect(() => {
@@ -245,6 +297,10 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   React.useEffect(() => {
     textStateRef.current = textState;
   }, [textState]);
+
+  React.useEffect(() => {
+    inlineTextTargetRef.current = inlineTextTarget;
+  }, [inlineTextTarget]);
 
   React.useEffect(() => {
     imageStateRef.current = imageState;
@@ -257,11 +313,14 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   React.useEffect(() => {
     if (!commentarySkillSelectionManaged) return;
     const configured = propertyPanelOptions?.commentarySkillSettingsConfigured === true;
-    setCommentarySkillSettingsConfigured(configured);
+    const nextSkillOptions = normalizeRuntimeSkillOptions(
+      propertyPanelOptions?.commentarySkillOptions,
+    );
+    setCommentarySkillOptions(nextSkillOptions);
     setEnabledCommentarySkillIds(
       resolveRuntimeSkillIds(
         propertyPanelOptions?.commentarySelectedSkillIds,
-        propertyPanelOptions?.commentarySkillOptions,
+        nextSkillOptions,
         configured,
       ),
     );
@@ -270,37 +329,6 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     propertyPanelOptions?.commentarySkillOptions,
     propertyPanelOptions?.commentarySelectedSkillIds,
     propertyPanelOptions?.commentarySkillSettingsConfigured,
-  ]);
-
-  const effectivePropertyPanelOptions = React.useMemo(() => {
-    if (!propertyPanelOptions || !commentarySkillSelectionManaged) {
-      return propertyPanelOptions;
-    }
-
-    return {
-      ...propertyPanelOptions,
-      commentarySelectedSkillIds: enabledCommentarySkillIds,
-      commentarySkillSettingsConfigured,
-      onCommentarySkillSelectionLoad: async () => {
-        const loadedSkillIds = await propertyPanelOptions.onCommentarySkillSelectionLoad?.();
-        const nextSkillIds = Array.isArray(loadedSkillIds)
-          ? normalizeRuntimeSkillIds(loadedSkillIds)
-          : normalizeRuntimeSkillIds(propertyPanelOptions.commentarySelectedSkillIds);
-        setEnabledCommentarySkillIds(nextSkillIds);
-        return nextSkillIds;
-      },
-      onCommentarySkillSelectionChange: async (skillIds: string[]) => {
-        const nextSkillIds = normalizeRuntimeSkillIds(skillIds);
-        await propertyPanelOptions.onCommentarySkillSelectionChange?.(nextSkillIds);
-        setCommentarySkillSettingsConfigured(true);
-        setEnabledCommentarySkillIds(nextSkillIds);
-      },
-    };
-  }, [
-    commentarySkillSettingsConfigured,
-    commentarySkillSelectionManaged,
-    enabledCommentarySkillIds,
-    propertyPanelOptions,
   ]);
 
   React.useEffect(() => {
@@ -405,7 +433,9 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   const syncSavedText = React.useCallback(
     (element: Element | null, resetDraft: boolean) => {
       const canEditText = propertyPanelOptions?.canEditText?.(element) ?? false;
-      const nextSavedText = canEditText ? (propertyPanelOptions?.getTextValue?.(element) ?? '') : '';
+      const nextSavedText = canEditText
+        ? (propertyPanelOptions?.getTextValue?.(element) ?? '')
+        : '';
       const prev = textStateRef.current;
       const next = syncDraftAgainstSaved(
         {
@@ -435,8 +465,11 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
         setImageState({ images: [] });
         return;
       }
+      const { userImages } = splitPromptImageAttachments(
+        propertyPanelOptions?.getAiNoteImages?.(element) ?? [],
+      );
       setImageState({
-        images: (propertyPanelOptions?.getAiNoteImages?.(element) ?? []).slice(0, MAX_PROMPT_IMAGE_ATTACHMENTS),
+        images: userImages.slice(0, MAX_PROMPT_IMAGE_ATTACHMENTS),
       });
     },
     [imageAttachmentsEnabled, propertyPanelOptions],
@@ -509,8 +542,10 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       if (!propertyPanelOptions?.onAiNoteChange) return false;
 
       const nextValue = noteStateRef.current.draftNote;
-      const nextSkillIds = options.skillIds?.slice() ?? noteStateRef.current.savedNoteMeta?.skillIds ?? [];
-      const skillsDirty = nextSkillIds.join('\0') !== (noteStateRef.current.savedNoteMeta?.skillIds ?? []).join('\0');
+      const nextSkillIds =
+        options.skillIds?.slice() ?? noteStateRef.current.savedNoteMeta?.skillIds ?? [];
+      const skillsDirty =
+        nextSkillIds.join('\0') !== (noteStateRef.current.savedNoteMeta?.skillIds ?? []).join('\0');
       if (!noteStateRef.current.noteDirty && !skillsDirty) return false;
 
       await propertyPanelOptions.onAiNoteChange(element, nextValue, {
@@ -535,15 +570,19 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
 
   const commitDraftText = React.useCallback(
     async (elementOverride?: Element | null) => {
-      const element = elementOverride ?? currentTargetRef.current;
+      const element = elementOverride ?? inlineTextTargetRef.current ?? currentTargetRef.current;
       if (!element || !propertyPanelOptions?.onTextValueChange) return false;
       if (!(propertyPanelOptions?.canEditText?.(element) ?? false)) return false;
       if (!textStateRef.current.textDirty) return false;
 
       const nextValue = textStateRef.current.draftText;
-      await propertyPanelOptions.onTextValueChange(element, nextValue, textStateRef.current.savedText);
+      await propertyPanelOptions.onTextValueChange(
+        element,
+        nextValue,
+        textStateRef.current.savedText,
+      );
 
-      if (currentTargetRef.current === element) {
+      if (currentTargetRef.current === element || inlineTextTargetRef.current === element) {
         const nextState = {
           savedText: nextValue,
           draftText: nextValue,
@@ -559,15 +598,30 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   );
 
   const commitDraftAnnotationMarkdown = React.useCallback(
-    async (elementOverride?: Element | null, markdownOverride?: string, options: { force?: boolean } = {}) => {
+    async (
+      elementOverride?: Element | null,
+      markdownOverride?: string,
+      options: { force?: boolean } = {},
+    ) => {
       const element = elementOverride ?? currentTargetRef.current;
       if (!element || !propertyPanelOptions?.onAnnotationMarkdownChange) return false;
       if (!(propertyPanelOptions?.canEditAnnotationMarkdown?.(element) ?? false)) return false;
-      if (getAnnotationManualEditLocatorState(element).disabled) return false;
+      if (
+        propertyPanelOptions.annotationMarkdownEditorKind !== 'document-source'
+        && getAnnotationManualEditLocatorState(
+          element,
+          undefined,
+          propertyPanelOptions.getCreateAnnotationBlockReason,
+          propertyPanelOptions.resolveAnnotationTarget,
+        ).disabled
+      ) return false;
 
       const nextValue =
-        typeof markdownOverride === 'string' ? markdownOverride : annotationStateRef.current.annotationDraftMarkdown;
-      if (!options.force && nextValue === annotationStateRef.current.savedAnnotationMarkdown) return false;
+        typeof markdownOverride === 'string'
+          ? markdownOverride
+          : annotationStateRef.current.annotationDraftMarkdown;
+      if (!options.force && nextValue === annotationStateRef.current.savedAnnotationMarkdown)
+        return false;
       const savingState = {
         ...annotationStateRef.current,
         annotationDraftMarkdown: nextValue,
@@ -608,12 +662,13 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     (element: Element | null) => {
       if (currentTargetRef.current === element) return;
       const previousTarget = currentTargetRef.current;
-      setInlineTextEditing(false);
+      const previousTextTarget = inlineTextTargetRef.current ?? previousTarget;
+      finishInlineTextEditing();
       if (noteStateRef.current.noteDirty) {
         void commitDraftNote(previousTarget);
       }
-      if (previousTarget && textStateRef.current.textDirty) {
-        void commitDraftText(previousTarget);
+      if (previousTextTarget && textStateRef.current.textDirty) {
+        void commitDraftText(previousTextTarget);
       }
       currentTargetRef.current = element;
       setCurrentTarget(element);
@@ -621,7 +676,9 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
         setAnchorRect(null);
       }
       selectionGuards.selectionNeedsExplicitReactivateRef.current = Boolean(
-        element && selectionGuards.selectionModeActiveRef.current && !selectionGuards.toolMinimizedRef.current,
+        element &&
+          selectionGuards.selectionModeActiveRef.current &&
+          !selectionGuards.toolMinimizedRef.current,
       );
       selectionGuards.syncSelectionModeAvailability();
       syncSavedNote(element, true);
@@ -632,6 +689,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     [
       commitDraftNote,
       commitDraftText,
+      finishInlineTextEditing,
       selectionGuards,
       syncSavedAnnotationMarkdown,
       syncSavedImages,
@@ -651,14 +709,16 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       uiModeRef.current = normalizedMode;
       setUiMode(normalizedMode);
       propertyPanelOptions?.onUiModeChange?.(normalizedMode);
-      propertyPanelOptions?.onSelectionChromeVisibleChange?.(!selectionGuards.toolMinimizedRef.current);
+      propertyPanelOptions?.onSelectionChromeVisibleChange?.(
+        !selectionGuards.toolMinimizedRef.current,
+      );
     },
     [propertyPanelOptions, selectionGuards.toolMinimizedRef],
   );
 
   const handleRefreshNoteState = React.useCallback(() => {
     syncSavedNote(currentTargetRef.current, false);
-    syncSavedText(currentTargetRef.current, false);
+    syncSavedText(inlineTextTargetRef.current ?? currentTargetRef.current, false);
     syncSavedImages(currentTargetRef.current);
     syncSavedAnnotationMarkdown(currentTargetRef.current, false);
   }, [syncSavedAnnotationMarkdown, syncSavedImages, syncSavedNote, syncSavedText]);
@@ -695,11 +755,13 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   );
 
   const currentAgentTask = taskStateProvider.getCurrentTask(currentTarget);
-  const currentTaskRunning = currentAgentTask?.status === 'pending' || currentAgentTask?.status === 'created';
+  const currentTaskRunning =
+    currentAgentTask?.status === 'pending' || currentAgentTask?.status === 'created';
   const canEditNote = Boolean(propertyPanelOptions?.onAiNoteChange);
   const annotationDocumentEditUrl = React.useMemo(() => {
     const resolver =
-      breadcrumbsOptions?.getAnnotationDocumentEditUrl ?? propertyPanelOptions?.getAnnotationDocumentEditUrl;
+      breadcrumbsOptions?.getAnnotationDocumentEditUrl ??
+      propertyPanelOptions?.getAnnotationDocumentEditUrl;
     return String(resolver?.(currentTarget) ?? '').trim();
   }, [breadcrumbsOptions, currentTarget, propertyPanelOptions]);
   const canStartInlineTextEditing = React.useCallback(
@@ -707,15 +769,26 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       if (!element || !element.isConnected) return false;
       if (!propertyPanelOptions?.onTextValueChange) return false;
       if (!(propertyPanelOptions?.canEditText?.(element) ?? false)) return false;
-      const task = taskStateProvider.getCurrentTask(element);
-      return task?.status !== 'pending' && task?.status !== 'created';
+      const targetTask = taskStateProvider.getCurrentTask(element);
+      const selectionTask = taskStateProvider.getCurrentTask(currentTargetRef.current);
+      return (
+        targetTask?.status !== 'pending'
+        && targetTask?.status !== 'created'
+        && selectionTask?.status !== 'pending'
+        && selectionTask?.status !== 'created'
+      );
     },
     [propertyPanelOptions, taskStateProvider],
   );
-  const canEditText = canStartInlineTextEditing(currentTarget);
+  const activeTextTarget = inlineTextTarget ?? currentTarget;
+  const canEditText = canStartInlineTextEditing(activeTextTarget);
 
   const handleDraftChange = React.useCallback((value: string) => {
     const prev = noteStateRef.current;
+    if (!isPromptTextChangeAllowed(prev.draftNote, value)) {
+      notifyRuntimeMessage('warning', PROMPT_TEXT_LIMIT_MESSAGE);
+      return;
+    }
     const nextState = {
       ...prev,
       draftNote: value,
@@ -766,7 +839,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   }, []);
 
   const handleConfirmText = React.useCallback(async () => {
-    await commitDraftText();
+    await commitDraftText(inlineTextTargetRef.current);
   }, [commitDraftText]);
 
   const handleAnnotationDraftChange = React.useCallback((value: string) => {
@@ -792,17 +865,25 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   );
 
   const handleInlineTextEditingChange = React.useCallback(
-    (editing: boolean) => {
+    (editing: boolean, element?: HTMLElement | null) => {
       if (!editing) {
-        selectionGuards.handlePromptSelectionInteractionLockChange(false);
-        setInlineTextEditing(false);
+        finishInlineTextEditing();
         return;
       }
-      const allowed = canStartInlineTextEditing(currentTargetRef.current);
-      selectionGuards.handlePromptSelectionInteractionLockChange(allowed);
-      setInlineTextEditing(allowed);
+      const requestedTarget = element ?? currentTargetRef.current;
+      const textTarget = requestedTarget instanceof HTMLElement ? requestedTarget : null;
+      const allowed = canStartInlineTextEditing(textTarget);
+      if (!allowed || !textTarget) {
+        finishInlineTextEditing();
+        return;
+      }
+      selectionGuards.handlePromptSelectionInteractionLockChange(true);
+      inlineTextTargetRef.current = textTarget;
+      setInlineTextTarget(textTarget);
+      syncSavedText(textTarget, true);
+      setInlineTextEditing(true);
     },
-    [canStartInlineTextEditing, selectionGuards],
+    [canStartInlineTextEditing, finishInlineTextEditing, selectionGuards, syncSavedText],
   );
 
   const handleImagesChange = React.useCallback(
@@ -810,8 +891,14 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       const element = currentTargetRef.current;
       if (!imageAttachmentsEnabled) return;
       if (!element || !propertyPanelOptions?.onAiNoteImagesChange) return;
-      const clippedImages = images.slice(0, MAX_PROMPT_IMAGE_ATTACHMENTS);
-      await propertyPanelOptions.onAiNoteImagesChange(element, clippedImages);
+      const clippedImages = images
+        .filter((image) => image.source !== 'target-screenshot')
+        .slice(0, MAX_PROMPT_IMAGE_ATTACHMENTS);
+      const nextImages = replaceUserPromptImageAttachments(
+        propertyPanelOptions.getAiNoteImages?.(element) ?? [],
+        clippedImages,
+      );
+      await propertyPanelOptions.onAiNoteImagesChange(element, nextImages);
       if (currentTargetRef.current === element) {
         setImageState({ images: clippedImages.slice() });
       }
@@ -848,17 +935,23 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       if (!preparedImages.length) {
         return { acceptedCount: 0, droppedCount: incomingImages.length };
       }
-      const currentImages = (propertyPanelOptions.getAiNoteImages?.(element) ?? []).slice(
-        0,
+      const currentImages = propertyPanelOptions.getAiNoteImages?.(element) ?? [];
+      const { userImages: currentUserImages } = splitPromptImageAttachments(currentImages);
+      const merged = mergePromptImageAttachments(
+        currentUserImages,
+        preparedImages,
         MAX_PROMPT_IMAGE_ATTACHMENTS,
       );
-      const merged = mergePromptImageAttachments(currentImages, preparedImages, MAX_PROMPT_IMAGE_ATTACHMENTS);
-      await propertyPanelOptions.onAiNoteImagesChange(element, merged.images);
+      const nextImages = replaceUserPromptImageAttachments(currentImages, merged.images);
+      await propertyPanelOptions.onAiNoteImagesChange(element, nextImages);
       if (currentTargetRef.current === element) {
         setImageState({ images: merged.images.slice() });
       }
       if (merged.droppedCount > 0) {
-        notifyRuntimeMessage('info', `最多允许 ${MAX_PROMPT_IMAGE_ATTACHMENTS} 张图片，已忽略多余图片。`);
+        notifyRuntimeMessage(
+          'info',
+          `最多允许 ${MAX_PROMPT_IMAGE_ATTACHMENTS} 张图片，已忽略多余图片。`,
+        );
       }
       return {
         acceptedCount: merged.acceptedCount,
@@ -871,39 +964,81 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   const handleNotePasteCapture = React.useCallback(
     (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
       const element = currentTargetRef.current;
-      if (!imageAttachmentsEnabled) return;
-      if (!element || !propertyPanelOptions?.onAiNoteImagesChange) return;
-
       const clipboardItems = event.clipboardData?.items;
-      if (!clipboardItems?.length) return;
-      const hasImageItems = Array.from(clipboardItems).some(
+      const clipboardText = event.clipboardData?.getData('text/plain') ?? '';
+      const hasImageItems = Boolean(clipboardItems?.length) && Array.from(clipboardItems).some(
         (item) => item.kind === 'file' && String(item.type ?? '').startsWith('image/'),
       );
-      if (!hasImageItems) return;
-
-      const clipboardText = event.clipboardData?.getData('text/plain') ?? '';
       const target = event.target instanceof HTMLTextAreaElement ? event.target : null;
       const currentDraft = noteStateRef.current.draftNote;
+      const nextDraft = clipboardText
+        ? target
+          ? replaceTextInControl(target, currentDraft, clipboardText)
+          : currentDraft + clipboardText
+        : currentDraft;
+      const canAttachImages = Boolean(
+        imageAttachmentsEnabled && element && propertyPanelOptions?.onAiNoteImagesChange,
+      );
+
+      if (canAttachImages && !hasImageItems && isStandardSvgText(clipboardText)) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        void (async () => {
+          const svgImage = await createPromptImageAttachmentFromSvgText(clipboardText);
+          if (!svgImage) return;
+          await applyImagesToElement(element!, [svgImage]);
+        })();
+        return;
+      }
+
+      const plainTextAllowed =
+        !clipboardText || isPromptTextChangeAllowed(currentDraft, nextDraft);
+
+      if (!hasImageItems) {
+        if (!plainTextAllowed) {
+          event.preventDefault();
+          event.stopPropagation();
+          notifyRuntimeMessage('warning', PROMPT_TEXT_LIMIT_MESSAGE);
+        }
+        return;
+      }
+
+      if (!canAttachImages) {
+        if (!plainTextAllowed) {
+          event.preventDefault();
+          event.stopPropagation();
+          notifyRuntimeMessage('warning', PROMPT_TEXT_LIMIT_MESSAGE);
+        }
+        return;
+      }
+
+      const shouldInsertClipboardText = Boolean(
+        target && clipboardText && !isStandardSvgText(clipboardText),
+      );
+      const shouldRejectClipboardText = shouldInsertClipboardText && !plainTextAllowed;
       event.preventDefault();
       event.stopPropagation();
+      if (shouldRejectClipboardText) {
+        notifyRuntimeMessage('warning', PROMPT_TEXT_LIMIT_MESSAGE);
+      }
 
       void (async () => {
         const images = await readPromptImageAttachmentsFromDataTransferItems(clipboardItems);
         if (!images.length) return;
 
-        if (target && clipboardText) {
-          const nextValue = replaceTextInControl(target, currentDraft, clipboardText);
+        if (shouldInsertClipboardText && !shouldRejectClipboardText) {
           const prev = noteStateRef.current;
           const nextState = {
             ...prev,
-            draftNote: nextValue,
-            noteDirty: nextValue !== prev.savedNote,
+            draftNote: nextDraft,
+            noteDirty: nextDraft !== prev.savedNote,
           };
           noteStateRef.current = nextState;
           setNoteState(nextState);
         }
 
-        await applyImagesToElement(element, images);
+        await applyImagesToElement(element!, images);
       })();
     },
     [applyImagesToElement, imageAttachmentsEnabled, propertyPanelOptions],
@@ -920,9 +1055,16 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     syncSavedText(element, true);
     syncSavedImages(element);
     syncSavedAnnotationMarkdown(element, true);
-    setInlineTextEditing(false);
+    finishInlineTextEditing();
     propertyPanelOptions.onDismissSelection?.();
-  }, [propertyPanelOptions, syncSavedAnnotationMarkdown, syncSavedImages, syncSavedNote, syncSavedText]);
+  }, [
+    finishInlineTextEditing,
+    propertyPanelOptions,
+    syncSavedAnnotationMarkdown,
+    syncSavedImages,
+    syncSavedNote,
+    syncSavedText,
+  ]);
 
   const handleDeleteCurrentAnnotationNode = React.useCallback(async () => {
     const element = currentTargetRef.current;
@@ -934,9 +1076,16 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     syncSavedText(element, true);
     syncSavedImages(element);
     syncSavedAnnotationMarkdown(element, true);
-    setInlineTextEditing(false);
+    finishInlineTextEditing();
     propertyPanelOptions.onDismissSelection?.();
-  }, [propertyPanelOptions, syncSavedAnnotationMarkdown, syncSavedImages, syncSavedNote, syncSavedText]);
+  }, [
+    finishInlineTextEditing,
+    propertyPanelOptions,
+    syncSavedAnnotationMarkdown,
+    syncSavedImages,
+    syncSavedNote,
+    syncSavedText,
+  ]);
 
   const handleSendCurrentElementPromptToAgent = React.useMemo(() => {
     if (!propertyPanelOptions?.onSendCurrentElementPromptToAgent) {
@@ -968,13 +1117,26 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
 
   React.useEffect(() => {
     if (!inlineTextEditing) return;
-    if (canEditText && currentTarget?.isConnected) return;
-    setInlineTextEditing(false);
-  }, [canEditText, currentTarget, inlineTextEditing]);
+    if (canEditText && activeTextTarget?.isConnected) return;
+    const previousTextTarget = inlineTextTargetRef.current;
+    if (previousTextTarget?.isConnected && textStateRef.current.textDirty) {
+      writeEditableText(previousTextTarget, textStateRef.current.savedText);
+    }
+    handleCancelText();
+    finishInlineTextEditing();
+  }, [
+    activeTextTarget,
+    canEditText,
+    finishInlineTextEditing,
+    handleCancelText,
+    inlineTextEditing,
+  ]);
 
   React.useEffect(() => {
     const editableElement =
-      inlineTextEditing && canEditText && currentTarget instanceof HTMLElement ? currentTarget : null;
+      inlineTextEditing && canEditText && activeTextTarget instanceof HTMLElement
+        ? activeTextTarget
+        : null;
     propertyPanelOptions?.onInlineTextEditingElementChange?.(editableElement);
 
     if (!editableElement) {
@@ -983,10 +1145,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       };
     }
 
-    const exitInlineTextEditing = () => {
-      promptSelectionInteractionLockChangeRef.current(false);
-      setInlineTextEditing(false);
-    };
+    const exitInlineTextEditing = finishInlineTextEditing;
 
     const previousContentEditableAttr = editableElement.getAttribute('contenteditable');
     const previousSpellcheck = editableElement.spellcheck;
@@ -1003,7 +1162,8 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     editableElement.style.setProperty('cursor', 'text', 'important');
 
     const syncDraftFromDom = () => {
-      const nextValue = editableElement.textContent ?? '';
+      const nextValue =
+        propertyPanelOptions?.getTextValue?.(editableElement) ?? editableElement.textContent ?? '';
       const prev = textStateRef.current;
       const nextState = {
         ...prev,
@@ -1036,22 +1196,36 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       if (event.key === 'Enter' && !isMobileDevice()) {
         event.preventDefault();
         event.stopPropagation();
-        syncDraftFromDom();
-        void (async () => {
-          await commitDraftText(editableElement);
-          exitInlineTextEditing();
-          editableElement.blur();
-        })();
+        if (event.metaKey || event.ctrlKey) {
+          syncDraftFromDom();
+          void (async () => {
+            await commitDraftText(editableElement);
+            exitInlineTextEditing();
+            editableElement.blur();
+          })();
+        } else if (insertLineBreakAtSelection(editableElement)) {
+          syncDraftFromDom();
+        }
         return;
       }
 
       if (event.key !== 'Escape') return;
       event.preventDefault();
       event.stopPropagation();
-      editableElement.textContent = textStateRef.current.savedText;
+      writeEditableText(editableElement, textStateRef.current.savedText);
       handleCancelText();
       exitInlineTextEditing();
       editableElement.blur();
+    };
+
+    const handleBeforeInput = (event: InputEvent) => {
+      if (!isMobileDevice()) return;
+      if (event.inputType !== 'insertParagraph' && event.inputType !== 'insertLineBreak') return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (insertLineBreakAtSelection(editableElement)) {
+        syncDraftFromDom();
+      }
     };
 
     const handleBlur = () => {
@@ -1065,6 +1239,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     };
 
     editableElement.addEventListener('input', handleInput);
+    editableElement.addEventListener('beforeinput', handleBeforeInput);
     editableElement.addEventListener('paste', handlePaste);
     editableElement.addEventListener('keydown', handleKeyDown);
     editableElement.addEventListener('blur', handleBlur);
@@ -1082,7 +1257,8 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
 
         const shadowActiveElement = editorShadowRoot?.activeElement;
         const documentActiveElement = editableElement.ownerDocument.activeElement;
-        const shadowUiOwnsFocus = shadowActiveElement instanceof HTMLElement || documentActiveElement === editorHost;
+        const shadowUiOwnsFocus =
+          shadowActiveElement instanceof HTMLElement || documentActiveElement === editorHost;
         if (!shadowUiOwnsFocus) return;
 
         if (shadowActiveElement instanceof HTMLElement) {
@@ -1126,6 +1302,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
         window.cancelAnimationFrame(restoreFocusRafId);
       }
       editableElement.removeEventListener('input', handleInput);
+      editableElement.removeEventListener('beforeinput', handleBeforeInput);
       editableElement.removeEventListener('paste', handlePaste);
       editableElement.removeEventListener('keydown', handleKeyDown);
       editableElement.removeEventListener('blur', handleBlur);
@@ -1145,7 +1322,15 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       restoreInlineStyle(editableElement, 'cursor', previousCursor);
       propertyPanelOptions?.onInlineTextEditingElementChange?.(null);
     };
-  }, [canEditText, commitDraftText, currentTarget, handleCancelText, inlineTextEditing, propertyPanelOptions]);
+  }, [
+    activeTextTarget,
+    canEditText,
+    commitDraftText,
+    finishInlineTextEditing,
+    handleCancelText,
+    inlineTextEditing,
+    propertyPanelOptions,
+  ]);
 
   return (
     <div style={panelContainerStyle}>
@@ -1175,10 +1360,14 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
           hideExecutionControls={Boolean(
             breadcrumbsOptions.hideExecutionControls ?? propertyPanelOptions?.hideExecutionControls,
           )}
+          hideCurrentElementExecutionAction={Boolean(
+            propertyPanelOptions?.hideCurrentElementExecutionAction,
+          )}
           hideContextAppendAction={Boolean(
             breadcrumbsOptions.hideExecutionControls ?? propertyPanelOptions?.hideExecutionControls,
           )}
           enabledSkillIds={commentarySkillSelectionManaged ? enabledCommentarySkillIds : undefined}
+          skillOptions={commentarySkillOptions}
           onBubbleStyleEditorOpenChange={setBubbleStyleEditorOpen}
           onSendCurrentElementPromptToAgent={handleSendCurrentElementPromptToAgent}
           onWakeAgent={propertyPanelOptions?.onWakeAgent}
@@ -1190,9 +1379,15 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
           }
           canExportSelectionToDesignTool={propertyPanelOptions?.canExportSelectionToDesignTool}
           onExportSelectionToDesignTool={propertyPanelOptions?.onExportSelectionToDesignTool}
-          getExportSelectionToDesignToolBlockReason={propertyPanelOptions?.getExportSelectionToDesignToolBlockReason}
-          onHoverSelectionSuppressedChange={selectionGuards.handlePromptHoverSelectionSuppressedChange}
-          onSelectionInteractionLockChange={selectionGuards.handlePromptSelectionInteractionLockChange}
+          getExportSelectionToDesignToolBlockReason={
+            propertyPanelOptions?.getExportSelectionToDesignToolBlockReason
+          }
+          onHoverSelectionSuppressedChange={
+            selectionGuards.handlePromptHoverSelectionSuppressedChange
+          }
+          onSelectionInteractionLockChange={
+            selectionGuards.handlePromptSelectionInteractionLockChange
+          }
           onUiModeChange={handleUiModeChange}
           onTargetChange={handleTargetChange}
           onAnchorRectChange={handleAnchorRectChange}
@@ -1233,10 +1428,10 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
           onDeleteCurrentAnnotationNode={handleDeleteCurrentAnnotationNode}
         />
       ) : null}
-      {effectivePropertyPanelOptions && propertyPanelVisible ? (
+      {propertyPanelOptions && propertyPanelVisible ? (
         <PropertyPanelView
           ref={propertyPanelRef}
-          options={effectivePropertyPanelOptions}
+          options={propertyPanelOptions}
           currentTarget={currentTarget}
           uiMode={uiMode}
           toolMinimized={toolMinimized}
@@ -1247,13 +1442,21 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
           uiSettings={uiSettings}
           interactionProfile={interactionProfile}
           agentVisualState={agentVisualState}
-          agentProviderAvailabilities={propertyPanelOptions?.getAgentProviderAvailabilities?.() ?? []}
+          agentProviderAvailabilities={
+            propertyPanelOptions?.getAgentProviderAvailabilities?.() ?? []
+          }
           onPropertyPanelOpenChange={setPropertyPanelOpen}
           onAgentVisualStateChange={handleAgentVisualStateChange}
           onUiSettingsChange={handleUiSettingsChange}
-          onRefreshAgentProviderAvailabilities={propertyPanelOptions?.refreshAgentProviderAvailabilities}
-          onHoverSelectionSuppressedChange={selectionGuards.handlePanelHoverSelectionSuppressedChange}
-          onSelectionInteractionLockChange={selectionGuards.handlePanelSelectionInteractionLockChange}
+          onRefreshAgentProviderAvailabilities={
+            propertyPanelOptions?.refreshAgentProviderAvailabilities
+          }
+          onHoverSelectionSuppressedChange={
+            selectionGuards.handlePanelHoverSelectionSuppressedChange
+          }
+          onSelectionInteractionLockChange={
+            selectionGuards.handlePanelSelectionInteractionLockChange
+          }
           onUiModeChange={handleUiModeChange}
           onToolMinimizedChange={selectionGuards.handleToolMinimizedChange}
           onSelectionModeActiveChange={selectionGuards.handleSelectionModeActiveChange}

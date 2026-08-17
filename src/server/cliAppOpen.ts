@@ -414,6 +414,15 @@ async function openMakeCliAppWithLock(
     });
   }
 
+  if (inspection.appPathRequired) {
+    return appResult(app, provider, {
+      ok: false,
+      code: 'app-path-required',
+      message: `${APP_LABELS[app]} has multiple supported installations. Select one with --app-path.`,
+      ...(inspection.detail ? { detail: inspection.detail } : {}),
+    });
+  }
+
   if (!inspection.installed && !inspection.ready) {
     return appResult(app, provider, {
       ok: false,

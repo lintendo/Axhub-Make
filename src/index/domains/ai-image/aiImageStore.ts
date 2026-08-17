@@ -2,6 +2,7 @@ import type { ContextBundleV2 } from '@axhub/acp/runtime';
 import type { PromptClientPreference } from '../../types';
 import type { CanvasLocalContextRef } from './canvasReferenceImages';
 import { getGenerationArtifactHistoryStore } from '../ai-generation/generationArtifactHistoryStore';
+import { requireProjectScope, withProjectScope } from '../../services/projectScope';
 
 export type AiImageTaskStatus = 'running' | 'done' | 'error';
 export type AiImageTaskStage =
@@ -112,7 +113,7 @@ export interface AiImageTaskStore {
   getState(): AiImageStoreState;
   getTasks(): AiImageTaskRecord[];
   getImage(id: string): AiImageStoredImage | undefined;
-  configure(options: { targetPath?: string | null }): Promise<void>;
+  configure(options: { projectId: string; targetPath?: string | null }): Promise<void>;
   subscribe(listener: (state: AiImageStoreState) => void): () => void;
   load(): Promise<void>;
   submit(request: AiImageGenerateRequest, options?: {
@@ -241,12 +242,22 @@ function normalizeTargetPath(value: string | null | undefined): string | undefin
   return `prototypes/${prototypeMatch[1]}`;
 }
 
-function generationTasksEndpoint(value: string): string {
-  return `/api/ai/generation-tasks?targetPath=${encodeURIComponent(value)}`;
+function generationTasksEndpoint(projectId: string, value: string): string {
+  return withProjectScope(
+    `/api/ai/generation-tasks?targetPath=${encodeURIComponent(value)}`,
+    { projectId },
+  );
 }
 
-function generationArtifactsEndpoint(value: string): string {
-  return `/api/ai/artifact-history?targetPath=${encodeURIComponent(value)}`;
+function generationArtifactsEndpoint(projectId: string, value: string): string {
+  return withProjectScope(
+    `/api/ai/artifact-history?targetPath=${encodeURIComponent(value)}`,
+    { projectId },
+  );
+}
+
+function createScopeKey(projectId: string | undefined, targetPath: string | undefined): string {
+  return projectId ? `${projectId}:${targetPath || ''}` : '';
 }
 
 function resolvePromptGenerationProvider(preferredPromptClient?: PromptClientPreference): string {
@@ -466,8 +477,8 @@ async function readAcpChatText(response: Response): Promise<string> {
   return output.trim();
 }
 
-async function getAssistantRuntimeForImagePromptGeneration(): Promise<AssistantRuntimeInfo> {
-  const response = await fetch('/api/assistant/runtime?autoStart=false');
+async function getAssistantRuntimeForImagePromptGeneration(projectId: string): Promise<AssistantRuntimeInfo> {
+  const response = await fetch(withProjectScope('/api/assistant/runtime?autoStart=false', { projectId }));
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(body?.error || '加载助手运行时配置失败');
@@ -481,12 +492,13 @@ async function getAssistantRuntimeForImagePromptGeneration(): Promise<AssistantR
 }
 
 async function executeCanvasAiImagePromptGeneration(params: {
+  projectId: string;
   sourcePrompt: string;
   localContextRefs: CanvasLocalContextRef[];
   referenceImageCount: number;
   preferredPromptClient?: PromptClientPreference;
 }): Promise<string> {
-  const runtime = await getAssistantRuntimeForImagePromptGeneration();
+  const runtime = await getAssistantRuntimeForImagePromptGeneration(params.projectId);
   const threadId = createImagePromptThreadId();
   const response = await fetch(buildAcpChatUrl(runtime.apiBaseUrl), {
     method: 'POST',
@@ -731,6 +743,7 @@ function upsertImageConversation(
 export function createAiImageTaskStore(options: AiImageTaskStoreOptions = {}): AiImageTaskStore {
   const now = options.now || (() => Date.now());
   let state: AiImageStoreState = { tasks: [], images: {}, imageConversations: [] };
+  let projectId: string | undefined;
   let targetPath: string | undefined;
   let loadRevision = 0;
   const listeners = new Set<(state: AiImageStoreState) => void>();
@@ -744,7 +757,10 @@ export function createAiImageTaskStore(options: AiImageTaskStoreOptions = {}): A
     emit();
   };
 
-  const upsertTask = (task: AiImageTaskRecord) => {
+  const isCurrentScope = (scopeKey: string) => scopeKey === createScopeKey(projectId, targetPath);
+
+  const upsertTask = (task: AiImageTaskRecord, scopeKey?: string) => {
+    if (scopeKey && !isCurrentScope(scopeKey)) return;
     setState({
       ...state,
       tasks: [task, ...state.tasks.filter((item) => item.id !== task.id)],
@@ -755,9 +771,12 @@ export function createAiImageTaskStore(options: AiImageTaskStoreOptions = {}): A
     getState: () => state,
     getTasks: () => state.tasks,
     getImage: (id) => state.images[id],
-    async configure({ targetPath: nextTargetPath }) {
+    async configure({ projectId: nextProjectId, targetPath: nextTargetPath }) {
+      const scope = requireProjectScope(nextProjectId);
       const normalizedTargetPath = normalizeTargetPath(nextTargetPath);
-      if (normalizedTargetPath === targetPath) return;
+      const nextScopeKey = createScopeKey(scope.projectId, normalizedTargetPath);
+      if (nextScopeKey === createScopeKey(projectId, targetPath)) return;
+      projectId = scope.projectId;
       targetPath = normalizedTargetPath;
       loadRevision += 1;
       state = { tasks: [], images: {}, imageConversations: [] };
@@ -771,12 +790,14 @@ export function createAiImageTaskStore(options: AiImageTaskStoreOptions = {}): A
       return () => listeners.delete(listener);
     },
     async load() {
-      if (!targetPath) return;
+      const loadProjectId = projectId;
+      const loadTargetPath = targetPath;
+      if (!loadProjectId || !loadTargetPath) return;
       const revision = loadRevision;
       try {
         const [tasksResponse, artifactsResponse] = await Promise.all([
-          fetch(generationTasksEndpoint(targetPath)),
-          fetch(generationArtifactsEndpoint(targetPath)),
+          fetch(generationTasksEndpoint(loadProjectId, loadTargetPath)),
+          fetch(generationArtifactsEndpoint(loadProjectId, loadTargetPath)),
         ]);
         if (!tasksResponse.ok) {
           throw new Error(`加载图片任务失败 (${tasksResponse.status})`);
@@ -837,6 +858,9 @@ export function createAiImageTaskStore(options: AiImageTaskStoreOptions = {}): A
       }
     },
     async submit(request, submitOptions = {}) {
+      const scope = requireProjectScope(projectId);
+      const submissionTargetPath = targetPath;
+      const submissionScopeKey = createScopeKey(scope.projectId, submissionTargetPath);
       const createdAt = now();
       const conversationId = request.conversationId || createConversationId();
       const roundId = request.roundId || createRoundId();
@@ -866,7 +890,7 @@ export function createAiImageTaskStore(options: AiImageTaskStoreOptions = {}): A
           ? { referenceImages: request.referenceImages }
           : {}),
       };
-      upsertTask(task);
+      upsertTask(task, submissionScopeKey);
       setState({
         ...state,
         imageConversations: upsertImageConversation(state.imageConversations, {
@@ -894,6 +918,7 @@ export function createAiImageTaskStore(options: AiImageTaskStoreOptions = {}): A
           task = { ...task, stage: 'generating-prompt' };
           upsertTask(task);
           const generatedPrompt = await executeCanvasAiImagePromptGeneration({
+            projectId: scope.projectId,
             sourcePrompt,
             localContextRefs,
             referenceImageCount: Array.isArray(request.referenceImages) ? request.referenceImages.length : 0,
@@ -901,13 +926,14 @@ export function createAiImageTaskStore(options: AiImageTaskStoreOptions = {}): A
           }).catch((error: any) => {
             throw new Error(`提示词生成失败：${error?.message || '未知错误'}`);
           });
+          if (!isCurrentScope(submissionScopeKey)) return task;
           task = {
             ...task,
             prompt: generatedPrompt,
             sourcePrompt,
             localContextRefs,
           };
-          upsertTask(task);
+          upsertTask(task, submissionScopeKey);
           generateRequest = {
             ...generateRequest,
             prompt: generatedPrompt,
@@ -916,17 +942,20 @@ export function createAiImageTaskStore(options: AiImageTaskStoreOptions = {}): A
           };
         }
         task = { ...task, stage: 'generating' };
-        upsertTask(task);
-        const response = await fetch('/api/ai/runs', {
+        upsertTask(task, submissionScopeKey);
+        const response = await fetch(withProjectScope('/api/ai/runs', { projectId: scope.projectId }), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            projectId: scope.projectId,
             scene: 'image',
             ...generateRequest,
             taskId: task.id,
             conversationId,
+            targetPath: submissionTargetPath,
           }),
         });
+        if (!isCurrentScope(submissionScopeKey)) return task;
         const contentType = response.headers.get('content-type') || '';
         if (!response.ok) {
           const body = contentType.includes('application/json')
@@ -937,7 +966,7 @@ export function createAiImageTaskStore(options: AiImageTaskStoreOptions = {}): A
           });
         }
         task = { ...task, stage: 'downloading' };
-        upsertTask(task);
+        upsertTask(task, submissionScopeKey);
 
         const outputImages: string[] = [];
         const actualParamsByImage: Record<string, Partial<AiImageTaskParams>> = {};
@@ -945,6 +974,7 @@ export function createAiImageTaskStore(options: AiImageTaskStoreOptions = {}): A
         const rawImageUrls: string[] = [];
 
         await readAiRunSseEvents(response, async ({ event, data }) => {
+          if (!isCurrentScope(submissionScopeKey)) return;
           if (event === 'run.error') {
             throw Object.assign(new Error(stringField(data.error) || '图片生成失败'), {
               rawImageUrls,
@@ -953,12 +983,17 @@ export function createAiImageTaskStore(options: AiImageTaskStoreOptions = {}): A
           if (event !== 'artifact.created' && event !== 'artifact.updated') return;
           const artifact = isRecord(data.artifact) ? data.artifact : {};
           if (artifact.kind !== 'image') return;
-          getGenerationArtifactHistoryStore().upsertArtifact(artifact, { status: 'running' });
+          getGenerationArtifactHistoryStore().upsertArtifact(artifact, {
+            status: 'running',
+            scope: { projectId: scope.projectId, targetPath: submissionTargetPath },
+          });
           const dataUrl = stringField(artifact.dataUrl);
           if (!dataUrl) return;
           const id = await sha256(`${stringField(artifact.id) || ''}:${dataUrl}`);
+          if (!isCurrentScope(submissionScopeKey)) return;
           if (outputImages.includes(id)) return;
           const size = await parseImageSize(dataUrl);
+          if (!isCurrentScope(submissionScopeKey)) return;
           const metadata = normalizeImageMetadata(artifact.metadata);
           const storedImage: AiImageStoredImage = {
             id,
@@ -1011,6 +1046,7 @@ export function createAiImageTaskStore(options: AiImageTaskStoreOptions = {}): A
             }),
           });
         });
+        if (!isCurrentScope(submissionScopeKey)) return task;
         const finishedAt = now();
         task = {
           ...task,
@@ -1055,7 +1091,8 @@ export function createAiImageTaskStore(options: AiImageTaskStoreOptions = {}): A
           finishedAt,
           elapsed: Math.max(0, finishedAt - createdAt),
         };
-        upsertTask(task);
+        if (!isCurrentScope(submissionScopeKey)) return task;
+        upsertTask(task, submissionScopeKey);
         setState({
           ...state,
           imageConversations: upsertImageConversation(state.imageConversations, {

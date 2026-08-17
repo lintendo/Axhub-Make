@@ -52,7 +52,7 @@
 
 ## 报告结构
 
-- 使用 `src/resources/templates/prototype-review-report-template.md`；`title` 固定为 `原型评审`。
+- 使用 `templates/prototype-review.md`；`title` 固定为 `原型评审`。
 - 公共前三组之后，第四组固定为 `完整性与项目对齐`。
 - 可以追加 `业务逻辑连贯性`、`状态、异常、边界与恢复`、`证据与评估说明`。
 

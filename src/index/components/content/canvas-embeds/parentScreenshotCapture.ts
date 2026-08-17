@@ -4,6 +4,7 @@ export interface CaptureSameOriginIframeScreenshotParams {
     iframe: HTMLIFrameElement;
     width: number;
     height: number;
+    captureFullContent?: boolean;
 }
 
 export interface CaptureSameOriginIframeScreenshotResult {
@@ -482,6 +483,7 @@ export async function captureSameOriginIframeScreenshot({
     iframe,
     width,
     height,
+    captureFullContent = true,
 }: CaptureSameOriginIframeScreenshotParams): Promise<CaptureSameOriginIframeScreenshotResult> {
     const captureWidth = normalizeCaptureSize(width);
     const captureHeight = normalizeCaptureSize(height);
@@ -492,9 +494,13 @@ export async function captureSameOriginIframeScreenshot({
         const rootElement = typeof doc.getElementById === 'function'
             ? doc.getElementById('root') as HTMLElement | null
             : null;
-        const outputSize = collectIframeCaptureSize(doc, rootElement, captureWidth, captureHeight);
-        applyCaptureBoxSize(doc, rootElement, outputSize.width, outputSize.height);
-        await settleIframeLayout(doc);
+        const outputSize = captureFullContent
+            ? collectIframeCaptureSize(doc, rootElement, captureWidth, captureHeight)
+            : { width: captureWidth, height: captureHeight };
+        if (captureFullContent) {
+            applyCaptureBoxSize(doc, rootElement, outputSize.width, outputSize.height);
+            await settleIframeLayout(doc);
+        }
         const dataUrl = await captureIframeWithSnapdom(doc, iframe, outputSize.width, outputSize.height);
         return {
             dataUrl,

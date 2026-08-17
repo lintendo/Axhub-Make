@@ -21,6 +21,23 @@ export interface FloatingDragMetrics {
   velocityY: number;
 }
 
+export const FLOATING_DRAG_POINTER_RELAY_EVENT = 'axhub-floating-drag-pointer-relay';
+
+type FloatingDragPointerRelayDetail = {
+  type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel';
+  pointerId: number;
+  pointerType: string;
+  isPrimary: boolean;
+  button: number;
+  buttons: number;
+  clientX: number;
+  clientY: number;
+  altKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+};
+
 export interface FloatingDragOptions {
   /** Element that triggers the drag (handle) */
   handleEl: HTMLElement;
@@ -166,6 +183,33 @@ function shouldIgnoreInteractiveTarget(
   return true;
 }
 
+function parsePointerRelayDetail(value: unknown): FloatingDragPointerRelayDetail | null {
+  if (!value || typeof value !== 'object') return null;
+  const detail = value as Partial<FloatingDragPointerRelayDetail>;
+  if (
+    !['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].includes(detail.type ?? '')
+    || !Number.isInteger(detail.pointerId)
+    || !Number.isFinite(detail.clientX)
+    || !Number.isFinite(detail.clientY)
+  ) {
+    return null;
+  }
+  return {
+    type: detail.type as FloatingDragPointerRelayDetail['type'],
+    pointerId: detail.pointerId as number,
+    pointerType: typeof detail.pointerType === 'string' ? detail.pointerType : 'mouse',
+    isPrimary: detail.isPrimary !== false,
+    button: Number.isFinite(detail.button) ? Number(detail.button) : 0,
+    buttons: Number.isFinite(detail.buttons) ? Number(detail.buttons) : 0,
+    clientX: Number(detail.clientX),
+    clientY: Number(detail.clientY),
+    altKey: detail.altKey === true,
+    ctrlKey: detail.ctrlKey === true,
+    metaKey: detail.metaKey === true,
+    shiftKey: detail.shiftKey === true,
+  };
+}
+
 export function installFloatingDrag(options: FloatingDragOptions): () => void {
   const { handleEl, targetEl, onPositionChange, clampMargin } = options;
   const moveThresholdPx = Math.max(0, options.moveThresholdPx ?? 3);
@@ -210,7 +254,7 @@ export function installFloatingDrag(options: FloatingDragOptions): () => void {
     cursorSnapshot = null;
   }
 
-  function teardownWindowListeners(): void {
+  function removeWindowListeners(): void {
     window.removeEventListener('pointermove', onWindowPointerMove, WINDOW_CAPTURE);
     window.removeEventListener('pointerup', onWindowPointerUp, WINDOW_CAPTURE);
     window.removeEventListener('pointercancel', onWindowPointerCancel, WINDOW_CAPTURE);
@@ -261,7 +305,6 @@ export function installFloatingDrag(options: FloatingDragOptions): () => void {
   function finishSession(resetMetrics = true): void {
     if (!session) return;
     cancelAnimationLoop();
-    teardownWindowListeners();
     cleanupCapture(session.pointerId);
     handleEl.dataset.dragging = 'false';
     setGlobalDraggingCursor(false);
@@ -332,12 +375,6 @@ export function installFloatingDrag(options: FloatingDragOptions): () => void {
     emitDragState(true);
     setGlobalDraggingCursor(true);
 
-    try {
-      handleEl.setPointerCapture(pointerId);
-    } catch {
-      // Pointer capture may fail on some elements/browsers.
-    }
-
     ensureAnimationLoop();
   }
 
@@ -381,7 +418,13 @@ export function installFloatingDrag(options: FloatingDragOptions): () => void {
 
   function onWindowPointerMove(event: PointerEvent): void {
     const currentSession = session;
-    if (!currentSession || event.pointerId !== currentSession.pointerId) return;
+    if (
+      !currentSession
+      || currentSession.phase === 'settling'
+      || event.pointerId !== currentSession.pointerId
+    ) {
+      return;
+    }
 
     if (!currentSession.activated) {
       const dx = event.clientX - currentSession.startClientX;
@@ -415,7 +458,13 @@ export function installFloatingDrag(options: FloatingDragOptions): () => void {
 
   function onWindowPointerUp(event: PointerEvent): void {
     const currentSession = session;
-    if (!currentSession || event.pointerId !== currentSession.pointerId) return;
+    if (
+      !currentSession
+      || currentSession.phase === 'settling'
+      || event.pointerId !== currentSession.pointerId
+    ) {
+      return;
+    }
 
     if (!currentSession.activated) {
       finishSession();
@@ -424,7 +473,6 @@ export function installFloatingDrag(options: FloatingDragOptions): () => void {
 
     blockEvent(event);
     suppressClickOnce();
-    teardownWindowListeners();
     cleanupCapture(event.pointerId);
     handleEl.dataset.dragging = 'false';
     setGlobalDraggingCursor(false);
@@ -434,7 +482,13 @@ export function installFloatingDrag(options: FloatingDragOptions): () => void {
 
   function onWindowPointerCancel(event: PointerEvent): void {
     const currentSession = session;
-    if (!currentSession || event.pointerId !== currentSession.pointerId) return;
+    if (
+      !currentSession
+      || currentSession.phase === 'settling'
+      || event.pointerId !== currentSession.pointerId
+    ) {
+      return;
+    }
 
     if (currentSession.activated) {
       blockEvent(event);
@@ -445,7 +499,7 @@ export function installFloatingDrag(options: FloatingDragOptions): () => void {
   }
 
   function onWindowKeyDown(event: KeyboardEvent): void {
-    if (event.key !== 'Escape' || !session) return;
+    if (event.key !== 'Escape' || !session || session.phase === 'settling') return;
 
     if (session.activated) {
       event.preventDefault();
@@ -458,7 +512,7 @@ export function installFloatingDrag(options: FloatingDragOptions): () => void {
   }
 
   function onWindowBlur(): void {
-    if (!session) return;
+    if (!session || session.phase === 'settling') return;
     if (session.activated) {
       cancelDrag();
     } else {
@@ -467,7 +521,7 @@ export function installFloatingDrag(options: FloatingDragOptions): () => void {
   }
 
   function onVisibilityChange(): void {
-    if (!session || document.visibilityState !== 'hidden') return;
+    if (!session || session.phase === 'settling' || document.visibilityState !== 'hidden') return;
     if (session.activated) {
       cancelDrag();
     } else {
@@ -475,11 +529,11 @@ export function installFloatingDrag(options: FloatingDragOptions): () => void {
     }
   }
 
-  function onHandlePointerDown(event: PointerEvent): void {
-    if (disposed || !targetEl.isConnected || session) return;
-    if (event.button !== 0 || !event.isPrimary) return;
+  function onHandlePointerDown(event: PointerEvent): boolean {
+    if (disposed || !targetEl.isConnected || session) return false;
+    if (event.button !== 0 || !event.isPrimary) return false;
     if (shouldIgnoreInteractiveTarget(event.target, handleEl, Boolean(options.ignoreInteractiveChildren))) {
-      return;
+      return false;
     }
 
     const rect = targetEl.getBoundingClientRect();
@@ -513,24 +567,76 @@ export function installFloatingDrag(options: FloatingDragOptions): () => void {
     emitDragMetrics({ velocityX: 0, velocityY: 0 });
     handleEl.dataset.dragging = 'false';
 
+    // Capture immediately instead of waiting for the movement threshold.
+    // Canvas hosts such as Figma can otherwise claim the first pointermove,
+    // preventing this pending drag from ever becoming active. A captured
+    // click still follows the normal below-threshold path and is not blocked.
+    try {
+      handleEl.setPointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture may fail on some elements/browsers.
+    }
+
     if (moveThresholdSq === 0) {
       activateDrag(event.pointerId);
     }
+    return true;
+  }
 
-    window.addEventListener('pointermove', onWindowPointerMove, WINDOW_CAPTURE);
-    window.addEventListener('pointerup', onWindowPointerUp, WINDOW_CAPTURE);
-    window.addEventListener('pointercancel', onWindowPointerCancel, WINDOW_CAPTURE);
-    window.addEventListener('keydown', onWindowKeyDown, WINDOW_CAPTURE);
-    window.addEventListener('blur', onWindowBlur, WINDOW_CAPTURE);
-    document.addEventListener('visibilitychange', onVisibilityChange);
+  function onRelayedPointerEvent(event: Event): void {
+    if (!(event instanceof CustomEvent)) return;
+    const detail = parsePointerRelayDetail(event.detail);
+    if (!detail) return;
+
+    const pointerEvent = {
+      ...detail,
+      target: handleEl,
+      cancelable: event.cancelable,
+      preventDefault: () => event.preventDefault(),
+      stopImmediatePropagation: () => event.stopImmediatePropagation(),
+      stopPropagation: () => event.stopPropagation(),
+    } as unknown as PointerEvent;
+
+    if (detail.type === 'pointerdown') {
+      if (!onHandlePointerDown(pointerEvent)) return;
+      event.preventDefault();
+      return;
+    }
+
+    const currentSession = session;
+    if (
+      !currentSession
+      || currentSession.phase === 'settling'
+      || currentSession.pointerId !== detail.pointerId
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    if (detail.type === 'pointermove') onWindowPointerMove(pointerEvent);
+    else if (detail.type === 'pointerup') onWindowPointerUp(pointerEvent);
+    else onWindowPointerCancel(pointerEvent);
   }
 
   handleEl.dataset.dragging = 'false';
   handleEl.addEventListener('pointerdown', onHandlePointerDown, HANDLE_POINTER_DOWN_CAPTURE);
+  handleEl.addEventListener(FLOATING_DRAG_POINTER_RELAY_EVENT, onRelayedPointerEvent);
+  // Keep these listeners installed for the lifetime of the draggable instance.
+  // Canvas hosts such as Figma register per-gesture capture listeners during
+  // pointerdown. Registering ours only after pointerdown lets those listeners
+  // run first and stop the move before this drag session can activate.
+  window.addEventListener('pointermove', onWindowPointerMove, WINDOW_CAPTURE);
+  window.addEventListener('pointerup', onWindowPointerUp, WINDOW_CAPTURE);
+  window.addEventListener('pointercancel', onWindowPointerCancel, WINDOW_CAPTURE);
+  window.addEventListener('keydown', onWindowKeyDown, WINDOW_CAPTURE);
+  window.addEventListener('blur', onWindowBlur, WINDOW_CAPTURE);
+  document.addEventListener('visibilitychange', onVisibilityChange);
 
   return () => {
     disposed = true;
     handleEl.removeEventListener('pointerdown', onHandlePointerDown, HANDLE_POINTER_DOWN_CAPTURE);
+    handleEl.removeEventListener(FLOATING_DRAG_POINTER_RELAY_EVENT, onRelayedPointerEvent);
     finishSession();
+    removeWindowListeners();
   };
 }

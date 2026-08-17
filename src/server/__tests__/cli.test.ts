@@ -30,11 +30,15 @@ vi.mock('../index.ts', () => ({
   startMakeServer: startMakeServerMock,
 }));
 
-vi.mock('../makeServiceLifecycle.ts', () => ({
-  inspectMakeService: inspectMakeServiceMock,
-  startMakeServiceInBackground: startMakeServiceInBackgroundMock,
-  stopMakeService: stopMakeServiceMock,
-}));
+vi.mock('../makeServiceLifecycle.ts', async () => {
+  const actual = await vi.importActual<typeof import('../makeServiceLifecycle.ts')>('../makeServiceLifecycle.ts');
+  return {
+    ...actual,
+    inspectMakeService: inspectMakeServiceMock,
+    startMakeServiceInBackground: startMakeServiceInBackgroundMock,
+    stopMakeService: stopMakeServiceMock,
+  };
+});
 
 vi.mock('../cliAppOpen.ts', async () => {
   const actual = await vi.importActual<typeof import('../cliAppOpen.ts')>('../cliAppOpen.ts');
@@ -50,6 +54,7 @@ vi.mock('../diagnosticLog.ts', () => ({
 }));
 
 import { CLI_USAGE, isCliEntrypoint, parseCliArgs, runCli, shouldAutoRunCli } from '../cli.ts';
+import { withMakeServiceStartGate } from '../makeServiceStartGate.ts';
 import { getGlobalMakeStateDir } from '../projectCore/index.ts';
 
 const DEFAULT_MAKE_SERVER_PORT = 53817;
@@ -512,6 +517,74 @@ describe('make-server CLI args', () => {
       expect.arrayContaining(['http://localhost:53817']),
       { detached: true, stdio: 'ignore' },
     );
+  });
+
+  it('passes self-contained executable identity and endpoint options to background startup', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await expect(runCli([
+      '--background', '--no-open', '--host', '127.0.0.1', '--port', '6123',
+    ], { selfContainedExecutable: true } as any)).resolves.toBe(0);
+
+    expect(startMakeServiceInBackgroundMock).toHaveBeenCalledWith(expect.objectContaining({
+      selfContainedExecutable: true,
+      host: '127.0.0.1',
+      port: 6123,
+    }));
+  });
+
+  it('serializes concurrent foreground starts and reuses the winner', async () => {
+    useMakeHomeDir();
+    let running = false;
+    const inspect = vi.fn(async () => running
+      ? { status: 'running' as const, origin: 'http://127.0.0.1:53817', pid: 81240 }
+      : { status: 'stopped' as const });
+    const start = vi.fn(async () => {
+      running = true;
+      return {
+        close: vi.fn(async () => {}),
+        host: '127.0.0.1',
+        origin: 'http://127.0.0.1:53817',
+        port: DEFAULT_MAKE_SERVER_PORT,
+      };
+    });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await expect(Promise.all([
+      runCli(['--no-open'], { inspectMakeService: inspect, startMakeServer: start }),
+      runCli(['--no-open'], { inspectMakeService: inspect, startMakeServer: start }),
+    ])).resolves.toEqual([0, 0]);
+    expect(start).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets a direct background child inherit its parent startup claim', async () => {
+    const homeDir = useMakeHomeDir();
+    const stateDirectory = getGlobalMakeStateDir(homeDir);
+    const inspect = vi.fn(async () => ({ status: 'stopped' as const }));
+    const start = vi.fn(async () => ({
+      close: vi.fn(async () => {}),
+      host: '127.0.0.1',
+      origin: 'http://127.0.0.1:53817',
+      port: DEFAULT_MAKE_SERVER_PORT,
+    }));
+    const unexpectedGate = vi.fn(async () => {
+      throw new Error('child attempted to reacquire its parent startup gate');
+    });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await withMakeServiceStartGate({ stateDirectory }, async (lease) => {
+      await expect(runCli(['serve', '--no-open'], {
+        inspectMakeService: inspect,
+        startMakeServer: start,
+        inheritedStartGateClaim: lease.entryPath,
+        parentPid: process.pid,
+        withMakeServiceStartGate: unexpectedGate,
+      } as any)).resolves.toBe(0);
+      return null;
+    });
+
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(unexpectedGate).not.toHaveBeenCalled();
   });
 
   it('injects the App only after a reusable Make service is available', async () => {

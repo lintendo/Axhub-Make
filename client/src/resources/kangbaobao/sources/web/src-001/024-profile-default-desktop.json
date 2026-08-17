@@ -1,0 +1,266 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 24,
+  "pageId": "7r7b8e",
+  "pageName": "我的",
+  "sitemapPath": "我的",
+  "requestedPath": "我的.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.59.49/%E6%88%91%E7%9A%84.html",
+  "dataUrl": "http://127.0.0.1:32768/20.59.49/files/%E6%88%91%E7%9A%84/data.js",
+  "generationDate": "2026-08-14T12:59:49.197Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 首页\n- paragraph: 百科\n- paragraph: 菜谱\n- paragraph: 我的\n- paragraph: 辣妈0636966\n- paragraph: 2个月 男宝\n- paragraph: 一年 女宝\n- paragraph: 我的\n- paragraph: \"1\"\n- paragraph: 宝宝管理\n- paragraph: 百科收藏\n- paragraph: 菜谱收藏\n- paragraph: 推荐给好友\n- paragraph: 关于康宝宝\n- paragraph: 设置\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "024-profile-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "背景",
+    "菜单",
+    "弹窗",
+    "标签栏",
+    "首页",
+    "百科",
+    "菜谱",
+    "我的",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [],
+  "panels": [
+    {
+      "scope": "master:底部tab / 标签栏",
+      "label": "标签栏",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:我的",
+      "event": "Page loaded",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of (底部tab)/我的 equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:我的 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 修改昵称 in Current window",
+      "target": "修改昵称_1.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:我的 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 消息通知 in Current window",
+      "target": "消息通知.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:我的 / 菜单 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 我的宝宝 in Current window",
+      "target": "我的宝宝.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:我的 / 菜单 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 百科收藏 in Current window",
+      "target": "百科收藏.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:我的 / 菜单 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 菜谱收藏 in Current window",
+      "target": "菜谱收藏.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:我的 / 菜单 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 弹窗",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:我的 / 菜单 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 关于康宝宝 in Current window",
+      "target": "关于康宝宝.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:我的 / 菜单 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 设置 in Current window",
+      "target": "设置.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:我的 / 弹窗",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹窗fade none 100ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:底部tab / 标签栏 / state:State1 / 首页",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 首页 in Current window",
+      "target": "首页.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "master:底部tab / 标签栏 / state:State1 / 百科",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 百科 in Current window",
+      "target": "百科.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "master:底部tab / 标签栏 / state:State1 / 菜谱",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 菜谱 in Current window",
+      "target": "菜谱.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "master:底部tab / 标签栏 / state:State1 / 我的",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 我的 in Current window",
+      "target": "我的.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

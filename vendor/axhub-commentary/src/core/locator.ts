@@ -12,6 +12,10 @@
 
 import type { ElementLocator } from '../web-editor-types';
 import { findDebugSource } from './debug-source';
+import {
+  getEditableTextFragmentLocator,
+  resolveEditableTextFragment,
+} from './text-fragment';
 
 // =============================================================================
 // Types
@@ -631,6 +635,14 @@ export function generateCssSelector(
  * The locator contains multiple strategies for re-identification.
  */
 export function createElementLocator(element: Element): ElementLocator {
+  const textFragment = getEditableTextFragmentLocator(element);
+  if (textFragment) {
+    return {
+      ...createElementLocator(textFragment.parent),
+      textFragment: textFragment.fragment,
+    };
+  }
+
   const root = getQueryRoot(element);
 
   // Extract debug source (React/Vue component file path)
@@ -731,7 +743,9 @@ export function locateElement(
       continue;
     }
 
-    return element;
+    return locator.textFragment
+      ? resolveEditableTextFragment(element, locator.textFragment)
+      : element;
   }
 
   return null;
@@ -744,5 +758,8 @@ export function locatorKey(locator: ElementLocator): string {
   const selectors = locator.selectors.join('|');
   const shadow = locator.shadowHostChain?.join('>') ?? '';
   const frame = locator.frameChain?.join('>') ?? '';
-  return `frame:${frame}|shadow:${shadow}|sel:${selectors}`;
+  const textFragment = locator.textFragment
+    ? `|text:${locator.textFragment.childNodeIndex}`
+    : '';
+  return `frame:${frame}|shadow:${shadow}|sel:${selectors}${textFragment}`;
 }

@@ -24,7 +24,7 @@ interface SourceZipApiHandlers {
     req: IncomingMessage,
     res: ServerResponse,
     options: ManagementApiOptions,
-    mode: 'active-fallback',
+    mode: 'explicit-required',
   ) => SourceZipProjectContext | null;
   findProjectResourceByPath: (metadata: SourceZipProjectContext['metadata'], rawPath: string) => any;
   resolveSourceFileFromMetadata: (context: SourceZipProjectContext, rawPath: string) => string | null;
@@ -135,7 +135,7 @@ function handleProjectAwareSourceAndZip(
     return false;
   }
 
-  const context = handlers.resolveProjectContext(req, res, options, 'active-fallback');
+  const context = handlers.resolveProjectContext(req, res, options, 'explicit-required');
   if (!context) {
     return true;
   }

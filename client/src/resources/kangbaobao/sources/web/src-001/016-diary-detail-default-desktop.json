@@ -1,0 +1,274 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 16,
+  "pageId": "rok618",
+  "pageName": "日记详情",
+  "sitemapPath": "首页 / 宝宝日记 / 日记详情",
+  "requestedPath": "日记详情.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.59.03/%E6%97%A5%E8%AE%B0%E8%AF%A6%E6%83%85.html",
+  "dataUrl": "http://127.0.0.1:32768/20.59.03/files/%E6%97%A5%E8%AE%B0%E8%AF%A6%E6%83%85/data.js",
+  "generationDate": "2026-08-14T12:59:03.009Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 日记详情\n- paragraph: 宝宝今天482天了，一晃好久没给宝宝记东西了。时间是最大的敌人，也是最大的朋友，可惜错过了太多的记录，而且这种记录再也找不回来。很多细节无法去弥补。宝宝现在长大了，厉害的很，特能跑，醒着的时候一刻不闲的，总动来动去。而且现在不给人抱着了，一定要跑地上去玩。语言上能听懂百分之七十的话啦，很多时候语言交流。慢慢发简单的音，会叫爸爸妈妈了。除了行动和语言之外，想法也多了，自己很多小心思。\n- paragraph\n- paragraph\n- paragraph: 21小时前\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "016-diary-detail-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "导航",
+    "弹窗",
+    "删除成功",
+    "背景",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [],
+  "panels": [
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:日记详情 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:日记详情 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 弹窗",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:日记详情 / 弹窗 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹窗",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:日记详情 / 弹窗 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 发布日记 in Current window",
+      "target": "发布日记.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:日记详情 / 弹窗 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 弹窗",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:日记详情 / 弹窗 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹窗",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:日记详情 / 弹窗 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show (Group)",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:日记详情 / 弹窗 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹窗",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:日记详情 / 弹窗 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹窗",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:日记详情 / 弹窗",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹窗fade none 100ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:日记详情 / 弹窗 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide (Group)fade none 300ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:日记详情 / 弹窗 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 删除成功fade none 300ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:日记详情 / 弹窗 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "wait",
+      "description": "Wait 1500 ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:日记详情 / 弹窗 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 删除成功fade none 300ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:日记详情 / 弹窗 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 宝宝日记 in Current window",
+      "target": "宝宝日记.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:日记详情 / 弹窗 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide (Group)fade none 300ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

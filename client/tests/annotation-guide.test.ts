@@ -110,19 +110,25 @@ describe('annotation demo prototype', () => {
     expect(indexSource).toContain('原型目录内容');
     expect(indexSource).toContain('默认设置状态');
     expect(indexSource).toContain('annotation-guide-method-grid');
-    expect(indexSource).toContain('批注工具');
-    expect(indexSource).toContain('Agent 标注技能');
-    expect(indexSource).toContain('批注模式更多菜单');
+    expect(indexSource).toContain('人工开启');
+    expect(indexSource).toContain('AI 开启');
+    expect(indexSource).toContain('从原型顶部的标注入口进入');
+    expect(indexSource).not.toContain('批注工具');
+    expect(indexSource).not.toContain('批注模式更多菜单');
     expect(indexSource).toContain('annotation-guide-edit-method-list');
+    expect(indexSource).toContain('AI 编辑');
+    expect(indexSource).toContain('手动编辑');
     expect(indexSource).toContain('对话框直接提');
+    expect(indexSource).toContain('批注后通过 AI 执行');
     expect(indexSource).toContain('编辑节点');
+    expect(indexSource).toContain('编辑文档');
     expect(indexSource).toContain('annotation-guide-read-source-list');
     expect(indexSource).toContain('源码');
     expect(indexSource).toContain('标注内容');
     expect(indexSource).toContain('文档内容');
     expect(indexSource).toContain("import makeAnnotationAsset from './assets/make-annotation.png';");
     expect(indexSource).toContain("import aiSkillOpenAsset from './assets/ai-skill-open.png';");
-    expect(indexSource).toContain("import commentMenuOpenAsset from './assets/comment-menu-open.png';");
+    expect(indexSource).not.toContain("import commentMenuOpenAsset from './assets/comment-menu-open.png';");
     expect(indexSource).toContain("import documentEditAsset from './assets/document-edit.png';");
     expect(indexSource).toContain("import manualEditCommentAsset from './assets/manual-edit-comment.png';");
     expect(indexSource).toContain("import agentReadAsset from './assets/agent-read.png';");
@@ -130,7 +136,7 @@ describe('annotation demo prototype', () => {
     expect(indexSource.match(/className="annotation-guide-method-placeholder"/g)).toHaveLength(3);
     expect(indexSource).toContain('image: makeAnnotationAsset');
     expect(indexSource).toContain('image: aiSkillOpenAsset');
-    expect(indexSource).toContain('image: commentMenuOpenAsset');
+    expect(indexSource).not.toContain('image: commentMenuOpenAsset');
     expect(indexSource).toContain('image: manualEditCommentAsset');
     expect(indexSource).toContain('image: documentEditAsset');
     expect(indexSource).toContain('alt={`${item.title}界面`}');
@@ -255,6 +261,13 @@ describe('annotation demo prototype', () => {
     expect(annotationSource.format).toBe('axhub-annotation-source');
     expect(annotationSource.data.prototypeName).toBe('annotation-guide');
     expect(annotationSource.markdownMap['prototype-as-prd-purpose']).toContain('原型是主需求载体');
+    expect(annotationSource.markdownMap['enable-annotation-methods']).toContain('人工开启');
+    expect(annotationSource.markdownMap['enable-annotation-methods']).toContain('AI 开启');
+    expect(annotationSource.markdownMap['enable-annotation-methods']).not.toContain('批注工具');
+    expect(annotationSource.markdownMap['enable-annotation-methods']).not.toContain('更多菜单');
+    expect(annotationSource.markdownMap['edit-comments-methods']).toContain('# AI 编辑');
+    expect(annotationSource.markdownMap['edit-comments-methods']).toContain('# 手动编辑');
+    expect(annotationSource.markdownMap['edit-comments-methods']).toContain('从原型顶部的标注入口进入');
     expect(annotationSource.directory.nodes).toEqual([
       expect.objectContaining({ type: 'folder', id: 'directory-pages', title: '页面' }),
       expect.objectContaining({ type: 'folder', id: 'directory-documents', title: '文档' }),
@@ -298,6 +311,8 @@ describe('annotation demo prototype', () => {
     expect(prdMarkdown[0]).toContain('开启标注');
     expect(prdMarkdown[0]).toContain('编辑标注');
     expect(prdMarkdown[0]).toContain('Agent 读取');
+    expect(prdMarkdown[0]).toContain('人工开启');
+    expect(prdMarkdown[0]).toContain('AI 开启');
     expect(prdMarkdown[0]).toContain('## 4. Markdown 层级案例');
     expect(prdMarkdown[0]).toContain('- [背景](#背景)');
     expect(prdMarkdown[0]).toContain('    - [页面范围](#页面范围)');
@@ -310,7 +325,7 @@ describe('annotation demo prototype', () => {
     expect(prdMarkdown[1]).toContain('研发');
     expect(prdMarkdown[2]).toContain('## 1. 主流程');
     expect(prdMarkdown[2]).toContain('## 2. 页面流转');
-    expect(prdMarkdown[2]).toContain('开启标注后');
+    expect(prdMarkdown[2]).toContain('人工开启或 AI 开启');
     expect(prdMarkdown[2]).toContain('开发 Agent');
     expect(prdMarkdown[3]).toContain('## 1. 状态标注范围');
     expect(prdMarkdown[3]).toContain('结果状态');

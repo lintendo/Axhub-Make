@@ -23,6 +23,18 @@ describe('desktop client lifecycle', () => {
       command: 'tasklist.exe',
       args: ['/FI', 'IMAGENAME eq Cursor.exe', '/NH'],
     });
+    expect(buildDesktopClientProcessProbe('workbuddy', 'darwin')).toEqual({
+      command: 'pgrep',
+      args: ['-f', '/Applications/WorkBuddy.app/Contents/MacOS/Electron'],
+    });
+    expect(buildDesktopClientProcessProbe('traework', 'win32')).toMatchObject({
+      command: 'powershell.exe',
+    });
+    expect(JSON.stringify(buildDesktopClientProcessProbe('traework', 'win32'))).toContain('TRAE SOLO CN');
+    expect(buildDesktopClientProcessProbe('qoderwork', 'win32')).toEqual({
+      command: 'tasklist.exe',
+      args: ['/FI', 'IMAGENAME eq QoderWork.exe', '/NH'],
+    });
   });
 
   it('uses a non-force graceful Cursor quit command on Windows', () => {
@@ -30,6 +42,18 @@ describe('desktop client lifecycle', () => {
       command: 'powershell.exe',
     });
     expect(JSON.stringify(buildDesktopClientGracefulQuit('cursor', 'win32'))).not.toMatch(/\/F|Stop-Process|kill -9/iu);
+  });
+
+  it('uses fixed non-force quit commands for the additional hosts', () => {
+    expect(buildDesktopClientGracefulQuit('opencode', 'darwin')).toEqual({
+      command: 'osascript',
+      args: ['-e', 'tell application "OpenCode" to quit'],
+    });
+    expect(buildDesktopClientGracefulQuit('workbuddy', 'win32')).toMatchObject({
+      command: 'powershell.exe',
+    });
+    expect(JSON.stringify(buildDesktopClientGracefulQuit('traework', 'win32'))).not.toMatch(/\/F|Stop-Process|kill -9/iu);
+    expect(JSON.stringify(buildDesktopClientGracefulQuit('qoderwork', 'win32'))).toContain('QoderWork CN');
   });
 
   it('returns false when the client remains running through the bounded timeout', async () => {

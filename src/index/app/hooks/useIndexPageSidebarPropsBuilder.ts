@@ -9,10 +9,12 @@ import type {
     CreateDialogTab,
     AiPanelMode,
     NewSidebarGroupedProps,
+    PromptExecutionMeta,
     ResourceSection,
     SidebarTab,
 } from '../../types/index-page.types';
 import type { LocalExportCapabilities, ResourceWriteCapabilities } from '../../services/projectResources';
+import type { MakeSurfaceCapabilities } from '../makeSurface';
 
 interface UseIndexPageSidebarPropsBuilderParams {
     state: {
@@ -42,6 +44,7 @@ interface UseIndexPageSidebarPropsBuilderParams {
         sidebarTrees: any;
         webAgentPanelOpen?: boolean;
         aiPanelMode?: AiPanelMode;
+        surfaceCapabilities?: MakeSurfaceCapabilities;
         selectedDoc: ItemData | null;
         selectedResourceFolder?: any;
         selectedCanvas: any;
@@ -98,7 +101,7 @@ interface UseIndexPageSidebarPropsBuilderParams {
         handleOpenAcpWebAgent?: (targetPath?: string, provider?: AcpProvider) => void | Promise<void>;
         handleOpenImageAiPanel?: () => void | Promise<void>;
         handleOpenWebAgentInPanel?: (url: string) => boolean | void | Promise<boolean | void>;
-        onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+        onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
         onCloseAiPanel?: () => void;
         onCloseWebAgentPanel?: () => void;
         handleOpenSelectedDocInIDE: (itemOverride?: ItemData | null, kindOverride?: 'doc' | 'template') => Promise<void>;
@@ -114,6 +117,8 @@ export function useIndexPageSidebarPropsBuilder({
 }: UseIndexPageSidebarPropsBuilderParams): NewSidebarGroupedProps {
     return useMemo(() => {
         const prototypeStartPageActive = state.prototypeStartPageActive === true;
+        const conversationUiEnabled = state.surfaceCapabilities?.conversationUi !== false;
+        const externalOpenMenu = state.surfaceCapabilities?.externalOpenMenu !== false;
         const resetToPrototypeStartView = () => {
             deps.setActiveTab('prototypes');
             deps.setSidebarTab('prototype');
@@ -151,15 +156,36 @@ export function useIndexPageSidebarPropsBuilder({
             lanAccessAllowed: state.lanAccessAllowed,
             isDarkMode: state.isDarkMode,
             sidebarTrees: state.sidebarTrees,
-            webAgentPanelOpen: prototypeStartPageActive ? false : state.webAgentPanelOpen,
-            aiPanelMode: prototypeStartPageActive ? null : state.aiPanelMode,
+            webAgentPanelOpen: prototypeStartPageActive || !conversationUiEnabled ? false : state.webAgentPanelOpen,
+            aiPanelMode: prototypeStartPageActive || !conversationUiEnabled ? null : state.aiPanelMode,
+            externalOpenMenu,
             prototypeStartPageActive: state.prototypeStartPageActive,
             resourceStartDraftActive: state.resourceStartDraftActive,
             themeStartDraftActive: state.themeStartDraftActive,
         },
         actions: {
             handleTabChange: deps.handleTabChange,
-            onSidebarTabChange: deps.setSidebarTab,
+            onSidebarTabChange: (tab) => {
+                if (tab === 'prototype') {
+                    if (deps.handleCreatePrototypeStartDraft) {
+                        deps.handleCreatePrototypeStartDraft();
+                        return;
+                    }
+                }
+                if (tab === 'document') {
+                    if (deps.handleCreateResourceStartDraft) {
+                        deps.handleCreateResourceStartDraft();
+                        return;
+                    }
+                }
+                if (tab === 'assets') {
+                    if (deps.handleCreateThemeStartDraft) {
+                        deps.handleCreateThemeStartDraft();
+                        return;
+                    }
+                }
+                deps.setSidebarTab(tab);
+            },
             onPrototypeViewSelect: async (item, mode) => {
                 await Promise.resolve(deps.handleMenuClick({ key: item.name }));
                 deps.setSelectedPrototypePageId?.(null);
@@ -264,12 +290,12 @@ export function useIndexPageSidebarPropsBuilder({
             onSidebarTreePersist: deps.resources.handleSidebarTreePersist,
             handleVersionManagement: deps.resources.handleVersionManagement,
             handleOpenProjectInIDE: deps.handleOpenProjectInIDE,
-            onOpenAcpWebAgent: prototypeStartPageActive ? undefined : deps.handleOpenAcpWebAgent,
-            onOpenImageAiPanel: prototypeStartPageActive ? undefined : deps.handleOpenImageAiPanel,
-            onOpenWebAgentInPanel: deps.handleOpenWebAgentInPanel,
-            onExecutePrompt: deps.onExecutePrompt,
-            onCloseAiPanel: deps.onCloseAiPanel,
-            onCloseWebAgentPanel: deps.onCloseWebAgentPanel,
+            onOpenAcpWebAgent: prototypeStartPageActive || !conversationUiEnabled ? undefined : deps.handleOpenAcpWebAgent,
+            onOpenImageAiPanel: prototypeStartPageActive || !conversationUiEnabled ? undefined : deps.handleOpenImageAiPanel,
+            onOpenWebAgentInPanel: conversationUiEnabled ? deps.handleOpenWebAgentInPanel : undefined,
+            onExecutePrompt: conversationUiEnabled ? deps.onExecutePrompt : undefined,
+            onCloseAiPanel: conversationUiEnabled ? deps.onCloseAiPanel : undefined,
+            onCloseWebAgentPanel: conversationUiEnabled ? deps.onCloseWebAgentPanel : undefined,
             onOpenAISettings: () => deps.openSettingsDialog('ai'),
         },
         preferences: {

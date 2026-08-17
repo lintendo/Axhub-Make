@@ -25,22 +25,31 @@ import { useIndexPagePresentationPropsBuilder } from './hooks/useIndexPagePresen
 import { useIndexPageSelectionSync } from './hooks/useIndexPageSelectionSync';
 import { useIndexPageSidebarPropsBuilder } from './hooks/useIndexPageSidebarPropsBuilder';
 import { useIndexPageUiBridge } from './hooks/useIndexPageUiBridge';
-import { usePrototypeSpecController } from './hooks/usePrototypeSpecController';
+import {
+    shouldClosePrototypeSpecAfterAnnotationAttempt,
+    usePrototypeSpecController,
+} from './hooks/usePrototypeSpecController';
 import { useDocumentResourceNavigation } from './hooks/useDocumentResourceNavigation';
 import { usePrototypeSpecNavigationGuard } from './hooks/usePrototypeSpecNavigationGuard';
 import { resolveIndexContentMode, type IndexContentMode } from './index-page/contentMode';
+import { resolveMakeSurface, resolveMakeSurfaceCapabilities } from './makeSurface';
 import { buildIndexDeepLinkUrl, parseResourceDeepLink, shouldSyncIndexDeepLinkUrl, type ResourceDeepLinkTarget } from './index-page/resourceDeepLink';
 import {
     buildAssistantAutoOpenPanelModeStorageKey,
     buildAssistantAutoOpenDismissedStorageKey,
+    getCommentaryVoiceVisible,
     getAssistantAutoOpenPanelMode,
     getAssistantAutoOpenDismissed,
+    resolveAssistantPanelOpenTarget,
     resolveMobileItemOpenUrl,
     setAssistantAutoOpenPanelMode,
     setAssistantAutoOpenDismissed,
+    setCommentaryVoiceVisible,
+    shouldSuppressAssistantAutoOpenForProjectChange,
 } from './index-page.helpers';
 import { getSelectedResourceTargetPath } from './index-page/previewActions.helpers';
 import { apiService } from '../services/index.api';
+import { requireProjectScope, withProjectScope } from '../services/projectScope';
 import type { MakeClientUpdateStatus } from '../services/api';
 import type { AcpProvider } from '@/common/assistant-context/types';
 import { DEFAULT_LOCAL_EXPORT_CAPABILITIES, DEFAULT_RESOURCE_WRITE_CAPABILITIES, normalizeProjectResourcesPayload } from '../services/projectResources';
@@ -52,11 +61,50 @@ import { buildMakeClientStartupFailurePrompt } from '../utils/projectSetupErrors
 import type { ExcalidrawPropertyPanelMode, ExcalidrawPropertyPanelPosition } from '../utils/excalidrawUiMode';
 import type { CanvasAiGenerationRequest } from '../domains/ai-generation/CanvasAiGenerationTool';
 import { mapCanvasDirectRunArtifacts } from '../domains/ai-generation/canvasDirectRun';
+import { submitAnnotationPromptViaApi } from '../domains/assistant/annotationDirectRun';
+import { createAnnotationDirectRunPreflightResult } from '../domains/assistant/annotationDirectRunManager';
+import type { AiRunSseEvent } from '../domains/ai-generation/aiRunClient';
 import {
-    submitAnnotationPromptViaApi,
-} from '../domains/assistant/annotationDirectRun';
-import { buildAcpCanvasMcpServers } from '../domains/assistant/assistantAcpContext';
+    createMakeVoiceCommentOperations,
+} from '../domains/assistant/makeVoiceCommentPersistence';
+import { createMakeVoiceToolRegistry, type MakeVoiceToolRegistration } from '../domains/assistant/makeVoiceTools';
+import {
+    MAKE_COMMENTARY_VOICE_INSTRUCTIONS,
+    buildMakeVoiceTurnContext,
+} from '../domains/assistant/makeVoicePrompt';
+import {
+    checkMakeVoiceConfigurationAfterRuntimeReady,
+    executeMakeVoiceTool,
+    toAcpVoiceHostTools,
+} from '../domains/assistant/makeRealtimeVoice';
+import { buildAcpCanvasMcpServers, buildAcpPreviewMcpServers } from '../domains/assistant/assistantAcpContext';
 import type { AssistantImageAttachmentPayload } from '../domains/assistant/assistantContextPayload';
+import { resolveImageAiResourceTargetFolder } from '../domains/assistant/imageAiResourceTarget';
+import { createPrototypeCommentsPersistenceAdapter } from '../../dev-template/webEditorV2Integration';
+import {
+    createDocumentCommentsPersistenceAdapter,
+    createDocumentCommentsPersistenceScope,
+} from '../../common/documentCommentsPersistence';
+import {
+    buildInternalPrototypeCommentPageScope,
+    buildSafeVoicePrototypeResourcePath,
+} from '../../common/prototypeCommentPageScope';
+import { MakeCommentaryVoiceEntry } from '../components/content/MakeCommentaryVoiceEntry';
+import {
+    createNotificationCoordinator,
+    type NotificationCoordinator,
+    type NotificationIntent,
+} from '../domains/notifications/notificationCoordinator';
+import {
+    installNotificationDebugApi,
+    notificationDiagnostics,
+} from '../domains/notifications/notificationDiagnostics';
+import { createNotificationPlayer, type NotificationPlayer } from '../domains/notifications/notificationPlayer';
+import { readNotificationSettings } from '../domains/notifications/notificationSettings';
+import {
+    resolveEffectiveSidebarCollapsed,
+    resolveResponsiveSidebarDefaultCollapsed,
+} from '../components/sidebar/responsiveSidebarState';
 import './styles/index-page.css';
 
 interface AppInnerProps {
@@ -136,32 +184,18 @@ function buildCanvasMcpServersForDirectRun(canvasFilePath: string): unknown[] | 
     return mcpServers || undefined;
 }
 
-function buildCreatedPrototypeStartItem(result: any): ItemData | null {
-    const name = String(result?.name || result?.folderName || '').trim();
-    if (!name) {
-        return null;
-    }
-    const displayName = String(result?.displayName || result?.title || name).trim() || name;
-    const clientUrl = String(result?.clientUrl || '').trim();
-    const filePath = String(result?.filePath || '').trim();
-    const absoluteFilePath = String(result?.absoluteFilePath || '').trim();
-    const canvasFilePath = String(result?.canvasFilePath || '').trim();
-    const absoluteCanvasFilePath = String(result?.absoluteCanvasFilePath || '').trim();
-    return {
-        name,
-        displayName,
-        jsUrl: '',
-        specUrl: '',
-        previewUrl: clientUrl,
-        clientUrl: clientUrl || undefined,
-        filePath: filePath || undefined,
-        absoluteFilePath: absoluteFilePath || undefined,
-        canvasFilePath: canvasFilePath || undefined,
-        absoluteCanvasFilePath: absoluteCanvasFilePath || undefined,
-        previewDisabled: !clientUrl,
-        ...(result?.placeholder === true ? { placeholder: true } : {}),
-        ...(result?.placeholderGuide ? { placeholderGuide: result.placeholderGuide } : {}),
-    };
+function buildCommentaryVoiceMcpServersForDirectRun(): unknown[] | undefined {
+    if (typeof window === 'undefined') return undefined;
+    const globals = window as unknown as Record<string, unknown>;
+    const previewToken = String(globals.__AXHUB_PREVIEW_MCP_TOKEN__ || '').trim();
+    const previewBridgeClientId = String(globals.__AXHUB_PREVIEW_BRIDGE_CLIENT_ID__ || '').trim();
+    if (!previewToken || !previewBridgeClientId) return undefined;
+    return buildAcpPreviewMcpServers({
+        makeOrigin: window.location.origin,
+        previewToken,
+        previewBridgeClientId,
+        voiceTools: true,
+    }) || undefined;
 }
 
 function buildMakeStatePermissionPrompt(health: unknown): string {
@@ -219,11 +253,74 @@ export default function IndexPage({
     setExcalidrawPropertyPanelPosition,
 }: AppInnerProps) {
     const { appDialog, messageApi, modal } = useIndexPageUiBridge();
+    const makeSurface = useMemo(() => (
+        resolveMakeSurface(typeof window === 'undefined' ? '' : window.location.search)
+    ), []);
+    const surfaceCapabilities = useMemo(() => resolveMakeSurfaceCapabilities(makeSurface), [makeSurface]);
+    const conversationUiEnabled = surfaceCapabilities.conversationUi;
     const workspace = useWorkspaceNavigationController({ messageApi });
     const bridge = useAxhubBridge();
+    const notificationPlayerRef = useRef<NotificationPlayer | null>(null);
+    if (!notificationPlayerRef.current) {
+        notificationPlayerRef.current = createNotificationPlayer();
+    }
+    const notificationCoordinatorRef = useRef<NotificationCoordinator | null>(null);
+    if (!notificationCoordinatorRef.current) {
+        notificationCoordinatorRef.current = createNotificationCoordinator({
+            getSettings: readNotificationSettings,
+            player: notificationPlayerRef.current,
+        });
+    }
+    const notifyAiNotification = useCallback((intent: NotificationIntent) => {
+        void notificationCoordinatorRef.current?.notify(intent);
+    }, []);
+    useEffect(() => installNotificationDebugApi({
+        diagnostics: notificationDiagnostics,
+        player: notificationPlayerRef.current!,
+    }), []);
+    useEffect(() => {
+        const primeNotificationAudio = () => {
+            notificationPlayerRef.current?.prime?.();
+        };
+        window.addEventListener('pointerdown', primeNotificationAudio, { capture: true, once: true });
+        window.addEventListener('keydown', primeNotificationAudio, { capture: true, once: true });
+        return () => {
+            window.removeEventListener('pointerdown', primeNotificationAudio, { capture: true });
+            window.removeEventListener('keydown', primeNotificationAudio, { capture: true });
+        };
+    }, []);
 
-    const [collapsed, setCollapsed] = useState(false);
+    const initialResourceDeepLink = useMemo(() => parseResourceDeepLink(), []);
+    const [responsiveSidebarDefaultCollapsed, setResponsiveSidebarDefaultCollapsed] = useState(() => (
+        typeof window === 'undefined'
+            ? false
+            : resolveResponsiveSidebarDefaultCollapsed({
+                workspaceWidth: window.innerWidth,
+                assistantVisible: false,
+                assistantWidth: 0,
+            })
+    ));
+    const [sidebarPinnedCollapsed, setSidebarPinnedCollapsed] = useState<boolean | null>(() => (
+        initialResourceDeepLink?.collapseSidebar ? true : null
+    ));
+    const [sidebarSystemCollapsed, setSidebarSystemCollapsed] = useState<boolean | null>(null);
+    const collapsed = resolveEffectiveSidebarCollapsed({
+        responsiveDefaultCollapsed: responsiveSidebarDefaultCollapsed,
+        pinnedCollapsed: sidebarPinnedCollapsed,
+        systemCollapsed: sidebarSystemCollapsed,
+    });
+    const collapsedRef = useRef(collapsed);
+    collapsedRef.current = collapsed;
+    const setCollapsed = useCallback<React.Dispatch<React.SetStateAction<boolean>>>((next) => {
+        const resolvedNext = typeof next === 'function' ? next(collapsedRef.current) : next;
+        setSidebarSystemCollapsed(null);
+        setSidebarPinnedCollapsed(resolvedNext);
+    }, []);
+    const setSystemCollapsed = useCallback((next: boolean | null) => {
+        setSidebarSystemCollapsed(next);
+    }, []);
     const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+    const [showCommentaryVoice, setShowCommentaryVoice] = useState(getCommentaryVoiceVisible);
     const [settingsDialogInitialTab, setSettingsDialogInitialTab] = useState<SettingsDialogInitialTab>('project');
     const [settingsDialogAIContext, setSettingsDialogAIContext] = useState<SettingsDialogAIContext | null>(null);
     const [makeClientUpdateAvailable, setMakeClientUpdateAvailable] = useState(false);
@@ -242,16 +339,17 @@ export default function IndexPage({
     const [startServerError, setStartServerError] = useState('');
     const [startServerErrorPrompt, setStartServerErrorPrompt] = useState('');
     const [pendingReturnTarget, setPendingReturnTarget] = useState<PendingReturnTarget | null>(null);
+    const [assistantCompactViewport, setAssistantCompactViewport] = useState(() => (
+        typeof window !== 'undefined'
+        && resolveAssistantPanelOpenTarget(window.innerWidth) === 'window'
+    ));
     const onlineOpenAutoTriggeredRef = useRef('');
     const onlineOpenAutoRestorePendingRef = useRef('');
     const previousAssistantAutoOpenProjectScopeRef = useRef('');
     const assistantAutoOpenSuppressedProjectScopeRef = useRef('');
-    const closedPrototypePlaceholderAutoCloseKeyRef = useRef('');
-    const openedPrototypeWaitingGenerationKeyRef = useRef('');
     const startGuideResourceUploadInputRef = useRef<HTMLInputElement | null>(null);
     const makeClientUpdateReminderTargetRef = useRef<MakeClientUpdateReminderTarget | null>(null);
     const makeClientUpdateReminderPendingSeenProjectIdRef = useRef('');
-    const initialResourceDeepLink = useMemo(() => parseResourceDeepLink(), []);
     const [initialResourceDeepLinkHandled, setInitialResourceDeepLinkHandled] = useState(() => !initialResourceDeepLink);
     const handleInitialResourceDeepLinkHandled = useCallback(() => {
         setInitialResourceDeepLinkHandled(true);
@@ -368,10 +466,10 @@ export default function IndexPage({
             uiPreferences: {
                 excalidrawPropertyPanelMode: mode,
             },
-        }).catch((error) => {
+        }, requireProjectScope(workspace.activeProjectId)).catch((error) => {
             console.warn('Failed to save Excalidraw property panel preference:', error);
         });
-    }, [setExcalidrawPropertyPanelMode]);
+    }, [setExcalidrawPropertyPanelMode, workspace.activeProjectId]);
 
     const handleExcalidrawPropertyPanelPositionChange = useCallback((position: ExcalidrawPropertyPanelPosition) => {
         setExcalidrawPropertyPanelPosition(position);
@@ -379,10 +477,10 @@ export default function IndexPage({
             uiPreferences: {
                 excalidrawPropertyPanelPosition: position,
             },
-        }).catch((error) => {
+        }, requireProjectScope(workspace.activeProjectId)).catch((error) => {
             console.warn('Failed to save Excalidraw property panel position preference:', error);
         });
-    }, [setExcalidrawPropertyPanelPosition]);
+    }, [setExcalidrawPropertyPanelPosition, workspace.activeProjectId]);
 
     const availableDocOptions = useMemo(
         () => workspace.docsItems.map((doc) => ({ name: doc.name, displayName: doc.displayName || doc.name })),
@@ -411,6 +509,8 @@ export default function IndexPage({
         setViewMode('demo');
         setSelectedItem(null);
         setSelectedPrototypePageId(null);
+        setResourceStartDraftActive(false);
+        setThemeStartDraftActive(false);
         setPrototypeStartDraftActive(true);
     }, []);
 
@@ -517,13 +617,11 @@ export default function IndexPage({
         const hide = messageApi.loading('正在上传资源...', 0);
         try {
             const formData = new FormData();
-            if (workspace.activeProjectId) {
-                formData.append('projectId', workspace.activeProjectId);
-            }
+            formData.append('projectId', requireProjectScope(workspace.activeProjectId).projectId);
             for (const file of Array.from(files)) {
                 formData.append('file', file, file.name);
             }
-            const response = await fetch('/api/docs/upload', {
+            const response = await fetch(withProjectScope('/api/docs/upload', requireProjectScope(workspace.activeProjectId)), {
                 method: 'POST',
                 body: formData,
             });
@@ -555,6 +653,9 @@ export default function IndexPage({
         autoOpen: shouldAutoOpenInitialPrototypeSpec,
         onError: messageApi.error,
     });
+    const prototypeSpecAnnotationAttemptIdRef = useRef(0);
+    const currentPrototypeSpecItemRef = useRef(prototypeSpec.currentItem);
+    currentPrototypeSpecItemRef.current = prototypeSpec.currentItem;
     useEffect(() => {
         if (prototypeSpec.isOpen && sidebarTab !== 'prototype') prototypeSpec.close();
     }, [prototypeSpec.isOpen, prototypeSpec.close, sidebarTab]);
@@ -581,16 +682,14 @@ export default function IndexPage({
     }, [contentMode, prototypeSpec.currentItem, resources.selectedDoc, resources.selectedTemplate]);
     const currentMarkdownItem = currentMarkdownResource.item;
     const currentMarkdownLabel = currentMarkdownResource.kind === 'template' ? '模板' : '文档';
-    const prototypePlaceholderActive = contentMode === 'preview' && viewMode === 'demo' && selectedItem?.placeholder === true;
-    const prototypeStartPageActive = prototypeStartDraftActive || prototypePlaceholderActive;
-    const startPageActive = prototypeStartPageActive || resourceStartDraftActive || themeStartDraftActive;
-    const prototypePlaceholderAutoCloseKey = prototypePlaceholderActive && selectedItem
-        ? selectedItem.resourceId || selectedItem.name
-        : '';
-    const prototypeWaitingGenerationActive = contentMode === 'preview' && viewMode === 'demo' && selectedItem?.generationStatus === 'waiting' && selectedItem?.placeholder !== true;
-    const prototypeWaitingGenerationAutoOpenKey = prototypeWaitingGenerationActive && selectedItem
-        ? selectedItem.resourceId || selectedItem.name
-        : '';
+    const prototypeStartDraftShellActive = contentMode === 'preview'
+        && prototypeStartDraftActive
+        && !selectedItem;
+    const reviewPanelVisible = viewMode !== 'canvas'
+        && !prototypeStartDraftShellActive
+        && !(contentMode === 'doc' && resourceStartDraftActive && !resources.selectedDoc)
+        && !(contentMode === 'theme' && themeStartDraftActive && !resources.selectedTheme);
+    const prototypeStartPageActive = prototypeStartDraftShellActive;
 
     const preferences = useIndexPagePreferences({
         setDefaultThemeName: resources.setDefaultThemeName,
@@ -601,8 +700,7 @@ export default function IndexPage({
         onExcalidrawPropertyPanelPositionLoaded: setExcalidrawPropertyPanelPosition,
     });
 
-    const assistantAutoOpenProjectScope = workspace.activeProjectId
-        || workspace.projectTitle;
+    const assistantAutoOpenProjectScope = workspace.activeProjectId || '';
     const assistantAutoOpenDismissedStorageKey = useMemo(() => (
         buildAssistantAutoOpenDismissedStorageKey(assistantAutoOpenProjectScope)
     ), [assistantAutoOpenProjectScope]);
@@ -620,16 +718,25 @@ export default function IndexPage({
         resources.selectedCanvas,
         resources.selectedDoc,
     ]);
+    const [imageAiSaveDirectory, setImageAiSaveDirectory] = useState('');
+    const handleImageAiSaved = useCallback(() => {
+        void resources.refreshDocsResources().catch((error: any) => {
+            messageApi.error(error?.message || '刷新资源失败');
+        });
+    }, [messageApi, resources.refreshDocsResources]);
 
     const assistantController = useAssistantPanelController({
         messageApi,
         modal,
-        preferredPromptClient: null,
+        preferredPromptClient: preferences.conversationPromptClient,
+        preferredModel: preferences.conversationModel,
         onOpenAISettings: (runtime, message) => openSettingsDialog('ai', {
             runtime,
             failureSource: '右侧 ACP UI 助手面板',
             failureMessage: message,
         }),
+        onAiNotification: notifyAiNotification,
+        onImageSaved: handleImageAiSaved,
         activeProjectId: workspace.activeProjectId,
         activeTab,
         viewMode,
@@ -639,6 +746,7 @@ export default function IndexPage({
         currentMarkdownResource,
         initialAssistantPanelMode,
         assistantImageGenerationConfig: preferences.assistantImageGenerationConfig,
+        imageAiSaveDirectory,
         currentCanvas: currentAssistantCanvasResource,
         currentTheme: resources.selectedTheme,
         currentDataTable: resources.selectedDataTable,
@@ -657,9 +765,33 @@ export default function IndexPage({
     ]);
 
     useEffect(() => {
+        const updateAssistantViewport = () => {
+            setAssistantCompactViewport(resolveAssistantPanelOpenTarget(window.innerWidth) === 'window');
+        };
+        updateAssistantViewport();
+        window.addEventListener('resize', updateAssistantViewport);
+        return () => window.removeEventListener('resize', updateAssistantViewport);
+    }, []);
+
+    useEffect(() => {
+        if (!assistantCompactViewport || !assistantController.assistantVisible) {
+            return;
+        }
+        assistantController.hideAssistantPanelTemporarily();
+    }, [
+        assistantCompactViewport,
+        assistantController.assistantVisible,
+        assistantController.hideAssistantPanelTemporarily,
+    ]);
+
+    useEffect(() => {
         const nextScope = assistantAutoOpenProjectScope;
         const previousScope = previousAssistantAutoOpenProjectScopeRef.current;
-        if (previousScope && nextScope && previousScope !== nextScope && !assistantController.assistantVisible) {
+        if (shouldSuppressAssistantAutoOpenForProjectChange(
+            previousScope,
+            nextScope,
+            assistantController.assistantVisible,
+        )) {
             assistantAutoOpenSuppressedProjectScopeRef.current = nextScope;
         }
         if (previousScope !== nextScope) {
@@ -672,12 +804,53 @@ export default function IndexPage({
         assistantController.assistantVisible,
     ]);
 
-    const ensureDefaultAiConfigured = useCallback((promptClient: unknown) => {
+    const ensureDefaultAiConfigured = useCallback((
+        promptClient: unknown,
+        purposeLabel: '对话 AI' | '批注 AI' | '画布 AI',
+    ) => {
         if (resolveAcpPromptClientProvider(normalizePromptClientPreference(promptClient))) return true;
         openSettingsDialog('ai');
-        messageApi.warning('请先在 AI 设置中选择本地 AI Agent');
+        messageApi.warning(`请先在 AI 设置中配置${purposeLabel}`);
         return false;
     }, [messageApi, openSettingsDialog]);
+
+    const handleSubmitConversationAssistantPrompt = useCallback(async (
+        context: AssistantContextV1,
+        promptText: string,
+        options?: {
+            forceNewThread?: boolean;
+            waitUntil?: 'started' | 'finished';
+            provider?: string | null;
+            model?: string | null;
+            mode?: string | null;
+            thought?: string | null;
+            autoSend?: boolean;
+        },
+    ) => {
+        const prompt = String(promptText || '').trim();
+        if (!prompt) {
+            messageApi.warning('请输入提示词');
+            return false;
+        }
+        if (!ensureDefaultAiConfigured(preferences.conversationPromptClient, '对话 AI')) return false;
+        const conversationProvider = resolveAcpPromptClientProvider(preferences.conversationPromptClient);
+        if (!conversationProvider) return false;
+        assistantAutoOpenSuppressedProjectScopeRef.current = '';
+        setAssistantAutoOpenDismissed(assistantAutoOpenDismissedStorageKey, false);
+        return assistantController.openAssistantWithContextAndSubmitPrompt(context, prompt, {
+            ...options,
+            provider: options?.provider ?? conversationProvider,
+            model: options?.model ?? preferences.conversationModel,
+            autoSend: options?.autoSend,
+        });
+    }, [
+        assistantAutoOpenDismissedStorageKey,
+        assistantController.openAssistantWithContextAndSubmitPrompt,
+        ensureDefaultAiConfigured,
+        messageApi,
+        preferences.conversationModel,
+        preferences.conversationPromptClient,
+    ]);
 
     const handleSubmitAnnotationAssistantPrompt = useCallback(async (
         context: AssistantContextV1,
@@ -700,8 +873,8 @@ export default function IndexPage({
             messageApi.warning('请输入提示词');
             return false;
         }
-        if (!ensureDefaultAiConfigured(preferences.preferredPromptClient)) return false;
-        const annotationPromptClient = preferences.annotationPromptClient || preferences.preferredPromptClient;
+        if (!ensureDefaultAiConfigured(preferences.annotationPromptClient, '批注 AI')) return false;
+        const annotationPromptClient = preferences.annotationPromptClient;
         const annotationProvider = resolveAcpPromptClientProvider(annotationPromptClient);
         if (!annotationProvider) return false;
         const annotationModel = preferences.annotationModel || null;
@@ -720,7 +893,6 @@ export default function IndexPage({
         messageApi,
         preferences.annotationModel,
         preferences.annotationPromptClient,
-        preferences.preferredPromptClient,
     ]);
 
     const handleRunAnnotationAssistantPromptViaApi = useCallback(async (request: {
@@ -728,6 +900,8 @@ export default function IndexPage({
         prompt: string;
         onPrepared?: (payload: any) => void | Promise<void>;
         onAccepted?: (payload: any) => void | Promise<void>;
+        onEvent?: (event: AiRunSseEvent) => void | Promise<void>;
+        mcpServers?: unknown[];
         signal?: AbortSignal;
     }) => {
         const prompt = String(request.prompt || '').trim();
@@ -735,27 +909,29 @@ export default function IndexPage({
             messageApi.warning('请输入提示词');
             return false;
         }
-        if (!ensureDefaultAiConfigured(preferences.preferredPromptClient)) return false;
-        const annotationPromptClient = preferences.annotationPromptClient || preferences.preferredPromptClient;
+        if (!ensureDefaultAiConfigured(preferences.annotationPromptClient, '批注 AI')) return createAnnotationDirectRunPreflightResult();
+        const annotationPromptClient = preferences.annotationPromptClient;
         const annotationProvider = resolveAcpPromptClientProvider(annotationPromptClient);
-        if (!annotationProvider) return false;
+        if (!annotationProvider) return createAnnotationDirectRunPreflightResult();
         const annotationModel = preferences.annotationModel || null;
         return submitAnnotationPromptViaApi({
             context: request.context,
             prompt,
             projectPath: assistantController.assistantProjectPath,
             projectScope: workspace.activeProjectId || assistantController.assistantProjectPath || workspace.projectTitle,
-            projectId: workspace.activeProjectId,
+            projectId: requireProjectScope(workspace.activeProjectId).projectId,
             preferredPromptClient: annotationPromptClient || `acp:${annotationProvider}`,
             provider: annotationProvider,
             model: annotationModel,
             agentRunConcurrency: preferences.agentRunConcurrency,
+            mcpServers: request.mcpServers,
             builtinToolSettings: preferences.assistantImageGenerationConfig
                 ? { imageGeneration: preferences.assistantImageGenerationConfig }
                 : undefined,
             onRunStarting: (message) => messageApi.info(message),
             onPrepared: request.onPrepared,
             onAccepted: request.onAccepted,
+            onEvent: request.onEvent,
             signal: request.signal,
         });
     }, [
@@ -766,7 +942,6 @@ export default function IndexPage({
         preferences.annotationPromptClient,
         preferences.agentRunConcurrency,
         preferences.assistantImageGenerationConfig,
-        preferences.preferredPromptClient,
         workspace.activeProjectId,
         workspace.projectTitle,
     ]);
@@ -781,8 +956,8 @@ export default function IndexPage({
             messageApi.warning('请输入提示词');
             return false;
         }
-        if (!ensureDefaultAiConfigured(preferences.preferredPromptClient)) return false;
-        const annotationPromptClient = preferences.annotationPromptClient || preferences.preferredPromptClient;
+        if (!ensureDefaultAiConfigured(preferences.annotationPromptClient, '批注 AI')) return false;
+        const annotationPromptClient = preferences.annotationPromptClient;
         const annotationProvider = resolveAcpPromptClientProvider(annotationPromptClient);
         if (!annotationProvider) return false;
         const annotationModel = preferences.annotationModel || null;
@@ -791,7 +966,7 @@ export default function IndexPage({
             prompt,
             projectPath: assistantController.assistantProjectPath,
             projectScope: workspace.activeProjectId || assistantController.assistantProjectPath || workspace.projectTitle,
-            projectId: workspace.activeProjectId,
+            projectId: requireProjectScope(workspace.activeProjectId).projectId,
             preferredPromptClient: annotationPromptClient || `acp:${annotationProvider}`,
             scene: 'prototype-review-direct',
             provider: annotationProvider,
@@ -810,7 +985,6 @@ export default function IndexPage({
         preferences.annotationPromptClient,
         preferences.agentRunConcurrency,
         preferences.assistantImageGenerationConfig,
-        preferences.preferredPromptClient,
         workspace.activeProjectId,
         workspace.projectTitle,
     ]);
@@ -843,13 +1017,13 @@ export default function IndexPage({
         prompt: string,
         meta: { scene: string; targetPath?: string | null; autoSend?: boolean },
     ) => {
-        const submitted = await handleSubmitAnnotationAssistantPrompt(
+        const submitted = await handleSubmitConversationAssistantPrompt(
             buildPromptActionAssistantContext(meta.targetPath),
             prompt,
             { waitUntil: 'started', autoSend: meta.autoSend },
         );
         return Boolean(submitted);
-    }, [buildPromptActionAssistantContext, handleSubmitAnnotationAssistantPrompt]);
+    }, [buildPromptActionAssistantContext, handleSubmitConversationAssistantPrompt]);
 
     const handlePreviewNavigate = useCallback(async (target: ResolvedPreviewNavigateTarget): Promise<PreviewHostContext> => {
         const deepLinkTarget = target.deepLinkTarget;
@@ -861,7 +1035,7 @@ export default function IndexPage({
         handleInitialResourceDeepLinkHandled();
 
         const buildNextContext = (overrides: Partial<PreviewHostContext>): PreviewHostContext => ({
-            projectId: workspace.activeProjectId,
+            projectId: requireProjectScope(workspace.activeProjectId).projectId,
             activeTab,
             viewMode,
             contentMode,
@@ -992,6 +1166,7 @@ export default function IndexPage({
         activeTab,
         collapsed,
         setCollapsed,
+        setSystemCollapsed,
         sidebarTab,
         setSidebarTab,
         resourceSection,
@@ -1002,6 +1177,7 @@ export default function IndexPage({
         selectedDoc: resources.selectedDoc,
         selectedPrototypeSpec: prototypeSpec.currentItem,
         contentModeOverride: contentMode,
+        reviewPanelVisible,
         onPrototypeSpecExit: prototypeSpec.close,
         setSelectedDoc: resources.setSelectedDoc,
         selectedTemplate: resources.selectedTemplate,
@@ -1016,6 +1192,7 @@ export default function IndexPage({
         setIsDarkMode,
         openSettingsDialog,
         agentRunConcurrency: preferences.agentRunConcurrency,
+        autoClearCompletedComments: preferences.autoClearCompletedComments,
         assistantContextV1: assistantController.assistantContextV1,
         assistantProjectPath: assistantController.assistantProjectPath,
         assistantContextAppendAvailable: assistantController.assistantContextAppendAvailable,
@@ -1027,6 +1204,7 @@ export default function IndexPage({
         connectAssistantRuntimeSilently: assistantController.connectAssistantRuntimeSilently,
         syncAssistantCanvasComments: assistantController.syncAssistantCanvasComments,
         clearAssistantSelectedElementsOnExit: assistantController.clearAssistantSelectedElementsOnExit,
+        onAiNotification: notifyAiNotification,
         onPrototypeRouteInfo: (routeInfo: PrototypeRouteInfo) => {
             if (!selectedItem) {
                 return;
@@ -1066,6 +1244,224 @@ export default function IndexPage({
         },
     });
 
+    // The voice surface is deliberately a client-only adapter over the same
+    // Commentary/direct-run functions used by the existing Make page. It does
+    // not create an ACP session, transport, or task registry of its own.
+    const commentaryVoiceCommentAdapter = useMemo(() => (
+        createPrototypeCommentsPersistenceAdapter({
+            getProjectId: () => workspace.activeProjectId || '',
+            getMakeServerOrigin: () => window.location.origin,
+        })
+    ), [workspace.activeProjectId]);
+    const commentaryDocumentContext = useMemo(() => {
+        const documentPath = String(
+            currentMarkdownItem?.projectDocumentPath
+            || currentMarkdownItem?.filePath
+            || currentMarkdownItem?.resourceId
+            || currentMarkdownItem?.name
+            || '',
+        ).trim().replace(/\\/gu, '/');
+        return workspace.activeProjectId && documentPath
+            ? {
+                projectId: workspace.activeProjectId,
+                documentPath,
+                makeServerOrigin: window.location.origin,
+            }
+            : null;
+    }, [currentMarkdownItem, workspace.activeProjectId]);
+    const commentaryDocumentAdapter = useMemo(() => (
+        createDocumentCommentsPersistenceAdapter(() => commentaryDocumentContext)
+    ), [commentaryDocumentContext]);
+    const resolveCommentaryVoiceCommentScope = useCallback(() => {
+        if (contentMode !== 'preview') {
+            return commentaryDocumentContext
+                ? {
+                    scope: createDocumentCommentsPersistenceScope(commentaryDocumentContext),
+                    adapter: commentaryDocumentAdapter,
+                }
+                : null;
+        }
+        if (!selectedItem) return null;
+        const rawPrototypeId = String(selectedItem.resourceId || selectedItem.name || '').trim();
+        if (!rawPrototypeId) return null;
+        const prototypeId = rawPrototypeId.replace(/^prototypes\//u, '').replace(/\/.*$/u, '');
+        if (!prototypeId) return null;
+        const targetPath = `prototypes/${prototypeId}`;
+        const filePath = String(
+            selectedItem.projectDocumentPath || selectedItem.filePath || `src/prototypes/${prototypeId}/index.tsx`,
+        ).trim().replace(/\\/gu, '/');
+        return {
+            scope: {
+                targetPath,
+                storageScope: targetPath,
+                prototypeId,
+                filePath,
+                pageScope: buildInternalPrototypeCommentPageScope(targetPath, selectedPrototypePageId) || undefined,
+                resource: { kind: 'prototype', id: prototypeId, path: targetPath },
+            },
+            adapter: commentaryVoiceCommentAdapter,
+        };
+    }, [
+        commentaryDocumentAdapter,
+        commentaryDocumentContext,
+        commentaryVoiceCommentAdapter,
+        contentMode,
+        selectedItem,
+        selectedPrototypePageId,
+    ]);
+    const commentaryVoiceExecutionDependencies = useMemo(() => ({
+        sync: async ({ signal }: any) => {
+            if (signal.aborted) throw new DOMException('语音操作已取消', 'AbortError');
+            if (!await preview.refreshCommentaryVoicePersistedComments()) {
+                throw new Error('批注执行状态同步失败，请刷新后重试');
+            }
+        },
+        resolve: async ({ commentId, signal }: any) => {
+            if (signal.aborted) throw new DOMException('语音操作已取消', 'AbortError');
+            return preview.resolveCommentaryExecutionContext(commentId);
+        },
+        submit: async ({ commentId, operationId, executionContext, signal }: any) => {
+            if (signal.aborted) throw new DOMException('语音操作已取消', 'AbortError');
+            if (!ensureDefaultAiConfigured(preferences.annotationPromptClient, '批注 AI')) {
+                return { accepted: false };
+            }
+            const promptText = String(executionContext?.promptText || '').trim();
+            const editingTarget = executionContext?.editingTarget;
+            if (!promptText || !editingTarget?.elementKey) {
+                throw new Error('当前批注上下文不可用，请刷新后重试');
+            }
+            return preview.runAnnotationAcpChatPrompt({
+                promptText,
+                operationId,
+                showCompletionFeedback: false,
+                returnExecutionHandle: true,
+                mcpServers: buildCommentaryVoiceMcpServersForDirectRun(),
+                editingTargets: [{ ...editingTarget, commentId }],
+            });
+        },
+        get: async ({ taskId }: { taskId: string }) => (
+            preview.getAnnotationDirectRunOperation(taskId)
+            ?? null
+        ),
+        findByOperationId: async ({ operationId }: { operationId: string }) => (
+            preview.getAnnotationDirectRunOperation(operationId)
+        ),
+        cancel: async ({ taskId }: { taskId: string }) => ({
+            taskId,
+            cancelled: await preview.abortAnnotationDirectRun({ taskId, showFeedback: false }),
+        }),
+    }), [
+        preview.abortAnnotationDirectRun,
+        preview.getAnnotationDirectRunOperation,
+        preview.refreshCommentaryVoicePersistedComments,
+        preview.resolveCommentaryExecutionContext,
+        preview.runAnnotationAcpChatPrompt,
+        ensureDefaultAiConfigured,
+        preferences.annotationPromptClient,
+    ]);
+    const commentaryVoiceCommentOperations = useMemo(() => (
+        createMakeVoiceCommentOperations({
+            resolveScope: resolveCommentaryVoiceCommentScope,
+            tasks: commentaryVoiceExecutionDependencies,
+        })
+    ), [commentaryVoiceExecutionDependencies, resolveCommentaryVoiceCommentScope]);
+    const commentaryVoiceToolRegistrationsRef = useRef<readonly MakeVoiceToolRegistration[]>([]);
+    const commentaryVoiceTools = useMemo(() => createMakeVoiceToolRegistry({
+        commentary: {
+            getVoiceTargets: preview.getCommentaryVoiceTargets,
+            findVoiceElements: preview.findCommentaryVoiceElements,
+            getVoiceElementStructure: preview.getCommentaryVoiceElementStructure,
+            activateVoiceElement: preview.activateCommentaryVoiceElement,
+            createVoiceComment: preview.createCommentaryVoiceComment,
+            refreshPersistedComments: preview.refreshCommentaryVoicePersistedComments,
+        },
+        page: {
+            url: () => window.location.href,
+            title: () => document.title,
+            capture: async (input) => {
+                const capture = await preview.requestCurrentScreenshot(input.scope);
+                return {
+                    width: capture.width,
+                    height: capture.height,
+                    mimeType: 'image/png',
+                };
+            },
+        },
+        comments: commentaryVoiceCommentOperations,
+        resource: () => {
+            const targetPath = buildSafeVoicePrototypeResourcePath(selectedItem);
+            return selectedItem ? {
+                kind: 'prototype',
+                id: String(selectedItem.resourceId || selectedItem.name || '').trim() || undefined,
+                path: targetPath || undefined,
+                url: window.location.href,
+            } : null;
+        },
+    }), [
+        commentaryVoiceCommentOperations,
+        preview.activateCommentaryVoiceElement,
+        preview.createCommentaryVoiceComment,
+        preview.findCommentaryVoiceElements,
+        preview.getCommentaryVoiceElementStructure,
+        preview.getCommentaryVoiceTargets,
+        preview.refreshCommentaryVoicePersistedComments,
+        preview.requestCurrentScreenshot,
+        selectedItem,
+    ]);
+	const commentaryVoiceHostTools = useMemo(
+		() => toAcpVoiceHostTools(commentaryVoiceTools),
+		[commentaryVoiceTools],
+	);
+	useEffect(() => {
+		commentaryVoiceToolRegistrationsRef.current = commentaryVoiceTools;
+		return () => {
+			commentaryVoiceToolRegistrationsRef.current = [];
+		};
+	}, [commentaryVoiceTools]);
+    const commentaryVoiceAvailable = contentMode === 'preview'
+        && Boolean(selectedItem)
+        && preview.editorStatus.mode === 'quickEdit';
+    const commentaryVoiceVisible = commentaryVoiceAvailable
+        && showCommentaryVoice;
+    const handleToggleCommentaryVoice = useCallback(() => {
+        setShowCommentaryVoice((previousVisible) => {
+            const nextVisible = !previousVisible;
+            setCommentaryVoiceVisible(nextVisible);
+            return nextVisible;
+        });
+    }, []);
+	const commentaryVoicePrompt = useMemo(() => ({
+		instructions: MAKE_COMMENTARY_VOICE_INSTRUCTIONS,
+		buildTurnContext: async () => {
+			const activeTargets = await preview.getCommentaryVoiceTargets();
+			return buildMakeVoiceTurnContext({
+				resourcePath: buildSafeVoicePrototypeResourcePath(selectedItem),
+				resourceName: selectedItem?.displayName || selectedItem?.name || '',
+				activeTargets,
+			});
+		},
+	}), [preview.getCommentaryVoiceTargets, selectedItem]);
+    const commentaryVoiceConfigurationCheck = useCallback(
+        () => checkMakeVoiceConfigurationAfterRuntimeReady(
+            workspace.activeProjectId || '',
+            assistantController.connectAssistantRuntimeSilently,
+        ),
+        [assistantController.connectAssistantRuntimeSilently, workspace.activeProjectId],
+    );
+    const commentaryVoiceEntry = useMemo(() => (
+        <MakeCommentaryVoiceEntry
+            enabled={commentaryVoiceVisible}
+			serviceBaseUrl={assistantController.assistantWebBaseUrl}
+			tools={commentaryVoiceHostTools}
+			prompt={commentaryVoicePrompt}
+			checkVoiceConfiguration={commentaryVoiceConfigurationCheck}
+			openSettings={({ message }) => {
+                openSettingsDialog('ai', { voiceSection: 'voice-doubao' });
+                messageApi.warning(message);
+            }}
+        />
+	), [assistantController.assistantWebBaseUrl, commentaryVoiceConfigurationCheck, commentaryVoiceHostTools, commentaryVoicePrompt, commentaryVoiceVisible, messageApi, openSettingsDialog]);
+
     const prototypeSpecNavigation = usePrototypeSpecNavigationGuard({
         enabled: contentMode === 'prototype-spec' && prototypeSpec.isOpen,
         currentPath: prototypeSpec.currentPath,
@@ -1097,11 +1493,27 @@ export default function IndexPage({
     });
 
     const handlePrototypeSpecPreviewReady = useCallback(() => {
-        if (String(prototypeSpec.currentItem?.name || '').toLowerCase().endsWith('.md')) return;
-        preview.handleEnableDocEdit('comment', { disableSelectionMode: true, preserveSidebar: true });
-    }, [preview.handleEnableDocEdit, prototypeSpec.currentItem?.name]);
+        const attemptedItem = prototypeSpec.currentItem;
+        if (!attemptedItem || String(attemptedItem.name || '').toLowerCase().endsWith('.md')) return;
+        const attemptId = prototypeSpecAnnotationAttemptIdRef.current + 1;
+        prototypeSpecAnnotationAttemptIdRef.current = attemptId;
+        void (async () => {
+            const annotationEnabled = await preview.handleEnableDocEdit('comment', { disableSelectionMode: true, preserveSidebar: true });
+            if (!shouldClosePrototypeSpecAfterAnnotationAttempt({
+                enabled: annotationEnabled,
+                attemptedItem,
+                currentItem: currentPrototypeSpecItemRef.current,
+                attemptId,
+                latestAttemptId: prototypeSpecAnnotationAttemptIdRef.current,
+            })) {
+                return;
+            }
+            prototypeSpec.close();
+        })();
+    }, [preview.handleEnableDocEdit, prototypeSpec.close, prototypeSpec.currentItem]);
 
     const selection = useIndexPageSelectionSync({
+        projectId: workspace.activeProjectId,
         loading: workspace.loading,
         data: workspace.data,
         docsItems: workspace.docsItems,
@@ -1155,6 +1567,7 @@ export default function IndexPage({
                 view: viewMode,
                 pageId: selectedPrototypePageId || undefined,
                 projectId: activeProjectId || undefined,
+                device: preview.previewDeviceParam || undefined,
             };
         }
         if (currentContentIsDocumentResource && resources.selectedDoc) {
@@ -1180,7 +1593,7 @@ export default function IndexPage({
             };
         }
         return null;
-    }, [contentMode, resources.selectedDoc, resources.selectedTemplate, resources.selectedTheme, selectedItem, selectedPrototypePageId, sidebarTab, viewMode, workspace.activeProjectId]);
+    }, [contentMode, preview.previewDeviceParam, resources.selectedDoc, resources.selectedTemplate, resources.selectedTheme, selectedItem, selectedPrototypePageId, sidebarTab, viewMode, workspace.activeProjectId]);
 
     const currentDeepLinkUrl = useMemo(() => (
         currentDeepLinkTarget ? buildIndexDeepLinkUrl(currentDeepLinkTarget) : ''
@@ -1225,6 +1638,17 @@ export default function IndexPage({
     usePreviewBridgeHost({
         context: previewBridgeContext,
         onNavigate: handlePreviewNavigate,
+        onVoiceToolCommand: async ({ name, input, requestId }) => {
+            const registration = commentaryVoiceToolRegistrationsRef.current.find((tool) => tool.name === name);
+            if (!registration || registration.confirmation !== 'none') {
+                throw new Error('当前预览不允许执行这个批注工具');
+            }
+			return executeMakeVoiceTool(registration, input, {
+                callId: requestId,
+                operationId: requestId,
+                signal: new AbortController().signal,
+            });
+        },
     });
 
     const canSyncCurrentDeepLinkUrl = shouldSyncIndexDeepLinkUrl({
@@ -1289,13 +1713,16 @@ export default function IndexPage({
     }, [appDialog, messageApi]);
 
     useEffect(() => {
+        if (!conversationUiEnabled) {
+            return;
+        }
+        if (assistantCompactViewport) {
+            return;
+        }
+        if (prototypeStartDraftShellActive) {
+            return;
+        }
         if (!preferences.initialPreferencesLoaded || !assistantAutoOpenTargetPath) {
-            return;
-        }
-        if (prototypePlaceholderActive) {
-            return;
-        }
-        if (prototypeWaitingGenerationActive) {
             return;
         }
         const autoOpenTargetKey = assistantAutoOpenTargetPath;
@@ -1325,42 +1752,69 @@ export default function IndexPage({
                 }
             });
     }, [
+        assistantCompactViewport,
         assistantAutoOpenProjectScope,
         assistantAutoOpenTargetPath,
         assistantAutoOpenPanelModeStorageKey,
         assistantAutoOpenDismissedStorageKey,
+        conversationUiEnabled,
         preferences.initialPreferencesLoaded,
-        prototypePlaceholderActive,
-        prototypeWaitingGenerationActive,
+        prototypeStartDraftShellActive,
         restoreAssistantPanel,
     ]);
 
     const handleOpenAcpWebAgent = useCallback((targetPath?: string, provider?: AcpProvider) => {
-        if (!ensureDefaultAiConfigured(preferences.preferredPromptClient)) return;
+        if (!conversationUiEnabled) return;
+        if (!ensureDefaultAiConfigured(preferences.conversationPromptClient, '对话 AI')) return;
+        if (assistantCompactViewport) {
+            assistantController.handleOpenAssistantInNewWindowNoContext(targetPath);
+            return;
+        }
         assistantAutoOpenSuppressedProjectScopeRef.current = '';
         setAssistantAutoOpenDismissed(buildAssistantAutoOpenKeyForTarget(targetPath), false);
         setAssistantAutoOpenPanelMode(assistantAutoOpenPanelModeStorageKey, 'general-ai');
         assistantController.handleOpenAcpWebAgent(targetPath, provider);
     }, [
         assistantController,
+        assistantCompactViewport,
         assistantAutoOpenPanelModeStorageKey,
         buildAssistantAutoOpenKeyForTarget,
+        conversationUiEnabled,
         ensureDefaultAiConfigured,
-        preferences.preferredPromptClient,
+        preferences.conversationPromptClient,
     ]);
 
-    const handleOpenImageAiPanel = useCallback(() => {
-        if (!ensureDefaultAiConfigured(preferences.preferredPromptClient)) return;
+    const handleOpenImageAiPanel = useCallback(async () => {
+        if (!conversationUiEnabled) return;
+        if (!ensureDefaultAiConfigured(preferences.conversationPromptClient, '对话 AI')) return;
+        const targetFolder = resolveImageAiResourceTargetFolder({
+            sidebarTab,
+            selectedFolder: resources.selectedResourceFolder,
+            selectedResource: resources.selectedDoc,
+        });
+        const preparedFolder = await resources.prepareImageAiResourceFolder(targetFolder);
+        if (!preparedFolder) return;
+        setImageAiSaveDirectory(preparedFolder.absolutePath);
+        if (assistantCompactViewport) {
+            assistantController.handleOpenImageAiPanelInNewWindow();
+            return;
+        }
         assistantAutoOpenSuppressedProjectScopeRef.current = '';
         setAssistantAutoOpenDismissed(assistantAutoOpenDismissedStorageKey, false);
         setAssistantAutoOpenPanelMode(assistantAutoOpenPanelModeStorageKey, 'image-ai');
         assistantController.openImageAiPanel();
     }, [
+        assistantCompactViewport,
         assistantAutoOpenDismissedStorageKey,
         assistantAutoOpenPanelModeStorageKey,
         assistantController,
+        conversationUiEnabled,
         ensureDefaultAiConfigured,
-        preferences.preferredPromptClient,
+        preferences.conversationPromptClient,
+        resources.prepareImageAiResourceFolder,
+        resources.selectedDoc,
+        resources.selectedResourceFolder,
+        sidebarTab,
     ]);
 
     const handleCloseAiPanel = useCallback(() => {
@@ -1385,6 +1839,7 @@ export default function IndexPage({
     ]);
 
     const handleToggleAssistantPanel = useCallback(() => {
+        if (!conversationUiEnabled) return;
         if (!assistantController.assistantVisible) {
             assistantAutoOpenSuppressedProjectScopeRef.current = '';
         }
@@ -1396,29 +1851,19 @@ export default function IndexPage({
     }, [
         assistantAutoOpenDismissedStorageKey,
         assistantController,
+        conversationUiEnabled,
     ]);
 
     useEffect(() => {
-        if (!prototypePlaceholderAutoCloseKey) {
-            closedPrototypePlaceholderAutoCloseKeyRef.current = '';
+        if (!conversationUiEnabled) {
             return;
         }
-        if (!assistantController.assistantVisible) {
+        if (assistantCompactViewport) {
             return;
         }
-        if (closedPrototypePlaceholderAutoCloseKeyRef.current === prototypePlaceholderAutoCloseKey) {
+        if (prototypeStartDraftShellActive) {
             return;
         }
-
-        closedPrototypePlaceholderAutoCloseKeyRef.current = prototypePlaceholderAutoCloseKey;
-        assistantController.hideAssistantPanelTemporarily();
-    }, [
-        assistantController.assistantVisible,
-        assistantController.hideAssistantPanelTemporarily,
-        prototypePlaceholderAutoCloseKey,
-    ]);
-
-    useEffect(() => {
         if (!assistantController.assistantPanelMounted) {
             return;
         }
@@ -1426,12 +1871,6 @@ export default function IndexPage({
             return;
         }
         if (!preferences.initialPreferencesLoaded) {
-            return;
-        }
-        if (prototypePlaceholderActive) {
-            return;
-        }
-        if (prototypeWaitingGenerationActive) {
             return;
         }
         if (!assistantAutoOpenTargetPath) {
@@ -1447,49 +1886,16 @@ export default function IndexPage({
         const rememberedAiPanelMode = getAssistantAutoOpenPanelMode(assistantAutoOpenPanelModeStorageKey);
         restoreAssistantPanel(assistantAutoOpenTargetPath, rememberedAiPanelMode);
     }, [
+        assistantCompactViewport,
         assistantAutoOpenProjectScope,
         assistantAutoOpenDismissedStorageKey,
         assistantAutoOpenPanelModeStorageKey,
         assistantAutoOpenTargetPath,
         assistantController.assistantPanelMounted,
         assistantController.assistantVisible,
+        conversationUiEnabled,
         preferences.initialPreferencesLoaded,
-        prototypePlaceholderActive,
-        prototypeWaitingGenerationActive,
-        restoreAssistantPanel,
-    ]);
-
-    useEffect(() => {
-        if (!prototypeWaitingGenerationActive) {
-            openedPrototypeWaitingGenerationKeyRef.current = '';
-            return;
-        }
-        if (!preferences.initialPreferencesLoaded) {
-            return;
-        }
-        if (!prototypeWaitingGenerationAutoOpenKey) {
-            return;
-        }
-        const waitingGenerationAutoOpenKey = prototypeWaitingGenerationAutoOpenKey;
-        if (openedPrototypeWaitingGenerationKeyRef.current === waitingGenerationAutoOpenKey) {
-            return;
-        }
-        if (!assistantAutoOpenTargetPath) {
-            return;
-        }
-        assistantAutoOpenSuppressedProjectScopeRef.current = '';
-        setAssistantAutoOpenDismissed(assistantAutoOpenDismissedStorageKey, false);
-        const rememberedAiPanelMode = getAssistantAutoOpenPanelMode(assistantAutoOpenPanelModeStorageKey);
-        setAssistantAutoOpenPanelMode(assistantAutoOpenPanelModeStorageKey, rememberedAiPanelMode);
-        openedPrototypeWaitingGenerationKeyRef.current = waitingGenerationAutoOpenKey;
-        void restoreAssistantPanel(assistantAutoOpenTargetPath, rememberedAiPanelMode);
-    }, [
-        assistantAutoOpenDismissedStorageKey,
-        assistantAutoOpenPanelModeStorageKey,
-        assistantAutoOpenTargetPath,
-        preferences.initialPreferencesLoaded,
-        prototypeWaitingGenerationActive,
-        prototypeWaitingGenerationAutoOpenKey,
+        prototypeStartDraftShellActive,
         restoreAssistantPanel,
     ]);
 
@@ -1608,8 +2014,8 @@ export default function IndexPage({
                 nextPrototypes = normalizeProjectResourcesPayload(payload, projectId).data.prototypes;
             }
         }
-        if (!projectId || nextPrototypes === workspace.data.prototypes) {
-            const response = await fetch('/api/entries.json').catch(() => null);
+        if (projectId && nextPrototypes === workspace.data.prototypes) {
+            const response = await fetch(withProjectScope('/api/entries.json', { projectId })).catch(() => null);
             if (response?.ok) {
                 const body = await response.json().catch(() => null);
                 nextPrototypes = Array.isArray(body?.prototypes) ? body.prototypes : workspace.data.prototypes;
@@ -1624,35 +2030,6 @@ export default function IndexPage({
         }
         return nextPrototypes;
     }, [selectedItem?.name, setSelectedItem, workspace]);
-
-    const handleCreatePrototypeForDraftStart = useCallback(async (): Promise<ItemData | null> => {
-        try {
-            const result = await apiService.createPlaceholderPrototype({ projectId: workspace.activeProjectId });
-            const createdFromResult = buildCreatedPrototypeStartItem(result);
-            if (!createdFromResult) {
-                throw new Error('创建原型失败');
-            }
-            const refreshedPrototypes = await handleRefreshCanvasPrototypeItems(createdFromResult.name);
-            const created = refreshedPrototypes.find((item) => item.name === createdFromResult.name) || createdFromResult;
-            setSelectedItem(created);
-            setSelectedPrototypePageId(null);
-            setSidebarTab('prototype');
-            setViewMode('demo');
-            setPrototypeStartDraftActive(false);
-            return created;
-        } catch (error: any) {
-            messageApi.error(error?.message || '创建原型失败');
-            return null;
-        }
-    }, [
-        handleRefreshCanvasPrototypeItems,
-        messageApi,
-        setSelectedItem,
-        setSelectedPrototypePageId,
-        setSidebarTab,
-        setViewMode,
-        workspace.activeProjectId,
-    ]);
 
     const buildCanvasAssistantContext = useCallback((request: CanvasAiGenerationRequest): AssistantContextV1 => {
         const canvasFilePath = String(request.canvasFilePath || '').trim();
@@ -1760,55 +2137,103 @@ export default function IndexPage({
             messageApi.warning('请输入提示词');
             return { ok: false };
         }
-        if (!ensureDefaultAiConfigured(preferences.preferredPromptClient)) return { ok: false };
-        const annotationPromptClient = preferences.annotationPromptClient || preferences.preferredPromptClient;
-        const annotationProvider = resolveAcpPromptClientProvider(annotationPromptClient);
-        if (!annotationProvider) return { ok: false };
-        const selectedProvider = resolveAcpPromptClientProvider(request.provider) || annotationProvider;
-        const annotationModel = preferences.annotationModel || null;
         const canvasAssistantContext = buildCanvasAssistantContext(request);
+        const shouldOpenStartGuideConversation = request.source === 'placeholder-start'
+            || request.source === 'resource-start'
+            || request.source === 'theme-start';
+        if (shouldOpenStartGuideConversation) {
+            if (!ensureDefaultAiConfigured(preferences.conversationPromptClient, '对话 AI')) return { ok: false };
+            const conversationProvider = resolveAcpPromptClientProvider(preferences.conversationPromptClient);
+            if (!conversationProvider) return { ok: false };
+            const selectedProvider = resolveAcpPromptClientProvider(request.provider) || conversationProvider;
+            const conversationModel = preferences.conversationModel || null;
+            const submitted = await handleSubmitConversationAssistantPrompt(
+                canvasAssistantContext,
+                prompt,
+                {
+                    forceNewThread: true,
+                    waitUntil: 'started',
+                    provider: selectedProvider,
+                    model: request.model ?? conversationModel,
+                    mode: request.mode,
+                    thought: request.thought,
+                },
+            );
+            return { ok: Boolean(submitted && (typeof submitted !== 'object' || submitted.ok !== false)) };
+        }
+        const isAnnotationPromptCard = request.source === 'annotation-prompt-card';
+        const purposePromptClient = isAnnotationPromptCard
+            ? preferences.annotationPromptClient
+            : preferences.canvasPromptClient;
+        const purposeModel = isAnnotationPromptCard
+            ? preferences.annotationModel
+            : preferences.canvasModel;
+        const purposeLabel = isAnnotationPromptCard ? '批注 AI' : '画布 AI';
+        if (!ensureDefaultAiConfigured(purposePromptClient, purposeLabel)) return { ok: false };
+        const purposeProvider = resolveAcpPromptClientProvider(purposePromptClient);
+        if (!purposeProvider) return { ok: false };
+        const selectedProvider = resolveAcpPromptClientProvider(request.provider) || purposeProvider;
         const result = await submitAnnotationPromptViaApi({
             context: canvasAssistantContext,
             prompt,
             projectPath: assistantController.assistantProjectPath,
             projectScope: workspace.activeProjectId || assistantController.assistantProjectPath || workspace.projectTitle,
-            projectId: workspace.activeProjectId,
-            preferredPromptClient: selectedProvider ? `acp:${selectedProvider}` : annotationPromptClient,
+            projectId: requireProjectScope(workspace.activeProjectId).projectId,
+            preferredPromptClient: selectedProvider ? `acp:${selectedProvider}` : purposePromptClient,
             scene: `canvas-${request.scene}-direct`,
             provider: selectedProvider,
-            model: request.model ?? annotationModel,
+            model: request.model ?? purposeModel,
             mode: request.mode,
             thought: request.thought,
+            threadId: request.threadId,
+            conversationId: request.conversationId,
+            referenceImages: request.referenceImages,
+            permissionMode: request.source === 'canvas-viewport' ? 'bypassPermissions' : undefined,
             targetPath: request.canvasFilePath || undefined,
             agentRunConcurrency: preferences.agentRunConcurrency,
-            mcpServers: buildCanvasMcpServersForDirectRun(getAssistantContextCurrentFilePath(canvasAssistantContext)),
+            mcpServers: request.source === 'canvas-viewport'
+                ? undefined
+                : buildCanvasMcpServersForDirectRun(getAssistantContextCurrentFilePath(canvasAssistantContext)),
             builtinToolSettings: preferences.assistantImageGenerationConfig
                 ? { imageGeneration: preferences.assistantImageGenerationConfig }
                 : undefined,
             onPrepared: request.onPrepared,
             onAccepted: request.onAccepted,
+            onEvent: request.onEvent,
             signal: request.signal,
         });
         if (!result) {
             return { ok: false };
         }
-        const artifacts = mapCanvasDirectRunArtifacts((result.artifacts || []) as Record<string, unknown>[], {
-            canvasFilePath: request.canvasFilePath,
-            taskId: result.runId,
-            runId: result.runId,
-            threadId: result.threadId,
-        });
-        return { ok: true, artifacts };
+        const artifacts = request.source === 'canvas-viewport'
+            ? []
+            : mapCanvasDirectRunArtifacts((result.artifacts || []) as Record<string, unknown>[], {
+                canvasFilePath: request.canvasFilePath,
+                taskId: result.runId,
+                runId: result.runId,
+                threadId: result.threadId,
+            });
+        return {
+            ok: true,
+            artifacts,
+            ...(request.source === 'canvas-viewport' && result.output.trim()
+                ? { message: result.output.trim() }
+                : {}),
+        };
     }, [
         assistantController.assistantProjectPath,
         buildCanvasAssistantContext,
         ensureDefaultAiConfigured,
+        handleSubmitConversationAssistantPrompt,
         messageApi,
         preferences.annotationModel,
         preferences.annotationPromptClient,
         preferences.agentRunConcurrency,
         preferences.assistantImageGenerationConfig,
-        preferences.preferredPromptClient,
+        preferences.canvasModel,
+        preferences.canvasPromptClient,
+        preferences.conversationModel,
+        preferences.conversationPromptClient,
         workspace.activeProjectId,
         workspace.projectTitle,
     ]);
@@ -2035,15 +2460,16 @@ export default function IndexPage({
             isDarkMode,
             sidebarTrees: workspace.sidebarTrees,
             prototypeStartPageActive,
-            webAgentPanelOpen: startPageActive ? false : assistantController.assistantVisible,
-            aiPanelMode: startPageActive ? null : assistantController.aiPanelMode,
+            surfaceCapabilities,
+            webAgentPanelOpen: assistantController.assistantVisible,
+            aiPanelMode: assistantController.aiPanelMode,
             selectedDoc: resources.selectedDoc,
             selectedResourceFolder: resources.selectedResourceFolder,
             selectedCanvas: resources.selectedCanvas,
             selectedTheme: resources.selectedTheme,
         },
         deps: {
-            preferredPromptClient: preferences.preferredPromptClient,
+            preferredPromptClient: preferences.conversationPromptClient,
             preferredIDE: preferences.preferredIDE,
             ideAvailability: preferences.ideAvailability,
             agentAvailability: preferences.agentAvailability,
@@ -2073,8 +2499,8 @@ export default function IndexPage({
             handleCreateResourceStartDraft,
             handleCreateThemeStartDraft,
             handleOpenProjectInIDE: ideActions.handleOpenProjectInIDE,
-            handleOpenAcpWebAgent: startPageActive ? undefined : handleOpenAcpWebAgent,
-            handleOpenImageAiPanel: startPageActive ? undefined : handleOpenImageAiPanel,
+            handleOpenAcpWebAgent,
+            handleOpenImageAiPanel,
             handleOpenWebAgentInPanel: assistantController.openRawUrlInAssistantPanel,
             onExecutePrompt: handleExecutePromptAction,
             onCloseAiPanel: handleCloseAiPanel,
@@ -2103,7 +2529,8 @@ export default function IndexPage({
             themeStartDraftActive,
             viewMode,
             activeTab,
-            assistantVisible: startPageActive ? false : assistantController.assistantVisible,
+            surfaceCapabilities,
+            assistantVisible: assistantController.assistantVisible,
             isDarkMode,
             contentMode,
             docsItems: workspace.docsItems,
@@ -2119,7 +2546,10 @@ export default function IndexPage({
             selectedTheme: resources.selectedTheme,
             selectedDataTable: resources.selectedDataTable,
             defaultThemeName: resources.defaultThemeName,
-            preferredPromptClient: preferences.preferredPromptClient,
+            preferredPromptClient: preferences.conversationPromptClient,
+            preferredModel: preferences.conversationModel,
+            canvasPromptClient: preferences.canvasPromptClient,
+            canvasModel: preferences.canvasModel,
             preferredIDE: preferences.preferredIDE,
             ideAvailability: preferences.ideAvailability,
             agentAvailability: preferences.agentAvailability,
@@ -2134,20 +2564,22 @@ export default function IndexPage({
             excalidrawPropertyPanelPosition,
             bridgeConnected: assistantController.assistantContextAppendAvailable,
             activeProjectId: workspace.activeProjectId,
-            webAgentPanelOpen: startPageActive ? false : assistantController.assistantVisible,
-            aiPanelMode: startPageActive ? null : assistantController.aiPanelMode,
+            webAgentPanelOpen: assistantController.assistantVisible,
+            aiPanelMode: assistantController.aiPanelMode,
             assistantApiBaseUrl: assistantController.assistantApiBaseUrl,
             assistantProjectPath: assistantController.assistantProjectPath,
             prototypes: workspace.data.prototypes,
             themes: workspace.themes,
             onOpenPrototypeCreateDialog: handleOpenPrototypeCreateDialog,
+            commentaryVoiceEntry,
+            commentaryVoiceVisible,
         },
         preview,
         actions: {
             setCollapsed,
             setViewMode,
             handleEnterSelectedPrototypePreview,
-            handleToggleAssistant: startPageActive ? () => undefined : handleToggleAssistantPanel,
+            handleToggleAssistant: handleToggleAssistantPanel,
             handleStartCurrentProjectServer,
             handleCopyStartServerErrorPrompt,
             handleOpenIdeFile: ideActions.handleOpenIdeFile,
@@ -2174,19 +2606,22 @@ export default function IndexPage({
             onOpenCanvasInIDE: handleOpenCanvasInIDE,
             onOpenCanvasAgent: handleOpenCanvasAgent,
             handleOpenProjectInIDE: ideActions.handleOpenProjectInIDE,
-            onOpenAcpWebAgent: startPageActive ? undefined : handleOpenAcpWebAgent,
-            onOpenImageAiPanel: startPageActive ? undefined : handleOpenImageAiPanel,
+            onOpenAcpWebAgent: handleOpenAcpWebAgent,
+            onOpenImageAiPanel: handleOpenImageAiPanel,
             onOpenWebAgentInPanel: assistantController.openRawUrlInAssistantPanel,
             onExecutePrompt: handleExecutePromptAction,
             onCloseAiPanel: handleCloseAiPanel,
             onCloseWebAgentPanel: handleCloseWebAgentPanel,
             onPreferredIDEChange: preferences.setPreferredIDE,
             openSettingsDialog,
-            onCreatePrototypeForDraftStart: handleCreatePrototypeForDraftStart,
+            onToggleCommentaryVoice: handleToggleCommentaryVoice,
             onUploadResourceFiles: handleOpenStartGuideResourceUpload,
             onCreateResourceCanvasFile: resources.handleCreateResourceCanvasFile,
             onCreateDrawioResourceFile: resources.handleCreateDrawioResourceFile,
             onOpenDesignImport: resources.handleImportThemeResource,
+            onRefreshThemes: async () => {
+                await resources.refreshSidebarAssets();
+            },
             onRefreshPrototypes: handleRefreshCanvasPrototypeItems,
             agentRunConcurrency: preferences.agentRunConcurrency,
             onSubmitCanvasAssistantPrompt: handleSubmitCanvasAssistantPrompt,
@@ -2206,14 +2641,15 @@ export default function IndexPage({
     };
 
     const assistantPanelProps = {
-        mounted: startPageActive ? false : assistantController.assistantPanelMounted,
-        visible: startPageActive ? false : assistantController.assistantVisible,
+        mounted: conversationUiEnabled && !assistantCompactViewport && !prototypeStartDraftShellActive && assistantController.assistantPanelMounted,
+        visible: conversationUiEnabled && !assistantCompactViewport && !prototypeStartDraftShellActive && assistantController.assistantVisible,
         width: assistantController.assistantPanelWidth,
         minWidth: assistantController.assistantPanelMinWidth,
         maxWidth: assistantController.assistantPanelMaxWidth,
-        iframeSrc: assistantController.assistantIframeSrc,
-        iframeRef: assistantController.assistantIframeRef,
-        onLoad: assistantController.handleAssistantIframeLoad,
+        iframeEntries: assistantController.assistantIframeEntries,
+        activeIframeKey: assistantController.assistantActiveIframeKey,
+        onIframeRef: assistantController.handleAssistantIframeRef,
+        onIframeLoad: assistantController.handleAssistantIframeLoad,
         onResize: assistantController.setAssistantPanelWidth,
         onAddContextItems: assistantController.addContextItems,
         onToggle: handleToggleAssistantPanel,
@@ -2235,39 +2671,38 @@ export default function IndexPage({
         } : null,
         docReferencePromptDialog: resources.docReferencePromptDialog,
         setDocReferencePromptDialog: resources.setDocReferencePromptDialog,
-        preferredPromptClient: preferences.preferredPromptClient,
+        preferredPromptClient: preferences.conversationPromptClient,
         preferredIDE: preferences.preferredIDE,
         ideAvailability: preferences.ideAvailability,
-        assistantOpen: assistantController.assistantVisible && assistantController.aiPanelMode === 'general-ai',
-        onExecutePrompt: handleExecutePromptAction,
+        assistantOpen: conversationUiEnabled && assistantController.assistantVisible && assistantController.aiPanelMode === 'general-ai',
+        onExecutePrompt: conversationUiEnabled ? handleExecutePromptAction : undefined,
         createDialog: {
             visible: createDialogVisible,
             activeTab: selection.activeTab,
-            activeProjectId: workspace.activeProjectId,
+            activeProjectId: workspace.activeProjectId || '',
             initialTab: initialCreateDialogTab,
             initialUploadType: initialCreateDialogUploadType,
             targetPrototypeName: createDialogTargetPrototypeName,
             resourceWriteCapabilities,
             ideAvailability: preferences.ideAvailability,
-            assistantOpen: assistantController.assistantVisible && assistantController.aiPanelMode === 'general-ai',
+            assistantOpen: conversationUiEnabled && assistantController.assistantVisible && assistantController.aiPanelMode === 'general-ai',
             onClose: handleCreateCancel,
             onAfterCreatePromptAction: clearCreateDialogState,
-            onExecutePrompt: handleExecutePromptAction,
+            onExecutePrompt: conversationUiEnabled ? handleExecutePromptAction : undefined,
             onUploadSuccess: resources.handleCreateDialogUploadSuccess,
         },
         createThemeDialog: {
             visible: resources.themeCreateDialogVisible,
-            initialTab: resources.initialThemeDialogTab,
+            activeProjectId: workspace.activeProjectId || '',
             resourceWriteCapabilities,
-            ideAvailability: preferences.ideAvailability,
-            assistantOpen: assistantController.assistantVisible && assistantController.aiPanelMode === 'general-ai',
             onClose: resources.handleThemeCreateCancel,
-            onAfterCreatePromptAction: resources.clearThemeCreateDialogState,
-            onExecutePrompt: handleExecutePromptAction,
-            onImportSuccess: resources.refreshSidebarAssets,
+            onImportSuccess: async () => {
+                await resources.refreshSidebarAssets();
+            },
         },
         exportDialog: {
             open: preview.isExportModalOpen,
+            projectId: workspace.activeProjectId || '',
             preferencesStorageKey: preview.exportPreferencesStorageKey,
             imageConfig: preview.imageConfig,
             axureCopyOptions: preview.axureCopyOptions,
@@ -2278,8 +2713,8 @@ export default function IndexPage({
             initialReviewResult: preview.pendingExportReviewResult,
             exportAvailability: preview.exportAvailability,
             ideAvailability: preferences.ideAvailability,
-            assistantOpen: assistantController.assistantVisible && assistantController.aiPanelMode === 'general-ai',
-            onExecutePrompt: handleExecutePromptAction,
+            assistantOpen: conversationUiEnabled && assistantController.assistantVisible && assistantController.aiPanelMode === 'general-ai',
+            onExecutePrompt: conversationUiEnabled ? handleExecutePromptAction : undefined,
             onClose: () => preview.setIsExportModalOpen(false),
             onInitialReviewHandled: () => preview.setPendingExportReviewResult(null),
             setImageConfig: preview.setImageConfig as any,
@@ -2294,6 +2729,7 @@ export default function IndexPage({
         },
         figmaMakeExportDialog: {
             open: preview.isFigmaMakeExportDialogOpen,
+            projectId: workspace.activeProjectId || '',
             itemName: selection.selectedItem?.name,
             itemDisplayName: selection.selectedItem?.displayName,
             targetPath: selection.selectedItem ? getSelectedResourceTargetPath(selection.selectedItem) : '',
@@ -2304,6 +2740,7 @@ export default function IndexPage({
         },
         cloudPublishSettingsDialog: {
             open: preview.cloudPublishSettingsOpen,
+            projectId: workspace.activeProjectId || '',
             initialTarget: preview.cloudPublishSettingsInitialTarget,
             onOpenChange: preview.setCloudPublishSettingsOpen,
             onSaved: preview.handleCloudPublishSettingsSaved,
@@ -2311,13 +2748,15 @@ export default function IndexPage({
         axhubPublishDialog: {
             open: preview.axhubPublishDialogOpen,
             targetPath: preview.currentPublishResourcePath,
-            projectId: workspace.activeProjectId,
+            projectId: workspace.activeProjectId || '',
             onOpenChange: preview.setAxhubPublishDialogOpen,
             onPublished: preview.handleAxhubPublished,
         },
+        settingsDialogProjectId: workspace.activeProjectId || '',
         settingsDialogOpen,
         settingsDialogInitialTab,
         settingsDialogAIContext,
+        conversationUiEnabled,
         setSettingsDialogOpen,
         makeClientUpdateReminderVisible,
         onMakeClientUpdateReminderSeen: markMakeClientUpdateReminderSeen,
@@ -2345,6 +2784,7 @@ export default function IndexPage({
         onOpenImageAiPanel: assistantController.handleOpenImageAiPanelInNewWindow,
         onOpenItem: handleMobileItemClick,
         onOpenAssistantWithItemContext: assistantController.handleOpenAssistantWithItemContext,
+        conversationUi: conversationUiEnabled,
     };
 
     return (
@@ -2365,6 +2805,13 @@ export default function IndexPage({
                 sidebarProps={sidebarProps}
                 presentationAreaProps={presentationAreaProps}
                 assistantPanelProps={assistantPanelProps}
+                responsiveSidebarProps={{
+                    defaultCollapsed: responsiveSidebarDefaultCollapsed,
+                    onDefaultCollapsedChange: setResponsiveSidebarDefaultCollapsed,
+                }}
+                workspaceMetricsProps={{
+                    onExternalAvailableWidthChange: preview.handlePreviewExternalWorkspaceWidthChange,
+                }}
                 dialogsProps={dialogsProps}
                 mobileProps={mobileProps}
             />

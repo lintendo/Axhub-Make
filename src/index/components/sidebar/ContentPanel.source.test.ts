@@ -7,6 +7,14 @@ function readContentPanelSource() {
 }
 
 describe('ContentPanel make client project setup source', () => {
+  it('uses one concise design-creation sentence for the empty design tree', () => {
+    const source = readContentPanelSource();
+
+    expect(source).toContain("if (dataTab === 'themes' && !searchText.trim())");
+    expect(source).toContain('暂无内容，创建设计规范，统一原型的视觉与文案风格');
+    expect(source.match(/暂无内容，创建设计规范，统一原型的视觉与文案风格/gu)).toHaveLength(1);
+  });
+
   it('renders the AI open dropdown in the sidebar header chrome', () => {
     const source = readContentPanelSource();
     const headerSource = source.slice(
@@ -738,8 +746,10 @@ describe('ContentPanel document paste upload source', () => {
     expect(pasteEffectSource).toContain('if (pastedFiles.length === 0) {');
     expect(pasteEffectSource).toContain('event.preventDefault();');
     expect(pasteEffectSource).toContain('void uploadResourceFiles(pastedFiles, { targetFolder: documentPasteTargetFolder });');
-    expect(uploadSource).toContain("formData.append('projectId', activeProjectId);");
+    expect(uploadSource).toContain("formData.append('projectId', requireProjectScope(activeProjectId).projectId);");
     expect(uploadSource).toContain("formData.append('targetFolder', targetFolder);");
+    expect(source).toContain('sidebarApi.openResourceInSystem(');
+    expect(source).toContain('requireProjectScope(activeProjectId),');
   });
 
   it('passes uploaded document resources back to the parent so the new file can be selected', () => {
@@ -1012,6 +1022,24 @@ describe('ContentPanel LAN share source', () => {
     expect(lanGroupIndex).toBeGreaterThan(guardIndex);
     expect(lanLabelIndex).toBeGreaterThan(lanGroupIndex);
     expect(qrIndex).toBeGreaterThan(lanGroupIndex);
+  });
+});
+
+describe('ContentPanel prototype menu capabilities source', () => {
+  it('separates preview access from local directory management for spec-only prototypes', () => {
+    const source = readContentPanelSource();
+    const itemActionsSource = source.slice(
+      source.indexOf('const renderItemActions ='),
+      source.indexOf('const renderFolderActions ='),
+    );
+
+    expect(source).toContain("import { getPrototypeLocalBasePath, hasExplicitLocalPath } from '../../utils/localPath';");
+    expect(itemActionsSource).toContain("const prototypeLocalBasePath = isPrototypeItem ? getPrototypeLocalBasePath(item) : '';");
+    expect(itemActionsSource).toContain('const showLocalPathActions = isPrototypeItem ? Boolean(prototypeLocalBasePath) : hasExplicitLocalPath(item);');
+    expect(itemActionsSource).toContain('const showPrototypeAccessLinks = isPrototypeItem && item.previewDisabled !== true && hasShareUrl;');
+    expect(itemActionsSource).toContain('{showPrototypeAccessLinks ? (');
+    expect(itemActionsSource).not.toContain('{isPrototypeItem ? (\n                    <DropdownMenuSub>');
+    expect(itemActionsSource).toContain('{canDeleteItem ? (\n                    <>\n                        <DropdownMenuSeparator />');
   });
 });
 

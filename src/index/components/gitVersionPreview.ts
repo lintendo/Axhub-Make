@@ -1,7 +1,7 @@
 interface GitVersionEntryProbeOptions {
-  commitHash: string;
-  targetPath: string;
-  projectId?: string;
+    commitHash: string;
+    targetPath: string;
+    projectId: string;
 }
 
 type GitVersionEntryFetch = (
@@ -19,8 +19,7 @@ export function buildGitVersionEntryProbeUrl(options: GitVersionEntryProbeOption
     .map((segment) => encodeURIComponent(segment))
     .join('/');
   const pathname = `/api/git/version-file/${encodeURIComponent(versionId)}/${encodedPath}/index.tsx`;
-  const projectId = String(options.projectId || '').trim();
-  return projectId ? `${pathname}?projectId=${encodeURIComponent(projectId)}` : pathname;
+  return `${pathname}?projectId=${encodeURIComponent(options.projectId)}`;
 }
 
 export async function probeGitVersionEntry(

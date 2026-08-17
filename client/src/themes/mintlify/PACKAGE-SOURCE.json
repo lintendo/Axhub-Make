@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "themeId": "mintlify",
+  "sourceCommit": "0fa70b810ff51d98fe1c142243c45ed008cd7ab0",
+  "files": [
+    {
+      "path": "DESIGN.md",
+      "hash": "sha256:754ffcf35dcd39ef8aef450085ce936aaca5b872ff92caa66be99e91a5c3d5ec"
+    },
+    {
+      "path": "SOURCE.md",
+      "hash": "sha256:c44e531665181c572158366be5910fe93caf02871fa0e101d0a57e87fd9edef9"
+    },
+    {
+      "path": "_runtime/DesignMdBatchShowcase/base.css",
+      "hash": "sha256:98414363d97e5262bb0e14d507aa32b04b36233726d26127a60daa32f3382f26"
+    },
+    {
+      "path": "_runtime/DesignMdBatchShowcase/headerLinks.ts",
+      "hash": "sha256:527a4eda89a06eaec92b351e8c8882ba19ead3c840d8647dd371f2ad5b02a0c6"
+    },
+    {
+      "path": "_runtime/DesignMdBatchShowcase/index.tsx",
+      "hash": "sha256:6482b563ee9676908d380567bd91b5406a2c64ed1386c54849e72b1993380d9e"
+    },
+    {
+      "path": "assets/official-homepage.webp",
+      "hash": "sha256:15f5c868c07a55ae9f06c2532bec6757871613e7d76696832c803dddc6d2698d"
+    },
+    {
+      "path": "assets/preview.html",
+      "hash": "sha256:b07bbe97c546bb1df5d74bcfc1ae4eb010d587e1c99640cb3ed40656745eeac6"
+    },
+    {
+      "path": "assets/tokens.json",
+      "hash": "sha256:7e2e75ea82ab7dcecd887d5fb4093b543e535ff316487eb3e600756db4199812"
+    },
+    {
+      "path": "index.tsx",
+      "hash": "sha256:f69f8237e087a7af76b61dc41d36c292582d8b1f33eb82fb28245f5fff58b96c"
+    },
+    {
+      "path": "style.css",
+      "hash": "sha256:3b9a796f6a65ff87bcd29bee8469a74c11da265de73832fdca2c092579b525d9"
+    },
+    {
+      "path": "theme.json",
+      "hash": "sha256:4398a4d0b4e41eef440e6659f81e3005265b92985ffd98fd3fd775806c759a3c"
+    },
+    {
+      "path": "tw.css",
+      "hash": "sha256:6fa454b67c6d82ccc4fdff832fff7035b10bbe3ee7be1bb44e56c66956772a25"
+    }
+  ]
+}

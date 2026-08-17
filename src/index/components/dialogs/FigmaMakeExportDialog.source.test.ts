@@ -17,4 +17,14 @@ describe('FigmaMakeExportDialog source', () => {
     expect(source).not.toContain('MAKE 文件');
     expect(source).not.toContain('下载 Make');
   });
+
+  it('scopes probes, prompts, and downloads to the selected project', () => {
+    const source = readSource();
+
+    expect(source).toContain('projectId: string;');
+    expect(source).toContain('const scope = React.useMemo(() => requireProjectScope(projectId), [projectId]);');
+    expect(source).toContain('apiService.probeExportMake(resolvedTargetPath, scope)');
+    expect(source).toContain("withProjectScope(`/api/export-make?path=${encodeURIComponent(resolvedTargetPath)}`, scope)");
+    expect(source).toContain('apiService.getExportMakePrompt(resolvedTargetPath, scope)');
+  });
 });

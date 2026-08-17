@@ -143,6 +143,7 @@ describe('canvas prompt optimization', () => {
     });
 
     const result = await optimizeCanvasPrompt({
+      projectId: 'project-b',
       prompt: '做一个 CRM 首页',
       scene: 'page',
       sceneSettings: {},
@@ -180,6 +181,7 @@ describe('canvas prompt optimization', () => {
     });
 
     await expect(optimizeCanvasPrompt({
+      projectId: 'project-b',
       prompt: '做一个 CRM 首页',
       scene: 'page',
       sceneSettings: {},

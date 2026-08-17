@@ -1,8 +1,4 @@
-import {
-  EDITOR_CHROME,
-  POPUP_LAYER_Z_INDEX,
-  WEB_EDITOR_POPUP_ROOT_ATTR,
-} from '../theme';
+import { EDITOR_CHROME, POPUP_LAYER_Z_INDEX, WEB_EDITOR_POPUP_ROOT_ATTR } from '../theme';
 
 export const WEB_EDITOR_POPUP_ROOT_STYLES = `
   @keyframes we-runtime-agent-task-scan {
@@ -265,12 +261,17 @@ export const WEB_EDITOR_POPUP_ROOT_STYLES = `
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-popover,
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-popconfirm,
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-color-picker-dropdown {
-    z-index: ${POPUP_LAYER_Z_INDEX + 20};
+    z-index: ${POPUP_LAYER_Z_INDEX + 20} !important;
   }
 
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-select-dropdown,
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-ai-execution-provider-dropdown {
     z-index: ${POPUP_LAYER_Z_INDEX + 40} !important;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-popover .ant-popover-inner,
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-popconfirm .ant-popover-inner {
+    box-shadow: ${EDITOR_CHROME.shadowCompact} !important;
   }
 
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-dark-mode-button.ant-btn {
@@ -283,6 +284,215 @@ export const WEB_EDITOR_POPUP_ROOT_STYLES = `
     padding: 0;
   }
 
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card {
+    --we-runtime-settings-control-width: 120px;
+    width: min(264px, calc(100vw - 32px));
+    overflow: visible;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__header {
+    display: flex;
+    min-height: 32px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 2px;
+    padding: 0 4px 6px;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__title {
+    color: ${EDITOR_CHROME.textPrimary};
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 22px;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__list,
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__execution {
+    display: flex;
+    flex-direction: column;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__list {
+    gap: 2px;
+    max-height: none;
+    overflow: visible;
+    scrollbar-width: none;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__list::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__execution {
+    gap: 6px;
+    width: 100%;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__row,
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__execution-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--we-runtime-settings-control-width);
+    align-items: center;
+    column-gap: 12px;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__row {
+    min-height: 36px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    cursor: default;
+    transition: background-color 160ms ease, color 160ms ease;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__row--full {
+    display: block;
+    min-height: 0;
+    margin: 0;
+    padding: 4px 6px 6px;
+    border-radius: 8px;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__row--compact-control {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__row--action,
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__execution-row--action {
+    cursor: pointer;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__row--action:hover {
+    background: ${EDITOR_CHROME.hoverSubtle};
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__execution-row {
+    min-height: 30px;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__execution-row--action {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__execution-row--action:hover .we-runtime-settings-card__value {
+    color: ${EDITOR_CHROME.textPrimary};
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__label {
+    min-width: 0;
+    color: ${EDITOR_CHROME.textPrimary};
+    font-size: 14px;
+    line-height: 20px;
+    white-space: nowrap;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__skill-label {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__recommended-badge {
+    display: inline-flex;
+    height: 18px;
+    flex: 0 0 auto;
+    align-items: center;
+    padding: 0 5px;
+    border: 1px solid ${EDITOR_CHROME.accentRing};
+    border-radius: 4px;
+    background: ${EDITOR_CHROME.accentSoft};
+    color: ${EDITOR_CHROME.accent};
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 16px;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__install-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    min-width: 0;
+    height: 24px;
+    padding: 0 2px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: ${EDITOR_CHROME.accent} !important;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+    cursor: pointer;
+    text-decoration: none;
+    text-underline-offset: 3px;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__install-button:hover {
+    background: transparent;
+    color: ${EDITOR_CHROME.accent} !important;
+    text-decoration: underline;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__install-button:focus-visible {
+    outline: 2px solid ${EDITOR_CHROME.accentRing};
+    outline-offset: 2px;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__full-control,
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__execution-control {
+    min-width: 0;
+    width: 100%;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__execution-control .ant-select,
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__execution-control .ant-input-number,
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__execution-control .ant-input-affix-wrapper {
+    width: 100%;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__workspace-input input {
+    text-overflow: ellipsis;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__row-control,
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__value {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    justify-self: stretch;
+    gap: 6px;
+    color: ${EDITOR_CHROME.textSecondary};
+    font-size: 13px;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__workspace-value {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__workspace-value-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-card__workspace-value > .anticon {
+    flex: 0 0 auto;
+  }
+
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-dark-mode-button .anticon {
     display: inline-flex;
     align-items: center;
@@ -292,6 +502,10 @@ export const WEB_EDITOR_POPUP_ROOT_STYLES = `
 
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-settings-dark-mode-button .anticon svg {
     display: block;
+  }
+
+  [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .we-runtime-html-file-save-dropdown .ant-dropdown-menu {
+    min-width: 176px;
   }
 
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-dropdown,
@@ -309,7 +523,7 @@ export const WEB_EDITOR_POPUP_ROOT_STYLES = `
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-dropdown .ant-dropdown-menu:not(.ant-dropdown-menu-submenu-popup) {
     background: ${EDITOR_CHROME.surfaceElevated} !important;
     border: 1px solid ${EDITOR_CHROME.border} !important;
-    box-shadow: ${EDITOR_CHROME.shadow} !important;
+    box-shadow: ${EDITOR_CHROME.shadowCompact} !important;
   }
 
   [${WEB_EDITOR_POPUP_ROOT_ATTR}="true"] .ant-dropdown-menu-item,

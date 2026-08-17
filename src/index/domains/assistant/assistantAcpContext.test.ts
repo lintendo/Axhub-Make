@@ -10,6 +10,7 @@ import {
   getAcpCanvasMcpConfigSignature,
   getAcpImageGenerationConfigSignature,
   buildAcpCanvasMcpServers,
+  buildAcpPreviewMcpServers,
   mapAssistantContextToAcpContextBundle,
 } from './assistantAcpContext';
 
@@ -287,6 +288,46 @@ describe('assistant ACP context mapping', () => {
     expect(JSON.stringify(message)).not.toContain('"imageGeneration"');
   });
 
+  it('includes the transient image playground save directory in config and sync signatures', () => {
+    const baseConfig = {
+      baseUrl: 'https://api.images.example.com/v1',
+      apiKey: 'sk-image-secret',
+      model: 'gpt-image-2',
+    };
+
+    expect(buildAcpImageGenerationPostMessage({
+      ...baseConfig,
+      saveDirectory: ' /workspace/src/resources/brand ',
+    }, 'image-save-directory')).toEqual({
+      type: 'acp.runtime.configure',
+      requestId: 'image-save-directory',
+      payload: {
+        merge: true,
+        builtinTools: ['image-generation'],
+        builtinToolSettings: {
+          'image-generation': {
+            baseUrl: 'https://api.images.example.com/v1',
+            apiKey: 'sk-image-secret',
+            model: 'gpt-image-2',
+            saveDirectory: '/workspace/src/resources/brand',
+          },
+        },
+      },
+    });
+
+    const firstSignature = getAcpImageGenerationConfigSignature({
+      ...baseConfig,
+      saveDirectory: '/workspace/src/resources/brand',
+    });
+    const secondSignature = getAcpImageGenerationConfigSignature({
+      ...baseConfig,
+      saveDirectory: '/workspace/src/resources/research',
+    });
+    expect(firstSignature).toContain('/workspace/src/resources/brand');
+    expect(firstSignature).not.toContain('sk-image-secret');
+    expect(firstSignature).not.toEqual(secondSignature);
+  });
+
   it('builds ACP image generation clear messages when Make AI settings are incomplete', () => {
     expect(buildAcpImageGenerationPostMessage({
       baseUrl: 'https://api.images.example.com/v1',
@@ -355,6 +396,25 @@ describe('assistant ACP context mapping', () => {
           }],
         }],
       },
+    });
+  });
+
+  it('adds the opt-in voice tool capability only to a requested direct run', () => {
+    const servers = buildAcpPreviewMcpServers({
+      makeOrigin: 'http://localhost:5174',
+      previewToken: 'preview-secret',
+      previewBridgeClientId: 'preview-voice',
+      voiceTools: true,
+    }) as any[];
+
+    expect(servers).toHaveLength(1);
+    expect(servers[0]).toMatchObject({
+      name: 'axhub-preview',
+      headers: expect.arrayContaining([
+        { name: 'x-axhub-preview-mcp-token', value: 'preview-secret' },
+        { name: 'x-axhub-preview-bridge-client-id', value: 'preview-voice' },
+        { name: 'x-axhub-preview-voice-tools', value: '1' },
+      ]),
     });
   });
 

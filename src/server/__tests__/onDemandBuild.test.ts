@@ -102,6 +102,36 @@ afterEach(() => {
 });
 
 describe('buildOnDemand', () => {
+  it('replaces embedded images with dimension-preserving gray SVG placeholders', () => {
+    const pngHeader = Buffer.alloc(24);
+    pngHeader.writeUInt32BE(640, 16);
+    pngHeader.writeUInt32BE(360, 20);
+    const originalDataUrl = `data:image/png;base64,${pngHeader.toString('base64')}`;
+
+    const result = __onDemandBuildTestUtils.replaceEmbeddedImageAssets(`const image = "${originalDataUrl}";`);
+    const placeholderDataUrl = result.match(/data:image\/svg\+xml;base64,[A-Za-z\d+/=]+/u)?.[0];
+    const placeholderSvg = placeholderDataUrl
+      ? Buffer.from(placeholderDataUrl.split(',')[1], 'base64').toString('utf8')
+      : '';
+
+    expect(result).not.toContain(originalDataUrl);
+    expect(placeholderSvg).toContain('width="640" height="360"');
+    expect(placeholderSvg).toContain('fill="#f2f4f7"');
+  });
+
+  it('replaces URI-encoded SVG images while preserving their viewBox ratio', () => {
+    const originalDataUrl = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 120"></svg>')}`;
+
+    const result = __onDemandBuildTestUtils.replaceEmbeddedImageAssets(`const image = "${originalDataUrl}";`);
+    const placeholderDataUrl = result.match(/data:image\/svg\+xml;base64,[A-Za-z\d+/=]+/u)?.[0];
+    const placeholderSvg = placeholderDataUrl
+      ? Buffer.from(placeholderDataUrl.split(',')[1], 'base64').toString('utf8')
+      : '';
+
+    expect(result).not.toContain(originalDataUrl);
+    expect(placeholderSvg).toContain('width="300" height="120"');
+  });
+
   it('normalizes named exports from CJS module default objects', () => {
     const build = () => ({ output: [] });
 

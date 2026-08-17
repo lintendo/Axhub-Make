@@ -1,0 +1,14 @@
+{
+  "index": 41,
+  "label": "权限审计",
+  "requestedUrl": "https://xl3n1thocz.feishu.cn/admin/security/compliance/authz",
+  "url": "https://xl3n1thocz.feishu.cn/admin/security/compliance/authz",
+  "title": "权限审计 - 飞书管理后台",
+  "text": "企业管理\n产品设置\n合规\n权限审计\n权限审计\n满足企业在审计监管、安全合规等方面的诉求，企业管理员可查看成员拥有的权限和记录\n联系客服升级\n实时权限查询\n查看企业成员或其他主体拥有的角色以及拥有的权限，支持实时查询\n了解更多\n权限查询任务\n当需要查询的业务数据量比较大时，可通过任务形式查询成员或其他主体拥有的权限，如云文档\n了解更多\n成员权限变更记录\n查看企业成员权限变更的日志，追溯权限变更记录\n了解更多\n权限规则变更记录\n查看业务角色的变更记录，方便追溯\n了解更多\n异动成员权限提醒\n当企业成员组织架构发生变动或离职时，系统自动生成一条记录，管理员可查看其拥有的权限，并可快速收回\n了解更多\n无操作权限",
+  "buttons": [
+    "联系客服升级"
+  ],
+  "inputs": [],
+  "headings": [],
+  "screenshot": "041-security-compliance-authz-default-desktop.png"
+}

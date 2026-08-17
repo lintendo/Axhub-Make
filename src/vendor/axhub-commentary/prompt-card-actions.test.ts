@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { executePromptCardCurrentElementAction } from '../../../vendor/axhub-commentary/src/ui/runtime/prompt-card-actions';
+import { getAgentPromptBubbleActionState } from '../../../vendor/axhub-commentary/src/ui/agent-prompt-action';
 
 function createDeferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -13,7 +14,24 @@ function createDeferred<T = void>() {
 }
 
 describe('prompt card current element action', () => {
-  it('dismisses the editable bubble immediately after dispatching a long-running AI send', async () => {
+  it('keeps the vendored execution action loading while its element task is running', () => {
+    const state = getAgentPromptBubbleActionState({
+      visualState: 'awake',
+      pageTaskRunning: true,
+      pageTaskSessionReady: true,
+      currentTaskRunning: true,
+      currentTaskSessionReady: true,
+      onSendCurrentElementPromptToAgent: () => undefined,
+      getAgentBridgeConnected: () => true,
+      hasReusableConversation: true,
+    });
+
+    expect(state.disabled).toBe(true);
+    expect(state.loading).toBe(true);
+    expect(state.dismissBubble).toBe(true);
+  });
+
+  it('leaves vendored bubble dismissal to the task lifecycle', async () => {
     const target = {} as Element;
     const sendDeferred = createDeferred<void>();
     const onConfirmText = vi.fn().mockResolvedValue(undefined);
@@ -21,13 +39,14 @@ describe('prompt card current element action', () => {
     const onDismissSelection = vi.fn();
     const onSendCurrentElementPromptToAgent = vi.fn(() => sendDeferred.promise);
 
-    const resultPromise = executePromptCardCurrentElementAction({
+    const actionOptions = {
       currentTarget: target,
       onConfirmText,
       onConfirmNote,
       onDismissSelection,
       onSendCurrentElementPromptToAgent,
-    });
+    };
+    const resultPromise = executePromptCardCurrentElementAction(actionOptions);
 
     await Promise.resolve();
     await Promise.resolve();
@@ -36,33 +55,27 @@ describe('prompt card current element action', () => {
     expect(onConfirmText).toHaveBeenCalledTimes(1);
     expect(onConfirmNote).toHaveBeenCalledTimes(1);
     expect(onSendCurrentElementPromptToAgent).toHaveBeenCalledWith(target);
-    expect(onDismissSelection).toHaveBeenCalledTimes(1);
+    expect(onDismissSelection).not.toHaveBeenCalled();
 
     sendDeferred.resolve();
     await expect(resultPromise).resolves.toBe(true);
+    expect(onDismissSelection).not.toHaveBeenCalled();
   });
 
-  it('exposes a dispatch hook so bubble loading clears before a long-running AI send completes', async () => {
+  it('keeps the vendored bubble available when task startup fails', async () => {
     const target = {} as Element;
-    const sendDeferred = createDeferred<void>();
-    const onDispatched = vi.fn();
+    const onDismissSelection = vi.fn();
 
-    const resultPromise = executePromptCardCurrentElementAction({
+    const actionOptions = {
       currentTarget: target,
       onConfirmText: vi.fn().mockResolvedValue(undefined),
       onConfirmNote: vi.fn().mockResolvedValue(undefined),
-      onDismissSelection: vi.fn(),
-      onSendCurrentElementPromptToAgent: vi.fn(() => sendDeferred.promise),
-      onDispatched,
-    });
+      onDismissSelection,
+      onSendCurrentElementPromptToAgent: vi.fn().mockRejectedValue(new Error('启动失败')),
+    };
 
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+    await expect(executePromptCardCurrentElementAction(actionOptions)).rejects.toThrow('启动失败');
 
-    expect(onDispatched).toHaveBeenCalledTimes(1);
-
-    sendDeferred.resolve();
-    await expect(resultPromise).resolves.toBe(true);
+    expect(onDismissSelection).not.toHaveBeenCalled();
   });
 });

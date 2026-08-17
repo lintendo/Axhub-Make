@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "themeId": "uber",
+  "sourceCommit": "0fa70b810ff51d98fe1c142243c45ed008cd7ab0",
+  "files": [
+    {
+      "path": "DESIGN.md",
+      "hash": "sha256:1a281c78ce1f1744dd763ecc7ca0b7ded0c2ccacec56733d47136fd6389b5bca"
+    },
+    {
+      "path": "SOURCE.md",
+      "hash": "sha256:128d1d0ac98577037b0435123e14daf715d71db37ae2ad92e7e0172b59077a39"
+    },
+    {
+      "path": "_runtime/DesignMdBatchShowcase/base.css",
+      "hash": "sha256:98414363d97e5262bb0e14d507aa32b04b36233726d26127a60daa32f3382f26"
+    },
+    {
+      "path": "_runtime/DesignMdBatchShowcase/headerLinks.ts",
+      "hash": "sha256:527a4eda89a06eaec92b351e8c8882ba19ead3c840d8647dd371f2ad5b02a0c6"
+    },
+    {
+      "path": "_runtime/DesignMdBatchShowcase/index.tsx",
+      "hash": "sha256:6482b563ee9676908d380567bd91b5406a2c64ed1386c54849e72b1993380d9e"
+    },
+    {
+      "path": "assets/official-homepage.webp",
+      "hash": "sha256:39edb5e86d0e6066430b54c64b5d00d6024fdbacee86731a1453658a28fea2e6"
+    },
+    {
+      "path": "assets/preview.html",
+      "hash": "sha256:aa19192f71758e446f8015650cc5f03fc83283f3c7613f5214dd377ca4e84f69"
+    },
+    {
+      "path": "assets/tokens.json",
+      "hash": "sha256:b5c0cd6d6a6ef58d273e36512d47c05fce66dc549c29433c0b51a73707054137"
+    },
+    {
+      "path": "index.tsx",
+      "hash": "sha256:f19e5b413e1bf6bf33a6f29aa8466be0d04425d9a79fd510f5fecdccaa031321"
+    },
+    {
+      "path": "style.css",
+      "hash": "sha256:fe9dba7a830febac16f936c874b61d432f90e9e7d73234f96fd7bcb5fc2f3b9d"
+    },
+    {
+      "path": "theme.json",
+      "hash": "sha256:46b3fab4cababa00ea1c7fd1558d34c7dbbe8cd7d27db4ae8311c898cdd6f8e4"
+    },
+    {
+      "path": "tw.css",
+      "hash": "sha256:225a7280b9737108360b2df9cde3dc13449ecb8a43f7ae0209866c63758c558b"
+    }
+  ]
+}

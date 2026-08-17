@@ -337,6 +337,7 @@ declare const STANDARD_FIGMA_CONTRACT_FALLBACKS: {
     };
 };
 
+declare const deriveStandardFontStyle: (fontWeight: unknown, fontStyle: unknown, fallback: string) => string;
 declare const validateAndNormalizeStandardFigmaNode: (input: unknown, path?: string, fontOptions?: StandardFigmaFontNormalizationOptions) => StandardFigmaNodeValidationResult;
 declare const validateStandardFigmaLayerPayload: (layers: unknown, fontOptions?: StandardFigmaFontNormalizationOptions) => StandardFigmaNodePayloadValidationResult;
 
@@ -363,6 +364,7 @@ interface ConverterStats {
 interface ConvertLayersToStandardFigmaNodesOptions {
     validateContract?: boolean;
     rootPath?: string;
+    availableFontFamilies?: Iterable<string> | null;
 }
 interface ConvertLayersToStandardFigmaNodesResult {
     nodes: StandardFigmaNode[];
@@ -410,6 +412,11 @@ type CapturedFontUsage = {
     fontStyle: string;
     fontStretch: string;
     fontSize: string;
+    metrics?: {
+        fontBoundingBoxAscent?: number;
+        fontBoundingBoxDescent?: number;
+        lineBoxHeight?: number;
+    };
 };
 type CapturedFontFamily = {
     familyName: string;
@@ -438,7 +445,8 @@ type CapturedElementNode = {
     childNodes: CapturedNode[];
     content?: string;
     placeholderUrl?: string;
-    pseudoElementStyles?: Record<string, Record<string, string>>;
+    pseudoElementStyles?: Partial<Record<'before' | 'after' | 'marker' | 'placeholder', Record<string, string>>>;
+    variableStyles?: Record<string, string>;
     relativeTransform?: CapturedRelativeTransform;
     quad?: {
         p1: CapturedQuadPoint;
@@ -477,14 +485,28 @@ type CapturedDocumentToFigmaLayersOptions = {
     enableAutoLayout?: boolean;
     useFrames?: boolean;
 };
+type OfficialClipboardMetadata = {
+    dataType: 'h2d';
+    source: 'mcp';
+    capturedAtIso: string;
+};
+type OfficialClipboardCopyResult = {
+    success: boolean;
+    error?: string;
+    assetCount: number;
+    embeddedAssetCount: number;
+    missingAssetCount: number;
+    payloadSizeKb: number;
+};
+type OfficialClipboardSerializedResult = OfficialClipboardCopyResult & {
+    htmlBase64?: string;
+};
 declare const __convertUrlToDataUrlForTests: (url: string) => Promise<string | null>;
 declare const captureDocumentForFigmaNew: (selector?: string | Element, options?: CaptureDocumentForFigmaNewOptions) => Promise<CapturedDocument>;
 declare const buildOfficialClipboardPayloadFromCapturedDocument: (capturedDoc: CapturedDocument) => Promise<string>;
-declare const buildOfficialClipboardHtmlFromPayload: (payloadText: string) => Promise<Blob>;
-declare const copyDocumentForFigmaNewOfficialClipboard: (selector?: string | Element) => Promise<{
-    success: true;
-    payloadSizeKb: number;
-}>;
+declare const buildOfficialClipboardHtmlFromPayload: (payloadText: string, metadata?: OfficialClipboardMetadata) => Promise<Blob>;
+declare const serializeDocumentForFigmaNewOfficialClipboard: (selector?: string | Element) => Promise<OfficialClipboardSerializedResult>;
+declare const copyDocumentForFigmaNewOfficialClipboard: (selector?: string | Element) => Promise<OfficialClipboardCopyResult>;
 declare const capturedDocumentToFigmaLayers: (capturedDoc: CapturedDocument, options?: CapturedDocumentToFigmaLayersOptions) => Promise<any[]>;
 
 declare const htmlToFigma: (selector?: string | HTMLElement, options?: any) => Promise<any[]>;
@@ -714,4 +736,4 @@ declare function isValidAxurePayload(value: any): boolean;
 declare function extractAxurePayload(value: any, visited?: Set<any>): any | null;
 declare function normalizeAxurePayloadFromFrameResults(frameResults: any[]): any | null;
 
-export { type AnyNode, type ArtboardNode, type AxhubDocument, type BaseFill, type BaseNode, type BlurEffect, type CaptureDocumentForFigmaNewOptions, type CapturedAsset, type CapturedDocument, type CapturedDocumentToFigmaLayersOptions, type CapturedElementNode, type CapturedFontFamily, type CapturedFontUsage, type CapturedFonts, type CapturedNode, type CapturedQuadPoint, type CapturedRect, type CapturedRelativeTransform, type CapturedTextNode, type Color, type CompleteLayerMappingResult, type ConvertLayersToStandardFigmaNodesOptions, type ConvertLayersToStandardFigmaNodesResult, type CopyToFigmaResult, type CustomFigmaScriptAdapter, type CustomFigmaScriptCaptureResult, type CustomFigmaScriptConsoleFallbackPayload, type CustomFigmaScriptParams, type CustomFigmaScriptStatus, type Effect, type FigmaProtocolAssets, type FigmaSchemaValidationResult, type Fill, FillType, type GradientFill, type GradientStop, type ImageFill, ItemType, type LayerNode, type NodeScene, type Numeric, type Paragraph, type PathNode, type PathPoint, type PathSegment, type Point, type Rect, type RectangleNode, type ResizingConstraints, STANDARD_COUNTER_AXIS_ALIGN, STANDARD_FIGMA_CONTRACT_FALLBACKS, STANDARD_FIGMA_EFFECT_TYPES, STANDARD_FIGMA_NODE_TYPES, STANDARD_FIGMA_PAINT_TYPES, STANDARD_HORIZONTAL_CONSTRAINTS, STANDARD_IMAGE_SCALE_MODES, STANDARD_LAYOUT_ALIGN, STANDARD_LAYOUT_MODES, STANDARD_LAYOUT_POSITIONING, STANDARD_LAYOUT_SIZING, STANDARD_LAYOUT_WRAP, STANDARD_PRIMARY_AXIS_ALIGN, STANDARD_TEXT_ALIGN_HORIZONTAL, STANDARD_TEXT_ALIGN_VERTICAL, STANDARD_TEXT_AUTO_RESIZE, STANDARD_TEXT_CASE, STANDARD_TEXT_DECORATION, STANDARD_VERTICAL_CONSTRAINTS, type SafeResult, type SceneContainerNode, type ShadowEffect, type SolidFill, type StandardCounterAxisAlignItems, type StandardFigmaColor, type StandardFigmaEffect, type StandardFigmaEffectType, type StandardFigmaFontName, type StandardFigmaFontNormalizationOptions, type StandardFigmaGradientPaint, type StandardFigmaGradientStop, type StandardFigmaImagePaint, type StandardFigmaNode, type StandardFigmaNodePayloadValidationResult, type StandardFigmaNodeType, type StandardFigmaNodeValidationResult, type StandardFigmaNumberField, type StandardFigmaPaint, type StandardFigmaPaintType, type StandardFigmaSolidPaint, type StandardFigmaTextData, type StandardFigmaTextDataLine, type StandardFigmaTransform, type StandardFigmaVector, type StandardHorizontalConstraint, type StandardImageScaleMode, type StandardLayoutAlign, type StandardLayoutMode, type StandardLayoutPositioning, type StandardLayoutSizingMode, type StandardLayoutWrap, type StandardPrimaryAxisAlignItems, type StandardTextAlignHorizontal, type StandardTextAlignVertical, type StandardTextAutoResize, type StandardTextCase, type StandardTextDecoration, type StandardVerticalConstraint, type Stroke, type TextInline, type TextListInfo, type TextNode, __convertUrlToDataUrlForTests, buildKiwiClipboardFragment, buildKiwiDebugRectangleMessage, buildKiwiMessageFromLayers, buildOfficialClipboardHtmlFromPayload, buildOfficialClipboardPayloadFromCapturedDocument, captureDocumentForFigmaNew, captureWithCustomFigmaScript, capturedDocumentToFigmaLayers, convertLayersToStandardFigmaNodes, copyDebugRectangleToFigmaWithKiwi, copyDocumentForFigmaNewOfficialClipboard, copyLayersToFigmaClipboard, copyToFigmaWithKiwi, extractAxurePayload, getProtocolVersion, hasChromeRuntime, hasClipboardEnvironment, hasDomEnvironment, htmlToAxure, htmlToFigma, isValidAxurePayload, loadFigmaProtocolAssets, mapLayersToCompleteFigmaNodes, normalizeAxurePayloadFromFrameResults, processWithOriginalLogic, processWithSnapDOMImplementation, safeBuildKiwiClipboardFragment, safeCaptureWithCustomFigmaScript, safeCopyDebugRectangleToFigmaWithKiwi, safeCopyLayersToFigmaClipboard, safeCopyToFigmaWithKiwi, safeHtmlToAxure, safeHtmlToFigma, validateAndNormalizeStandardFigmaNode, validateFigmaSchema, validateStandardFigmaLayerPayload };
+export { type AnyNode, type ArtboardNode, type AxhubDocument, type BaseFill, type BaseNode, type BlurEffect, type CaptureDocumentForFigmaNewOptions, type CapturedAsset, type CapturedDocument, type CapturedDocumentToFigmaLayersOptions, type CapturedElementNode, type CapturedFontFamily, type CapturedFontUsage, type CapturedFonts, type CapturedNode, type CapturedQuadPoint, type CapturedRect, type CapturedRelativeTransform, type CapturedTextNode, type Color, type CompleteLayerMappingResult, type ConvertLayersToStandardFigmaNodesOptions, type ConvertLayersToStandardFigmaNodesResult, type CopyToFigmaResult, type CustomFigmaScriptAdapter, type CustomFigmaScriptCaptureResult, type CustomFigmaScriptConsoleFallbackPayload, type CustomFigmaScriptParams, type CustomFigmaScriptStatus, type Effect, type FigmaProtocolAssets, type FigmaSchemaValidationResult, type Fill, FillType, type GradientFill, type GradientStop, type ImageFill, ItemType, type LayerNode, type NodeScene, type Numeric, type OfficialClipboardCopyResult, type OfficialClipboardSerializedResult, type Paragraph, type PathNode, type PathPoint, type PathSegment, type Point, type Rect, type RectangleNode, type ResizingConstraints, STANDARD_COUNTER_AXIS_ALIGN, STANDARD_FIGMA_CONTRACT_FALLBACKS, STANDARD_FIGMA_EFFECT_TYPES, STANDARD_FIGMA_NODE_TYPES, STANDARD_FIGMA_PAINT_TYPES, STANDARD_HORIZONTAL_CONSTRAINTS, STANDARD_IMAGE_SCALE_MODES, STANDARD_LAYOUT_ALIGN, STANDARD_LAYOUT_MODES, STANDARD_LAYOUT_POSITIONING, STANDARD_LAYOUT_SIZING, STANDARD_LAYOUT_WRAP, STANDARD_PRIMARY_AXIS_ALIGN, STANDARD_TEXT_ALIGN_HORIZONTAL, STANDARD_TEXT_ALIGN_VERTICAL, STANDARD_TEXT_AUTO_RESIZE, STANDARD_TEXT_CASE, STANDARD_TEXT_DECORATION, STANDARD_VERTICAL_CONSTRAINTS, type SafeResult, type SceneContainerNode, type ShadowEffect, type SolidFill, type StandardCounterAxisAlignItems, type StandardFigmaColor, type StandardFigmaEffect, type StandardFigmaEffectType, type StandardFigmaFontName, type StandardFigmaFontNormalizationOptions, type StandardFigmaGradientPaint, type StandardFigmaGradientStop, type StandardFigmaImagePaint, type StandardFigmaNode, type StandardFigmaNodePayloadValidationResult, type StandardFigmaNodeType, type StandardFigmaNodeValidationResult, type StandardFigmaNumberField, type StandardFigmaPaint, type StandardFigmaPaintType, type StandardFigmaSolidPaint, type StandardFigmaTextData, type StandardFigmaTextDataLine, type StandardFigmaTransform, type StandardFigmaVector, type StandardHorizontalConstraint, type StandardImageScaleMode, type StandardLayoutAlign, type StandardLayoutMode, type StandardLayoutPositioning, type StandardLayoutSizingMode, type StandardLayoutWrap, type StandardPrimaryAxisAlignItems, type StandardTextAlignHorizontal, type StandardTextAlignVertical, type StandardTextAutoResize, type StandardTextCase, type StandardTextDecoration, type StandardVerticalConstraint, type Stroke, type TextInline, type TextListInfo, type TextNode, __convertUrlToDataUrlForTests, buildKiwiClipboardFragment, buildKiwiDebugRectangleMessage, buildKiwiMessageFromLayers, buildOfficialClipboardHtmlFromPayload, buildOfficialClipboardPayloadFromCapturedDocument, captureDocumentForFigmaNew, captureWithCustomFigmaScript, capturedDocumentToFigmaLayers, convertLayersToStandardFigmaNodes, copyDebugRectangleToFigmaWithKiwi, copyDocumentForFigmaNewOfficialClipboard, copyLayersToFigmaClipboard, copyToFigmaWithKiwi, deriveStandardFontStyle, extractAxurePayload, getProtocolVersion, hasChromeRuntime, hasClipboardEnvironment, hasDomEnvironment, htmlToAxure, htmlToFigma, isValidAxurePayload, loadFigmaProtocolAssets, mapLayersToCompleteFigmaNodes, normalizeAxurePayloadFromFrameResults, processWithOriginalLogic, processWithSnapDOMImplementation, safeBuildKiwiClipboardFragment, safeCaptureWithCustomFigmaScript, safeCopyDebugRectangleToFigmaWithKiwi, safeCopyLayersToFigmaClipboard, safeCopyToFigmaWithKiwi, safeHtmlToAxure, safeHtmlToFigma, serializeDocumentForFigmaNewOfficialClipboard, validateAndNormalizeStandardFigmaNode, validateFigmaSchema, validateStandardFigmaLayerPayload };

@@ -40,7 +40,9 @@ export function installGlobalCommentaryReviewCommentProtocol(
   options: InstallGlobalCommentaryReviewCommentProtocolOptions,
 ): CommentaryReviewCommentProtocolInstallation {
   const windowRef = options.windowRef
-    ?? (typeof window !== 'undefined' ? window as Window & Record<string, unknown> : undefined);
+    ?? (typeof window !== 'undefined'
+      ? window as unknown as Window & Record<string, unknown>
+      : undefined);
   let disposed = false;
 
   const canWrite = (): boolean => {

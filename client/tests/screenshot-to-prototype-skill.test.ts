@@ -11,9 +11,29 @@ const agentSkillRoot = path.join(appRoot, '.agents/skills/screenshot-to-prototyp
 const claudeSkillRoot = path.join(appRoot, '.claude/skills/screenshot-to-prototype');
 const skillRelativeFiles = [
   'SKILL.md',
+  'agents/openai.yaml',
   'references/prompts.md',
+  'scripts/build-reconstruction-manifest.mjs',
+  'scripts/compile-reconstruction-tailwind.mjs',
+  'scripts/key-transparent-image.mjs',
+  'scripts/prepare-reconstruction-source.mjs',
+  'scripts/probe-key-color.mjs',
+  'scripts/png-utils.mjs',
+  'scripts/remove-background-rembg.mjs',
+  'scripts/render-reconstruction-review.mjs',
+  'scripts/slice-alpha-components.mjs',
+  'scripts/request-vision.mjs',
+  'scripts/normalize-text-regions.mjs',
+  'scripts/mask-layer-recall.mjs',
+  'scripts/finalize-layer-recall.mjs',
   'scripts/slice-asset-sheet.mjs',
   'scripts/audit-assets.mjs',
+  'scripts/validate-reconstruction-manifest.mjs',
+];
+const removedWorkflowFiles = [
+  'assets/visual-comparison-template.html',
+  'scripts/build-visual-comparison.mjs',
+  'scripts/compare-reconstruction.mjs',
 ];
 
 function readSkillFile(root: string, relativePath: string) {
@@ -93,16 +113,40 @@ function createFixtureSheet(filePath: string) {
 }
 
 describe('screenshot-to-prototype skill', () => {
+  it('keeps the main workflow concise and returns first-pass HTML before automatic review', () => {
+    const skillSource = readSkillFile(agentSkillRoot, 'SKILL.md');
+    const wordCount = skillSource.trim().split(/\s+/u).length;
+    expect(wordCount).toBeLessThanOrEqual(320);
+    expect(skillSource).toContain('具体字段和素材分流见 `references/prompts.md`');
+
+    const firstPassIndex = skillSource.indexOf('首版生成后立即返回可访问链接');
+    const continueIndex = skillSource.indexOf('不得结束当前任务，也不得等待用户确认');
+    const autoReviewIndex = skillSource.indexOf('随后自动进入 AI 评审');
+    const finalSpecIndex = skillSource.indexOf('最终回复提供 HTML 主规格链接');
+    expect(firstPassIndex).toBeGreaterThan(-1);
+    expect(continueIndex).toBeGreaterThan(firstPassIndex);
+    expect(autoReviewIndex).toBeGreaterThan(continueIndex);
+    expect(finalSpecIndex).toBeGreaterThan(autoReviewIndex);
+    expect(skillSource).toContain('使用 `?projectId=<id>&docPath=<编码后的项目相对路径>`');
+    expect(skillSource).toContain('使用 `?projectId=<id>&p=<slug>&spec=1`');
+  });
+
   it('ships matching default skills for agent harnesses with narrow triggers and relative paths', () => {
     for (const relativePath of skillRelativeFiles) {
       expect(fs.existsSync(path.join(agentSkillRoot, relativePath)), `${relativePath} missing in .agents`).toBe(true);
       expect(fs.existsSync(path.join(claudeSkillRoot, relativePath)), `${relativePath} missing in .claude`).toBe(true);
       expect(readSkillFile(agentSkillRoot, relativePath)).toBe(readSkillFile(claudeSkillRoot, relativePath));
     }
+    for (const relativePath of removedWorkflowFiles) {
+      expect(fs.existsSync(path.join(agentSkillRoot, relativePath)), `${relativePath} should not remain in .agents`).toBe(false);
+      expect(fs.existsSync(path.join(claudeSkillRoot, relativePath)), `${relativePath} should not remain in .claude`).toBe(false);
+    }
 
     const skillSource = readSkillFile(agentSkillRoot, 'SKILL.md');
+    const openAiPrompt = readSkillFile(agentSkillRoot, 'agents/openai.yaml');
     const promptsSource = readSkillFile(agentSkillRoot, 'references/prompts.md');
     const combinedMarkdown = `${skillSource}\n${promptsSource}`;
+    const combinedSkillFiles = skillRelativeFiles.map((relativePath) => readSkillFile(agentSkillRoot, relativePath)).join('\n');
     const frontmatterMatch = skillSource.match(/^---\n([\s\S]*?)\n---/u);
     expect(frontmatterMatch).not.toBeNull();
     const frontmatter = frontmatterMatch?.[1] || '';
@@ -111,45 +155,70 @@ describe('screenshot-to-prototype skill', () => {
     expect(frontmatter).toContain('$screenshot-to-prototype');
     expect(frontmatter).toContain('Use only when 用户明确要求把本地截图、设计稿或高保真界面图还原成 Axhub Make client 可运行原型');
     expect(frontmatter).toContain('仅提供图片作为素材、参考图、需求图或风格上下文时不要使用');
+    expect(openAiPrompt).toContain('脚本生成首版 HTML 后立即给我链接');
+    expect(openAiPrompt).toContain('在同一任务中自动继续视觉评审');
+    expect(openAiPrompt).toContain('等我明确确认后再转换为当前 client 的 React 可运行原型');
     expect(frontmatter).not.toMatch(/URL cloning|theme extraction|general UI image generation|ordinary prototype creation/iu);
     expect(frontmatter).not.toMatch(/截图或本地图片|转换为|做网页|生成图片|提取主题|参考 URL/u);
     expect(frontmatter).not.toMatch(/还原.*复刻|复刻.*还原|截图或本地图片/u);
 
-    expect(combinedMarkdown).toContain('图片生成能力可以来自 `ui-image-generation`、系统 `imagegen`、内部图片生成 MCP 或其他可用图片生成工具，或 Agent 图片配置');
-    expect(combinedMarkdown).not.toContain('Make/Codex 图片配置');
-    expect(combinedMarkdown).toContain('停止前必须主动检查这些通道');
-    expect(combinedMarkdown).not.toContain('用户提醒存在 Image Gen 或 UI 设计图片时');
-    expect(combinedMarkdown).not.toContain('没有可调用的图片生成工具时，必须停止');
-    expect(combinedMarkdown).toContain('必须能获取源图的本地路径');
-    expect(combinedMarkdown).toContain('确认所有图片生成通道都不可用或都不支持传入本地图片路径时，才停止');
-    expect(combinedMarkdown).toContain('如果源图没有本地路径，必须停止');
-    expect(combinedMarkdown).toContain('启动实现前必须确认存在视觉回归工具');
-    expect(combinedMarkdown).toContain('视觉回归工具必须能获取产物真实运行截图');
-    expect(combinedMarkdown).toContain('如果无法获取真实运行截图，必须停止');
-    expect(combinedMarkdown).toContain('用户只是提供图片作为需求、内容、素材、风格上下文或普通参考图时，必须停止');
-    expect(combinedMarkdown).toContain('所有素材提取、修复、高清化、设计分析都必须把用户本地图片路径作为参考图传入');
-    expect(combinedMarkdown).toContain('不能只用文字描述生成素材');
-    expect(combinedMarkdown).toContain('由图片 AI 判断具体提取对象');
-    expect(combinedMarkdown).toContain('只说明筛选规则');
-    expect(combinedMarkdown).not.toContain('AGENTS.md');
-    expect(combinedMarkdown).toContain('src/prototypes/<slug>/assets/');
-    expect(combinedMarkdown).toContain('.local/screenshot-to-prototype/<slug>/');
-    expect(combinedMarkdown).toContain('轻量偏差报告');
-    expect(combinedMarkdown).toContain('HTML/CSS 难快速稳定还原');
-    expect(combinedMarkdown).toContain('中文');
-    expect(promptsSource).not.toContain('such as icons, logos, avatars');
-    expect(combinedMarkdown).toContain('交互状态');
-    expect(combinedMarkdown).toContain('SVG');
+    expect(skillSource).toContain('源图本地路径');
+    expect(skillSource).toContain('不能只用文字描述');
+    expect(skillSource).toContain('`ui-image-generation`');
+    expect(skillSource).toContain('src/prototypes/<slug>/.spec/spec.html');
+    expect(skillSource).toContain('src/prototypes/<slug>/assets/');
+    expect(skillSource).toContain('.local/screenshot-to-prototype/<slug>/');
+    expect(skillSource).toContain('reconstruction-manifest.json');
+    expect(skillSource).toContain('render-reconstruction-review.mjs');
+    expect(skillSource).toContain('request-vision.mjs');
+    expect(skillSource).toContain('normalize-text-regions.mjs');
+    expect(skillSource).toContain('mask-layer-recall.mjs');
+    expect(skillSource).toContain('finalize-layer-recall.mjs');
+    expect(skillSource).toContain('含状态栏');
+    expect(promptsSource).toContain('（含状态栏）');
+    expect(promptsSource).toContain('第二轮不得提交 OCR');
+    expect(skillSource).toContain('OCR 是可选增强');
+    expect(promptsSource).toContain('text-regions.json');
+    expect(promptsSource).toContain('`ocr`、`vision-api` 或 `current-agent`');
+    expect(promptsSource).toContain('不能进入其他素材框或其他文字框');
+    expect(skillSource).toContain('preview_capture');
+    expect(skillSource).toContain('源图 viewport 下的 1:1 尺寸');
+    expect(skillSource).toContain('只有用户明确确认最终 HTML 主规格后');
+    expect(skillSource).toContain('不使用 CDN，不加载 preflight');
+    expect(readSkillFile(agentSkillRoot, 'scripts/render-reconstruction-review.mjs')).toContain('[--generation-artifacts <json>]');
+
+    expect(promptsSource).toContain('## UI 元素分流');
+    expect(promptsSource).toContain('## 文字角色与素材审核');
+    expect(promptsSource).toContain('brand-text');
+    expect(promptsSource).toContain('display-text');
+    expect(promptsSource).toContain('decorative-text');
+    expect(promptsSource).toContain('preserve-in-image');
+    expect(promptsSource).toContain('semantic-only');
+    expect(promptsSource).toContain('## 完整候选素材矩阵');
+    expect(promptsSource).toContain('preserve');
+    expect(promptsSource).toContain('existing-alpha');
+    expect(promptsSource).toContain('known-key');
+    expect(promptsSource).toContain('complex-remove');
+    expect(promptsSource).toContain('不得二选一');
+    expect(promptsSource).toContain('两种候选都进入主规格');
+    expect(skillSource).not.toContain('birefnet-general');
+    expect(skillSource).not.toContain('generated-chroma');
+    expect(skillSource).not.toContain('candidate-manifest.json');
+    expect(combinedMarkdown).not.toContain('flatten-in-page');
     expect(combinedMarkdown).not.toMatch(/\bHard rule\b|\bInput:\b|\bPrompt:\b|\bWorkflow\b|\bAsset Naming\b|\bIcon Strategy\b/u);
     expect(combinedMarkdown).not.toMatch(/\/Users\/|[A-Za-z]:\\|apps\/axhub-make|Axhub Runtime|Mac|macOS/u);
-    expect(skillSource).toContain('## 退出规则');
+    expect(combinedSkillFiles).not.toMatch(/asset-manifest\.json|comparison\.html|visual-comparison-template|build-visual-comparison|compare-reconstruction|pixelmatch|diff\.png|comparison-metrics|SnapDiff|FigEdit/iu);
+    expect(combinedMarkdown).not.toMatch(/Source \/ Render \/ Overlay \/ Diff|\bDiff\b|diff\.png|comparison-metrics|pixelmatch/iu);
+
+    const packageJson = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8'));
+    expect(packageJson.devDependencies.pixelmatch).toBeUndefined();
   });
 
   it('cuts transparent asset sheets and audits the generated manifest', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'screenshot-to-prototype-skill-'));
     const inputPath = path.join(tempDir, 'sheet.png');
     const outputDir = path.join(tempDir, 'assets');
-    const manifestPath = path.join(outputDir, 'asset-manifest.json');
+    const manifestPath = path.join(outputDir, 'candidate-manifest.json');
     createFixtureSheet(inputPath);
 
     execFileSync(process.execPath, [
@@ -219,7 +288,7 @@ describe('screenshot-to-prototype skill', () => {
     }
     writeRgbaPng(path.join(outputDir, 'edge.png'), 4, 4, edgePixels);
 
-    const manifestPath = path.join(outputDir, 'asset-manifest.json');
+    const manifestPath = path.join(outputDir, 'candidate-manifest.json');
     fs.writeFileSync(manifestPath, JSON.stringify({
       schemaVersion: 1,
       source: '../../sheet.png',

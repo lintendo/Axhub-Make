@@ -19,6 +19,17 @@ describe('PresentationArea resource folder source', () => {
     expect(source).toContain('{shouldShowPresentationToolbar ? (');
   });
 
+  it('keeps one compact sidebar trigger when the full presentation toolbar is hidden', () => {
+    const source = readPresentationAreaSource();
+
+    expect(source).toContain("import ResponsiveSidebarTriggerButton from '../sidebar/ResponsiveSidebarTriggerButton';");
+    expect(source).toContain('className="ax-sidebar-compact-fallback-trigger"');
+    expect(source).toContain('<ResponsiveSidebarTriggerButton');
+    expect(source).toContain('collapsedOnly');
+    expect(source).toContain('collapsed={props.collapsed}');
+    expect(source).toContain('setCollapsed={props.setCollapsed}');
+  });
+
   it('hides the presentation toolbar on the prototype start draft page', () => {
     const source = readPresentationAreaSource();
 
@@ -37,19 +48,19 @@ describe('PresentationArea resource folder source', () => {
     expect(source).toContain('&& !isThemeStartDraft');
   });
 
-  it('hides the presentation toolbar on existing placeholder prototype start pages', () => {
+  it('treats an existing placeholder prototype like an ordinary presentation page', () => {
     const source = readPresentationAreaSource();
 
-    expect(source).toContain("const isPrototypeStartPlaceholder = isPreviewContentMode && props.selectedItem?.placeholder === true && props.viewMode === 'demo';");
-    expect(source).toContain('&& !isPrototypeStartPlaceholder');
+    expect(source).not.toContain('isPrototypeStartPlaceholder');
+    expect(source).not.toContain('props.selectedItem?.placeholder');
   });
 
-  it('hides the assistant side panel on prototype start pages even when it is open', () => {
+  it('hides the assistant side panel only on start drafts without a real resource', () => {
     const source = readPresentationAreaSource();
 
     expect(source).toContain('const shouldShowAssistantPanel = props.reviewPanelOpen');
     expect(source).toContain('&& !isPrototypeStartDraft');
-    expect(source).toContain('&& !isPrototypeStartPlaceholder');
+    expect(source).not.toContain('&& !isPrototypeStartPlaceholder');
     expect(source).toContain('{shouldShowAssistantPanel ? (');
     expect(source).not.toContain("{props.reviewPanelOpen && props.viewMode !== 'canvas' ? (");
   });
@@ -77,7 +88,7 @@ describe('PresentationArea resource folder source', () => {
 
     expect(source).toContain("const isPreviewContentMode = props.contentMode === 'preview';");
     expect(source).toContain('const isPrototypeStartDraft = isPreviewContentMode');
-    expect(source).toContain('const isPrototypeStartPlaceholder = isPreviewContentMode');
+    expect(source).not.toContain('const isPrototypeStartPlaceholder = isPreviewContentMode');
   });
 
   it('passes review report list state into the review layout without panel close or zoom wiring', () => {
@@ -151,5 +162,11 @@ describe('PresentationArea resource folder source', () => {
 
     expect(source).toContain('onSubmitCanvasAssistantPrompt={props.onSubmitCanvasAssistantPrompt}');
     expect(source).not.toContain('onSubmitPrototypeAssistantPrompt={props.onSubmitPrototypeAssistantPrompt}');
+  });
+
+  it('forwards the conversation UI capability into the content area', () => {
+    const source = readPresentationAreaSource();
+
+    expect(source).toContain('conversationUiEnabled={props.conversationUiEnabled}');
   });
 });

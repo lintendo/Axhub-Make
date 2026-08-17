@@ -63,6 +63,7 @@ export interface CanvasDirectRunResult {
   error?: unknown;
   runId?: string;
   threadId?: string;
+  message?: string;
 }
 
 type CanvasDirectRunTerminalEvent =
@@ -286,10 +287,12 @@ export function createCanvasDirectRunController(options: {
           signal: controller.signal,
           onPrepared: async (payload) => {
             activeRun.taskRef = normalizeTaskRef(payload, activeRun.taskRef);
+            await request.onPrepared?.(payload);
             await emit(activeRun, { type: 'prepared', runKey, request, taskRef: activeRun.taskRef });
           },
           onAccepted: async (payload) => {
             activeRun.taskRef = normalizeTaskRef(payload, activeRun.taskRef);
+            await request.onAccepted?.(payload);
             await emit(activeRun, { type: 'accepted', runKey, request, taskRef: activeRun.taskRef });
           },
         });
@@ -322,6 +325,7 @@ export function createCanvasDirectRunController(options: {
             artifacts,
             ...(submittedResult.runId ? { runId: submittedResult.runId } : {}),
             ...(submittedResult.threadId ? { threadId: submittedResult.threadId } : {}),
+            ...(normalizeString(submittedResult.message) ? { message: normalizeString(submittedResult.message) } : {}),
           };
         }
         const streamResult = submittedResult as AiRunStreamResult | null;
@@ -345,6 +349,7 @@ export function createCanvasDirectRunController(options: {
           artifacts,
           ...(streamResult?.runId ? { runId: streamResult.runId } : {}),
           ...(streamResult?.threadId ? { threadId: streamResult.threadId } : {}),
+          ...(normalizeString(streamResult?.output) ? { message: normalizeString(streamResult?.output) } : {}),
         };
       } catch (error) {
         if (controller.signal.aborted || isAbortError(error)) {

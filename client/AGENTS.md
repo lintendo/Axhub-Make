@@ -5,7 +5,7 @@
 新建或明显更新原型时，按以下顺序推进：
 
 ```text
-读取上下文 -> 产品需求对齐 -> DESIGN.md 候选与设计方向对齐 -> 创建/更新主规格草案 -> 围绕主规格多轮评审与确认 -> 实现 -> 同步主规格 -> 验收
+读取上下文 -> 产品需求对齐 -> DESIGN.md 候选与设计方向对齐 -> 创建/更新主规格草案 -> 围绕主规格多轮评审与确认 -> 实现 -> 同步主规格 -> 提供预览链接 -> 验收
 ```
 
 - 主规格不是空白起点；需求与设计完成第一轮对齐后，才创建或更新主规格草案。
@@ -14,7 +14,7 @@
 - 如果目标、范围、内容来源、验收重点、信息架构、交互路径、视觉方向或设计基底存在会改变产出方向的多种选择，停在对应阶段与用户确认。
 - 详细对齐方法见 `rules/requirements-alignment-guide.md`。
 - 原型主规格、确认门槛和双向同步统一遵循该指南的“原型主规格”。
-- 主题和项目资料不使用原型主规格流程，分别使用 `$build-design-system` 和遵循 `rules/resource-management-guide.md`。
+- 选择设计基底时，先检查当前项目本地候选（项目默认主题、已有同类原型和 `src/themes/`）；本地不足 3 个时，再使用 `$search-design-system` 从 Design Knowledge 主题库补足。只有用户明确要求创建或修改主题时才使用 `$build-design-system`。
 
 验收后由用户按需发起的可选阶段：
 
@@ -24,6 +24,8 @@ Review（可选） -> 标注（可选） -> 发布（可选）
 
 - 三个阶段均为可选，可按任务需要独立进入；进入后遵循对应规则。
 - Review 发现问题时，回到主规格、实现和验收阶段完成修复闭环。
+- 原型标注使用 `$prototype-annotation`。
+- Commentary 批注处理使用 `$handle-comments`，不属于原型标注阶段。
 
 ## 工作原则
 
@@ -36,15 +38,18 @@ Review（可选） -> 标注（可选） -> 发布（可选）
 4. **尽早展示关键决策**
    - 需要用户选择页面结构、交互路径或设计方向时，优先用简短摘要或结构化文字对齐；文字难以表达时再用 ASCII Wireframe/Diagram 或 Mermaid。
 5. **代理负责验收**
-   - 代理应自行完成可执行的检查，并向用户提供可打开的预览链接；不要把 CLI 验收步骤交给用户。
+   - 页面就绪后先向用户提供可打开的预览链接，再继续验收。
    - 明确进入 review 环节时，优先由未参与实现的子代理独立审查，不以实现者自检代替 review。
 
 ## 产物与规则
 
-| 场景 | 位置 | 参考文档 |
-|------|------|----------|
-| 原型开发与验收 | `src/prototypes/<prototype-id>/` | `rules/prototype-development-guide.md` |
-| 主题、设计系统、设计规范 | `src/themes/<theme-key>/` | `$build-design-system 技能` |
-| PRD 文档 | `src/resources/` | `$plan-prds 技能` / `$write-prd 技能` |
-| 项目资料、文档、普通资源和画布 | `src/resources/` | `rules/resource-management-guide.md` |
-| 原型 Review（业务/UI） | 原型 `.spec/reviews/` | `rules/prototype-review-guide.md` / `rules/ui-review-guide.md` |
+Make 管理端默认使用 `http://localhost:53817/`；`check-app-ready` 返回 `serverUrl` 时以实际值为准。`projectId` 仅表示项目作用域，query 参数需 URL 解码。
+
+| 场景 | 位置 | Make 链接信号 | 参考文档 |
+|------|------|---------------|----------|
+| 原型开发与验收 | `src/prototypes/<prototype-id>/` | `?p=<prototype-id>`；`&spec=1` 对应 `.spec/` | `rules/prototype-development-guide.md` |
+| 创建或修改主题、设计系统、设计规范 | `src/themes/<theme-key>/` | `?theme=<theme-key>` | `$build-design-system 技能` |
+| PRD 文档 | `src/resources/` | `?doc=<resource-path>` | `$plan-prds 技能` / `$write-prd 技能` |
+| 项目资料、文档、普通资源和画布 | `src/resources/` | `?doc=<resource-path>` | `rules/resource-management-guide.md` |
+| 固定文档模板 | `templates/` | 项目设置 | `rules/resource-management-guide.md` |
+| 原型 Review（业务/UI） | 原型 `.spec/reviews/` | 随 `?p=<prototype-id>&spec=1` 定位 | `rules/prototype-review-guide.md` / `rules/ui-review-guide.md` |

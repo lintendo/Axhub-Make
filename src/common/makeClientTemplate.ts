@@ -1,7 +1,7 @@
 export const MAKE_CLIENT_TEMPLATE_ZIP_NAME = 'axhub-make-client-template.zip';
 export const MAKE_CLIENT_TEMPLATE_LATEST_MANIFEST_NAME = 'axhub-make-client-template.latest.json';
-export const DEFAULT_MAKE_CLIENT_TEMPLATE_VERSION = '0.1.15';
-export const DEFAULT_MAKE_CLIENT_TEMPLATE_RELEASE_NOTES = "# Axhub Make Client 0.1.15\n\n- 用 `handle-comments` 统一处理原型、Markdown、HTML 和规格文档批注\n- 统一共享批注与图片资源的项目内存储约定\n- 修复预览管理运行时的加载顺序、重复注入和 HTML 转换边界\n- 保持发布模板仅包含官方原型、主题、规则与资源模板";
+export const DEFAULT_MAKE_CLIENT_TEMPLATE_VERSION = '0.1.18';
+export const DEFAULT_MAKE_CLIENT_TEMPLATE_RELEASE_NOTES = "# Axhub Make Client 0.1.18\n\n- 更新客户端工作规则和内置技能，完善原型开发与截图还原流程\n- 为 `screenshot-to-prototype` 新增 rembg 背景移除能力和重建清单校验\n- `check-app-ready` 返回 Make 管理端深链，便于直接打开目标资源\n- 支持仅包含主规格的原型参与项目元数据同步\n- 更新内置示例原型及相关标注内容";
 export const PRIMARY_MAKE_CLIENT_TEMPLATE_RELEASE_REPOSITORY = 'lintendo/Axhub-Make';
 export const GITEE_MAKE_CLIENT_TEMPLATE_RELEASE_BASE_URL = 'https://gitee.com/axhub/Axhub-Make/releases/download';
 export const GITEE_MAKE_CLIENT_TEMPLATE_LATEST_RELEASE_TAG = 'make-client-template-latest';

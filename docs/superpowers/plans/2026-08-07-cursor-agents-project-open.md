@@ -30,7 +30,7 @@
 - Consumes: `inspectCursorIntegration(context)`, the discovered `appPath`, fixed `CURSOR_DEBUG_PORT`, and `CursorLauncherContext` process/test dependencies.
 - Produces: `openCursorAgentsProject(targetPath: string, context?: CursorLauncherContext): Promise<OpenCursorAgentsProjectResult>` where the result contains `appPath` and `targetPath`.
 
-- [ ] **Step 1: Write failing cold-launch tests for Agents-only startup**
+- [x] **Step 1: Write failing cold-launch tests for Agents-only startup**
 
 Update the existing macOS and Windows launch expectations so `--chat` is the first Cursor application argument:
 
@@ -50,7 +50,7 @@ expect(launch).toHaveBeenCalledWith(appPath, [
 ]);
 ```
 
-- [ ] **Step 2: Run the cold-launch tests and verify RED**
+- [x] **Step 2: Run the cold-launch tests and verify RED**
 
 Run:
 
@@ -60,7 +60,7 @@ pnpm exec vitest run src/server/__tests__/cursorIntegration-launcher.test.ts -t 
 
 Expected: both tests fail because the production argument arrays do not contain `--chat`.
 
-- [ ] **Step 3: Add the minimal Agents-only launch argument**
+- [x] **Step 3: Add the minimal Agents-only launch argument**
 
 Build the fixed launch arguments as:
 
@@ -73,11 +73,11 @@ const cdpArgs = [
 ];
 ```
 
-- [ ] **Step 4: Run the cold-launch tests and verify GREEN**
+- [x] **Step 4: Run the cold-launch tests and verify GREEN**
 
 Run the command from Step 2. Expected: 2 tests pass.
 
-- [ ] **Step 5: Write failing native handoff tests**
+- [x] **Step 5: Write failing native handoff tests**
 
 Import `openCursorAgentsProject` and add tests covering macOS, Windows, and incompatibility detection. The macOS test must expect the bundled CLI and exact argument order:
 
@@ -116,7 +116,7 @@ expect(run).toHaveBeenNthCalledWith(2, cliPath, ['/workspace/demo']);
 
 The Windows test expects `Cursor.exe` for both calls. The incompatibility test returns a newly created non-Agents workbench page from the final target probe and expects rejection containing `Cursor-version incompatibility`.
 
-- [ ] **Step 6: Run the handoff tests and verify RED**
+- [x] **Step 6: Run the handoff tests and verify RED**
 
 Run:
 
@@ -126,7 +126,7 @@ pnpm exec vitest run src/server/__tests__/cursorIntegration-launcher.test.ts -t 
 
 Expected: test collection or assertions fail because `openCursorAgentsProject` does not exist.
 
-- [ ] **Step 7: Implement the native handoff**
+- [x] **Step 7: Implement the native handoff**
 
 Add a workbench-page predicate, platform router resolver, and exported operation with this behavior:
 
@@ -176,7 +176,7 @@ export async function openCursorAgentsProject(
 
 `assertNoNewNonAgentsWorkbench` compares stable target IDs for top-level `page` targets whose URL is Cursor's workbench URL. It throws a fixed `Cursor-version incompatibility: project opened outside Cursor Agents.` error only for a newly created non-Agents workbench page.
 
-- [ ] **Step 8: Run the complete launcher test file and verify GREEN**
+- [x] **Step 8: Run the complete launcher test file and verify GREEN**
 
 Run:
 
@@ -185,6 +185,28 @@ pnpm exec vitest run src/server/__tests__/cursorIntegration-launcher.test.ts
 ```
 
 Expected: all launcher tests pass with no warning or unhandled rejection.
+
+- [x] **Step 9: Write a failing closed-Agents recovery test**
+
+Mock a running installed Cursor whose CDP target probe first returns an empty list and then returns `cursorTarget`. Expect `openCursorIntegration()` to call the bundled desktop router with `['--chat']`, return `{ launched: false, reused: true }`, and avoid starting or closing the process. Run:
+
+```bash
+pnpm exec vitest run src/server/__tests__/cursorIntegration-launcher.test.ts -t 'Agents window is closed'
+```
+
+Expected before implementation: FAIL with the ordinary-running-Cursor restart error.
+
+- [x] **Step 10: Implement and verify recoverable CDP state**
+
+Add optional `recoverable?: boolean` to `DesktopIntegrationInspection`. Set it only when the Cursor CDP endpoint responds, no Agents target exists, the Cursor process and discovered app exist, and Axhub integration files are installed. Make `openCursorIntegration()` focus Agents with the desktop router in that state, and make the coordinator call `launch()` without closing or returning `restart-required` when `recoverable` is true.
+
+Run:
+
+```bash
+pnpm exec vitest run src/server/__tests__/cursorIntegration-launcher.test.ts src/server/__tests__/desktopIntegrationOpen.test.ts -t 'window is closed'
+```
+
+Expected: both recovery tests pass.
 
 ### Task 2: Explicit Integrated Versus Normal Coordinator Mode
 
@@ -196,7 +218,7 @@ Expected: all launcher tests pass with no warning or unhandled rejection.
 - Consumes: existing provider inspection, launch, close, and project result types.
 - Produces: `openProject(mode: 'integrated' | 'normal'): Promise<DesktopIntegrationProjectOpenResult>` on `DesktopIntegrationOpenAdapters`.
 
-- [ ] **Step 1: Write failing mode-routing tests**
+- [x] **Step 1: Write failing mode-routing tests**
 
 Change the adapter fixture to accept a mode and assert exact calls:
 
@@ -216,7 +238,7 @@ In the normal test:
 expect(adapters.openProject).toHaveBeenCalledWith('normal');
 ```
 
-- [ ] **Step 2: Run the coordinator tests and verify RED**
+- [x] **Step 2: Run the coordinator tests and verify RED**
 
 Run:
 
@@ -226,7 +248,7 @@ pnpm exec vitest run src/server/__tests__/desktopIntegrationOpen.test.ts
 
 Expected: assertions fail because production calls `openProject()` without a mode.
 
-- [ ] **Step 3: Pass the explicit mode from the coordinator**
+- [x] **Step 3: Pass the explicit mode from the coordinator**
 
 Update the interface and the two calls:
 
@@ -238,7 +260,7 @@ const project = await adapters.openProject('normal');
 const project = await adapters.openProject('integrated');
 ```
 
-- [ ] **Step 4: Run the coordinator tests and verify GREEN**
+- [x] **Step 4: Run the coordinator tests and verify GREEN**
 
 Run the command from Step 2. Expected: all coordinator tests pass.
 
@@ -252,7 +274,7 @@ Run the command from Step 2. Expected: all coordinator tests pass.
 - Consumes: `openCursorAgentsProject(targetPath)` from Task 1 and the mode argument from Task 2.
 - Produces: the existing `/api/desktop-integration/open` response contract, with integrated Cursor using Agents and normal Cursor using `openIDEPath()`.
 
-- [ ] **Step 1: Write the failing API adapter test**
+- [x] **Step 1: Write the failing API adapter test**
 
 Mock only the new narrow launcher operation while retaining the real launcher module:
 
@@ -279,7 +301,7 @@ expect(childProcessMock.spawn).not.toHaveBeenCalled();
 
 Add a separate normal-mode assertion that `openCursorAgentsProjectMock` is not called and the existing Cursor IDE opener still launches `open -a Cursor <projectRoot>` on macOS.
 
-- [ ] **Step 2: Run only the desktop-integration API tests and verify RED**
+- [x] **Step 2: Run only the desktop-integration API tests and verify RED**
 
 Run:
 
@@ -289,7 +311,7 @@ pnpm exec vitest run src/server/__tests__/agent-open-api.test.ts -t 'desktop int
 
 Expected: integrated adapter assertion fails because it still calls the shared Cursor IDE opener.
 
-- [ ] **Step 3: Split integrated and normal provider project routing**
+- [x] **Step 3: Split integrated and normal provider project routing**
 
 Import `openCursorAgentsProject`, add the mode to `openDesktopIntegrationProject`, and put the integrated Cursor branch before the existing normal branch:
 
@@ -376,11 +398,11 @@ const openProject = (mode: 'integrated' | 'normal') => openDesktopIntegrationPro
 });
 ```
 
-- [ ] **Step 4: Run the desktop-integration API tests and verify GREEN**
+- [x] **Step 4: Run the desktop-integration API tests and verify GREEN**
 
 Run the command from Step 2. Expected: all matching API tests pass.
 
-- [ ] **Step 5: Run focused regression and server type verification**
+- [x] **Step 5: Run focused regression and server type verification**
 
 Run:
 
@@ -395,7 +417,7 @@ pnpm server:build
 
 Expected: the focused suite passes and the Node server TypeScript build exits with status `0`. If `server:build` exposes unrelated pre-existing failures, record them separately and rerun the narrow TypeScript/test proof for touched modules.
 
-- [ ] **Step 6: Run the macOS desktop smoke**
+- [x] **Step 6: Run the macOS desktop smoke**
 
 With Cursor Agents already available on port `9230`, invoke the bundled Cursor desktop CLI with the current Make directory as one bare positional argument, then inspect the CDP target list and Agents body:
 
@@ -407,7 +429,7 @@ curl -fsS http://127.0.0.1:9230/json
 
 Expected: the only top-level workbench page is titled `Cursor Agents`, and the Agents workspace/file tree contains `axhub-make`.
 
-- [ ] **Step 7: Review the final scoped diff without committing user-owned changes**
+- [x] **Step 7: Review the final scoped diff without committing user-owned changes**
 
 Run:
 

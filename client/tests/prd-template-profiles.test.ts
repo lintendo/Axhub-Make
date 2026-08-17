@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const clientRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const templatesRoot = path.join(clientRoot, 'src/resources/templates');
+const templatesRoot = path.join(clientRoot, 'templates');
 const agentWritePrdPath = path.join(clientRoot, '.agents/skills/write-prd/SKILL.md');
 const claudeWritePrdPath = path.join(clientRoot, '.claude/skills/write-prd/SKILL.md');
 const agentPlanPrdsPath = path.join(clientRoot, '.agents/skills/plan-prds/SKILL.md');
@@ -18,7 +18,7 @@ function readTemplate(fileName: string): string {
 
 describe('PRD template profiles', () => {
   it('ships one scalable built-in PRD template', () => {
-    const template = readTemplate('prd-template.md');
+    const template = readTemplate('prd.md');
     const comprehensivePath = path.join(templatesRoot, 'prd-comprehensive-template.md');
 
     expect(fs.existsSync(comprehensivePath)).toBe(false);
@@ -49,14 +49,16 @@ describe('PRD template profiles', () => {
 
   it('publishes only the unified built-in PRD template', () => {
     const manifest = JSON.parse(fs.readFileSync(templateManifestPath, 'utf8')) as {
+      runtime: { files: string[] };
       resources: { files: string[] };
     };
-    const unifiedEntries = manifest.resources.files.filter(
-      (filePath) => filePath === 'src/resources/templates/prd-template.md',
+    const unifiedEntries = manifest.runtime.files.filter(
+      (filePath) => filePath === 'templates/prd.md',
     );
 
     expect(unifiedEntries).toHaveLength(1);
     expect(manifest.resources.files).not.toContain('src/resources/templates/prd-comprehensive-template.md');
+    expect(manifest.resources.files).not.toContain('src/resources/templates/prd-template.md');
   });
 
   it('keeps write-prd focused on the unified or explicitly supplied template', () => {
@@ -65,9 +67,10 @@ describe('PRD template profiles', () => {
 
     expect(agentSkill).toBe(claudeSkill);
     expect(agentSkill).toContain('统一内置模板');
-    expect(agentSkill).toContain('src/resources/templates/prd-template.md');
+    expect(agentSkill).toContain('templates/prd.md');
     expect(agentSkill).toContain('允许用户或项目指定其他模板文件');
     expect(agentSkill).not.toContain('prd-comprehensive-template.md');
+    expect(agentSkill).not.toContain('src/resources/templates');
   });
 
   it('uses the unified template without built-in profile selection', () => {
@@ -76,12 +79,10 @@ describe('PRD template profiles', () => {
 
     expect(agentSkill).toBe(claudeSkill);
     expect(agentSkill).toContain('#### 记录 PRD 模板');
-    expect(agentSkill).toContain('src/resources/templates/prd-template.md');
+    expect(agentSkill).toContain('templates/prd.md');
     expect(agentSkill).toContain('用户明确指定其他模板时直接采用');
     expect(agentSkill).toContain('用户明确指定时可覆盖单个任务');
-    expect(agentSkill).toContain(
-      '已有计划仍引用 `src/resources/templates/prd-comprehensive-template.md` 时改为统一模板',
-    );
+    expect(agentSkill).not.toContain('src/resources/templates');
     expect(agentSkill).not.toContain('确认 PRD 模板');
     expect(agentSkill).not.toContain('轻量 PRD');
     expect(agentSkill).not.toContain('完善型 PRD');

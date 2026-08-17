@@ -7,6 +7,7 @@ export type MultiPageColumns = 1 | 2 | 3 | 4;
 export interface PreviewConfig {
   previewMode: PreviewMode;
   singlePreset: PreviewSinglePreset;
+  adaptiveDesktop?: boolean;
   customWidth: number | null;
   customHeight: number | null;
   multiPageColumns: MultiPageColumns;
@@ -93,6 +94,10 @@ export const DEVICE_PRESET_SIZES: Record<PreviewDeviceId, { width: number; heigh
   mobile: { width: 393, height: 852 },
   tablet: { width: 820, height: 1180 },
 };
+
+export const ADAPTIVE_DESKTOP_WIDTH = 1440;
+export const ADAPTIVE_DESKTOP_HEIGHT = 900;
+export const ADAPTIVE_DESKTOP_ACTIVATION_WIDTH = 1280;
 
 export const MULTI_PAGE_MAX_VISIBLE = 16;
 export const MULTI_PAGE_ACTIVE_LIMIT = 2;
@@ -223,6 +228,34 @@ export function createDefaultPreviewConfig(): PreviewConfig {
   };
 }
 
+export function resolveAdaptiveDesktopPreviewConfig(
+  intentConfig: PreviewConfig,
+  previewWidth: number,
+): PreviewConfig {
+  if (
+    intentConfig.previewMode !== 'single'
+    || intentConfig.singlePreset !== 'desktop'
+  ) {
+    return { ...intentConfig, adaptiveDesktop: false };
+  }
+
+  const adaptiveDesktop = Number.isFinite(previewWidth)
+    && previewWidth > 0
+    && previewWidth < ADAPTIVE_DESKTOP_ACTIVATION_WIDTH;
+  if (!adaptiveDesktop) {
+    return { ...intentConfig, adaptiveDesktop: false };
+  }
+
+  return {
+    ...intentConfig,
+    singlePreset: 'custom',
+    customWidth: ADAPTIVE_DESKTOP_WIDTH,
+    customHeight: ADAPTIVE_DESKTOP_HEIGHT,
+    scaleMode: 'fit-screen',
+    adaptiveDesktop: true,
+  };
+}
+
 export function getSinglePreviewLogicalSize(config: PreviewConfig): { width: number; height: number } | null {
   switch (config.singlePreset) {
     case 'mobile':
@@ -304,6 +337,7 @@ export function resolvePreviewLayout(params: {
     width: number;
     height: number;
   };
+  singleReservedWidth?: number;
   splitReservedHeight?: number;
   splitReservedWidth?: number;
 }): PreviewLayoutResult {
@@ -316,6 +350,7 @@ export function resolvePreviewLayout(params: {
     width: Math.max(0, Math.floor(params.deviceShellInset?.width ?? 0)),
     height: Math.max(0, Math.floor(params.deviceShellInset?.height ?? 0)),
   };
+  const singleReservedWidth = Math.max(0, Math.floor(params.singleReservedWidth ?? 0));
   const splitReservedHeight = Math.max(0, Math.floor(params.splitReservedHeight ?? 0));
   const splitReservedWidth = Math.max(0, Math.floor(params.splitReservedWidth ?? 0));
 
@@ -411,13 +446,13 @@ export function resolvePreviewLayout(params: {
     const measuredSize = resolveMeasuredSize(
       clampPositive(config.customWidth, DEVICE_PRESET_SIZES.desktop.width),
       clampPositive(config.customHeight, DEVICE_PRESET_SIZES.desktop.height),
-      params.actualSingleContentSize,
+      config.adaptiveDesktop ? null : params.actualSingleContentSize,
       config.scaleMode,
     );
     const metrics = createViewportMetrics(
       measuredSize.width,
       measuredSize.height,
-      containerWidth,
+      Math.max(1, containerWidth - singleReservedWidth),
       containerHeight,
       config.scaleMode,
     );

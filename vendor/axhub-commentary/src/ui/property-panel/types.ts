@@ -10,20 +10,31 @@ import type { DesignTokensService } from '../../core/design-tokens';
 import type { FloatingPosition } from '../floating-drag';
 import type { CommentEntryMode } from '../selection-ui-mode';
 import type { CommentShortcutSettings } from '../../core/editor/comment-shortcut-settings';
-import type { ElementAgentTaskState, PageAgentConversationState, PromptImageAttachment } from '../../core/editor/state';
+import type {
+  ElementAgentTaskState,
+  PageAgentConversationState,
+  PromptImageAttachment,
+} from '../../core/editor/state';
 import type {
   AgentProviderAvailability,
   SessionActivityListener,
   SessionActivityTarget,
 } from '../../core/editor/contracts';
-import type { CommentaryTweakEntry, CommentaryTweakSchema, CommentaryTweakValues } from '../../tweak/protocol';
+import type {
+  CommentaryTweakEntry,
+  CommentaryTweakSchema,
+  CommentaryTweakValues,
+} from '../../tweak/protocol';
 import type {
   WebEditorInteractionProfile,
   WebEditorDesignAdjustmentTool,
   WebEditorUiSettings,
 } from '../../core/editor/ui-settings';
 import type {
+  CommentaryAnnotationSaveStatus,
   CommentaryClearEditsOptions,
+  CommentaryClearEditsTarget,
+  CommentaryHostSurfaceVisibilityControl,
   CommentarySkillOption,
   CommentaryHostToolbarAction,
   CommentaryHostToolbarActionResult,
@@ -74,7 +85,9 @@ export interface PropertyPanelOptions {
   /** Wake Agent after the host confirms the backend is ready */
   onWakeAgent?: () => boolean | Promise<boolean>;
   /** Clear current edits + cache */
-  onClearEdits?: (options?: CommentaryClearEditsOptions) => void | Promise<void>;
+  onClearEdits?: (
+    options?: CommentaryClearEditsOptions,
+  ) => CommentaryClearEditsTarget | null | void | Promise<CommentaryClearEditsTarget | null | void>;
   /** Whether the current prototype has persisted comments in any page scope. */
   hasPrototypeComments?: () => boolean;
   /** Clear the current element's related edits, note, and local modifications */
@@ -90,6 +103,10 @@ export interface PropertyPanelOptions {
   toolbarMode?: CommentaryToolbarMode;
   /** Hide UI affordances that directly execute Agent/agent tasks. */
   hideExecutionControls?: boolean;
+  /** Hide the current-element send action in the prompt bubble. */
+  hideCurrentElementExecutionAction?: boolean;
+  /** Replace the execution slot with a host-owned surface visibility toggle. */
+  hostSurfaceVisibilityControl?: CommentaryHostSurfaceVisibilityControl | null;
   /** Single-line summary for the host-managed AI execution settings. */
   aiExecutionConfigSummary?: string;
   /** Whether the host-managed AI execution settings are complete enough to run. */
@@ -106,6 +123,10 @@ export interface PropertyPanelOptions {
     label: string;
     disabled?: boolean;
   }>;
+  /** Show host-managed direct-save actions for the current HTML source file. */
+  htmlFileSaveEnabled?: boolean;
+  /** Whether the host's ACP UI service is currently connected. */
+  getAcpUiConnected?: () => boolean;
   /** Execute a host toolbar action from the inline toolbar/settings surface. */
   onHostToolbarAction?: (
     action: CommentaryHostToolbarAction,
@@ -120,6 +141,12 @@ export interface PropertyPanelOptions {
   getAnnotationEnableAvailable?: () => boolean;
   /** Whether the local annotation injection action is busy. */
   getAnnotationEnableLoading?: () => boolean;
+  /** Whether the floating toolbar may show the Markdown full-source editor switch. */
+  markdownSourceEditorAvailable?: boolean;
+  /** Read whether the Markdown source pane is currently visible. */
+  getMarkdownSourceEditorOpen?: () => boolean;
+  /** Show or hide the Markdown source pane, returning the resulting state. */
+  onMarkdownSourceEditorOpenChange?: (open: boolean) => boolean | Promise<boolean>;
   /** Optional extension-specific single-line hint for running external editing tasks */
   externalEditingStatusDescription?: string;
   /** Optional skill document source used when copying the Agent skill install prompt */
@@ -130,10 +157,6 @@ export interface PropertyPanelOptions {
   commentarySelectedSkillIds?: string[];
   /** Whether the host has persisted a skill selection, including an empty one. */
   commentarySkillSettingsConfigured?: boolean;
-  /** Load selected Chrome commentary skill IDs from the host. */
-  onCommentarySkillSelectionLoad?: () => readonly string[] | Promise<readonly string[]>;
-  /** Persist selected Chrome commentary skill IDs through the host. */
-  onCommentarySkillSelectionChange?: (skillIds: string[]) => void | Promise<void>;
   /** Whether the Agent bridge is currently online */
   getAgentBridgeAvailable?: () => boolean;
   /** Whether the Agent bridge websocket is connected and ready */
@@ -155,7 +178,10 @@ export interface PropertyPanelOptions {
   /** Refresh Agent provider availability snapshots */
   refreshAgentProviderAvailabilities?: (providers?: readonly string[]) => Promise<void>;
   /** Subscribe to the current page Agent session activity stream */
-  subscribeSessionActivity?: (target: SessionActivityTarget, listener: SessionActivityListener) => () => void;
+  subscribeSessionActivity?: (
+    target: SessionActivityTarget,
+    listener: SessionActivityListener,
+  ) => () => void;
   /** Dismiss the current Agent task terminal state for an element */
   dismissElementAgentTaskState?: (element: Element) => void;
   /** Dismiss all currently visible Agent task terminal states */
@@ -165,7 +191,10 @@ export interface PropertyPanelOptions {
   /** Pre-flight check to block sending only the current element prompt into Agent */
   getSendCurrentElementPromptToAgentBlockReason?: (element: Element | null) => string | undefined;
   /** Optional design-tool export support for the selected element */
-  canExportSelectionToDesignTool?: (tool: WebEditorDesignAdjustmentTool, element?: Element | null) => boolean;
+  canExportSelectionToDesignTool?: (
+    tool: WebEditorDesignAdjustmentTool,
+    element?: Element | null,
+  ) => boolean;
   /** Export the current selection to the configured design tool */
   onExportSelectionToDesignTool?: (
     tool: WebEditorDesignAdjustmentTool,
@@ -199,7 +228,11 @@ export interface PropertyPanelOptions {
   getTextValue?: (element: Element | null) => string;
 
   /** Commit a new normalized text value for the selected element */
-  onTextValueChange?: (element: Element, value: string, previousValue?: string) => void | Promise<void>;
+  onTextValueChange?: (
+    element: Element,
+    value: string,
+    previousValue?: string,
+  ) => void | Promise<void>;
 
   /** Notify the core runtime which page element is currently in inline text-edit mode */
   onInlineTextEditingElementChange?: (element: HTMLElement | null) => void;
@@ -239,6 +272,15 @@ export interface PropertyPanelOptions {
   /** Whether local annotation markdown editing is available for the selected element */
   canEditAnnotationMarkdown?: (element: Element | null) => boolean;
 
+  /** Resolve synthetic editor targets to the host element used by annotation checks */
+  resolveAnnotationTarget?: (element: Element | null) => Element | null;
+
+  /** Return a host-specific reason that prevents creating an annotation for the selected element */
+  getCreateAnnotationBlockReason?: (element: Element | null) => string | undefined;
+
+  /** Select whether the Markdown composer edits annotation metadata or document source */
+  annotationMarkdownEditorKind?: 'annotation' | 'document-source';
+
   /** Return an edit URL for the selected annotation document, or an empty value to hide the document edit entry */
   getAnnotationDocumentEditUrl?: (element: Element | null) => string | null | undefined;
 
@@ -252,7 +294,10 @@ export interface PropertyPanelOptions {
   getHoveredElement?: () => Element | null;
 
   /** Persist a marker anchor for the target element using viewport coordinates */
-  onRememberSelectionAnchor?: (element: Element, selectionAnchor?: { clientX: number; clientY: number }) => void;
+  onRememberSelectionAnchor?: (
+    element: Element,
+    selectionAnchor?: { clientX: number; clientY: number },
+  ) => void;
 
   /** Update the saved AI note for the current element or current page */
   onAiNoteChange?: (
@@ -262,7 +307,10 @@ export interface PropertyPanelOptions {
   ) => void | Promise<void>;
 
   /** Update the saved AI note images for the current element */
-  onAiNoteImagesChange?: (element: Element, images: readonly PromptImageAttachment[]) => void | Promise<void>;
+  onAiNoteImagesChange?: (
+    element: Element,
+    images: readonly PromptImageAttachment[],
+  ) => void | Promise<void>;
 
   /** Collapse the whole comment/editor tool */
   onRequestClose?: () => void;
@@ -292,6 +340,12 @@ export interface PropertyPanelOptions {
   /** Interaction profile used to tailor the runtime UI */
   interactionProfile?: WebEditorInteractionProfile;
 
+  /** Whether the settings menu may switch between design and document comment interactions. */
+  documentCommentModeAvailable?: boolean;
+
+  /** Whether page-editing settings are relevant to the current host surface. */
+  pageEditingSettingsAvailable?: boolean;
+
   /** Persist runtime UI settings */
   onUiSettingsChange?: (settings: WebEditorUiSettings) => void;
 
@@ -312,6 +366,9 @@ export interface PropertyPanelOptions {
 
   /** Get current modified/marked element count */
   getModifiedElementCount?: () => number;
+
+  /** Get the current annotation persistence status */
+  getAnnotationSaveStatus?: () => CommentaryAnnotationSaveStatus;
 
   /** Toggle hover/selection visual chrome visibility */
   onSelectionChromeVisibleChange?: (visible: boolean) => void;
@@ -352,8 +409,8 @@ export interface PropertyPanel {
   /** Focus note entry using the requested comment mode */
   enterCommentInput?(mode?: CommentEntryMode): void;
 
-  /** Legacy no-op retained for older host integrations. */
-  enterInlineTextEdit?(): void;
+  /** Start inline editing for the selected element or an explicit descendant text target. */
+  enterInlineTextEdit?(element?: HTMLElement | null): void;
 
   /** Read the current host toolbar state */
   getHostToolbarState(): CommentaryHostToolbarState;

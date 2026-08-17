@@ -245,7 +245,7 @@ describe('make-server admin static assets', () => {
     expect(redirect.header('location')).toBe('/?projectId=make14&p=mtime-new&v=canvas&fromP=untitled');
   });
 
-  it('injects escaped runtime configuration into admin HTML', async () => {
+  it('injects runtime configuration without exposing the project root', async () => {
     const projectRoot = createTempRoot("axhub-admin-static-project-'quoted-");
     const adminRoot = createTempRoot('axhub-admin-static-dist-');
     writeFile(path.join(adminRoot, 'index.html'), '<html><head></head><body>Admin</body></html>');
@@ -259,9 +259,8 @@ describe('make-server admin static assets', () => {
       expect(response.headers.get('cache-control')).toBe('no-store');
       expect(html).toContain("window.__PROJECT_PREFIX__ = '';");
       expect(html).toContain(`window.__LOCAL_PORT__ = ${server.port};`);
-      expect(html).toContain("window.__PROJECT_ROOT__ = '");
+      expect(html).not.toContain('window.__PROJECT_ROOT__');
       expect(html).toContain('window.__AXHUB_MAKE_API_ORIGIN__ = window.location.origin;');
-      expect(html).toContain("\\'quoted-");
     } finally {
       await server.close();
     }

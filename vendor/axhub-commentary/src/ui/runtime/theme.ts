@@ -42,8 +42,7 @@ export const BRAND_PRIMARY_SHADOW = 'rgba(0, 143, 93, 0.28)';
 export const BRAND_ACCENT = '#00D68F';
 export const SLEEPING_ICON = '#A1A1AA';
 export const SLEEPING_ICON_STRONG = '#71717A';
-export const WEB_EDITOR_PARENT_PASTE_BRIDGE_CLEANUP_KEY =
-  '__webEditorV2ParentPasteBridgeCleanup__';
+export const WEB_EDITOR_PARENT_PASTE_BRIDGE_CLEANUP_KEY = '__webEditorV2ParentPasteBridgeCleanup__';
 
 export type EditorThemeMode = 'light' | 'dark';
 
@@ -105,7 +104,7 @@ const LIGHT_EDITOR_CHROME: EditorChromeValues = {
   toolbarShellInset: 'inset 0 1px 0 rgba(255, 255, 255, 0.88)',
   toolbarGlow: '0 0 20px -5px rgba(0, 143, 93, 0.20)',
   shadow: '0 24px 60px rgba(15, 23, 42, 0.14), 0 8px 24px rgba(15, 23, 42, 0.08)',
-  shadowCompact: '0 18px 38px rgba(15, 23, 42, 0.14), 0 6px 16px rgba(15, 23, 42, 0.08)',
+  shadowCompact: '0 10px 28px rgba(15, 23, 42, 0.10), 0 2px 8px rgba(15, 23, 42, 0.06)',
   overlayCloseBackground: 'rgba(255, 255, 255, 0.94)',
 };
 
@@ -136,7 +135,7 @@ const DARK_EDITOR_CHROME: EditorChromeValues = {
   toolbarShellInset: 'inset 0 1px 0 rgba(255, 255, 255, 0.02)',
   toolbarGlow: '0 0 20px -5px rgba(0, 143, 93, 0.15)',
   shadow: '0 18px 48px rgba(0, 0, 0, 0.42), 0 4px 18px rgba(0, 0, 0, 0.28)',
-  shadowCompact: '0 16px 32px rgba(0, 0, 0, 0.36), 0 4px 14px rgba(0, 0, 0, 0.22)',
+  shadowCompact: '0 10px 28px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.20)',
   overlayCloseBackground: 'rgba(18, 18, 18, 0.92)',
 } as const;
 
@@ -233,8 +232,7 @@ export function createRuntimeAntdTheme(mode: EditorThemeMode): ThemeConfig {
       colorBgBase: chrome.surface,
       colorBgContainer: chrome.surfaceElevated,
       colorBgElevated: chrome.surfaceElevated,
-      colorFill:
-        mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)',
+      colorFill: mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)',
       colorFillSecondary: chrome.surfaceMuted,
       colorFillTertiary: chrome.surfaceInteractive,
       colorText: chrome.textPrimary,
@@ -302,10 +300,8 @@ export function createRuntimeAntdTheme(mode: EditorThemeMode): ThemeConfig {
       Slider: {
         colorPrimary: chrome.accent,
         handleSize: 8,
-        railBg:
-          mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(15, 23, 42, 0.12)',
-        railHoverBg:
-          mode === 'dark' ? 'rgba(255, 255, 255, 0.18)' : 'rgba(15, 23, 42, 0.18)',
+        railBg: mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(15, 23, 42, 0.12)',
+        railHoverBg: mode === 'dark' ? 'rgba(255, 255, 255, 0.18)' : 'rgba(15, 23, 42, 0.18)',
         trackBg: chrome.accent,
         trackHoverBg: chrome.accentHover,
       },

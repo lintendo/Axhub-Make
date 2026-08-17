@@ -38,4 +38,8 @@
 
 ## 模板提交边界
 
-官方 client 模板只提交 `client.json`、`axhub.config.json`、本 README 和 `sidebar-tree.json`。其它运行缓存、记录和产物应保持本地忽略。
+官方 client 模板只提交 `client.json`、`axhub.config.json`、本 README 和 `sidebar-tree.json`；用户项目产生的共享批注目录按下方规则单独保留。其它运行缓存、记录和产物应保持本地忽略。
+
+## 共享批注存储
+
+`.axhub/make/comments/` 和 `.axhub/make/comment-assets/` 保存 Markdown、HTML 及原型规格文档的共享本地 Commentary 批注。这两个目录会纳入 Git，但不是构建输入；其它 Make 运行时目录仍保持忽略。

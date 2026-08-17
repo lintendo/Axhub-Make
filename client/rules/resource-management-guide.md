@@ -18,8 +18,8 @@
 ## 目录边界
 
 - `src/resources/` 存放长期项目资料、文档、画布、图表、数据样例和业务附件。
-- `src/resources/templates/` 存放可复用文档模板；模板也是文档资源的一种。
-- 画布是普通资源文件，保存为 `src/resources/**/*.excalidraw`；画布内图片、截图和 AI 生成图保存到同级 `<画布文件名去扩展名>.assets/`。
+- 项目固定文档模板位于根目录 `templates/`，通过项目设置预览和编辑；缺失时可恢复默认模板。
+- 画布是普通资源文件，保存为 `src/resources/**/*.excalidraw`；画布内图片、截图和 AI 生成图统一保存到 `src/resources/.assets/<资源相对路径>/`，例如 `src/resources/.assets/flows/order.excalidraw/`。
 - 原型页面专属素材放在对应原型目录内，例如 `src/prototypes/<name>/assets/`。
 - 主题素材放在对应主题目录内，例如 `src/themes/<theme-key>/assets/`。
 
@@ -40,7 +40,7 @@
 /?projectId=<projectId>&doc=<resource-path>
 ```
 
-其中 `resource-path` 是相对 `src/resources/` 的路径，例如 `templates/prd-template.md`、`flows/app.excalidraw` 或 `flows/order-status.drawio`。
+其中 `resource-path` 是相对 `src/resources/` 的路径，例如 `documents/prd.md`、`flows/app.excalidraw` 或 `flows/order-status.drawio`。
 
 除 Markdown 外，所有资源的只读链接统一使用文档资源文件地址：
 

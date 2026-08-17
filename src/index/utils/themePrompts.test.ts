@@ -31,8 +31,10 @@ describe('generateCreateThemePrompt', () => {
         expect(prompt).toContain('新建设计系统');
         expect(prompt).toContain('**📋 参考文档（必须阅读）**：');
         expect(prompt).toContain('`AGENTS.md`');
-        expect(prompt).toContain('`rules/theme-guide.md`');
+        expect(prompt).toContain('`$build-design-system`');
         expect(prompt).toContain('`rules/resource-management-guide.md`');
+        expect(prompt).not.toContain('rules/theme-guide.md');
+        expect(prompt).not.toContain('rules/theme-source-capture-guide.md');
         expect(prompt).toContain('**参考原型页面**');
         expect(prompt).toContain('`beginner-guide` - 新手指导');
         expect(prompt).not.toContain('**任务**：新建一个主题');

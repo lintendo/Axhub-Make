@@ -1,0 +1,214 @@
+{
+  "documentVersion": 1,
+  "format": "axhub-annotation-source",
+  "data": {
+    "version": 2,
+    "prototypeName": "home-pilot",
+    "pageId": "home",
+    "nodes": [
+      {
+        "id": "annotation-1",
+        "index": 1,
+        "locator": {
+          "selectors": [],
+          "fingerprint": "div",
+          "path": [
+            {
+              "tag": "div",
+              "index": 0
+            },
+            {
+              "tag": "div",
+              "index": 0
+            },
+            {
+              "tag": "div",
+              "index": 0
+            },
+            {
+              "tag": "div",
+              "index": 1
+            }
+          ]
+        },
+        "aiPrompt": "",
+        "annotationText": "",
+        "hasMarkdown": true,
+        "color": "#1677FF",
+        "images": [],
+        "pageId": "home",
+        "createdAt": 1786615604933,
+        "updatedAt": 1786615604933
+      }
+    ],
+    "updatedAt": 1786615604933
+  },
+  "markdownMap": {
+    "annotation-1": "你好你好你好。"
+  },
+  "assetMap": {},
+  "directory": {
+    "nodes": [
+      {
+        "type": "folder",
+        "id": "directory-pages",
+        "title": "页面",
+        "defaultExpanded": true,
+        "children": [
+          {
+            "type": "route",
+            "id": "route-home",
+            "title": "首页",
+            "route": "home"
+          },
+          {
+            "type": "route",
+            "id": "route-regulation",
+            "title": "制度列表",
+            "route": "regulation"
+          },
+          {
+            "type": "route",
+            "id": "route-regulation-create",
+            "title": "制度发起",
+            "route": "regulation-create"
+          },
+          {
+            "type": "route",
+            "id": "route-meeting-list",
+            "title": "会议列表",
+            "route": "meeting-list"
+          },
+          {
+            "type": "route",
+            "id": "route-meeting-create",
+            "title": "会议发起",
+            "route": "meeting-create"
+          },
+          {
+            "type": "route",
+            "id": "route-meeting-todo",
+            "title": "会议发起待办审批",
+            "route": "meeting-todo"
+          },
+          {
+            "type": "route",
+            "id": "route-meeting-archive",
+            "title": "会议材料归档",
+            "route": "meeting-archive"
+          },
+          {
+            "type": "route",
+            "id": "route-meeting-detail",
+            "title": "会议材料归档详情",
+            "route": "meeting-detail"
+          },
+          {
+            "type": "route",
+            "id": "route-research-list",
+            "title": "调研列表",
+            "route": "research-list"
+          },
+          {
+            "type": "route",
+            "id": "route-research-detail",
+            "title": "调研详情",
+            "route": "research-detail"
+          },
+          {
+            "type": "route",
+            "id": "route-research-create",
+            "title": "调研发起",
+            "route": "research-create"
+          },
+          {
+            "type": "route",
+            "id": "route-info-list",
+            "title": "信息列表",
+            "route": "info-list"
+          },
+          {
+            "type": "route",
+            "id": "route-info-detail",
+            "title": "信息详情",
+            "route": "info-detail"
+          },
+          {
+            "type": "route",
+            "id": "route-info-create",
+            "title": "董事参考",
+            "route": "info-create"
+          },
+          {
+            "type": "route",
+            "id": "route-my-initiation",
+            "title": "我的发起",
+            "route": "my-initiation"
+          },
+          {
+            "type": "route",
+            "id": "route-sign-create",
+            "title": "发起签字流程",
+            "route": "sign-create"
+          },
+          {
+            "type": "route",
+            "id": "route-sign-detail",
+            "title": "签字详情",
+            "route": "sign-detail"
+          },
+          {
+            "type": "route",
+            "id": "route-sign-approve-dept",
+            "title": "部室负责人审批",
+            "route": "sign-approve-dept"
+          },
+          {
+            "type": "route",
+            "id": "route-sign-approve-office",
+            "title": "董办负责人审批",
+            "route": "sign-approve-office"
+          },
+          {
+            "type": "route",
+            "id": "route-sign-approve-secretary",
+            "title": "董秘审批",
+            "route": "sign-approve-secretary"
+          },
+          {
+            "type": "route",
+            "id": "route-sign-deliver",
+            "title": "经办人呈送",
+            "route": "sign-deliver"
+          },
+          {
+            "type": "route",
+            "id": "route-sign",
+            "title": "董事签署",
+            "route": "sign"
+          },
+          {
+            "type": "route",
+            "id": "route-sign-finish",
+            "title": "办结",
+            "route": "sign-finish"
+          }
+        ]
+      },
+      {
+        "type": "folder",
+        "id": "directory-documents",
+        "title": "文档",
+        "defaultExpanded": true,
+        "children": [
+          {
+            "type": "markdown",
+            "id": "doc-overview",
+            "title": "原型说明",
+            "markdown": "# 首页工作台\n\n集团董事会-子企业董事会系统的首页工作台原型，聚合制度、会议、调研、信息等模块的入口与待办。\n\n右侧目录可用于在不同页面之间快速切换。"
+          }
+        ]
+      }
+    ]
+  }
+}

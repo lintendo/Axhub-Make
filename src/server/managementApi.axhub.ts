@@ -32,7 +32,7 @@ interface AxhubApiHandlers {
     req: IncomingMessage,
     res: ServerResponse,
     options: ManagementApiOptions,
-    mode: 'active-fallback',
+    mode: 'explicit-required',
     body?: unknown,
   ) => AxhubPublishContext | null;
   resolveSourceFileFromMetadata: (context: AxhubPublishContext, targetPath: string) => string | null;
@@ -176,7 +176,7 @@ async function buildPublishFiles(params: {
   body: any;
 }) {
   const targetPath = stringValue(params.body?.path);
-  const context = params.handlers.resolveProjectContext(params.req, params.res, params.options, 'active-fallback', params.body);
+  const context = params.handlers.resolveProjectContext(params.req, params.res, params.options, 'explicit-required', params.body);
   if (!context) return null;
   const metadata = context.metadata;
   const normalizedTargetPath = metadata

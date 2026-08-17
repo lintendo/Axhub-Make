@@ -1,17 +1,19 @@
-export function buildMarkdownFileUrl(markdownPath: string): string {
+import { withProjectScope } from '../services/projectScope';
+
+export function buildMarkdownFileUrl(markdownPath: string, projectId: string): string {
     const normalizedPath = String(markdownPath || '').trim();
     if (!normalizedPath) {
         return '';
     }
-    return `/api/markdown-file?path=${encodeURIComponent(normalizedPath)}`;
+    return withProjectScope(`/api/markdown-file?path=${encodeURIComponent(normalizedPath)}`, { projectId });
 }
 
-export function buildMarkdownFileMetaUrl(markdownPath: string): string {
+export function buildMarkdownFileMetaUrl(markdownPath: string, projectId: string): string {
     const normalizedPath = String(markdownPath || '').trim();
     if (!normalizedPath) {
         return '';
     }
-    return `/api/markdown-file-meta?path=${encodeURIComponent(normalizedPath)}`;
+    return withProjectScope(`/api/markdown-file-meta?path=${encodeURIComponent(normalizedPath)}`, { projectId });
 }
 
 export function buildSpecTemplatePreviewUrl(markdownUrl: string): string {
@@ -46,6 +48,48 @@ function addProjectIdQuery(url: string, projectId?: string): string {
     params.set('projectId', normalizedProjectId);
     const nextQuery = params.toString();
     return nextQuery ? `${path}?${nextQuery}` : path;
+}
+
+function isExplicitProjectApiUrl(url: string): boolean {
+    try {
+        return /^\/api\/projects\/[^/]+\//u.test(new URL(url, 'http://axhub.local').pathname);
+    } catch {
+        return false;
+    }
+}
+
+function isProjectOwnedMarkdownApiUrl(url: string): boolean {
+    try {
+        const pathname = new URL(url, 'http://axhub.local').pathname;
+        return pathname === '/api/markdown-file'
+            || pathname === '/api/markdown-file-meta'
+            || pathname.startsWith('/api/docs/');
+    } catch {
+        return false;
+    }
+}
+
+function scopeProjectOwnedMarkdownApiUrl(url: string, projectId: string): string {
+    if (!url || isExplicitProjectApiUrl(url) || !isProjectOwnedMarkdownApiUrl(url)) {
+        return url;
+    }
+    if (!projectId) {
+        return '';
+    }
+    return withProjectScope(url, { projectId });
+}
+
+function scopeSpecTemplatePreviewUrl(url: string, projectId: string): string {
+    try {
+        const parsed = new URL(url, 'http://axhub.local');
+        const markdownUrl = parsed.searchParams.get('url') || '';
+        const scopedMarkdownUrl = scopeProjectOwnedMarkdownApiUrl(markdownUrl, projectId);
+        return scopedMarkdownUrl === markdownUrl
+            ? url
+            : buildSpecTemplatePreviewUrl(scopedMarkdownUrl);
+    } catch {
+        return url;
+    }
 }
 
 function isSpecTemplatePreviewUrl(url: string): boolean {
@@ -175,24 +219,30 @@ export function resolveMarkdownPreviewIframeUrl(
 ): string {
     if (!item) return '';
 
+    const projectId = String(item.projectId || '').trim();
     const previewUrl = String(item.previewUrl || '').trim();
     const specUrl = String(item.specUrl || '').trim();
-    if (isSpecTemplatePreviewUrl(previewUrl)) return previewUrl;
-    if (isSpecTemplatePreviewUrl(specUrl)) return specUrl;
+    if (isSpecTemplatePreviewUrl(previewUrl)) return scopeSpecTemplatePreviewUrl(previewUrl, projectId);
+    if (isSpecTemplatePreviewUrl(specUrl)) return scopeSpecTemplatePreviewUrl(specUrl, projectId);
 
     for (const url of [previewUrl, specUrl]) {
         if (isHtmlRawUrl(url)) {
-            return url;
+            return scopeProjectOwnedMarkdownApiUrl(url, projectId);
         }
+    }
+
+    const projectDocumentPath = normalizeResourceName(item.projectDocumentPath);
+    if (kind === 'doc' && projectId && hasHtmlExtension(projectDocumentPath)) {
+        return buildApiMarkdownUrl(item, kind);
     }
 
     const directFilePath = String(item.absoluteFilePath || item.filePath || '').trim();
     if (hasHtmlExtension(directFilePath)) {
-        return buildMarkdownFileUrl(directFilePath);
+        return projectId ? buildMarkdownFileUrl(directFilePath, projectId) : '';
     }
 
     const name = normalizeResourceName(item.name);
-    if (kind === 'doc' && item.projectId && normalizeResourceName(item.projectDocumentPath)) {
+    if (kind === 'doc' && projectId && projectDocumentPath) {
         const markdownUrl = buildApiMarkdownUrl(item, kind);
         return markdownUrl ? buildSpecTemplatePreviewUrl(markdownUrl) : '';
     }
@@ -202,12 +252,13 @@ export function resolveMarkdownPreviewIframeUrl(
 
     for (const url of [previewUrl, specUrl]) {
         if (isMarkdownRawUrl(url, kind)) {
-            return buildSpecTemplatePreviewUrl(url);
+            const scopedUrl = scopeProjectOwnedMarkdownApiUrl(url, projectId);
+            return scopedUrl ? buildSpecTemplatePreviewUrl(scopedUrl) : '';
         }
     }
 
     if (hasMarkdownExtension(directFilePath)) {
-        return buildSpecTemplatePreviewUrl(buildMarkdownFileUrl(directFilePath));
+        return projectId ? buildSpecTemplatePreviewUrl(buildMarkdownFileUrl(directFilePath, projectId)) : '';
     }
 
     if (hasMarkdownExtension(name) || (kind === 'template' && name && !hasFileExtension(name))) {
@@ -215,5 +266,6 @@ export function resolveMarkdownPreviewIframeUrl(
         return markdownUrl ? buildSpecTemplatePreviewUrl(markdownUrl) : '';
     }
 
-    return previewUrl || specUrl;
+    const fallbackUrl = previewUrl || specUrl;
+    return scopeProjectOwnedMarkdownApiUrl(fallbackUrl, projectId);
 }

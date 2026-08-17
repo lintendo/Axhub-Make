@@ -1,0 +1,122 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 14,
+  "pageId": "2ya3d8",
+  "pageName": "接种详情",
+  "sitemapPath": "首页 / 疫苗接种 / 接种详情",
+  "requestedPath": "接种详情.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.59.02/%E6%8E%A5%E7%A7%8D%E8%AF%A6%E6%83%85.html",
+  "dataUrl": "http://127.0.0.1:32768/20.59.02/files/%E6%8E%A5%E7%A7%8D%E8%AF%A6%E6%83%85/data.js",
+  "generationDate": "2026-08-14T12:59:02.125Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 卡介苗\n- paragraph: 接种原因：\n- paragraph: 卡介苗属于婴儿疫苗，用于预防儿童重症结核病。\n- paragraph: 4岁以上的孩子即使没有接种过卡介苗，也无需补种。\n- paragraph: 根据世界卫生组织的建议，我国已经在97年废除了卡介苗加强（7岁或12岁再次接种卡介苗），因为研究表明，多次接种未提升疫苗保护效果。\n- paragraph: 卡介苗不能预防原发性感染，更重要的是不能预防肺部潜伏感染的复燃，因此对于预防结核病传播的效果有限。\n- paragraph: 即使成年后再重新种卡介苗，也并不能预防结核菌的感染及结核发病。\n- paragraph: 接种反应：\n- paragraph: 卡介苗接种被称为“出生第一针”，所以在产院、产科新生婴儿一出生就应该接种。如果出生时没能及时接种，在1岁以内一定要到当地结核病防治所卡介苗门诊或者卫生防疫站计划免疫门诊去补种。\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "014-vaccination-detail-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "导航",
+    "背景",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [],
+  "panels": [
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:接种详情 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

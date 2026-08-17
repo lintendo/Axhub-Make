@@ -25,6 +25,23 @@ describe('AssistantPanel source', () => {
     expect(source).not.toContain('sandbox=');
   });
 
+  it('keeps bounded assistant iframe entries mounted and only displays the active entry', () => {
+    const source = readFileSync(resolve(__dirname, './AssistantPanel.tsx'), 'utf8');
+    const desktopSource = readFileSync(resolve(__dirname, './IndexPageDesktop.tsx'), 'utf8');
+
+    expect(source).toContain('iframeEntries: AssistantIframeRenderEntry[];');
+    expect(source).toContain('activeIframeKey: string | null;');
+    expect(source).toContain('iframeEntries.map((entry) => (');
+    expect(source).toContain('key={entry.key}');
+    expect(source).toContain('src={entry.src}');
+    expect(source).toContain('onIframeRef(entry.key, iframe)');
+    expect(source).toContain('onIframeLoad(entry.key)');
+    expect(source).toContain("display: entry.key === activeIframeKey ? 'block' : 'none'");
+    expect(desktopSource).toContain('iframeEntries={assistantPanel.iframeEntries}');
+    expect(desktopSource).toContain('activeIframeKey={assistantPanel.activeIframeKey}');
+    expect(desktopSource).not.toContain('iframeSrc={assistantPanel.iframeSrc}');
+  });
+
   it('shows a full-panel assistant context drop overlay only for assistant-context drags', () => {
     const source = readFileSync(resolve(__dirname, './AssistantPanel.tsx'), 'utf8');
     const dropOverlaySource = source.slice(

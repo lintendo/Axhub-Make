@@ -252,6 +252,42 @@ describe('captureSameOriginIframeScreenshot', () => {
     });
   });
 
+  it('keeps the requested viewport size when full-content capture is disabled', async () => {
+    const iframe = createSameOriginIframe();
+    const rootElement = iframe.contentDocument.getElementById('root');
+    rootElement.clientWidth = 1440;
+    rootElement.clientHeight = 900;
+    rootElement.offsetWidth = 1440;
+    rootElement.offsetHeight = 900;
+    rootElement.scrollWidth = 1440;
+    rootElement.scrollHeight = 1995;
+    snapdomToPng.mockImplementation(async () => {
+      expect(rootElement.style.width).toBe('1440px');
+      expect(rootElement.style.height).toBe('900px');
+      expect(rootElement.style.minHeight).toBe('900px');
+      return createFakeImage('data:image/png;base64,dmlld3BvcnQ=', 1440, 900);
+    });
+
+    const resultPromise = captureSameOriginIframeScreenshot({
+      iframe: iframe as unknown as HTMLIFrameElement,
+      width: 1440,
+      height: 900,
+      captureFullContent: false,
+    });
+    await vi.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(snapdomToPng).toHaveBeenCalledWith(rootElement, expect.objectContaining({
+      width: 1440,
+      height: 900,
+    }));
+    expect(result).toEqual({
+      dataUrl: 'data:image/png;base64,dmlld3BvcnQ=',
+      width: 1440,
+      height: 900,
+    });
+  });
+
   it('flattens centering layout styles while capturing so screenshots start at the viewport origin', async () => {
     const iframe = createSameOriginIframe();
     const doc = iframe.contentDocument;

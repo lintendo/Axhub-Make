@@ -4,12 +4,15 @@ import type {
   WebEditorElementKey,
   CommentaryApi,
   CommentaryHostOptions,
+  CommentaryHostSurfaceVisibilityControl,
   CommentaryHostToolbarAction,
   CommentaryHostToolbarActionResult,
   CommentarySkillOption,
   WebEditorRevertElementResponse,
   CommentaryState,
   CommentaryToolbarMode,
+  CommentaryImageSource,
+  CommentaryPageElementSummary,
 } from '../../web-editor-types';
 import type { WebEditorAgentProvider } from '../../agent-bridge';
 import type { ShadowHostManager } from '../../ui/shadow-host';
@@ -30,7 +33,10 @@ import type { PerfMonitor } from '../perf-monitor';
 import { locatorKey } from '../locator';
 import type { CommentShortcutSettings } from './comment-shortcut-settings';
 import { DEFAULT_COMMENT_SHORTCUT_SETTINGS } from './comment-shortcut-settings';
-import type { WebEditorInteractionProfile, WebEditorUiSettings } from '../../core/editor/ui-settings';
+import type {
+  WebEditorInteractionProfile,
+  WebEditorUiSettings,
+} from '../../core/editor/ui-settings';
 import { DEFAULT_WEB_EDITOR_UI_SETTINGS } from './ui-settings';
 import type { CommentaryTweakValues } from '../../tweak/protocol';
 import type { AnnotationBridgeSelection } from '../../utils/annotation-comment-bridge';
@@ -48,6 +54,10 @@ export interface WebEditorV2UiOptions {
   initialDarkMode?: boolean;
   showCopyPromptAction?: boolean;
   hideExecutionControls?: boolean;
+  /** Hide the current-element send action in the prompt bubble. */
+  hideCurrentElementExecutionAction?: boolean;
+  /** Replace the execution slot with a host-owned surface visibility toggle. */
+  hostSurfaceVisibilityControl?: CommentaryHostSurfaceVisibilityControl | null;
   aiExecutionConfigSummary?: string;
   aiExecutionConfigConfigured?: boolean;
   aiExecutionProvider?: string;
@@ -58,6 +68,12 @@ export interface WebEditorV2UiOptions {
     label: string;
     disabled?: boolean;
   }>;
+  /** Show host-managed direct-save actions for a resolved local HTML file. */
+  htmlFileSaveEnabled?: boolean;
+  /** Whether page-editing settings are relevant to the current host surface. */
+  pageEditingSettingsAvailable?: boolean;
+  /** Read whether the host's ACP UI service is currently connected. */
+  getAcpUiConnected?: () => boolean;
   getAssistantPanelOpen?: () => boolean;
   onHostToolbarAction?: (
     action: CommentaryHostToolbarAction,
@@ -66,13 +82,17 @@ export interface WebEditorV2UiOptions {
   getAnnotationEnabled?: () => boolean;
   getAnnotationEnableAvailable?: () => boolean;
   getAnnotationEnableLoading?: () => boolean;
+  /** Show a host-managed Markdown source pane beside the document body. */
+  markdownSourceEditorAvailable?: boolean;
+  /** Read whether the Markdown source pane is currently visible. */
+  getMarkdownSourceEditorOpen?: () => boolean;
+  /** Show or hide the Markdown source pane, returning the resulting state. */
+  onMarkdownSourceEditorOpenChange?: (open: boolean) => boolean | Promise<boolean>;
   externalEditingStatusDescription?: string;
   skillInstallSource?: string;
   commentarySkillOptions?: CommentarySkillOption[];
   commentarySelectedSkillIds?: string[];
   commentarySkillSettingsConfigured?: boolean;
-  onCommentarySkillSelectionLoad?: () => readonly string[] | Promise<readonly string[]>;
-  onCommentarySkillSelectionChange?: (skillIds: string[]) => void | Promise<void>;
   onRequestFullExit?: () => void | Promise<void>;
 }
 export type CommentaryUiOptions = WebEditorV2UiOptions;
@@ -128,16 +148,24 @@ export interface WebEditorV2InitOptions {
 export type CommentaryInitOptions = WebEditorV2InitOptions;
 
 export interface ResolvedWebEditorOptions {
-  ui: Required<WebEditorV2UiOptions>;
+  ui: Required<Omit<WebEditorV2UiOptions, 'getAcpUiConnected'>> &
+    Pick<WebEditorV2UiOptions, 'getAcpUiConnected'>;
   host: Required<Pick<CommentaryHostOptions, 'getResourceContext'>> &
     Pick<
       CommentaryHostOptions,
       | 'buildCopyPrompt'
+      | 'getCurrentHoveredElement'
       | 'getElementTools'
       | 'onElementToolAction'
       | 'shouldAllowPageEvent'
+      | 'getPersistenceScope'
       | 'persistenceAdapter'
+      | 'conversationTaskTransport'
+      | 'commentPersistenceMode'
       | 'canEditAnnotationMarkdown'
+      | 'showAnnotationMarkdownEditor'
+      | 'getCreateAnnotationBlockReason'
+      | 'annotationMarkdownEditorKind'
       | 'getAnnotationDocumentEditUrl'
       | 'getAnnotationMarkdown'
       | 'onAnnotationMarkdownChange'
@@ -173,6 +201,7 @@ export interface PromptImageAttachment {
   mimeType: string;
   size: number;
   createdAt: number;
+  source?: CommentaryImageSource;
   assetPath?: string;
 }
 
@@ -249,6 +278,7 @@ export interface MarkerAnchor {
 }
 
 export interface ElementEditMeta {
+  commentId: string | null;
   elementKey: WebEditorElementKey;
   locator: ElementLocator;
   label: string;
@@ -264,6 +294,51 @@ export interface ElementEditMeta {
   styleSummaryLines: string[];
   textSummary: string | null;
   classSummaryLines: string[];
+  voiceCreateOperationId?: string;
+  voiceElementKey?: string;
+  voiceTargetRef?: string;
+  voiceTarget?: CommentaryPageElementSummary;
+  anchorPlacement?: 'target';
+}
+
+export interface DeleteElementAnnotationLink {
+  transactionId: string;
+  transactionElementKey: WebEditorElementKey;
+  parentElementKey: WebEditorElementKey;
+  parentElement: Element;
+  parentLocator: ElementLocator;
+  baseNote: string;
+  annotationNote: string;
+  createdAt: number;
+  active: boolean;
+}
+
+function generateCommentId(): string {
+  const cryptoApi = globalThis.crypto;
+  if (cryptoApi && typeof cryptoApi.randomUUID === 'function') {
+    return cryptoApi.randomUUID();
+  }
+
+  if (cryptoApi && typeof cryptoApi.getRandomValues === 'function') {
+    const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, '0'));
+    return [
+      hex.slice(0, 4).join(''),
+      hex.slice(4, 6).join(''),
+      hex.slice(6, 8).join(''),
+      hex.slice(8, 10).join(''),
+      hex.slice(10).join(''),
+    ].join('-');
+  }
+
+  return `comment-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+}
+
+export function ensureElementEditCommentId(meta: ElementEditMeta): string {
+  meta.commentId ??= generateCommentId();
+  return meta.commentId;
 }
 
 export interface EditorRuntimeState {
@@ -284,12 +359,14 @@ export interface EditorRuntimeState {
   tokensService: DesignTokensService | null;
   perfMonitor: PerfMonitor | null;
   perfHotkeyCleanup: (() => void) | null;
+  deleteElementHotkeyCleanup: (() => void) | null;
   selectionModeHotkeyCleanup: (() => void) | null;
   parentSelectHotkeyCleanup: (() => void) | null;
   commentShortcutCleanup: (() => void) | null;
   hoveredElement: Element | null;
   pendingHoverTransition: boolean;
   selectedElement: Element | null;
+  initialSelectionElement: Element | null;
   selectionAnchor: MarkerAnchor | null;
   commentEntryMode: CommentEntryMode;
   commentShortcutSettings: CommentShortcutSettings;
@@ -297,6 +374,7 @@ export interface EditorRuntimeState {
   propertyPanelPosition: { left: number; top: number } | null;
   uiResizeCleanup: (() => void) | null;
   editMetaByKey: Map<WebEditorElementKey, ElementEditMeta>;
+  deleteElementAnnotationsByTransactionId: Map<string, DeleteElementAnnotationLink>;
   processedEditTimestampsByKey: Map<WebEditorElementKey, number>;
   pendingMarkerAnchors: Map<WebEditorElementKey, MarkerAnchor>;
   markerLayer: HTMLElement | null;
@@ -334,7 +412,9 @@ function generateExternalClientId(): string {
   return `${prefix}-${Date.now().toString(36)}-${randomPart}`;
 }
 
-export function resolveWebEditorOptions(options: WebEditorV2InitOptions = {}): ResolvedWebEditorOptions {
+export function resolveWebEditorOptions(
+  options: WebEditorV2InitOptions = {},
+): ResolvedWebEditorOptions {
   return {
     ui: {
       breadcrumbs: true,
@@ -346,36 +426,49 @@ export function resolveWebEditorOptions(options: WebEditorV2InitOptions = {}): R
       initialDarkMode: false,
       showCopyPromptAction: true,
       hideExecutionControls: false,
+      hideCurrentElementExecutionAction: false,
+      hostSurfaceVisibilityControl: null,
       aiExecutionConfigSummary: '',
       aiExecutionConfigConfigured: false,
       aiExecutionProvider: '',
       aiExecutionWorkspacePath: '',
       aiExecutionRunConcurrency: 5,
       aiExecutionProviderOptions: [],
+      htmlFileSaveEnabled: false,
+      pageEditingSettingsAvailable: true,
+      getAcpUiConnected: undefined,
       getAssistantPanelOpen: () => false,
       onHostToolbarAction: async () => false,
       onEnableAnnotation: async () => false,
       getAnnotationEnabled: () => false,
       getAnnotationEnableAvailable: () => false,
       getAnnotationEnableLoading: () => false,
+      markdownSourceEditorAvailable: false,
+      getMarkdownSourceEditorOpen: () => false,
+      onMarkdownSourceEditorOpenChange: async () => false,
       externalEditingStatusDescription: '',
       skillInstallSource: '',
       commentarySkillOptions: [],
       commentarySelectedSkillIds: [],
       commentarySkillSettingsConfigured: false,
-      onCommentarySkillSelectionLoad: async () => [],
-      onCommentarySkillSelectionChange: async () => undefined,
       onRequestFullExit: async () => undefined,
       ...(options.ui ?? {}),
     },
     host: {
       getResourceContext: options.host?.getResourceContext ?? (() => null),
       buildCopyPrompt: options.host?.buildCopyPrompt ?? undefined,
+      getCurrentHoveredElement: options.host?.getCurrentHoveredElement ?? undefined,
       getElementTools: options.host?.getElementTools ?? undefined,
       onElementToolAction: options.host?.onElementToolAction ?? undefined,
       shouldAllowPageEvent: options.host?.shouldAllowPageEvent ?? undefined,
+      getPersistenceScope: options.host?.getPersistenceScope ?? undefined,
       persistenceAdapter: options.host?.persistenceAdapter ?? undefined,
+      conversationTaskTransport: options.host?.conversationTaskTransport ?? undefined,
+      commentPersistenceMode: options.host?.commentPersistenceMode ?? 'local',
       canEditAnnotationMarkdown: options.host?.canEditAnnotationMarkdown ?? undefined,
+      showAnnotationMarkdownEditor: options.host?.showAnnotationMarkdownEditor ?? true,
+      getCreateAnnotationBlockReason: options.host?.getCreateAnnotationBlockReason ?? undefined,
+      annotationMarkdownEditorKind: options.host?.annotationMarkdownEditorKind ?? 'annotation',
       getAnnotationDocumentEditUrl: options.host?.getAnnotationDocumentEditUrl ?? undefined,
       getAnnotationMarkdown: options.host?.getAnnotationMarkdown ?? undefined,
       onAnnotationMarkdownChange: options.host?.onAnnotationMarkdownChange ?? undefined,
@@ -439,12 +532,14 @@ export function createEditorRuntimeState(): EditorRuntimeState {
     tokensService: null,
     perfMonitor: null,
     perfHotkeyCleanup: null,
+    deleteElementHotkeyCleanup: null,
     selectionModeHotkeyCleanup: null,
     parentSelectHotkeyCleanup: null,
     commentShortcutCleanup: null,
     hoveredElement: null,
     pendingHoverTransition: false,
     selectedElement: null,
+    initialSelectionElement: null,
     selectionAnchor: null,
     commentEntryMode: 'bubble-card',
     commentShortcutSettings: { ...DEFAULT_COMMENT_SHORTCUT_SETTINGS },
@@ -452,6 +547,7 @@ export function createEditorRuntimeState(): EditorRuntimeState {
     propertyPanelPosition: null,
     uiResizeCleanup: null,
     editMetaByKey: new Map(),
+    deleteElementAnnotationsByTransactionId: new Map(),
     processedEditTimestampsByKey: new Map(),
     pendingMarkerAnchors: new Map(),
     markerLayer: null,
@@ -481,11 +577,13 @@ export function clearAnnotationBridgeSelection(state: EditorRuntimeState): void 
 export function resetEditorTransientState(state: EditorRuntimeState): void {
   clearAnnotationBridgeSelection(state);
   state.editMetaByKey.clear();
+  state.deleteElementAnnotationsByTransactionId.clear();
   state.processedEditTimestampsByKey.clear();
   state.pendingMarkerAnchors.clear();
   state.markerLayer = null;
   state.hoveredElement = null;
   state.selectedElement = null;
+  state.initialSelectionElement = null;
   state.selectionAnchor = null;
   state.pendingHoverTransition = false;
   state.commentShortcutDialogOpen = false;
@@ -515,6 +613,7 @@ export function clearEditorRuntimeRefs(state: EditorRuntimeState): void {
   state.tokensService = null;
   state.perfMonitor = null;
   state.perfHotkeyCleanup = null;
+  state.deleteElementHotkeyCleanup = null;
   state.selectionModeHotkeyCleanup = null;
   state.parentSelectHotkeyCleanup = null;
   state.commentShortcutCleanup = null;
@@ -522,6 +621,7 @@ export function clearEditorRuntimeRefs(state: EditorRuntimeState): void {
   state.markerLayer = null;
   state.hoveredElement = null;
   state.selectedElement = null;
+  state.initialSelectionElement = null;
   state.selectionAnchor = null;
   state.pendingHoverTransition = false;
   state.commentShortcutDialogOpen = false;
@@ -535,10 +635,14 @@ export function clearEditorRuntimeRefs(state: EditorRuntimeState): void {
   state.activeTextComment = null;
   state.pendingMarkerAnchors.clear();
   state.editMetaByKey.clear();
+  state.deleteElementAnnotationsByTransactionId.clear();
   state.processedEditTimestampsByKey.clear();
 }
 
-export function getProcessedEditTimestamp(state: EditorRuntimeState, elementKey: WebEditorElementKey): number | null {
+export function getProcessedEditTimestamp(
+  state: EditorRuntimeState,
+  elementKey: WebEditorElementKey,
+): number | null {
   const value = state.processedEditTimestampsByKey.get(elementKey);
   return Number.isFinite(Number(value)) ? Number(value) : null;
 }
@@ -567,4 +671,6 @@ export function filterUnprocessedTransactions(
 
 export type EditorApiFactory = (options?: CommentaryInitOptions) => CommentaryApi;
 export type EditorStateGetter = () => CommentaryState;
-export type EditorRevertHandler = (elementKey: WebEditorElementKey) => Promise<WebEditorRevertElementResponse>;
+export type EditorRevertHandler = (
+  elementKey: WebEditorElementKey,
+) => Promise<WebEditorRevertElementResponse>;

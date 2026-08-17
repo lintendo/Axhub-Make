@@ -55,7 +55,7 @@ describe('prototype placeholder settings storage', () => {
       },
       documentFormat: 'html',
       documentHtmlVisualSpec: 'kami',
-      documentNeedsRequirementsAnalysis: true,
+      documentUsePrdPlanning: true,
       selectedDocumentTemplateName: 'write-prd.md',
     });
 
@@ -73,7 +73,7 @@ describe('prototype placeholder settings storage', () => {
       },
       documentFormat: 'html',
       documentHtmlVisualSpec: 'kami',
-      documentNeedsRequirementsAnalysis: true,
+      documentUsePrdPlanning: true,
       selectedDocumentTemplateName: 'write-prd.md',
     });
   });
@@ -95,7 +95,7 @@ describe('prototype placeholder settings storage', () => {
       },
       documentFormat: 'pdf',
       documentHtmlVisualSpec: 1,
-      documentNeedsRequirementsAnalysis: null,
+      documentUsePrdPlanning: null,
       selectedDocumentTemplateName: {},
     }));
 

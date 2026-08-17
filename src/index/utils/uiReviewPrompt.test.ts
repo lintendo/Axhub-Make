@@ -25,7 +25,7 @@ describe('ui review prompts', () => {
     expect(prompt).toContain('如果没有 DESIGN.md');
     expect(prompt).toContain('按常规设计评审执行');
     expect(prompt).toContain('src/prototypes/home/.spec/reviews/ui-review.md');
-    expect(prompt).toContain('src/resources/templates/ui-review-report-template.md');
+    expect(prompt).toContain('templates/ui-review.md');
     expect(prompt).toContain('请先读取并套用报告模板');
     expect(prompt).toContain('细节以规则文档和报告模板为准');
     expect(prompt).toContain('输出 Markdown');
@@ -59,7 +59,7 @@ describe('ui review prompts', () => {
     expect(prompt).toContain('同时存在时以 HTML 为准');
     expect(prompt).toContain('按主规格链接读取必要子文档');
     expect(prompt).toContain('src/prototypes/home/.spec/reviews/prototype-review.md');
-    expect(prompt).toContain('src/resources/templates/prototype-review-report-template.md');
+    expect(prompt).toContain('templates/prototype-review.md');
     expect(prompt).toContain('请先读取并套用报告模板');
     expect(prompt).toContain('细节以规则文档和报告模板为准');
     expect(prompt).toContain('输出 Markdown');
@@ -78,10 +78,10 @@ describe('ui review prompts', () => {
     expect(prompt).not.toContain('Home Prototype · Prototype Review');
   });
 
-  it('keeps review report templates in the project resource templates directory', () => {
-    const templateRoot = resolve(__dirname, '../../../client/src/resources/templates');
-    const uiTemplatePath = resolve(templateRoot, 'ui-review-report-template.md');
-    const prototypeTemplatePath = resolve(templateRoot, 'prototype-review-report-template.md');
+  it('keeps review report templates in the fixed project templates directory', () => {
+    const templateRoot = resolve(__dirname, '../../../client/templates');
+    const uiTemplatePath = resolve(templateRoot, 'ui-review.md');
+    const prototypeTemplatePath = resolve(templateRoot, 'prototype-review.md');
 
     expect(existsSync(uiTemplatePath)).toBe(true);
     expect(existsSync(prototypeTemplatePath)).toBe(true);

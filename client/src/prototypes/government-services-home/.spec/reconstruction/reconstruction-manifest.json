@@ -1,0 +1,4222 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "path": ".local/screenshot-to-prototype/government-services-home/source.png",
+    "sha256": "1f05fa7a99bf4858ba760c94a1e92db0a7a1fbe0e7c3dc26827df8e7dc5b3254",
+    "width": 863,
+    "height": 1823,
+    "viewport": {
+      "width": 863,
+      "height": 1823,
+      "deviceScaleFactor": 1
+    }
+  },
+  "elements": [
+    {
+      "id": "screen-background",
+      "kind": "container",
+      "uiRole": "screen-background",
+      "sourceBBox": {
+        "x": 0,
+        "y": 0,
+        "width": 863,
+        "height": 1823
+      },
+      "targetBBox": {
+        "x": 0,
+        "y": 0,
+        "width": 863,
+        "height": 1823
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "background": "linear-gradient(180deg,#0448ab 0%,#0755b9 22%,#49a3e7 34%,#eef8ff 47%,#f8fafc 69%,#f8fafc 100%)",
+        "zIndex": 0
+      },
+      "candidates": [
+        {
+          "id": "candidate-screen-background",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-screen-background",
+      "specElementId": "screen-background",
+      "reactTarget": null
+    },
+    {
+      "id": "header-blue-layer",
+      "kind": "container",
+      "uiRole": "header-background",
+      "sourceBBox": {
+        "x": 0,
+        "y": 0,
+        "width": 863,
+        "height": 329
+      },
+      "targetBBox": {
+        "x": 0,
+        "y": 0,
+        "width": 863,
+        "height": 329
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "background": "linear-gradient(135deg,#0141a6 0%,#0040a7 62%,#013da4 100%)",
+        "zIndex": 1
+      },
+      "candidates": [
+        {
+          "id": "candidate-header-blue-layer",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-header-blue-layer",
+      "specElementId": "header-blue-layer",
+      "reactTarget": null
+    },
+    {
+      "id": "status-time",
+      "kind": "image",
+      "uiRole": "status-time",
+      "sourceBBox": {
+        "x": 56,
+        "y": 29,
+        "width": 70,
+        "height": 33
+      },
+      "targetBBox": {
+        "x": 56,
+        "y": 29,
+        "width": 70,
+        "height": 33
+      },
+      "representation": "clean-crop",
+      "textReview": {
+        "content": "9:41",
+        "textRole": "ui-text",
+        "renderMode": "preserve-in-image",
+        "ocrUsage": "semantic-only",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "系统状态栏时间保持源像素，避免浏览器字体度量造成偏差。"
+      },
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-status-time",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/status-time.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-status-time",
+      "specElementId": "status-time",
+      "reactTarget": null
+    },
+    {
+      "id": "status-cellular",
+      "kind": "image",
+      "uiRole": "status-cellular",
+      "sourceBBox": {
+        "x": 674,
+        "y": 30,
+        "width": 42,
+        "height": 32
+      },
+      "targetBBox": {
+        "x": 674,
+        "y": 30,
+        "width": 42,
+        "height": 32
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-status-cellular",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/status-cellular.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-status-cellular",
+      "specElementId": "status-cellular",
+      "reactTarget": null
+    },
+    {
+      "id": "status-wifi",
+      "kind": "image",
+      "uiRole": "status-wifi",
+      "sourceBBox": {
+        "x": 723,
+        "y": 30,
+        "width": 39,
+        "height": 32
+      },
+      "targetBBox": {
+        "x": 723,
+        "y": 30,
+        "width": 39,
+        "height": 32
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-status-wifi",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/status-wifi.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-status-wifi",
+      "specElementId": "status-wifi",
+      "reactTarget": null
+    },
+    {
+      "id": "status-battery",
+      "kind": "image",
+      "uiRole": "status-battery",
+      "sourceBBox": {
+        "x": 765,
+        "y": 30,
+        "width": 56,
+        "height": 32
+      },
+      "targetBBox": {
+        "x": 765,
+        "y": 30,
+        "width": 56,
+        "height": 32
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-status-battery",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/status-battery.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-status-battery",
+      "specElementId": "status-battery",
+      "reactTarget": null
+    },
+    {
+      "id": "government-emblem",
+      "kind": "image",
+      "uiRole": "government-emblem",
+      "sourceBBox": {
+        "x": 37,
+        "y": 105,
+        "width": 83,
+        "height": 83
+      },
+      "targetBBox": {
+        "x": 37,
+        "y": 105,
+        "width": 83,
+        "height": 83
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-government-emblem",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/government-emblem.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-government-emblem",
+      "specElementId": "government-emblem",
+      "reactTarget": null
+    },
+    {
+      "id": "header-title",
+      "kind": "text",
+      "uiRole": "product-title",
+      "sourceBBox": {
+        "x": 138,
+        "y": 119,
+        "width": 190,
+        "height": 56
+      },
+      "targetBBox": {
+        "x": 138,
+        "y": 119,
+        "width": 190,
+        "height": 56
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "政务服务",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#ffffff",
+        "fontSize": 42,
+        "fontWeight": 700,
+        "lineHeight": 56,
+        "textShadow": "0 2px 4px rgba(0,38,105,0.2)"
+      },
+      "candidates": [
+        {
+          "id": "candidate-header-title",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-header-title",
+      "specElementId": "header-title",
+      "reactTarget": null
+    },
+    {
+      "id": "city-selector",
+      "kind": "text",
+      "uiRole": "location-selector",
+      "sourceBBox": {
+        "x": 625,
+        "y": 128,
+        "width": 94,
+        "height": 44
+      },
+      "targetBBox": {
+        "x": 625,
+        "y": 128,
+        "width": 94,
+        "height": 44
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "本市  ▼",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#ffffff",
+        "fontSize": 28,
+        "fontWeight": 400,
+        "lineHeight": 44
+      },
+      "candidates": [
+        {
+          "id": "candidate-city-selector",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-city-selector",
+      "specElementId": "city-selector",
+      "reactTarget": null
+    },
+    {
+      "id": "message-bubble",
+      "kind": "image",
+      "uiRole": "message-action",
+      "sourceBBox": {
+        "x": 778,
+        "y": 114,
+        "width": 57,
+        "height": 65
+      },
+      "targetBBox": {
+        "x": 778,
+        "y": 114,
+        "width": 57,
+        "height": 65
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-message-bubble",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/message-bubble.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-message-bubble",
+      "specElementId": "message-bubble",
+      "reactTarget": null
+    },
+    {
+      "id": "search-field",
+      "kind": "container",
+      "uiRole": "search-field",
+      "sourceBBox": {
+        "x": 36,
+        "y": 218,
+        "width": 790,
+        "height": 87
+      },
+      "targetBBox": {
+        "x": 36,
+        "y": 218,
+        "width": 790,
+        "height": 87
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#ffffff",
+        "borderRadius": 20,
+        "zIndex": 3
+      },
+      "candidates": [
+        {
+          "id": "candidate-search-field",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-search-field",
+      "specElementId": "search-field",
+      "reactTarget": null
+    },
+    {
+      "id": "search-symbol",
+      "kind": "image",
+      "uiRole": "search-icon",
+      "sourceBBox": {
+        "x": 64,
+        "y": 240,
+        "width": 39,
+        "height": 43
+      },
+      "targetBBox": {
+        "x": 64,
+        "y": 240,
+        "width": 39,
+        "height": 43
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-search-symbol",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/search-symbol.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-search-symbol",
+      "specElementId": "search-symbol",
+      "reactTarget": null
+    },
+    {
+      "id": "search-placeholder",
+      "kind": "text",
+      "uiRole": "search-placeholder",
+      "sourceBBox": {
+        "x": 116,
+        "y": 238,
+        "width": 360,
+        "height": 50
+      },
+      "targetBBox": {
+        "x": 116,
+        "y": 238,
+        "width": 360,
+        "height": 50
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "搜索事项、政策、办件",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#737780",
+        "fontSize": 27,
+        "fontWeight": 400,
+        "lineHeight": 50
+      },
+      "candidates": [
+        {
+          "id": "candidate-search-placeholder",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-search-placeholder",
+      "specElementId": "search-placeholder",
+      "reactTarget": null
+    },
+    {
+      "id": "hero-banner",
+      "kind": "image",
+      "uiRole": "hero-banner",
+      "sourceBBox": {
+        "x": 35,
+        "y": 328,
+        "width": 792,
+        "height": 261
+      },
+      "targetBBox": {
+        "x": 35,
+        "y": 328,
+        "width": 792,
+        "height": 261
+      },
+      "representation": "clean-crop",
+      "textReview": {
+        "content": "一网通办 高效便民 / 便民 高效 规范 智慧",
+        "textRole": "display-text",
+        "renderMode": "preserve-in-image",
+        "ocrUsage": "semantic-only",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标题与城市摄影、蓝色渐变及轮播状态构成完整 Banner 画面。"
+      },
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4,
+        "borderRadius": 17
+      },
+      "candidates": [
+        {
+          "id": "candidate-hero-banner",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/hero-banner.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-hero-banner",
+      "specElementId": "hero-banner",
+      "reactTarget": null
+    },
+    {
+      "id": "quick-actions-card",
+      "kind": "container",
+      "uiRole": "quick-actions",
+      "sourceBBox": {
+        "x": 35,
+        "y": 609,
+        "width": 793,
+        "height": 175
+      },
+      "targetBBox": {
+        "x": 35,
+        "y": 609,
+        "width": 793,
+        "height": 175
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#ffffff",
+        "borderRadius": 20,
+        "boxShadow": "0 5px 16px rgba(30,79,128,0.10)",
+        "zIndex": 1
+      },
+      "candidates": [
+        {
+          "id": "candidate-quick-actions-card",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-quick-actions-card",
+      "specElementId": "quick-actions-card",
+      "reactTarget": null
+    },
+    {
+      "id": "quick-divider-1",
+      "kind": "container",
+      "uiRole": "divider",
+      "sourceBBox": {
+        "x": 230,
+        "y": 655,
+        "width": 1,
+        "height": 82
+      },
+      "targetBBox": {
+        "x": 230,
+        "y": 655,
+        "width": 1,
+        "height": 82
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#edf0f4",
+        "zIndex": 2
+      },
+      "candidates": [
+        {
+          "id": "candidate-quick-divider-1",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-quick-divider-1",
+      "specElementId": "quick-divider-1",
+      "reactTarget": null
+    },
+    {
+      "id": "quick-divider-2",
+      "kind": "container",
+      "uiRole": "divider",
+      "sourceBBox": {
+        "x": 430,
+        "y": 655,
+        "width": 1,
+        "height": 82
+      },
+      "targetBBox": {
+        "x": 430,
+        "y": 655,
+        "width": 1,
+        "height": 82
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#edf0f4",
+        "zIndex": 2
+      },
+      "candidates": [
+        {
+          "id": "candidate-quick-divider-2",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-quick-divider-2",
+      "specElementId": "quick-divider-2",
+      "reactTarget": null
+    },
+    {
+      "id": "quick-divider-3",
+      "kind": "container",
+      "uiRole": "divider",
+      "sourceBBox": {
+        "x": 629,
+        "y": 655,
+        "width": 1,
+        "height": 82
+      },
+      "targetBBox": {
+        "x": 629,
+        "y": 655,
+        "width": 1,
+        "height": 82
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#edf0f4",
+        "zIndex": 2
+      },
+      "candidates": [
+        {
+          "id": "candidate-quick-divider-3",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-quick-divider-3",
+      "specElementId": "quick-divider-3",
+      "reactTarget": null
+    },
+    {
+      "id": "quick-scan",
+      "kind": "image",
+      "uiRole": "quick-action-icon",
+      "sourceBBox": {
+        "x": 100,
+        "y": 641,
+        "width": 59,
+        "height": 67
+      },
+      "targetBBox": {
+        "x": 100,
+        "y": 641,
+        "width": 59,
+        "height": 67
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-quick-scan",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/quick-scan.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-quick-scan",
+      "specElementId": "quick-scan",
+      "reactTarget": null
+    },
+    {
+      "id": "quick-reservation",
+      "kind": "image",
+      "uiRole": "quick-action-icon",
+      "sourceBBox": {
+        "x": 299,
+        "y": 641,
+        "width": 65,
+        "height": 67
+      },
+      "targetBBox": {
+        "x": 299,
+        "y": 641,
+        "width": 65,
+        "height": 67
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-quick-reservation",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/quick-reservation.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-quick-reservation",
+      "specElementId": "quick-reservation",
+      "reactTarget": null
+    },
+    {
+      "id": "quick-consult",
+      "kind": "image",
+      "uiRole": "quick-action-icon",
+      "sourceBBox": {
+        "x": 498,
+        "y": 641,
+        "width": 66,
+        "height": 69
+      },
+      "targetBBox": {
+        "x": 498,
+        "y": 641,
+        "width": 66,
+        "height": 69
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-quick-consult",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/quick-consult.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-quick-consult",
+      "specElementId": "quick-consult",
+      "reactTarget": null
+    },
+    {
+      "id": "quick-progress",
+      "kind": "image",
+      "uiRole": "quick-action-icon",
+      "sourceBBox": {
+        "x": 695,
+        "y": 641,
+        "width": 68,
+        "height": 69
+      },
+      "targetBBox": {
+        "x": 695,
+        "y": 641,
+        "width": 68,
+        "height": 69
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-quick-progress",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/quick-progress.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-quick-progress",
+      "specElementId": "quick-progress",
+      "reactTarget": null
+    },
+    {
+      "id": "quick-scan-label",
+      "kind": "text",
+      "uiRole": "quick-action-label",
+      "sourceBBox": {
+        "x": 80,
+        "y": 715,
+        "width": 102,
+        "height": 49
+      },
+      "targetBBox": {
+        "x": 80,
+        "y": 715,
+        "width": 102,
+        "height": 49
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "扫一扫",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#15191f",
+        "fontSize": 28,
+        "fontWeight": 400,
+        "lineHeight": 40,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-quick-scan-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-quick-scan-label",
+      "specElementId": "quick-scan-label",
+      "reactTarget": null
+    },
+    {
+      "id": "quick-reservation-label",
+      "kind": "text",
+      "uiRole": "quick-action-label",
+      "sourceBBox": {
+        "x": 286,
+        "y": 715,
+        "width": 90,
+        "height": 49
+      },
+      "targetBBox": {
+        "x": 286,
+        "y": 715,
+        "width": 90,
+        "height": 49
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "预约",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#15191f",
+        "fontSize": 28,
+        "fontWeight": 400,
+        "lineHeight": 40,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-quick-reservation-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-quick-reservation-label",
+      "specElementId": "quick-reservation-label",
+      "reactTarget": null
+    },
+    {
+      "id": "quick-consult-label",
+      "kind": "text",
+      "uiRole": "quick-action-label",
+      "sourceBBox": {
+        "x": 484,
+        "y": 715,
+        "width": 90,
+        "height": 49
+      },
+      "targetBBox": {
+        "x": 484,
+        "y": 715,
+        "width": 90,
+        "height": 49
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "咨询",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#15191f",
+        "fontSize": 28,
+        "fontWeight": 400,
+        "lineHeight": 40,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-quick-consult-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-quick-consult-label",
+      "specElementId": "quick-consult-label",
+      "reactTarget": null
+    },
+    {
+      "id": "quick-progress-label",
+      "kind": "text",
+      "uiRole": "quick-action-label",
+      "sourceBBox": {
+        "x": 684,
+        "y": 715,
+        "width": 90,
+        "height": 49
+      },
+      "targetBBox": {
+        "x": 684,
+        "y": 715,
+        "width": 90,
+        "height": 49
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "进度",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#15191f",
+        "fontSize": 28,
+        "fontWeight": 400,
+        "lineHeight": 40,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-quick-progress-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-quick-progress-label",
+      "specElementId": "quick-progress-label",
+      "reactTarget": null
+    },
+    {
+      "id": "service-categories-card",
+      "kind": "container",
+      "uiRole": "service-categories",
+      "sourceBBox": {
+        "x": 35,
+        "y": 802,
+        "width": 793,
+        "height": 345
+      },
+      "targetBBox": {
+        "x": 35,
+        "y": 802,
+        "width": 793,
+        "height": 345
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#ffffff",
+        "borderRadius": 20,
+        "boxShadow": "0 5px 16px rgba(30,79,128,0.10)",
+        "zIndex": 1
+      },
+      "candidates": [
+        {
+          "id": "candidate-service-categories-card",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-service-categories-card",
+      "specElementId": "service-categories-card",
+      "reactTarget": null
+    },
+    {
+      "id": "category-social-security",
+      "kind": "image",
+      "uiRole": "category-icon",
+      "sourceBBox": {
+        "x": 99,
+        "y": 831,
+        "width": 65,
+        "height": 81
+      },
+      "targetBBox": {
+        "x": 99,
+        "y": 831,
+        "width": 65,
+        "height": 81
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-social-security",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/category-social-security.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-category-social-security",
+      "specElementId": "category-social-security",
+      "reactTarget": null
+    },
+    {
+      "id": "category-medical-insurance",
+      "kind": "image",
+      "uiRole": "category-icon",
+      "sourceBBox": {
+        "x": 297,
+        "y": 833,
+        "width": 67,
+        "height": 79
+      },
+      "targetBBox": {
+        "x": 297,
+        "y": 833,
+        "width": 67,
+        "height": 79
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-medical-insurance",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/category-medical-insurance.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-category-medical-insurance",
+      "specElementId": "category-medical-insurance",
+      "reactTarget": null
+    },
+    {
+      "id": "category-housing-fund",
+      "kind": "image",
+      "uiRole": "category-icon",
+      "sourceBBox": {
+        "x": 491,
+        "y": 829,
+        "width": 69,
+        "height": 85
+      },
+      "targetBBox": {
+        "x": 491,
+        "y": 829,
+        "width": 69,
+        "height": 85
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-housing-fund",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/category-housing-fund.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-category-housing-fund",
+      "specElementId": "category-housing-fund",
+      "reactTarget": null
+    },
+    {
+      "id": "category-household",
+      "kind": "image",
+      "uiRole": "category-icon",
+      "sourceBBox": {
+        "x": 687,
+        "y": 836,
+        "width": 76,
+        "height": 76
+      },
+      "targetBBox": {
+        "x": 687,
+        "y": 836,
+        "width": 76,
+        "height": 76
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-household",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/category-household.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-category-household",
+      "specElementId": "category-household",
+      "reactTarget": null
+    },
+    {
+      "id": "category-traffic",
+      "kind": "image",
+      "uiRole": "category-icon",
+      "sourceBBox": {
+        "x": 97,
+        "y": 999,
+        "width": 67,
+        "height": 68
+      },
+      "targetBBox": {
+        "x": 97,
+        "y": 999,
+        "width": 67,
+        "height": 68
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-traffic",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/category-traffic.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-category-traffic",
+      "specElementId": "category-traffic",
+      "reactTarget": null
+    },
+    {
+      "id": "category-tax",
+      "kind": "image",
+      "uiRole": "category-icon",
+      "sourceBBox": {
+        "x": 296,
+        "y": 995,
+        "width": 68,
+        "height": 74
+      },
+      "targetBBox": {
+        "x": 296,
+        "y": 995,
+        "width": 68,
+        "height": 74
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-tax",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/category-tax.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-category-tax",
+      "specElementId": "category-tax",
+      "reactTarget": null
+    },
+    {
+      "id": "category-education",
+      "kind": "image",
+      "uiRole": "category-icon",
+      "sourceBBox": {
+        "x": 489,
+        "y": 997,
+        "width": 78,
+        "height": 74
+      },
+      "targetBBox": {
+        "x": 489,
+        "y": 997,
+        "width": 78,
+        "height": 74
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-education",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/category-education.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-category-education",
+      "specElementId": "category-education",
+      "reactTarget": null
+    },
+    {
+      "id": "category-enterprise",
+      "kind": "image",
+      "uiRole": "category-icon",
+      "sourceBBox": {
+        "x": 692,
+        "y": 995,
+        "width": 70,
+        "height": 74
+      },
+      "targetBBox": {
+        "x": 692,
+        "y": 995,
+        "width": 70,
+        "height": 74
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 4
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-enterprise",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/category-enterprise.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-category-enterprise",
+      "specElementId": "category-enterprise",
+      "reactTarget": null
+    },
+    {
+      "id": "category-social-label",
+      "kind": "text",
+      "uiRole": "category-label",
+      "sourceBBox": {
+        "x": 84,
+        "y": 918,
+        "width": 92,
+        "height": 50
+      },
+      "targetBBox": {
+        "x": 84,
+        "y": 918,
+        "width": 92,
+        "height": 50
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "社保",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#15191f",
+        "fontSize": 28,
+        "fontWeight": 400,
+        "lineHeight": 40,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-social-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-category-social-label",
+      "specElementId": "category-social-label",
+      "reactTarget": null
+    },
+    {
+      "id": "category-medical-label",
+      "kind": "text",
+      "uiRole": "category-label",
+      "sourceBBox": {
+        "x": 285,
+        "y": 918,
+        "width": 92,
+        "height": 50
+      },
+      "targetBBox": {
+        "x": 285,
+        "y": 918,
+        "width": 92,
+        "height": 50
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "医保",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#15191f",
+        "fontSize": 28,
+        "fontWeight": 400,
+        "lineHeight": 40,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-medical-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-category-medical-label",
+      "specElementId": "category-medical-label",
+      "reactTarget": null
+    },
+    {
+      "id": "category-fund-label",
+      "kind": "text",
+      "uiRole": "category-label",
+      "sourceBBox": {
+        "x": 469,
+        "y": 918,
+        "width": 111,
+        "height": 50
+      },
+      "targetBBox": {
+        "x": 469,
+        "y": 918,
+        "width": 111,
+        "height": 50
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "公积金",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#15191f",
+        "fontSize": 28,
+        "fontWeight": 400,
+        "lineHeight": 40,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-fund-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-category-fund-label",
+      "specElementId": "category-fund-label",
+      "reactTarget": null
+    },
+    {
+      "id": "category-household-label",
+      "kind": "text",
+      "uiRole": "category-label",
+      "sourceBBox": {
+        "x": 683,
+        "y": 918,
+        "width": 92,
+        "height": 50
+      },
+      "targetBBox": {
+        "x": 683,
+        "y": 918,
+        "width": 92,
+        "height": 50
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "户政",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#15191f",
+        "fontSize": 28,
+        "fontWeight": 400,
+        "lineHeight": 40,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-household-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-category-household-label",
+      "specElementId": "category-household-label",
+      "reactTarget": null
+    },
+    {
+      "id": "category-traffic-label",
+      "kind": "text",
+      "uiRole": "category-label",
+      "sourceBBox": {
+        "x": 84,
+        "y": 1074,
+        "width": 92,
+        "height": 50
+      },
+      "targetBBox": {
+        "x": 84,
+        "y": 1074,
+        "width": 92,
+        "height": 50
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "交通",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#15191f",
+        "fontSize": 28,
+        "fontWeight": 400,
+        "lineHeight": 40,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-traffic-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-category-traffic-label",
+      "specElementId": "category-traffic-label",
+      "reactTarget": null
+    },
+    {
+      "id": "category-tax-label",
+      "kind": "text",
+      "uiRole": "category-label",
+      "sourceBBox": {
+        "x": 285,
+        "y": 1074,
+        "width": 92,
+        "height": 50
+      },
+      "targetBBox": {
+        "x": 285,
+        "y": 1074,
+        "width": 92,
+        "height": 50
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "税务",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#15191f",
+        "fontSize": 28,
+        "fontWeight": 400,
+        "lineHeight": 40,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-tax-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-category-tax-label",
+      "specElementId": "category-tax-label",
+      "reactTarget": null
+    },
+    {
+      "id": "category-education-label",
+      "kind": "text",
+      "uiRole": "category-label",
+      "sourceBBox": {
+        "x": 482,
+        "y": 1074,
+        "width": 92,
+        "height": 50
+      },
+      "targetBBox": {
+        "x": 482,
+        "y": 1074,
+        "width": 92,
+        "height": 50
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "教育",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#15191f",
+        "fontSize": 28,
+        "fontWeight": 400,
+        "lineHeight": 40,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-education-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-category-education-label",
+      "specElementId": "category-education-label",
+      "reactTarget": null
+    },
+    {
+      "id": "category-enterprise-label",
+      "kind": "text",
+      "uiRole": "category-label",
+      "sourceBBox": {
+        "x": 653,
+        "y": 1074,
+        "width": 151,
+        "height": 50
+      },
+      "targetBBox": {
+        "x": 653,
+        "y": 1074,
+        "width": 151,
+        "height": 50
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "企业服务",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#15191f",
+        "fontSize": 28,
+        "fontWeight": 400,
+        "lineHeight": 40,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-category-enterprise-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-category-enterprise-label",
+      "specElementId": "category-enterprise-label",
+      "reactTarget": null
+    },
+    {
+      "id": "hot-services-card",
+      "kind": "container",
+      "uiRole": "hot-services",
+      "sourceBBox": {
+        "x": 35,
+        "y": 1160,
+        "width": 793,
+        "height": 228
+      },
+      "targetBBox": {
+        "x": 35,
+        "y": 1160,
+        "width": 793,
+        "height": 228
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#ffffff",
+        "borderRadius": 20,
+        "boxShadow": "0 5px 16px rgba(30,79,128,0.10)",
+        "zIndex": 1
+      },
+      "candidates": [
+        {
+          "id": "candidate-hot-services-card",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-hot-services-card",
+      "specElementId": "hot-services-card",
+      "reactTarget": null
+    },
+    {
+      "id": "hot-services-title",
+      "kind": "text",
+      "uiRole": "section-title",
+      "sourceBBox": {
+        "x": 58,
+        "y": 1173,
+        "width": 150,
+        "height": 54
+      },
+      "targetBBox": {
+        "x": 58,
+        "y": 1173,
+        "width": 150,
+        "height": 54
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "热门服务",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#111820",
+        "fontSize": 30,
+        "fontWeight": 500,
+        "lineHeight": 42
+      },
+      "candidates": [
+        {
+          "id": "candidate-hot-services-title",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-hot-services-title",
+      "specElementId": "hot-services-title",
+      "reactTarget": null
+    },
+    {
+      "id": "hot-services-more",
+      "kind": "text",
+      "uiRole": "section-more",
+      "sourceBBox": {
+        "x": 716,
+        "y": 1174,
+        "width": 88,
+        "height": 50
+      },
+      "targetBBox": {
+        "x": 716,
+        "y": 1174,
+        "width": 88,
+        "height": 50
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "更多  ›",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#777d86",
+        "fontSize": 24,
+        "fontWeight": 400,
+        "lineHeight": 36,
+        "justifyContent": "flex-end"
+      },
+      "candidates": [
+        {
+          "id": "candidate-hot-services-more",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-hot-services-more",
+      "specElementId": "hot-services-more",
+      "reactTarget": null
+    },
+    {
+      "id": "hot-item-social",
+      "kind": "container",
+      "uiRole": "hot-service-item",
+      "sourceBBox": {
+        "x": 58,
+        "y": 1244,
+        "width": 239,
+        "height": 123
+      },
+      "targetBBox": {
+        "x": 58,
+        "y": 1244,
+        "width": 239,
+        "height": 123
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "background": "linear-gradient(135deg,#eef5ff 0%,#dfeaff 100%)",
+        "borderRadius": 9,
+        "zIndex": 2
+      },
+      "candidates": [
+        {
+          "id": "candidate-hot-item-social",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-hot-item-social",
+      "specElementId": "hot-item-social",
+      "reactTarget": null
+    },
+    {
+      "id": "hot-item-fund",
+      "kind": "container",
+      "uiRole": "hot-service-item",
+      "sourceBBox": {
+        "x": 317,
+        "y": 1244,
+        "width": 239,
+        "height": 123
+      },
+      "targetBBox": {
+        "x": 317,
+        "y": 1244,
+        "width": 239,
+        "height": 123
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "background": "linear-gradient(135deg,#eff8f6 0%,#ddf1eb 100%)",
+        "borderRadius": 9,
+        "zIndex": 2
+      },
+      "candidates": [
+        {
+          "id": "candidate-hot-item-fund",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-hot-item-fund",
+      "specElementId": "hot-item-fund",
+      "reactTarget": null
+    },
+    {
+      "id": "hot-item-property",
+      "kind": "container",
+      "uiRole": "hot-service-item",
+      "sourceBBox": {
+        "x": 577,
+        "y": 1244,
+        "width": 235,
+        "height": 123
+      },
+      "targetBBox": {
+        "x": 577,
+        "y": 1244,
+        "width": 235,
+        "height": 123
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "background": "linear-gradient(135deg,#fff5f1 0%,#fde8df 100%)",
+        "borderRadius": 9,
+        "zIndex": 2
+      },
+      "candidates": [
+        {
+          "id": "candidate-hot-item-property",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-hot-item-property",
+      "specElementId": "hot-item-property",
+      "reactTarget": null
+    },
+    {
+      "id": "hot-social-decoration",
+      "kind": "icon",
+      "uiRole": "hot-card-decoration",
+      "sourceBBox": {
+        "x": 215,
+        "y": 1270,
+        "width": 82,
+        "height": 97
+      },
+      "targetBBox": {
+        "x": 215,
+        "y": 1270,
+        "width": 82,
+        "height": 97
+      },
+      "representation": "svg",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-svg",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "低饱和几何装饰适合透明 SVG 重绘，可消除源裁片背景接缝。"
+      },
+      "visualStyle": {
+        "objectFit": "contain",
+        "zIndex": 3
+      },
+      "candidates": [
+        {
+          "id": "candidate-hot-social-decoration",
+          "route": "svg",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/hot-social-decoration.svg"
+        }
+      ],
+      "selectedCandidateId": "candidate-hot-social-decoration",
+      "specElementId": "hot-social-decoration",
+      "reactTarget": null
+    },
+    {
+      "id": "hot-fund-decoration",
+      "kind": "icon",
+      "uiRole": "hot-card-decoration",
+      "sourceBBox": {
+        "x": 495,
+        "y": 1277,
+        "width": 61,
+        "height": 90
+      },
+      "targetBBox": {
+        "x": 495,
+        "y": 1277,
+        "width": 61,
+        "height": 90
+      },
+      "representation": "svg",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-svg",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "低饱和几何装饰适合透明 SVG 重绘，可消除源裁片背景接缝。"
+      },
+      "visualStyle": {
+        "objectFit": "contain",
+        "zIndex": 3
+      },
+      "candidates": [
+        {
+          "id": "candidate-hot-fund-decoration",
+          "route": "svg",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/hot-fund-decoration.svg"
+        }
+      ],
+      "selectedCandidateId": "candidate-hot-fund-decoration",
+      "specElementId": "hot-fund-decoration",
+      "reactTarget": null
+    },
+    {
+      "id": "hot-property-decoration",
+      "kind": "icon",
+      "uiRole": "hot-card-decoration",
+      "sourceBBox": {
+        "x": 731,
+        "y": 1274,
+        "width": 81,
+        "height": 93
+      },
+      "targetBBox": {
+        "x": 731,
+        "y": 1274,
+        "width": 81,
+        "height": 93
+      },
+      "representation": "svg",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-svg",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "低饱和几何装饰适合透明 SVG 重绘，可消除源裁片背景接缝。"
+      },
+      "visualStyle": {
+        "objectFit": "contain",
+        "zIndex": 3
+      },
+      "candidates": [
+        {
+          "id": "candidate-hot-property-decoration",
+          "route": "svg",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/hot-property-decoration.svg"
+        }
+      ],
+      "selectedCandidateId": "candidate-hot-property-decoration",
+      "specElementId": "hot-property-decoration",
+      "reactTarget": null
+    },
+    {
+      "id": "hot-social-title",
+      "kind": "text",
+      "uiRole": "hot-item-title",
+      "sourceBBox": {
+        "x": 78,
+        "y": 1260,
+        "width": 130,
+        "height": 48
+      },
+      "targetBBox": {
+        "x": 78,
+        "y": 1260,
+        "width": 130,
+        "height": 48
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "社保查询",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#15191f",
+        "fontSize": 25,
+        "fontWeight": 500,
+        "lineHeight": 48
+      },
+      "candidates": [
+        {
+          "id": "candidate-hot-social-title",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-hot-social-title",
+      "specElementId": "hot-social-title",
+      "reactTarget": null
+    },
+    {
+      "id": "hot-social-sub",
+      "kind": "text",
+      "uiRole": "hot-item-description",
+      "sourceBBox": {
+        "x": 78,
+        "y": 1302,
+        "width": 170,
+        "height": 39
+      },
+      "targetBBox": {
+        "x": 78,
+        "y": 1302,
+        "width": 170,
+        "height": 39
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "个人社保信息查询",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#858a92",
+        "fontSize": 19,
+        "fontWeight": 400,
+        "lineHeight": 39
+      },
+      "candidates": [
+        {
+          "id": "candidate-hot-social-sub",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-hot-social-sub",
+      "specElementId": "hot-social-sub",
+      "reactTarget": null
+    },
+    {
+      "id": "hot-fund-title",
+      "kind": "text",
+      "uiRole": "hot-item-title",
+      "sourceBBox": {
+        "x": 337,
+        "y": 1260,
+        "width": 144,
+        "height": 48
+      },
+      "targetBBox": {
+        "x": 337,
+        "y": 1260,
+        "width": 144,
+        "height": 48
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "公积金查询",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#15191f",
+        "fontSize": 25,
+        "fontWeight": 500,
+        "lineHeight": 48
+      },
+      "candidates": [
+        {
+          "id": "candidate-hot-fund-title",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-hot-fund-title",
+      "specElementId": "hot-fund-title",
+      "reactTarget": null
+    },
+    {
+      "id": "hot-fund-sub",
+      "kind": "text",
+      "uiRole": "hot-item-description",
+      "sourceBBox": {
+        "x": 337,
+        "y": 1302,
+        "width": 170,
+        "height": 39
+      },
+      "targetBBox": {
+        "x": 337,
+        "y": 1302,
+        "width": 170,
+        "height": 39
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "账户余额明细查询",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#858a92",
+        "fontSize": 19,
+        "fontWeight": 400,
+        "lineHeight": 39
+      },
+      "candidates": [
+        {
+          "id": "candidate-hot-fund-sub",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-hot-fund-sub",
+      "specElementId": "hot-fund-sub",
+      "reactTarget": null
+    },
+    {
+      "id": "hot-property-title",
+      "kind": "text",
+      "uiRole": "hot-item-title",
+      "sourceBBox": {
+        "x": 596,
+        "y": 1260,
+        "width": 144,
+        "height": 48
+      },
+      "targetBBox": {
+        "x": 596,
+        "y": 1260,
+        "width": 144,
+        "height": 48
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "不动产查询",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#15191f",
+        "fontSize": 25,
+        "fontWeight": 500,
+        "lineHeight": 48
+      },
+      "candidates": [
+        {
+          "id": "candidate-hot-property-title",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-hot-property-title",
+      "specElementId": "hot-property-title",
+      "reactTarget": null
+    },
+    {
+      "id": "hot-property-sub",
+      "kind": "text",
+      "uiRole": "hot-item-description",
+      "sourceBBox": {
+        "x": 596,
+        "y": 1302,
+        "width": 154,
+        "height": 39
+      },
+      "targetBBox": {
+        "x": 596,
+        "y": 1302,
+        "width": 154,
+        "height": 39
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "不动产信息查询",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#858a92",
+        "fontSize": 19,
+        "fontWeight": 400,
+        "lineHeight": 39
+      },
+      "candidates": [
+        {
+          "id": "candidate-hot-property-sub",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-hot-property-sub",
+      "specElementId": "hot-property-sub",
+      "reactTarget": null
+    },
+    {
+      "id": "notices-card",
+      "kind": "container",
+      "uiRole": "notices",
+      "sourceBBox": {
+        "x": 35,
+        "y": 1400,
+        "width": 793,
+        "height": 320
+      },
+      "targetBBox": {
+        "x": 35,
+        "y": 1400,
+        "width": 793,
+        "height": 320
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#ffffff",
+        "borderRadius": 20,
+        "boxShadow": "0 5px 16px rgba(30,79,128,0.10)",
+        "zIndex": 1
+      },
+      "candidates": [
+        {
+          "id": "candidate-notices-card",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notices-card",
+      "specElementId": "notices-card",
+      "reactTarget": null
+    },
+    {
+      "id": "notices-title",
+      "kind": "text",
+      "uiRole": "section-title",
+      "sourceBBox": {
+        "x": 58,
+        "y": 1417,
+        "width": 150,
+        "height": 54
+      },
+      "targetBBox": {
+        "x": 58,
+        "y": 1417,
+        "width": 150,
+        "height": 54
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "通知公告",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#111820",
+        "fontSize": 30,
+        "fontWeight": 500,
+        "lineHeight": 42
+      },
+      "candidates": [
+        {
+          "id": "candidate-notices-title",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notices-title",
+      "specElementId": "notices-title",
+      "reactTarget": null
+    },
+    {
+      "id": "notices-more",
+      "kind": "text",
+      "uiRole": "section-more",
+      "sourceBBox": {
+        "x": 716,
+        "y": 1418,
+        "width": 88,
+        "height": 50
+      },
+      "targetBBox": {
+        "x": 716,
+        "y": 1418,
+        "width": 88,
+        "height": 50
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "更多  ›",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#777d86",
+        "fontSize": 24,
+        "fontWeight": 400,
+        "lineHeight": 36,
+        "justifyContent": "flex-end"
+      },
+      "candidates": [
+        {
+          "id": "candidate-notices-more",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notices-more",
+      "specElementId": "notices-more",
+      "reactTarget": null
+    },
+    {
+      "id": "notice-divider-1",
+      "kind": "container",
+      "uiRole": "divider",
+      "sourceBBox": {
+        "x": 132,
+        "y": 1538,
+        "width": 670,
+        "height": 1
+      },
+      "targetBBox": {
+        "x": 132,
+        "y": 1538,
+        "width": 670,
+        "height": 1
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#e8ebef",
+        "zIndex": 2
+      },
+      "candidates": [
+        {
+          "id": "candidate-notice-divider-1",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notice-divider-1",
+      "specElementId": "notice-divider-1",
+      "reactTarget": null
+    },
+    {
+      "id": "notice-divider-2",
+      "kind": "container",
+      "uiRole": "divider",
+      "sourceBBox": {
+        "x": 132,
+        "y": 1607,
+        "width": 670,
+        "height": 1
+      },
+      "targetBBox": {
+        "x": 132,
+        "y": 1607,
+        "width": 670,
+        "height": 1
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#e8ebef",
+        "zIndex": 2
+      },
+      "candidates": [
+        {
+          "id": "candidate-notice-divider-2",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notice-divider-2",
+      "specElementId": "notice-divider-2",
+      "reactTarget": null
+    },
+    {
+      "id": "notice-divider-3",
+      "kind": "container",
+      "uiRole": "divider",
+      "sourceBBox": {
+        "x": 132,
+        "y": 1675,
+        "width": 670,
+        "height": 1
+      },
+      "targetBBox": {
+        "x": 132,
+        "y": 1675,
+        "width": 670,
+        "height": 1
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#e8ebef",
+        "zIndex": 2
+      },
+      "candidates": [
+        {
+          "id": "candidate-notice-divider-3",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notice-divider-3",
+      "specElementId": "notice-divider-3",
+      "reactTarget": null
+    },
+    {
+      "id": "notice-tag-bg-1",
+      "kind": "container",
+      "uiRole": "notice-tag",
+      "sourceBBox": {
+        "x": 58,
+        "y": 1489,
+        "width": 56,
+        "height": 34
+      },
+      "targetBBox": {
+        "x": 58,
+        "y": 1489,
+        "width": 56,
+        "height": 34
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#e8f2ff",
+        "borderRadius": 5,
+        "zIndex": 3
+      },
+      "candidates": [
+        {
+          "id": "candidate-notice-tag-bg-1",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notice-tag-bg-1",
+      "specElementId": "notice-tag-bg-1",
+      "reactTarget": null
+    },
+    {
+      "id": "notice-tag-bg-2",
+      "kind": "container",
+      "uiRole": "notice-tag",
+      "sourceBBox": {
+        "x": 58,
+        "y": 1558,
+        "width": 56,
+        "height": 34
+      },
+      "targetBBox": {
+        "x": 58,
+        "y": 1558,
+        "width": 56,
+        "height": 34
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#e8f2ff",
+        "borderRadius": 5,
+        "zIndex": 3
+      },
+      "candidates": [
+        {
+          "id": "candidate-notice-tag-bg-2",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notice-tag-bg-2",
+      "specElementId": "notice-tag-bg-2",
+      "reactTarget": null
+    },
+    {
+      "id": "notice-tag-bg-3",
+      "kind": "container",
+      "uiRole": "notice-tag",
+      "sourceBBox": {
+        "x": 58,
+        "y": 1626,
+        "width": 56,
+        "height": 34
+      },
+      "targetBBox": {
+        "x": 58,
+        "y": 1626,
+        "width": 56,
+        "height": 34
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#e8f2ff",
+        "borderRadius": 5,
+        "zIndex": 3
+      },
+      "candidates": [
+        {
+          "id": "candidate-notice-tag-bg-3",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notice-tag-bg-3",
+      "specElementId": "notice-tag-bg-3",
+      "reactTarget": null
+    },
+    {
+      "id": "notice-tag-1",
+      "kind": "text",
+      "uiRole": "notice-tag-text",
+      "sourceBBox": {
+        "x": 65,
+        "y": 1489,
+        "width": 43,
+        "height": 34
+      },
+      "targetBBox": {
+        "x": 65,
+        "y": 1489,
+        "width": 43,
+        "height": 34
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "公告",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#1761c9",
+        "fontSize": 19,
+        "fontWeight": 400,
+        "lineHeight": 34,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-notice-tag-1",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notice-tag-1",
+      "specElementId": "notice-tag-1",
+      "reactTarget": null
+    },
+    {
+      "id": "notice-tag-2",
+      "kind": "text",
+      "uiRole": "notice-tag-text",
+      "sourceBBox": {
+        "x": 65,
+        "y": 1558,
+        "width": 43,
+        "height": 34
+      },
+      "targetBBox": {
+        "x": 65,
+        "y": 1558,
+        "width": 43,
+        "height": 34
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "公告",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#1761c9",
+        "fontSize": 19,
+        "fontWeight": 400,
+        "lineHeight": 34,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-notice-tag-2",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notice-tag-2",
+      "specElementId": "notice-tag-2",
+      "reactTarget": null
+    },
+    {
+      "id": "notice-tag-3",
+      "kind": "text",
+      "uiRole": "notice-tag-text",
+      "sourceBBox": {
+        "x": 65,
+        "y": 1626,
+        "width": 43,
+        "height": 34
+      },
+      "targetBBox": {
+        "x": 65,
+        "y": 1626,
+        "width": 43,
+        "height": 34
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "公告",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#1761c9",
+        "fontSize": 19,
+        "fontWeight": 400,
+        "lineHeight": 34,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-notice-tag-3",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notice-tag-3",
+      "specElementId": "notice-tag-3",
+      "reactTarget": null
+    },
+    {
+      "id": "notice-copy-1",
+      "kind": "text",
+      "uiRole": "notice-copy",
+      "sourceBBox": {
+        "x": 132,
+        "y": 1483,
+        "width": 500,
+        "height": 47
+      },
+      "targetBBox": {
+        "x": 132,
+        "y": 1483,
+        "width": 500,
+        "height": 47
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "关于优化本市企业开办服务的通知",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#171b21",
+        "fontSize": 23,
+        "fontWeight": 400,
+        "lineHeight": 47
+      },
+      "candidates": [
+        {
+          "id": "candidate-notice-copy-1",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notice-copy-1",
+      "specElementId": "notice-copy-1",
+      "reactTarget": null
+    },
+    {
+      "id": "notice-copy-2",
+      "kind": "text",
+      "uiRole": "notice-copy",
+      "sourceBBox": {
+        "x": 132,
+        "y": 1552,
+        "width": 560,
+        "height": 47
+      },
+      "targetBBox": {
+        "x": 132,
+        "y": 1552,
+        "width": 560,
+        "height": 47
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "2024年端午节放假期间政务服务安排公告",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#171b21",
+        "fontSize": 23,
+        "fontWeight": 400,
+        "lineHeight": 47
+      },
+      "candidates": [
+        {
+          "id": "candidate-notice-copy-2",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notice-copy-2",
+      "specElementId": "notice-copy-2",
+      "reactTarget": null
+    },
+    {
+      "id": "notice-copy-3",
+      "kind": "text",
+      "uiRole": "notice-copy",
+      "sourceBBox": {
+        "x": 132,
+        "y": 1620,
+        "width": 550,
+        "height": 47
+      },
+      "targetBBox": {
+        "x": 132,
+        "y": 1620,
+        "width": 550,
+        "height": 47
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "部分政务服务事项办理流程优化调整公告",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#171b21",
+        "fontSize": 23,
+        "fontWeight": 400,
+        "lineHeight": 47
+      },
+      "candidates": [
+        {
+          "id": "candidate-notice-copy-3",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notice-copy-3",
+      "specElementId": "notice-copy-3",
+      "reactTarget": null
+    },
+    {
+      "id": "notice-date-1",
+      "kind": "text",
+      "uiRole": "notice-date",
+      "sourceBBox": {
+        "x": 727,
+        "y": 1483,
+        "width": 74,
+        "height": 47
+      },
+      "targetBBox": {
+        "x": 727,
+        "y": 1483,
+        "width": 74,
+        "height": 47
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "05-20",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#7a7f87",
+        "fontSize": 21,
+        "fontWeight": 400,
+        "lineHeight": 47,
+        "justifyContent": "flex-end"
+      },
+      "candidates": [
+        {
+          "id": "candidate-notice-date-1",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notice-date-1",
+      "specElementId": "notice-date-1",
+      "reactTarget": null
+    },
+    {
+      "id": "notice-date-2",
+      "kind": "text",
+      "uiRole": "notice-date",
+      "sourceBBox": {
+        "x": 727,
+        "y": 1552,
+        "width": 74,
+        "height": 47
+      },
+      "targetBBox": {
+        "x": 727,
+        "y": 1552,
+        "width": 74,
+        "height": 47
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "05-18",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#7a7f87",
+        "fontSize": 21,
+        "fontWeight": 400,
+        "lineHeight": 47,
+        "justifyContent": "flex-end"
+      },
+      "candidates": [
+        {
+          "id": "candidate-notice-date-2",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notice-date-2",
+      "specElementId": "notice-date-2",
+      "reactTarget": null
+    },
+    {
+      "id": "notice-date-3",
+      "kind": "text",
+      "uiRole": "notice-date",
+      "sourceBBox": {
+        "x": 727,
+        "y": 1620,
+        "width": 74,
+        "height": 47
+      },
+      "targetBBox": {
+        "x": 727,
+        "y": 1620,
+        "width": 74,
+        "height": 47
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "05-15",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 5,
+        "color": "#7a7f87",
+        "fontSize": 21,
+        "fontWeight": 400,
+        "lineHeight": 47,
+        "justifyContent": "flex-end"
+      },
+      "candidates": [
+        {
+          "id": "candidate-notice-date-3",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-notice-date-3",
+      "specElementId": "notice-date-3",
+      "reactTarget": null
+    },
+    {
+      "id": "bottom-navigation",
+      "kind": "container",
+      "uiRole": "bottom-navigation",
+      "sourceBBox": {
+        "x": 0,
+        "y": 1680,
+        "width": 863,
+        "height": 143
+      },
+      "targetBBox": {
+        "x": 0,
+        "y": 1680,
+        "width": 863,
+        "height": 143
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#ffffff",
+        "border": "1px solid #edf0f3",
+        "zIndex": 10
+      },
+      "candidates": [
+        {
+          "id": "candidate-bottom-navigation",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-bottom-navigation",
+      "specElementId": "bottom-navigation",
+      "reactTarget": null
+    },
+    {
+      "id": "bottom-home",
+      "kind": "image",
+      "uiRole": "bottom-nav-icon",
+      "sourceBBox": {
+        "x": 79,
+        "y": 1693,
+        "width": 60,
+        "height": 54
+      },
+      "targetBBox": {
+        "x": 79,
+        "y": 1693,
+        "width": 60,
+        "height": 54
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 11
+      },
+      "candidates": [
+        {
+          "id": "candidate-bottom-home",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/bottom-home.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-bottom-home",
+      "specElementId": "bottom-home",
+      "reactTarget": null
+    },
+    {
+      "id": "bottom-services",
+      "kind": "image",
+      "uiRole": "bottom-nav-icon",
+      "sourceBBox": {
+        "x": 298,
+        "y": 1693,
+        "width": 47,
+        "height": 54
+      },
+      "targetBBox": {
+        "x": 298,
+        "y": 1693,
+        "width": 47,
+        "height": 54
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 11
+      },
+      "candidates": [
+        {
+          "id": "candidate-bottom-services",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/bottom-services.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-bottom-services",
+      "specElementId": "bottom-services",
+      "reactTarget": null
+    },
+    {
+      "id": "bottom-news",
+      "kind": "image",
+      "uiRole": "bottom-nav-icon",
+      "sourceBBox": {
+        "x": 514,
+        "y": 1693,
+        "width": 47,
+        "height": 54
+      },
+      "targetBBox": {
+        "x": 514,
+        "y": 1693,
+        "width": 47,
+        "height": 54
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 11
+      },
+      "candidates": [
+        {
+          "id": "candidate-bottom-news",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/bottom-news.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-bottom-news",
+      "specElementId": "bottom-news",
+      "reactTarget": null
+    },
+    {
+      "id": "bottom-profile",
+      "kind": "image",
+      "uiRole": "bottom-nav-icon",
+      "sourceBBox": {
+        "x": 727,
+        "y": 1691,
+        "width": 54,
+        "height": 58
+      },
+      "targetBBox": {
+        "x": 727,
+        "y": 1691,
+        "width": 54,
+        "height": 58
+      },
+      "representation": "clean-crop",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reuse",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "源图裁片边界完整，首版直接复用以保留精确像素。"
+      },
+      "visualStyle": {
+        "objectFit": "fill",
+        "zIndex": 11
+      },
+      "candidates": [
+        {
+          "id": "candidate-bottom-profile",
+          "route": "clean-crop",
+          "audit": {
+            "status": "passed"
+          },
+          "assetPath": "assets/bottom-profile.png",
+          "backgroundMode": "preserve"
+        }
+      ],
+      "selectedCandidateId": "candidate-bottom-profile",
+      "specElementId": "bottom-profile",
+      "reactTarget": null
+    },
+    {
+      "id": "bottom-home-label",
+      "kind": "text",
+      "uiRole": "bottom-nav-label",
+      "sourceBBox": {
+        "x": 72,
+        "y": 1747,
+        "width": 74,
+        "height": 43
+      },
+      "targetBBox": {
+        "x": 72,
+        "y": 1747,
+        "width": 74,
+        "height": 43
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "首页",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 11,
+        "color": "#064ab1",
+        "fontSize": 22,
+        "fontWeight": 500,
+        "lineHeight": 43,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-bottom-home-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-bottom-home-label",
+      "specElementId": "bottom-home-label",
+      "reactTarget": null
+    },
+    {
+      "id": "bottom-services-label",
+      "kind": "text",
+      "uiRole": "bottom-nav-label",
+      "sourceBBox": {
+        "x": 284,
+        "y": 1747,
+        "width": 74,
+        "height": 43
+      },
+      "targetBBox": {
+        "x": 284,
+        "y": 1747,
+        "width": 74,
+        "height": 43
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "办事",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 11,
+        "color": "#8a8d93",
+        "fontSize": 22,
+        "fontWeight": 400,
+        "lineHeight": 43,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-bottom-services-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-bottom-services-label",
+      "specElementId": "bottom-services-label",
+      "reactTarget": null
+    },
+    {
+      "id": "bottom-news-label",
+      "kind": "text",
+      "uiRole": "bottom-nav-label",
+      "sourceBBox": {
+        "x": 500,
+        "y": 1747,
+        "width": 74,
+        "height": 43
+      },
+      "targetBBox": {
+        "x": 500,
+        "y": 1747,
+        "width": 74,
+        "height": 43
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "资讯",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 11,
+        "color": "#8a8d93",
+        "fontSize": 22,
+        "fontWeight": 400,
+        "lineHeight": 43,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-bottom-news-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-bottom-news-label",
+      "specElementId": "bottom-news-label",
+      "reactTarget": null
+    },
+    {
+      "id": "bottom-profile-label",
+      "kind": "text",
+      "uiRole": "bottom-nav-label",
+      "sourceBBox": {
+        "x": 715,
+        "y": 1747,
+        "width": 74,
+        "height": 43
+      },
+      "targetBBox": {
+        "x": 715,
+        "y": 1747,
+        "width": 74,
+        "height": 43
+      },
+      "representation": "html",
+      "textReview": {
+        "content": "我的",
+        "textRole": "ui-text",
+        "renderMode": "html-text",
+        "ocrUsage": "render",
+        "decisionSource": "vision-ai",
+        "confidence": 0.99,
+        "reason": "标准界面文案，保留为可编辑 HTML 文字。"
+      },
+      "assetReview": {
+        "assetAction": "none",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "普通 UI 文案无需位图素材。"
+      },
+      "visualStyle": {
+        "fontFamily": "-apple-system,BlinkMacSystemFont,\"PingFang SC\",\"Microsoft YaHei\",sans-serif",
+        "display": "flex",
+        "alignItems": "center",
+        "whiteSpace": "nowrap",
+        "zIndex": 11,
+        "color": "#8a8d93",
+        "fontSize": 22,
+        "fontWeight": 400,
+        "lineHeight": 43,
+        "justifyContent": "center"
+      },
+      "candidates": [
+        {
+          "id": "candidate-bottom-profile-label",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-bottom-profile-label",
+      "specElementId": "bottom-profile-label",
+      "reactTarget": null
+    },
+    {
+      "id": "home-indicator",
+      "kind": "container",
+      "uiRole": "system-home-indicator",
+      "sourceBBox": {
+        "x": 283,
+        "y": 1798,
+        "width": 297,
+        "height": 9
+      },
+      "targetBBox": {
+        "x": 283,
+        "y": 1798,
+        "width": 297,
+        "height": 9
+      },
+      "representation": "html",
+      "textReview": null,
+      "assetReview": {
+        "assetAction": "reconstruct-css",
+        "decisionSource": "vision-ai",
+        "status": "accepted",
+        "reason": "规则容器与几何样式使用 HTML/CSS 可精确复现。"
+      },
+      "visualStyle": {
+        "backgroundColor": "#000000",
+        "borderRadius": 5,
+        "zIndex": 12
+      },
+      "candidates": [
+        {
+          "id": "candidate-home-indicator",
+          "route": "html",
+          "audit": {
+            "status": "passed"
+          }
+        }
+      ],
+      "selectedCandidateId": "candidate-home-indicator",
+      "specElementId": "home-indicator",
+      "reactTarget": null
+    }
+  ]
+}

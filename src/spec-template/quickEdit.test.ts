@@ -47,6 +47,19 @@ describe('spec-template quickEdit helpers', () => {
         });
     });
 
+    it('resolves fixed Markdown template urls to their root templates path', () => {
+        expect(resolveMarkdownQuickEditMeta('/api/document-templates/prd?projectId=client-project&path=templates%2Fprd.md')).toMatchObject({
+            resourceKind: 'template',
+            docType: 'template',
+            docPath: 'templates/prd.md',
+            prototypePath: '',
+        });
+        expect(resolveMarkdownQuickEditMeta('/api/document-templates/custom?path=templates%2Fcustom.md')).toMatchObject({
+            resourceKind: 'unknown',
+            docPath: '',
+        });
+    });
+
     it('builds an actionable prompt from Markdown comments', () => {
         const result = buildMarkdownCommentPrompt({
             docLabel: '首页说明',

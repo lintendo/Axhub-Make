@@ -12,7 +12,6 @@ export interface AcpProviderOption {
   provider: AcpProviderKey;
   client: `acp:${AcpProviderKey}`;
   label: string;
-  defaultAnnotationModel: string;
   supportsNpxFallback?: boolean;
 }
 
@@ -22,14 +21,14 @@ export interface AcpAnnotationModelPreference {
 }
 
 export const ACP_PROVIDER_OPTIONS: readonly AcpProviderOption[] = [
-  { provider: 'claude', client: 'acp:claude', label: 'Claude Code', defaultAnnotationModel: 'sonnet' },
-  { provider: 'codex', client: 'acp:codex', label: 'Codex CLI', defaultAnnotationModel: 'gpt-5.5' },
-  { provider: 'opencode', client: 'acp:opencode', label: 'OpenCode', defaultAnnotationModel: 'opencode/big-pickle' },
-  { provider: 'cursor', client: 'acp:cursor', label: 'Cursor CLI', defaultAnnotationModel: 'default' },
-  { provider: 'qoder', client: 'acp:qoder', label: 'Qoder CLI', defaultAnnotationModel: 'auto' },
-  { provider: 'codebuddy', client: 'acp:codebuddy', label: 'CodeBuddy CLI', defaultAnnotationModel: 'default' },
-  { provider: 'reasonix', client: 'acp:reasonix', label: 'Reasonix CLI', defaultAnnotationModel: 'deepseek-v4-pro/deepseek-v4-pro' },
-  { provider: 'grok-build', client: 'acp:grok-build', label: 'Grok Build', defaultAnnotationModel: 'grok-build', supportsNpxFallback: true },
+  { provider: 'claude', client: 'acp:claude', label: 'Claude Code' },
+  { provider: 'codex', client: 'acp:codex', label: 'Codex CLI' },
+  { provider: 'opencode', client: 'acp:opencode', label: 'OpenCode' },
+  { provider: 'cursor', client: 'acp:cursor', label: 'Cursor CLI' },
+  { provider: 'qoder', client: 'acp:qoder', label: 'Qoder CLI' },
+  { provider: 'codebuddy', client: 'acp:codebuddy', label: 'CodeBuddy CLI' },
+  { provider: 'reasonix', client: 'acp:reasonix', label: 'Reasonix CLI' },
+  { provider: 'grok-build', client: 'acp:grok-build', label: 'Grok Build', supportsNpxFallback: true },
 ] as const;
 
 export const ACP_PROVIDER_KEYS = ACP_PROVIDER_OPTIONS.map((option) => option.provider) as AcpProviderKey[];

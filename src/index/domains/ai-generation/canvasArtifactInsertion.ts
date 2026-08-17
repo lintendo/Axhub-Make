@@ -8,6 +8,7 @@ import {
 import { buildMarkdownFileUrl } from '../../utils/markdownPreview';
 
 export interface ApplyGenerationArtifactsToCanvasElementsOptions {
+  projectId: string;
   elements: readonly any[];
   appState: any;
   artifacts: readonly GenerationArtifactRecord[];
@@ -80,11 +81,11 @@ function normalizeLocalMarkdownPath(value: string): string {
   return pathValue;
 }
 
-function resolveEmbedUrl(artifact: GenerationArtifactRecord, url: string): string {
+function resolveEmbedUrl(artifact: GenerationArtifactRecord, url: string, projectId: string): string {
   if (artifact.kind !== 'document') return url;
   const markdownPath = normalizeLocalMarkdownPath(stringField(artifact.target.path))
     || normalizeLocalMarkdownPath(url);
-  return markdownPath ? buildMarkdownFileUrl(markdownPath) : url;
+  return markdownPath ? buildMarkdownFileUrl(markdownPath, projectId) : url;
 }
 
 function resolveResourceType(artifact: GenerationArtifactRecord): 'doc' | 'prototype' {
@@ -183,9 +184,9 @@ function resolveArtifactResourceKey(artifact: GenerationArtifactRecord, url: str
   return metadataKey.startsWith(`${artifact.kind}:`) ? metadataKey : resolvedKey;
 }
 
-function createArtifactElement(artifact: GenerationArtifactRecord, x: number, y: number) {
+function createArtifactElement(artifact: GenerationArtifactRecord, x: number, y: number, projectId: string) {
   const url = resolveArtifactUrl(artifact);
-  const embedUrl = resolveEmbedUrl(artifact, url);
+  const embedUrl = resolveEmbedUrl(artifact, url, projectId);
   const resourceType = resolveResourceType(artifact);
   const resourceId = resolveResourceId(artifact, url);
   const title = stringField(artifact.title) || stringField(artifact.metadata.title) || basename(resourceId) || 'AI 生成产物';
@@ -225,6 +226,7 @@ function createArtifactElement(artifact: GenerationArtifactRecord, x: number, y:
         scale: [1, 1] as [number, number],
         crop: null,
         customData: {
+          projectId,
           title,
           previewUrl: url,
           openUrl: url,
@@ -276,6 +278,7 @@ function createArtifactElement(artifact: GenerationArtifactRecord, x: number, y:
         scale: [1, 1] as [number, number],
         crop: null,
         customData: {
+          projectId,
           type: 'axhub-drawio',
           title,
           previewUrl: url,
@@ -324,6 +327,7 @@ function createArtifactElement(artifact: GenerationArtifactRecord, x: number, y:
     link: openUrl,
     locked: false,
     customData: {
+      projectId,
       ...(resourceType === 'doc' ? { type: 'axhub-doc' } : {}),
       title,
       previewUrl,
@@ -350,8 +354,8 @@ function createArtifactElement(artifact: GenerationArtifactRecord, x: number, y:
   };
 }
 
-function updateArtifactElement(element: any, artifact: GenerationArtifactRecord): any {
-  const created = createArtifactElement(artifact, element.x, element.y);
+function updateArtifactElement(element: any, artifact: GenerationArtifactRecord, projectId: string): any {
+  const created = createArtifactElement(artifact, element.x, element.y, projectId);
   const replacement = 'element' in created ? created.element : created;
   const nextCustomData = {
     ...element.customData,
@@ -469,7 +473,7 @@ export function applyGenerationArtifactsToCanvasElements(
       }
       elements = elements.map((element) => {
         if (element?.id !== existing.id) return element;
-        const updated = updateArtifactElement(element, artifact);
+        const updated = updateArtifactElement(element, artifact, options.projectId);
         selectedElementIds[updated.id] = true;
         updatedElementIds.push(updated.id);
         return updated;
@@ -483,7 +487,7 @@ export function applyGenerationArtifactsToCanvasElements(
     const position = replacementElement
       ? { x: Number(replacementElement.x) || anchor.x, y: Number(replacementElement.y) || anchor.y }
       : findFreePosition(elements, anchor, insertionIndex);
-    const created = createArtifactElement(artifact, position.x, position.y);
+    const created = createArtifactElement(artifact, position.x, position.y, options.projectId);
     const inserted = 'element' in created ? created.element : created;
     if ('files' in created && created.files?.length) files.push(...created.files);
     if (replacementElement) {

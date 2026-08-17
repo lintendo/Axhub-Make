@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+:root,
+.dark {
+  --background: #0a0b0d;
+  --foreground: #f5f9fe;
+  --surface: #121314;
+  --surface-raised: #171a1c;
+  --primary: #32f08c;
+  --primary-foreground: #0a0b0d;
+  --primary-hover: #0fdc78;
+  --primary-disabled: #32f08c4d;
+  --secondary: #edeff214;
+  --secondary-foreground: #f5f9fe;
+  --muted: #edeff20a;
+  --muted-foreground: #a6aab5;
+  --tertiary-foreground: #787d87;
+  --accent: #edeff221;
+  --accent-foreground: #f5f9fe;
+  --destructive: #f64d46;
+  --destructive-foreground: #ffffff;
+  --info: #387bff;
+  --success: #26a57b;
+  --warning: #dc8730;
+  --border: #ffffff1f;
+  --border-subtle: #ffffff0f;
+  --ring: #32f08c;
+  --brand-gradient: linear-gradient(90deg, #3ee1a3 0%, #32f08c 36%, #60f2bd 71.63%, #a0fde7 100%);
+  --radius-control: 0px;
+  --radius-card: 4px;
+  --radius-micro: 2px;
+  --font-sans: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-display: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  --motion-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-base: 200ms ease;
+  --motion-slow: 300ms ease;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-tertiary-foreground: var(--tertiary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-info: var(--info);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-ring: var(--ring);
+  --radius-none: var(--radius-control);
+  --radius-sm: var(--radius-micro);
+  --radius-md: var(--radius-card);
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+

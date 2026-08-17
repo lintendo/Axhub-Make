@@ -1,0 +1,132 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 22,
+  "pageId": "ejmrvw",
+  "pageName": "菜谱列表",
+  "sitemapPath": "菜谱 / 菜谱列表",
+  "requestedPath": "菜谱列表.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.59.47/%E8%8F%9C%E8%B0%B1%E5%88%97%E8%A1%A8.html",
+  "dataUrl": "http://127.0.0.1:32768/20.59.47/files/%E8%8F%9C%E8%B0%B1%E5%88%97%E8%A1%A8/data.js",
+  "generationDate": "2026-08-14T12:59:47.947Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 7月龄宝宝食谱\n- paragraph: 蛋花豆腐羹\n- paragraph\n- paragraph: 2222人喜欢 40000人收藏\n- paragraph: 鸡蛋、南豆腐、西红柿、\n- paragraph: 玉米、胡萝卜\n- paragraph: 蛋花豆腐羹\n- paragraph\n- paragraph: 2222人喜欢 40000人收藏\n- paragraph: 鸡蛋、南豆腐、西红柿、\n- paragraph: 玉米、胡萝卜\n- paragraph: 蛋花豆腐羹\n- paragraph\n- paragraph: 2222人喜欢 40000人收藏\n- paragraph: 鸡蛋、南豆腐、西红柿、\n- paragraph: 玉米、胡萝卜\n- paragraph: 蛋花豆腐羹\n- paragraph\n- paragraph: 2222人喜欢 40000人收藏\n- paragraph: 鸡蛋、南豆腐、西红柿、\n- paragraph: 玉米、胡萝卜\n- paragraph: 数据加载中\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "022-recipe-list-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "导航",
+    "背景",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [],
+  "panels": [
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:菜谱列表 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:菜谱列表 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 菜谱详情 in Current window",
+      "target": "菜谱详情.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

@@ -40,14 +40,27 @@ describe('spec-template quick editing regression boundary', () => {
     );
   });
 
-  it('resolves relative images in project document content previews through a project asset endpoint', () => {
+  it('saves fixed Markdown templates through the fixed template API', () => {
     const viewerSource = readSpecTemplateSource('MarkdownViewer.tsx');
 
-    expect(viewerSource).toContain('buildProjectDocumentAssetUrl');
-    expect(viewerSource).toContain("parsedUrl.pathname.match(/^\\/api\\/projects\\/([^/]+)\\/document-content$/iu)");
-    expect(viewerSource).toContain('/api/projects/${encodeURIComponent(projectId)}/document-asset');
-    expect(viewerSource).toContain("path=${encodeURIComponent(filePath)}");
-    expect(viewerSource).toContain("asset=${encodeURIComponent(assetPath)}");
+    expect(viewerSource).toContain("pathname.startsWith('/api/document-templates/')");
+  });
+
+  it('resolves relative images in project document content previews through a project asset endpoint', () => {
+    const imageSource = readFileSync(resolve(__dirname, '../common/markdown/markdownImage.ts'), 'utf8');
+
+    expect(imageSource).toContain('buildProjectDocumentAssetUrl');
+    expect(imageSource).toContain("parsedUrl.pathname.match(/^\\/api\\/projects\\/([^/]+)\\/document-content$/iu)");
+    expect(imageSource).toContain('/api/projects/${encodeURIComponent(projectId)}/document-asset');
+    expect(imageSource).toContain("path=${encodeURIComponent(filePath)}");
+    expect(imageSource).toContain("asset=${encodeURIComponent(assetPath)}");
+  });
+
+  it('passes the active document image resolver into edit mode', () => {
+    const viewerSource = readSpecTemplateSource('MarkdownViewer.tsx');
+
+    expect(viewerSource).toContain('resolveCurrentDocumentImageSrc');
+    expect(viewerSource).toContain('imageSrcResolver={resolveCurrentDocumentImageSrc}');
   });
 
   it('supports opening Markdown documents directly in edit mode from the URL', () => {
@@ -80,6 +93,19 @@ describe('spec-template quick editing regression boundary', () => {
     expect(helperSource).toContain('formatLocatorPath');
   });
 
+  it('exposes synchronous Markdown comment prompt text to the preview host', () => {
+    const viewerSource = readSpecTemplateSource('MarkdownViewer.tsx');
+    const bootstrapSource = readSpecTemplateSource('index.tsx');
+
+    expect(viewerSource).toContain('getCopyPromptText: () => string;');
+    expect(viewerSource).toMatch(
+      /getCopyPromptText\(\) \{[\s\S]*?return buildCommentPromptPayload\(\)\.prompt;/,
+    );
+    expect(bootstrapSource).toMatch(
+      /getCopyPromptText\(\) \{[\s\S]*?return markdownViewerRef\.current\?\.getCopyPromptText\(\) \?\? '';/,
+    );
+  });
+
   it('unwraps JSON document content responses before rendering Markdown', () => {
     const bootstrapSource = readSpecTemplateSource('index.tsx');
 
@@ -88,12 +114,13 @@ describe('spec-template quick editing regression boundary', () => {
     expect(bootstrapSource).toContain("typeof payload?.content === 'string'");
   });
 
-  it('renders Markdown with the built-in renderer without adding a separate white page shell', () => {
+  it('renders Markdown through the shared reader without adding a separate white page shell', () => {
     const viewerSource = readSpecTemplateSource('MarkdownViewer.tsx');
 
-    expect(viewerSource).toContain("import { XMarkdown } from '@ant-design/x-markdown';");
-    expect(viewerSource).toContain('<XMarkdown');
-    expect(viewerSource).toContain('className="x-markdown-light"');
+    expect(viewerSource).toContain("import { ReadOnlyMarkdown } from '../common/markdown/ReadOnlyMarkdown';");
+    expect(viewerSource).toContain('<ReadOnlyMarkdown');
+    expect(viewerSource).not.toContain("import { XMarkdown } from '@ant-design/x-markdown';");
+    expect(viewerSource).not.toContain('<XMarkdown');
     expect(viewerSource).not.toMatch(/\.markdown-content\s*>\s*div\s*\{[\s\S]*background:\s*#fff/);
   });
 

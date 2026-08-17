@@ -1,0 +1,179 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 33,
+  "pageId": "q8s8sj",
+  "pageName": "搜索",
+  "sitemapPath": "搜索",
+  "requestedPath": "搜索.html",
+  "resolvedUrl": "http://127.0.0.1:32768/21.00.04/%E6%90%9C%E7%B4%A2.html",
+  "dataUrl": "http://127.0.0.1:32768/21.00.04/files/%E6%90%9C%E7%B4%A2/data.js",
+  "generationDate": "2026-08-14T13:00:04.060Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph\n- textbox: 搜索育儿知识\n- paragraph: 取消\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "033-search-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "导航",
+    "背景",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [
+    {
+      "scope": "page:搜索 / 导航 / Group / Text field",
+      "label": "",
+      "type": "Text field",
+      "visible": true
+    }
+  ],
+  "panels": [
+    {
+      "scope": "page:搜索 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1",
+        "有结果",
+        "无结果"
+      ]
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:搜索 / 导航 / Group / Text field",
+      "event": "Text changed",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show/hide widget",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:搜索 / 导航 / Group / Shape",
+      "event": "Click or tap",
+      "case": "无结果",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set (Dynamic panel) to&nbsp; to 无结果 ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:搜索 / 导航 / Group / Shape",
+      "event": "Click or tap",
+      "case": "有结果",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set (Dynamic panel) to&nbsp; to 有结果 ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:搜索 / 导航 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:搜索 / Dynamic panel / state:有结果 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 百科详情 in Current window",
+      "target": "百科详情.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

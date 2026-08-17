@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { apiService, type GitWorkspaceStatusResponse } from '../services/api';
 import { generateGitCommitMessage } from '../domains/ai-generation/gitCommitMessageGeneration';
+import { requireProjectScope, withProjectScope } from '../services/projectScope';
 import { ItemData } from '../types';
 import { getGitVersionUnavailableState, type GitVersionUnavailableState } from '../utils/gitVersionErrors';
 import { useAppDialog } from './dialogs/AppDialogProvider';
@@ -30,6 +31,7 @@ import {
 } from './VersionCards';
 
 interface VersionManagerProps {
+    projectId: string;
     visible: boolean;
     onCancel: () => void;
     item: ItemData | null;
@@ -118,6 +120,7 @@ function resolvePrototypeVersionPreviewUrl(targetItem: ItemData | null, prototyp
 }
 
 export default function VersionManager({
+    projectId,
     visible,
     onCancel,
     item,
@@ -134,6 +137,7 @@ export default function VersionManager({
     const [gitUnavailableState, setGitUnavailableState] = useState<GitVersionUnavailableState | null>(null);
     const [workspaceStatus, setWorkspaceStatus] = useState<GitWorkspaceStatusResponse | null>(null);
     const [busyAction, setBusyAction] = useState<PrototypeVersionAction | null>(null);
+    const projectScope = requireProjectScope(projectId);
     const targetPath = getGitTargetPath(item);
     const isBusy = busyAction !== null;
     const isRepositoryReady = Boolean(workspaceStatus?.isGitRepo && workspaceStatus?.hasCommits);
@@ -170,7 +174,7 @@ export default function VersionManager({
                 toast.error('无法获取文件路径');
                 return;
             }
-            const response = await fetch(`/api/git/history?path=${encodeURIComponent(targetPath)}`);
+            const response = await fetch(withProjectScope(`/api/git/history?path=${encodeURIComponent(targetPath)}`, projectScope));
             const data = await response.json();
 
             if (response.ok) {
@@ -183,7 +187,7 @@ export default function VersionManager({
                     previewReady: Boolean(commit.prototypeUrl) && await probeGitVersionEntry({
                         commitHash: commit.hash,
                         targetPath,
-                        projectId: data.projectId,
+                        projectId: projectScope.projectId,
                     }),
                 }))));
                 setHasUncommitted(Boolean(data.hasUncommitted));
@@ -210,7 +214,7 @@ export default function VersionManager({
         setBusyAction('load');
         setWorkspaceStatus(null);
         try {
-            setWorkspaceStatus(await apiService.getGitWorkspaceStatus({ path: targetPath }));
+            setWorkspaceStatus(await apiService.getGitWorkspaceStatus({ path: targetPath }, projectScope));
         } catch (error) {
             toast.error(error instanceof Error ? error.message : '加载版本状态失败');
         } finally {
@@ -229,7 +233,7 @@ export default function VersionManager({
         if (visible && item) {
             void reloadAll();
         }
-    }, [visible, item?.name, item?.filePath, item?.absoluteFilePath]);
+    }, [visible, item?.name, item?.filePath, item?.absoluteFilePath, projectId]);
 
     const openWorkspaceVersionCollaboration = () => {
         onCancel();
@@ -253,7 +257,7 @@ export default function VersionManager({
                 toast.error('无法获取文件路径');
                 return;
             }
-            const response = await fetch('/api/git/restore', {
+            const response = await fetch(withProjectScope('/api/git/restore', projectScope), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path: targetPath, commitHash }),
@@ -284,7 +288,7 @@ export default function VersionManager({
 
         setBusyAction('commit');
         try {
-            await apiService.commitGitWorkspace(commitMessage.trim(), { path: targetPath });
+            await apiService.commitGitWorkspace(commitMessage.trim(), projectScope, { path: targetPath });
             toast.success('提交成功');
             setCommitMessage('');
             await reloadAll();
@@ -299,6 +303,7 @@ export default function VersionManager({
         setGeneratingCommitMessage(true);
         try {
             const generatedMessage = await generateGitCommitMessage({
+                projectId,
                 scope: 'prototype',
                 status: workspaceStatus,
                 targetName: String(item?.displayName || item?.title || item?.name || '').trim(),
@@ -327,7 +332,7 @@ export default function VersionManager({
                 return;
             }
             toast.info('正在准备历史版本预览，完成后请再次点击预览');
-            const response = await fetch('/api/git/build-version', {
+            const response = await fetch(withProjectScope('/api/git/build-version', projectScope), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path: targetPath, commitHash }),
@@ -361,7 +366,7 @@ export default function VersionManager({
     const handleFetchRemote = async () => {
         setBusyAction('fetch');
         try {
-            await apiService.fetchGitWorkspace();
+            await apiService.fetchGitWorkspace(projectScope);
             await loadWorkspaceStatus();
             toast.success('已读取在线仓库');
         } catch (error) {
@@ -374,7 +379,7 @@ export default function VersionManager({
     const handleSyncDown = async () => {
         setBusyAction('sync-down');
         try {
-            await apiService.syncDownGitWorkspace();
+            await apiService.syncDownGitWorkspace(projectScope);
             await reloadAll();
             toast.success('已同步在线仓库');
         } catch (error) {
@@ -387,7 +392,7 @@ export default function VersionManager({
     const handlePush = async () => {
         setBusyAction('push');
         try {
-            await apiService.pushGitWorkspace();
+            await apiService.pushGitWorkspace(projectScope);
             await reloadAll();
             toast.success('已同步到在线仓库');
         } catch (error) {

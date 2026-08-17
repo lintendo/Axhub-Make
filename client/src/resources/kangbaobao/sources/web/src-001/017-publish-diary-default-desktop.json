@@ -1,0 +1,231 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 17,
+  "pageId": "ff40hv",
+  "pageName": "发布日记",
+  "sitemapPath": "首页 / 宝宝日记 / 发布日记",
+  "requestedPath": "发布日记.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.59.44/%E5%8F%91%E5%B8%83%E6%97%A5%E8%AE%B0.html",
+  "dataUrl": "http://127.0.0.1:32768/20.59.44/files/%E5%8F%91%E5%B8%83%E6%97%A5%E8%AE%B0/data.js",
+  "generationDate": "2026-08-14T12:59:44.423Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 日记\n- paragraph: 保存\n- textbox: 为这篇记录说点什么吧\n- paragraph: 记录时间\n- paragraph: 2019/06/19\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "017-publish-diary-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "导航",
+    "头像",
+    "弹层-选择日期",
+    "toast",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [
+    {
+      "scope": "page:发布日记 / Group / Text field",
+      "label": "",
+      "type": "Text field",
+      "visible": true
+    }
+  ],
+  "panels": [
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:发布日记 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:发布日记 / 导航 / Rectangle",
+      "event": "Click or tap",
+      "case": "修改成功",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show toast",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:发布日记 / 导航 / Rectangle",
+      "event": "Click or tap",
+      "case": "修改成功",
+      "condition": "",
+      "action": "wait",
+      "description": "Wait 1000 ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:发布日记 / 导航 / Rectangle",
+      "event": "Click or tap",
+      "case": "修改成功",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:发布日记 / Group / Text field",
+      "event": "Text changed",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show/hide widget",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:发布日记 / Group / Text field",
+      "event": "Got focus",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of&nbsp; equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:发布日记 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 弹层-选择日期",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:发布日记 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 头像",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:发布日记 / 头像",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 头像",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:发布日记 / 弹层-选择日期 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹层-选择日期",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:发布日记 / 弹层-选择日期 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹层-选择日期",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

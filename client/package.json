@@ -1,6 +1,6 @@
 {
   "name": "@axhub/make-client",
-  "version": "0.1.15",
+  "version": "0.1.18",
   "private": true,
   "description": "Official Axhub Make client runtime",
   "type": "module",
@@ -21,15 +21,13 @@
     "coverage": "npm run test:coverage",
     "check-ready": "node scripts/check-app-ready.mjs",
     "capture:theme": "node scripts/capture-theme-homepage.mjs",
-    "capture:theme-source": "node scripts/capture-theme-source.mjs",
-    "font:subset:beginner-guide": "node scripts/subset-beginner-guide-fonts.mjs",
-    "screenshots:collect": "node scripts/collect-mobile-theme-screenshots.mjs",
-    "screenshots:status": "node scripts/report-mobile-theme-screenshot-status.mjs",
-    "screenshots:wire": "node scripts/sync-mobile-theme-screenshot-wiring.mjs",
-    "screenshots:regress": "node scripts/regress-mobile-theme-screenshots.mjs"
+    "capture:theme-source": "node scripts/capture-theme-source.mjs"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@types/react-test-renderer": "18.3.1",
     "@vitejs/plugin-react": "^5.0.0",
     "@vitest/coverage-v8": "4.0.16",
     "@vitest/ui": "4.0.16",
@@ -37,7 +35,7 @@
     "iconv-lite": "^0.7.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "subset-font": "^2.5.0",
+    "react-test-renderer": "18.2.0",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
     "vite": "5.4.21",
@@ -45,8 +43,9 @@
     "ws": "^8.18.3"
   },
   "dependencies": {
-    "@axhub/annotation": "1.0.16",
+    "@axhub/annotation": "^1.0.18",
     "@axhub/commentary-react": "^1.0.0",
-    "lucide-react": "0.562.0"
+    "lucide-react": "0.562.0",
+    "tar-stream": "3.1.7"
   }
 }

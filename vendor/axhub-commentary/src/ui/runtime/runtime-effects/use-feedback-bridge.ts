@@ -1,5 +1,5 @@
 import React from 'react';
-import { App, Input } from 'antd';
+import { App, Button, Input } from 'antd';
 import { setWebEditorFeedbackBridge } from '../../feedback-bridge';
 
 type PromptBridgeContentHandle = {
@@ -98,8 +98,21 @@ export function useFeedbackBridge(): void {
 
   React.useEffect(() => {
     setWebEditorFeedbackBridge({
-      confirm: ({ title, content, okText, cancelText, okType, getContainer, onOk, onCancel }) => {
-        app.modal.confirm({
+      confirm: ({
+        title,
+        content,
+        okText,
+        cancelText,
+        secondaryText,
+        okType,
+        getContainer,
+        onOk,
+        onSecondary,
+        onCancel,
+      }) => {
+        let modalRef: ReturnType<typeof app.modal.confirm> | null = null;
+        modalRef = app.modal.confirm({
+          className: 'we-runtime-feedback-modal',
           title,
           content,
           okText,
@@ -109,12 +122,32 @@ export function useFeedbackBridge(): void {
           closable: true,
           maskClosable: true,
           getContainer,
+          cancelButtonProps: cancelText ? undefined : { style: { display: 'none' } },
+          footer: secondaryText
+            ? (_originNode, { OkBtn }) => React.createElement(
+              React.Fragment,
+              null,
+              React.createElement(
+                Button,
+                {
+                  key: 'secondary',
+                  onClick: () => {
+                    onSecondary?.();
+                    modalRef?.destroy();
+                  },
+                },
+                secondaryText,
+              ),
+              React.createElement(OkBtn),
+            )
+            : undefined,
           onOk,
           onCancel,
         });
       },
       alert: ({ title, content, okText, okType, getContainer, onOk }) => {
         app.modal.confirm({
+          className: 'we-runtime-feedback-modal',
           title,
           content,
           okText,
@@ -146,6 +179,7 @@ export function useFeedbackBridge(): void {
       }) => {
         const contentRef = React.createRef<PromptBridgeContentHandle>();
         const modalRef = app.modal.confirm({
+          className: 'we-runtime-feedback-modal',
           title,
           content: React.createElement(PromptBridgeContent, {
             ref: contentRef,

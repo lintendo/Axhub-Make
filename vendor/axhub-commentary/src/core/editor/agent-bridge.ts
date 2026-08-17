@@ -1248,30 +1248,17 @@ export function createAgentBridgeService(options: {
   }
 
   function persistTaskStates(scopeKey: string): void {
-    const now = Date.now();
-    const TERMINAL_STATE_TTL_MS = 30 * 60 * 1000; // 30min
     const tasks = Array.from(state.agentTaskByElementKey.values())
       .filter(
         (task) => {
           if (task.scopeKey !== scopeKey || task.dismissed) return false;
+          if (task.origin === 'external-editing') return false;
           // Always persist running tasks with valid session info
           if (isTaskRunning(task)
             && typeof task.sessionId === 'string'
             && task.sessionId.trim().length > 0
             && typeof task.provider === 'string'
             && task.provider.trim().length > 0
-          ) {
-            return true;
-          }
-          // Persist external-editing running tasks (may not have sessionId/provider)
-          if (isTaskRunning(task) && task.origin === 'external-editing') {
-            return true;
-          }
-          // Persist recent errors so failures survive brief refreshes; completed tasks are cleanup-only.
-          if (
-            task.status === 'error'
-            && task.origin === 'external-editing'
-            && (now - task.updatedAt) < TERMINAL_STATE_TTL_MS
           ) {
             return true;
           }
@@ -1556,28 +1543,53 @@ export function createAgentBridgeService(options: {
     return `prototype-comment-assets/${id}.${inferPromptImageExtension(image.mimeType, image.name)}`;
   }
 
-  function appendPromptImageAssetPathsToMessage(message: string, assetPaths: readonly string[]): string {
-    const paths = collectUniqueStrings(...assetPaths);
-    const missingPaths = paths.filter((assetPath) => !message.includes(assetPath));
-    if (missingPaths.length === 0) return message;
+  function appendPromptImageAssetPathsToMessage(
+    message: string,
+    images: readonly { assetPath?: string; source?: PromptImageAttachment['source'] }[],
+  ): string {
+    const userPaths = collectUniqueStrings(
+      ...images
+        .filter((image) => image.source !== 'target-screenshot')
+        .map((image) => normalizeString(image.assetPath)),
+    ).filter((assetPath) => !message.includes(assetPath));
+    const targetPath = [...images]
+      .reverse()
+      .find((image) => image.source === 'target-screenshot')?.assetPath;
+    const missingTargetPath = targetPath && !message.includes(targetPath) ? targetPath : '';
+    if (userPaths.length === 0 && !missingTargetPath) return message;
 
     return [
       message,
       '',
-      '本地图片素材:',
-      ...missingPaths.map((assetPath) => `- ${assetPath}`),
+      ...(userPaths.length > 0
+        ? ['本地图片素材:', ...userPaths.map((assetPath) => `- ${assetPath}`)]
+        : []),
+      ...(missingTargetPath
+        ? [`目标截图（用于精确定位当前批注元素）：${missingTargetPath}`]
+        : []),
     ].join('\n');
   }
 
   function collectPromptImagesForElements(elements: readonly Element[]) {
     return elements.flatMap((element) =>
-      options.changes.getImagesForElement(element).slice(0, 3).map((image, index) => ({
-        name: image.name,
-        data: image.data,
-        mimeType: image.mimeType,
-        size: image.size,
-        assetPath: inferPromptImageAssetPath(image, index),
-      })),
+      (() => {
+        const images = options.changes.getImagesForElement(element);
+        const userImages = images
+          .filter((image) => image.source !== 'target-screenshot')
+          .slice(0, 3);
+        const targetScreenshot = [...images]
+          .reverse()
+          .find((image) => image.source === 'target-screenshot');
+        return [...userImages, ...(targetScreenshot ? [targetScreenshot] : [])]
+          .map((image, index) => ({
+            name: image.name,
+            data: image.data,
+            mimeType: image.mimeType,
+            size: image.size,
+            ...(image.source === 'target-screenshot' ? { source: image.source } : {}),
+            assetPath: inferPromptImageAssetPath(image, index),
+          }));
+      })(),
     );
   }
 
@@ -1628,6 +1640,7 @@ export function createAgentBridgeService(options: {
     const selected = state.selectedElement;
     if (selected && selected !== taskRoot && isWithinTaskSubtree(selected, taskRoot)) {
       state.selectedElement = taskRoot;
+      state.initialSelectionElement = taskRoot;
       state.positionTracker?.setSelectionElement(taskRoot);
       state.breadcrumbs?.setTarget(taskRoot);
       state.propertyPanel?.setTarget(taskRoot);
@@ -1830,7 +1843,7 @@ export function createAgentBridgeService(options: {
       errorCode: string | null;
     },
   ): ElementAgentTaskState | null {
-    return updateTaskStateByRequestId(requestId, {
+    const task = updateTaskStateByRequestId(requestId, {
       status: patch.status,
       provider:
         typeof patch.provider === 'string' && patch.provider.trim()
@@ -1856,6 +1869,10 @@ export function createAgentBridgeService(options: {
     }, {
       reviveDismissed: true,
     });
+    if (task) {
+      options.persistence.flushPendingWrite('state');
+    }
+    return task;
   }
 
   function normalizeExternalTaskRef(
@@ -1941,7 +1958,6 @@ export function createAgentBridgeService(options: {
     const deleted = state.externalEditingTaskByElementKey.delete(meta.elementKey);
     removeTaskStateByRequestId(persistedTask.requestId);
     if (deleted) {
-      options.changes.markElementEditsHandled(element);
       notifyTaskStateChange();
     }
     return deleted;
@@ -1964,28 +1980,18 @@ export function createAgentBridgeService(options: {
 
   function finalizeExternalEditingCompletedTask(
     task: ElementAgentTaskState,
-    element?: Element | null,
+    _element?: Element | null,
   ): void {
     if (task.origin !== 'external-editing') return;
-    if (element?.isConnected) {
-      options.changes.markElementEditsHandled(element);
-    } else {
-      try {
-        const locatedElement = locateElement(task.locator);
-        if (locatedElement?.isConnected) {
-          options.changes.markElementEditsHandled(locatedElement);
-        }
-      } catch {
-        // Fall back to key-based cleanup below.
-      }
-    }
-    options.changes.markElementEditsHandledByKey({
-      elementKey: task.elementKey,
-      locator: task.locator,
-      label: task.label,
-    });
-    options.persistence.clearCommentRecord?.(task.elementKey);
-    options.persistence.flushPendingWrite();
+    options.persistence.recordCommentTaskState?.(
+      task.elementKey,
+      'completed',
+      task.taskRef ?? {
+        provider: task.provider,
+        sessionId: task.sessionId,
+        requestId: task.requestId,
+      },
+    );
   }
 
   function setExternalEditingTerminalState(
@@ -2280,6 +2286,13 @@ export function createAgentBridgeService(options: {
       }
     }
 
+    if (
+      updatedTasks.some((task) => task.origin !== 'external-editing') &&
+      (mapped.taskStatus === 'completed' || mapped.taskStatus === 'error')
+    ) {
+      options.persistence.flushPendingWrite('state');
+    }
+
     logInfo('Applied Agent state sync payload', {
       sessionId: payload.sessionId,
       provider: payload.provider,
@@ -2320,21 +2333,14 @@ export function createAgentBridgeService(options: {
     });
   }
 
-  function markTaskElementsEditsHandled(
+  function persistTaskElementStates(
     requestId: string,
     source: 'accepted_reused_session' | 'session_created',
   ): void {
     const tasks = getTaskStatesByRequestId(requestId);
     if (tasks.length === 0) return;
-    for (const task of tasks) {
-      const taskElement = locateElement(task.locator);
-      if (!taskElement?.isConnected) {
-        continue;
-      }
-      options.changes.markElementEditsHandled(taskElement);
-    }
-    options.persistence.flushPendingWrite();
-    logInfo('Marked element edits as handled after Agent handoff', { source, requestId });
+    options.persistence.flushPendingWrite('state');
+    logInfo('Persisted element task states after Agent handoff', { source, requestId });
   }
 
   function rehydratePersistedAgentState(): void {
@@ -2393,6 +2399,14 @@ export function createAgentBridgeService(options: {
     });
     for (const persistedTask of persistedTasks) {
       const isExternalEditing = persistedTask.origin === 'external-editing';
+
+      if (isExternalEditing) {
+        logInfo('Skipping legacy external-editing task restore', {
+          requestId: persistedTask.requestId,
+          elementKey: persistedTask.elementKey,
+        });
+        continue;
+      }
 
       // For non-external tasks, require running + sessionId + provider
       if (!isExternalEditing) {
@@ -2489,6 +2503,25 @@ export function createAgentBridgeService(options: {
         }
       }, RECOVERY_PENDING_STALENESS_MS);
     }
+  }
+
+  function discardDeletedElementStates(elementKeys: readonly WebEditorElementKey[]): void {
+    const deletedKeys = new Set(elementKeys.map((key) => String(key ?? '').trim()).filter(Boolean));
+    if (deletedKeys.size === 0) return;
+
+    for (const key of deletedKeys) {
+      state.agentTaskByElementKey.delete(key);
+      state.externalEditingTaskByElementKey.delete(key);
+    }
+    for (const [requestId, task] of state.agentTaskByRequestId) {
+      if (deletedKeys.has(String(task.elementKey ?? '').trim())) {
+        state.agentTaskByRequestId.delete(requestId);
+      }
+    }
+    options.persistence.discardAgentTaskStates(
+      resolveConversationLookupKeys(),
+      [...deletedKeys] as WebEditorElementKey[],
+    );
   }
 
   function clearProbeTimeout(): void {
@@ -3039,7 +3072,7 @@ export function createAgentBridgeService(options: {
         reviveDismissed: true,
       });
       if (currentRun?.sessionId) {
-        markTaskElementsEditsHandled(parsed.requestId ?? '', 'accepted_reused_session');
+        persistTaskElementStates(parsed.requestId ?? '', 'accepted_reused_session');
       }
       if (!pending.acceptedNotified) {
         pending.acceptedNotified = true;
@@ -3094,7 +3127,7 @@ export function createAgentBridgeService(options: {
           invalidated: false,
         });
       }
-      markTaskElementsEditsHandled(parsed.requestId ?? '', 'session_created');
+      persistTaskElementStates(parsed.requestId ?? '', 'session_created');
       if (!pending.sessionCreatedNotified) {
         pending.sessionCreatedNotified = true;
       }
@@ -3784,12 +3817,9 @@ export function createAgentBridgeService(options: {
     const { element, prompt, scopeKey, reusableConversation, effectiveProvider } = params;
     const meta = resolveElementTaskMeta(element);
     const promptImages = collectPromptImagesForElements([element]);
-    const promptImageAssetPaths = promptImages
-      .map((image) => normalizeString(image.assetPath))
-      .filter(Boolean);
     const messageWithImageAssets = appendPromptImageAssetPathsToMessage(
       prompt,
-      promptImageAssetPaths,
+      promptImages,
     );
     const sessionIdToReuse = reusableConversation?.sessionId ?? null;
     const startedAt = params.startedAt ?? Date.now();
@@ -4264,6 +4294,7 @@ export function createAgentBridgeService(options: {
     handleSyncCommentContextToAgent,
     handleSendPromptToAgentForElements,
     handleSendPromptToAgentForElement,
+    discardDeletedElementStates,
     rehydratePersistedAgentState,
   };
 }

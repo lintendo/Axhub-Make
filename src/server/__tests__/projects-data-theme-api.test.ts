@@ -12,6 +12,7 @@ import {
   cleanupProjectApiTestRoots,
   createTempRoot,
   registerProject,
+  scopeProjectApiUrl,
   setActiveProject,
   startTestServer,
   writeJson,
@@ -30,7 +31,7 @@ describe('make-server project data and theme APIs', () => {
     expect(handleProjectDataAndThemeApi).toBeTypeOf('function');
   });
 
-  it('supports project-scoped data table CRUD and CSV import/export through the active project', async () => {
+  it('supports explicit data table CRUD and CSV import/export without mutating the active project', async () => {
     const firstRoot = createTempRoot();
     const secondRoot = createTempRoot();
     writeProjectMetadata(firstRoot, {
@@ -45,34 +46,35 @@ describe('make-server project data and theme APIs', () => {
     const server = await startTestServer(firstRoot);
 
     try {
+      await registerProject(server.origin, firstRoot, 'first-client', 'First Client');
       await registerProject(server.origin, secondRoot, 'second-client', 'Second Client');
-      await setActiveProject(server.origin, 'second-client');
+      await setActiveProject(server.origin, 'first-client');
 
-      const records = await fetch(`${server.origin}/api/data/orders`).then((response) => response.json());
+      const records = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/data/orders?projectId=second-client`)).then((response) => response.json());
       expect(records).toEqual([{ id: 1, title: 'second' }]);
 
-      const updated = await fetch(`${server.origin}/api/data/orders/1`, {
+      const updated = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/data/orders/1?projectId=second-client`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'updated second' }),
       }).then((response) => response.json());
       expect(updated).toMatchObject({ id: 1, title: 'updated second' });
 
-      const inserted = await fetch(`${server.origin}/api/data/orders`, {
+      const inserted = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/data/orders?projectId=second-client`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'created' }),
       }).then((response) => response.json());
       expect(inserted).toMatchObject({ title: 'created' });
 
-      const imported = await fetch(`${server.origin}/api/data/orders/import`, {
+      const imported = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/data/orders/import?projectId=second-client`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ csvData: 'id,title\n3,imported\n' }),
       }).then((response) => response.json());
       expect(imported).toMatchObject({ success: true, recordCount: 1 });
 
-      const csv = await fetch(`${server.origin}/api/data/orders/export`);
+      const csv = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/data/orders/export?projectId=second-client`));
       expect(csv.status).toBe(200);
       expect(csv.headers.get('content-type')).toContain('text/csv');
       expect(await csv.text()).toContain('imported');
@@ -82,7 +84,7 @@ describe('make-server project data and theme APIs', () => {
       expect(JSON.parse(fs.readFileSync(path.join(secondRoot, 'src/resources/data/orders.json'), 'utf8')).records)
         .toEqual([{ id: 3, title: 'imported' }]);
 
-      const rename = await fetch(`${server.origin}/api/data/tables/orders`, {
+      const rename = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/data/tables/orders?projectId=second-client`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName: 'customers', tableName: 'Customers' }),
@@ -117,13 +119,13 @@ describe('make-server project data and theme APIs', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const list = await fetch(`${server.origin}/api/data/tables`).then((response) => response.json());
+      const list = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/data/tables`)).then((response) => response.json());
       expect(list).toEqual(expect.arrayContaining([
         { fileName: 'orders', tableName: 'Orders' },
         { fileName: 'customers', tableName: 'Customers' },
       ]));
 
-      const missingCreateName = await fetch(`${server.origin}/api/data/tables`, {
+      const missingCreateName = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/data/tables`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tableName: '' }),
@@ -136,7 +138,7 @@ describe('make-server project data and theme APIs', () => {
         },
       });
 
-      const invalidAdminPath = await fetch(`${server.origin}/api/data/tables/${encodeURIComponent('../escape')}`, {
+      const invalidAdminPath = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/data/tables/${encodeURIComponent('../escape')}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName: 'safe' }),
@@ -146,7 +148,7 @@ describe('make-server project data and theme APIs', () => {
         body: { code: 'VALIDATION_ERROR', error: 'Invalid fileName' },
       });
 
-      const duplicateTable = await fetch(`${server.origin}/api/data/tables/orders`, {
+      const duplicateTable = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/data/tables/orders`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName: 'customers' }),
@@ -156,14 +158,14 @@ describe('make-server project data and theme APIs', () => {
         body: { code: 'TABLE_EXISTS' },
       });
 
-      const missingExport = await fetch(`${server.origin}/api/data/missing/export`)
+      const missingExport = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/data/missing/export`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(missingExport).toMatchObject({
         status: 404,
         body: { code: 'NOT_FOUND' },
       });
 
-      const missingCsv = await fetch(`${server.origin}/api/data/orders/import`, {
+      const missingCsv = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/data/orders/import`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ csvData: '' }),
@@ -173,7 +175,7 @@ describe('make-server project data and theme APIs', () => {
         body: { code: 'VALIDATION_ERROR' },
       });
 
-      const duplicateRecord = await fetch(`${server.origin}/api/data/orders`, {
+      const duplicateRecord = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/data/orders`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: 1, title: 'duplicate' }),
@@ -183,22 +185,22 @@ describe('make-server project data and theme APIs', () => {
         body: { code: 'DUPLICATE_ID' },
       });
 
-      const missingRecord = await fetch(`${server.origin}/api/data/orders/404`)
+      const missingRecord = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/data/orders/404`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(missingRecord).toMatchObject({
         status: 404,
         body: { code: 'NOT_FOUND' },
       });
 
-      const record = await fetch(`${server.origin}/api/data/orders/1`)
+      const record = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/data/orders/1`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(record).toEqual({ status: 200, body: { id: 1, title: 'first' } });
 
-      const deletedRecord = await fetch(`${server.origin}/api/data/orders/1`, { method: 'DELETE' })
+      const deletedRecord = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/data/orders/1`), { method: 'DELETE' })
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(deletedRecord).toEqual({ status: 200, body: { success: true } });
 
-      const deletedTable = await fetch(`${server.origin}/api/data/tables/customers`, { method: 'DELETE' })
+      const deletedTable = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/data/tables/customers`), { method: 'DELETE' })
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(deletedTable).toEqual({ status: 200, body: { success: true } });
       expect(fs.existsSync(path.join(projectRoot, 'src/resources/data/customers.json'))).toBe(false);
@@ -223,7 +225,7 @@ describe('make-server project data and theme APIs', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const create = await fetch(`${server.origin}/api/themes`, {
+      const create = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'brand', displayName: 'Brand Theme', design: '# Brand\n' }),
@@ -241,7 +243,7 @@ describe('make-server project data and theme APIs', () => {
         },
       });
 
-      const rename = await fetch(`${server.origin}/api/themes/brand`, {
+      const rename = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes/brand`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'brand-new', displayName: 'Brand New' }),
@@ -257,7 +259,7 @@ describe('make-server project data and theme APIs', () => {
       expect(fs.existsSync(path.join(projectRoot, 'src/themes/brand'))).toBe(false);
       expect(fs.existsSync(path.join(projectRoot, 'src/themes/brand-new'))).toBe(true);
 
-      const contents = await fetch(`${server.origin}/api/themes/get-contents`, {
+      const contents = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes/get-contents`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ themeName: 'brand-new' }),
@@ -267,7 +269,7 @@ describe('make-server project data and theme APIs', () => {
         design: '# Brand\n',
       });
 
-      const referenceCheck = await fetch(`${server.origin}/api/themes/check-references`, {
+      const referenceCheck = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes/check-references`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ themeName: 'brand-new', action: 'delete' }),
@@ -277,7 +279,7 @@ describe('make-server project data and theme APIs', () => {
         references: [],
       });
 
-      const deleted = await fetch(`${server.origin}/api/themes/brand-new`, { method: 'DELETE' })
+      const deleted = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes/brand-new`), { method: 'DELETE' })
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(deleted).toMatchObject({
         status: 200,
@@ -314,7 +316,7 @@ describe('make-server project data and theme APIs', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const listResponse = await fetch(`${server.origin}/api/themes`);
+      const listResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes`));
       const themes = await listResponse.json();
       expect(listResponse.status).toBe(200);
       expect(themes).toEqual([
@@ -332,7 +334,7 @@ describe('make-server project data and theme APIs', () => {
 	      expect(themes[0]).not.toHaveProperty('demoUrl');
 	      expect(themes[0]).not.toHaveProperty('designTokenPath');
 
-      const detailResponse = await fetch(`${server.origin}/api/themes/antd-new`);
+      const detailResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes/antd-new`));
       const theme = await detailResponse.json();
       expect(detailResponse.status).toBe(200);
       expect(theme).toEqual(expect.objectContaining({
@@ -385,14 +387,14 @@ describe('make-server project data and theme APIs', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const themes = await fetch(`${server.origin}/api/themes`).then((response) => response.json());
+      const themes = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes`)).then((response) => response.json());
       expect(themes[0]).toMatchObject({
         id: 'genesis',
         clientUrl: 'http://localhost:51720/themes/genesis',
         previewUrl: 'http://localhost:51720/themes/genesis',
       });
 
-      const theme = await fetch(`${server.origin}/api/themes/genesis`).then((response) => response.json());
+      const theme = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes/genesis`)).then((response) => response.json());
       expect(theme).toMatchObject({
         id: 'genesis',
         clientUrl: 'http://localhost:51720/themes/genesis',
@@ -452,7 +454,7 @@ describe('make-server project data and theme APIs', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const list = await fetch(`${server.origin}/api/themes`).then((response) => response.json());
+      const list = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes`)).then((response) => response.json());
       expect(list).toEqual([
         expect.objectContaining({
           id: 'brand',
@@ -468,7 +470,7 @@ describe('make-server project data and theme APIs', () => {
         }),
       ]);
 
-      const contents = await fetch(`${server.origin}/api/themes/get-contents`, {
+      const contents = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes/get-contents`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ themeName: 'brand' }),
@@ -480,7 +482,7 @@ describe('make-server project data and theme APIs', () => {
         readme: '# Brand Theme\nTheme docs.\n',
       });
 
-      const references = await fetch(`${server.origin}/api/themes/check-references`, {
+      const references = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes/check-references`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ themeName: 'brand', action: 'rename' }),
@@ -491,7 +493,7 @@ describe('make-server project data and theme APIs', () => {
         hasReferences: false,
       });
 
-      const sync = await fetch(`${server.origin}/api/themes/sync-design`, {
+      const sync = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes/sync-design`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ themeName: 'brand' }),
@@ -499,7 +501,7 @@ describe('make-server project data and theme APIs', () => {
       expect(sync).toEqual({ success: true });
       expect(fs.readFileSync(path.join(projectRoot, 'DESIGN.md'), 'utf8')).toBe('# Brand Design\n');
 
-      const rename = await fetch(`${server.origin}/api/themes/brand`, {
+      const rename = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes/brand`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: 'Brand Refresh' }),
@@ -520,7 +522,7 @@ describe('make-server project data and theme APIs', () => {
         color: 'blue',
       });
 
-      const missingRename = await fetch(`${server.origin}/api/themes/missing`, {
+      const missingRename = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes/missing`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: 'Missing' }),
@@ -530,7 +532,7 @@ describe('make-server project data and theme APIs', () => {
         body: { error: 'Theme not found' },
       });
 
-      const removeDesign = await fetch(`${server.origin}/api/themes/sync-design`, {
+      const removeDesign = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes/sync-design`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ themeName: '' }),
@@ -538,7 +540,7 @@ describe('make-server project data and theme APIs', () => {
       expect(removeDesign).toEqual({ success: true, removed: true });
       expect(fs.existsSync(path.join(projectRoot, 'DESIGN.md'))).toBe(false);
 
-      const deleted = await fetch(`${server.origin}/api/themes/brand`, { method: 'DELETE' })
+      const deleted = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes/brand`), { method: 'DELETE' })
         .then((response) => response.json());
       expect(deleted).toEqual({ success: true });
       expect(fs.existsSync(path.join(themesDir, 'brand'))).toBe(false);
@@ -586,7 +588,7 @@ describe('make-server project data and theme APIs', () => {
     const server = await startTestServer(clientRoot);
 
     try {
-      const sync = await fetch(`${server.origin}/api/themes/sync-design`, {
+      const sync = await fetch(scopeProjectApiUrl(clientRoot, `${server.origin}/api/themes/sync-design`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ themeName: 'brand' }),
@@ -596,7 +598,7 @@ describe('make-server project data and theme APIs', () => {
       expect(fs.readFileSync(path.join(clientRoot, 'DESIGN.md'), 'utf8')).toBe('# Client Brand Design\n');
       expect(fs.existsSync(path.join(projectRoot, 'DESIGN.md'))).toBe(false);
 
-      const removeDesign = await fetch(`${server.origin}/api/themes/sync-design`, {
+      const removeDesign = await fetch(scopeProjectApiUrl(clientRoot, `${server.origin}/api/themes/sync-design`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ themeName: '' }),

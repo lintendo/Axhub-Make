@@ -44,6 +44,7 @@ import {
   cleanupProjectApiTestRoots,
   createTempRoot,
   registerProject,
+  scopeProjectApiUrl,
   setActiveProject,
   startTestServer,
   writeProjectMetadata,
@@ -118,7 +119,7 @@ describe('make-server project docs APIs', () => {
       await registerProject(server.origin, projectRoot, 'docs-client', 'Docs Client');
       await setActiveProject(server.origin, 'docs-client');
 
-      const docs = await fetch(`${server.origin}/api/docs`).then((response) => response.json());
+      const docs = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs`)).then((response) => response.json());
       expect(docs).toEqual(expect.arrayContaining([
         expect.objectContaining({
           name: 'nested/guide.md',
@@ -133,7 +134,7 @@ describe('make-server project docs APIs', () => {
       ]));
 
       const uploadBoundary = '----axhub-docs-boundary';
-      const upload = await fetch(`${server.origin}/api/docs/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/upload`), {
         method: 'POST',
         headers: { 'Content-Type': `multipart/form-data; boundary=${uploadBoundary}` },
         body: writeMultipartBody(uploadBoundary, [
@@ -155,7 +156,7 @@ describe('make-server project docs APIs', () => {
       });
       expect(fs.existsSync(path.join(docsDir, 'Plan-Draft.md'))).toBe(true);
 
-      const protectedCheck = await fetch(`${server.origin}/api/docs/check-references`, {
+      const protectedCheck = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/check-references`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ docName: 'project-overview.md', action: 'delete' }),
@@ -167,7 +168,7 @@ describe('make-server project docs APIs', () => {
       });
 
       const encodedGuide = encodeURIComponent('guide.md');
-      const copied = await fetch(`${server.origin}/api/docs/${encodedGuide}/copy`, {
+      const copied = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/${encodedGuide}/copy`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: 'Guide Copy' }),
@@ -183,7 +184,7 @@ describe('make-server project docs APIs', () => {
         },
       });
 
-      const renamed = await fetch(`${server.origin}/api/docs/${encodedGuide}`, {
+      const renamed = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/${encodedGuide}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newBaseName: 'Renamed Guide' }),
@@ -195,7 +196,7 @@ describe('make-server project docs APIs', () => {
       });
       expect(fs.existsSync(path.join(docsDir, 'Renamed-Guide.md'))).toBe(true);
 
-      const savedDoc = await fetch(`${server.origin}/api/docs/Renamed-Guide.md`, {
+      const savedDoc = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/Renamed-Guide.md`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: '# Saved Guide\n\nEdited online.\n' }),
@@ -209,7 +210,7 @@ describe('make-server project docs APIs', () => {
       });
       expect(fs.readFileSync(path.join(docsDir, 'Renamed-Guide.md'), 'utf8')).toBe('# Saved Guide\n\nEdited online.\n');
 
-      const deleted = await fetch(`${server.origin}/api/docs/Plan-Draft.md`, { method: 'DELETE' })
+      const deleted = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/Plan-Draft.md`), { method: 'DELETE' })
         .then((response) => response.json());
       expect(deleted).toEqual({ success: true });
       expect(fs.existsSync(path.join(docsDir, 'Plan-Draft.md'))).toBe(false);
@@ -244,7 +245,7 @@ describe('make-server project docs APIs', () => {
       await registerProject(server.origin, projectRoot, 'template-save-client', 'Template Save Client');
       await setActiveProject(server.origin, 'template-save-client');
 
-      const saved = await fetch(`${server.origin}/api/docs/templates/write-prd.md`, {
+      const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/templates/write-prd.md`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: '# Updated PRD 模板\n\nSaved from editor.\n' }),
@@ -287,7 +288,7 @@ describe('make-server project docs APIs', () => {
       await registerProject(server.origin, projectRoot, 'nested-template-rename-client', 'Nested Template Rename Client');
       await setActiveProject(server.origin, 'nested-template-rename-client');
 
-      const renamed = await fetch(`${server.origin}/api/docs/templates/${encodeURIComponent('nested/prd-template.md')}`, {
+      const renamed = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/templates/${encodeURIComponent('nested/prd-template.md')}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newBaseName: 'prd-template-v2' }),
@@ -332,7 +333,7 @@ describe('make-server project docs APIs', () => {
       await setActiveProject(server.origin, 'docs-delete-missing-client');
       const metadataBefore = fs.readFileSync(getProjectMetadataPath(projectRoot), 'utf8');
 
-      const deleted = await fetch(`${server.origin}/api/docs/missing.png`, { method: 'DELETE' })
+      const deleted = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/missing.png`), { method: 'DELETE' })
         .then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(deleted).toEqual({
@@ -368,7 +369,7 @@ describe('make-server project docs APIs', () => {
       await registerProject(server.origin, projectRoot, 'docs-drawio-preview-client', 'Docs Drawio Preview Client');
       await setActiveProject(server.origin, 'docs-drawio-preview-client');
 
-      const response = await fetch(`${server.origin}/api/docs/order-status-flow.drawio`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/order-status-flow.drawio`), {
         headers: {
           accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
@@ -388,7 +389,7 @@ describe('make-server project docs APIs', () => {
       expect(html).not.toContain('font-size: 18px;');
       expect(html).not.toContain('<mxfile');
 
-      const downloadResponse = await fetch(`${server.origin}/api/docs/order-status-flow.drawio?download=1`, {
+      const downloadResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/order-status-flow.drawio?download=1`), {
         headers: {
           accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
@@ -479,7 +480,7 @@ describe('make-server project docs APIs', () => {
       await registerProject(server.origin, projectRoot, 'template-drawio-preview-client', 'Template Drawio Preview Client');
       await setActiveProject(server.origin, 'template-drawio-preview-client');
 
-      const previewResponse = await fetch(`${server.origin}/api/docs/templates/flow.drawio`, {
+      const previewResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/templates/flow.drawio`), {
         headers: {
           accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
@@ -490,7 +491,7 @@ describe('make-server project docs APIs', () => {
       expect(previewResponse.headers.get('x-axhub-preview-fallback')).toBe('unsupported-file');
       expect(html).toContain('"resourceType":"templates"');
 
-      const openResponse = await fetch(`${server.origin}/api/docs/open-system`, {
+      const openResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/open-system`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ docName: 'flow.drawio', type: 'templates' }),
@@ -544,7 +545,7 @@ describe('make-server project docs APIs', () => {
       await registerProject(server.origin, projectRoot, 'docs-open-client', 'Docs Open Client');
       await setActiveProject(server.origin, 'docs-open-client');
 
-      const response = await fetch(`${server.origin}/api/docs/open-system`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/open-system`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ docName: 'guide.md' }),

@@ -4,7 +4,7 @@
 
 import './style.css';
 import React from 'react';
-import { DesignMdBatchShowcase, type BatchShowcaseConfig } from '../../common/DesignMdBatchShowcase';
+import { DesignMdBatchShowcase, type BatchShowcaseConfig } from './_runtime/DesignMdBatchShowcase';
 import themeData from './theme.json';
 import previewAsset0 from './assets/official-homepage.webp?url';
 

@@ -1,6 +1,7 @@
 import type { AcpProvider as AcpPromptProvider } from '../../../common/assistant-context/types';
 import type { ContextBundleV2 } from '@axhub/acp/runtime';
 import { getGenerationArtifactHistoryStore } from '../ai-generation/generationArtifactHistoryStore';
+import { withProjectScope } from '../../services/projectScope';
 
 export type PrototypeGenerationAgentStage =
   | 'accepted'
@@ -65,6 +66,7 @@ export interface PrototypeGenerationPromptOptions {
 }
 
 export interface RunAcpPrototypeAgentOptions extends PrototypeGenerationPromptOptions {
+  projectId: string;
   provider: AcpPromptProvider;
   onEvent?: (event: PrototypeGenerationAgentEvent) => void;
 }
@@ -160,6 +162,7 @@ export function buildPrototypeGenerationPrompt({
 }
 
 async function executePrototypeSessionRun(payload: {
+  projectId: string;
   taskId?: string;
   targetPath?: string;
   generatorElementId: string;
@@ -174,7 +177,7 @@ async function executePrototypeSessionRun(payload: {
   onEvent?: (event: PrototypeGenerationAgentEvent) => void;
 }) {
   const { onEvent, ...requestPayload } = payload;
-  const response = await fetch('/api/ai/runs', {
+  const response = await fetch(withProjectScope('/api/ai/runs', { projectId: payload.projectId }), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -189,7 +192,10 @@ async function executePrototypeSessionRun(payload: {
       result,
     });
   }
-  return readPrototypeAiRunResponse(response, onEvent);
+  return readPrototypeAiRunResponse(response, onEvent, {
+    projectId: payload.projectId,
+    targetPath: payload.targetPath,
+  });
 }
 
 function parseAiRunSseEvent(rawEvent: string): Array<{ event: string; data: Record<string, unknown> }> {
@@ -215,6 +221,7 @@ function parseAiRunSseEvent(rawEvent: string): Array<{ event: string; data: Reco
 async function readPrototypeAiRunResponse(
   response: Response,
   onEvent?: (event: PrototypeGenerationAgentEvent) => void,
+  artifactScope?: { projectId: string; targetPath?: string },
 ): Promise<Record<string, unknown>> {
   if (!response.body) {
     throw new Error('AI run response body 不可读取');
@@ -233,7 +240,7 @@ async function readPrototypeAiRunResponse(
         completed = event.data;
         if (Array.isArray(event.data.artifacts)) {
           event.data.artifacts.forEach((artifact) => {
-            getGenerationArtifactHistoryStore().upsertArtifact(artifact, { status: 'done' });
+            getGenerationArtifactHistoryStore().upsertArtifact(artifact, { status: 'done', scope: artifactScope });
           });
         }
       } else if (event.event === 'artifact.created' || event.event === 'artifact.updated') {
@@ -241,7 +248,7 @@ async function readPrototypeAiRunResponse(
           ? event.data.artifact as PrototypeGenerationArtifact
           : undefined;
         if (artifact) {
-          getGenerationArtifactHistoryStore().upsertArtifact(artifact, { status: 'running' });
+          getGenerationArtifactHistoryStore().upsertArtifact(artifact, { status: 'running', scope: artifactScope });
         }
         onEvent?.({
           stage: 'activity',
@@ -285,6 +292,7 @@ export async function runAcpPrototypeAgent(options: RunAcpPrototypeAgentOptions)
     options.onEvent?.({ stage: 'accepted' });
     options.onEvent?.({ stage: 'running' });
     const result = await executePrototypeSessionRun({
+      projectId: options.projectId,
       taskId: options.taskId,
       targetPath: options.targetPath || deriveTargetPathFromPrototype(options.currentPrototype),
       generatorElementId: options.generatorElementId,

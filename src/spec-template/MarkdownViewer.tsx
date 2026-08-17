@@ -6,9 +6,8 @@ import React, {
     useRef,
     useState,
 } from 'react';
-import { XMarkdown } from '@ant-design/x-markdown';
 import type { ComponentProps } from '@ant-design/x-markdown';
-import { Mermaid, XProvider } from '@ant-design/x';
+import { XProvider } from '@ant-design/x';
 import zhCN_X from '@ant-design/x/locale/zh_CN';
 import { ConfigProvider, Anchor, Modal, Tabs } from 'antd';
 import {
@@ -21,6 +20,8 @@ import {
 import { SimpleEditor, type UploadFunction } from 'tiptap-editor';
 import { defaultThemeConfig } from '../theme';
 import type { AssistantContextV1 } from '@/common/assistant-context/types';
+import { ReadOnlyMarkdown } from '../common/markdown/ReadOnlyMarkdown';
+import { resolveMarkdownImageSrc } from '../common/markdown/markdownImage';
 import {
     buildMarkdownCommentPrompt,
     buildPrototypeSpecMarkdownSaveRequest,
@@ -29,8 +30,12 @@ import {
     type MarkdownQuickEditMeta,
 } from './quickEdit';
 import {
+    createDocumentCommentsPersistenceAdapter,
+    createDocumentCommentsPersistenceScope,
+    type DocumentCommentContext,
+} from '../common/documentCommentsPersistence';
+import {
     resolveMarkdownDocumentLinkTarget,
-    resolvePrototypeSpecAssetUrl,
     resolvePrototypeSpecResourceUrl,
     stripMarkdownPreviewFrontmatter,
 } from './previewMarkdownContent';
@@ -49,12 +54,6 @@ interface MarkdownViewerProps {
     onDocumentChange?: (document: MarkdownDocument | null) => void;
 }
 
-interface MarkdownImageProps extends Record<string, unknown> {
-    src?: string;
-    style?: React.CSSProperties;
-    documentUrl?: string;
-}
-
 interface HeadingItem {
     id: string;
     title: string;
@@ -67,8 +66,8 @@ type SpecQuickEditMode = 'none' | 'comment' | 'edit';
 const MAKE_COMMENTARY_SKILL_INSTALL_SOURCE = [
     '.agents/skills/explore-options/SKILL.md',
     '.claude/skills/explore-options/SKILL.md',
-    '.agents/skills/prototype-comments/SKILL.md',
-    '.claude/skills/prototype-comments/SKILL.md',
+    '.agents/skills/handle-comments/SKILL.md',
+    '.claude/skills/handle-comments/SKILL.md',
 ].join('\n');
 
 interface SpecPromptRequestResult {
@@ -90,6 +89,10 @@ export interface MarkdownViewerHandle {
     getHostToolbarState: () => CommentaryHostToolbarState | null;
     subscribeHostToolbarState: (listener: (state: CommentaryHostToolbarState) => void) => () => void;
     runHostToolbarAction: (action: CommentaryHostToolbarAction) => Promise<boolean>;
+    getDebugState: () => unknown | null;
+    getVoiceTarget: () => unknown | null;
+    refreshPersistedComments: (deletedCommentIds?: readonly string[]) => Promise<void>;
+    setContext: (context: DocumentCommentContext | null) => void;
     setQuickEditMode: (mode: 'comment' | 'edit', options?: { saveBehavior?: 'none' | 'save' | 'discard' }) => Promise<boolean>;
     getQuickEditStatus: () => {
         enabled: boolean;
@@ -99,6 +102,7 @@ export interface MarkdownViewerHandle {
         activeDocKey: string;
         quickEditMode: SpecQuickEditMode;
     };
+    getCopyPromptText: () => string;
     handleCopyPrompt: () => Promise<SpecPromptRequestResult>;
     saveCurrentDoc: (options?: {
         exitAfterSave?: boolean;
@@ -163,154 +167,9 @@ function ensureMarkdownExtension(value: string): string {
     return trimmed.toLowerCase().endsWith('.md') ? trimmed : `${trimmed}.md`;
 }
 
-function parseAxhubImageWidth(src: string | undefined): { cleanSrc: string; width: number | null } {
-    const safeSrc = String(src || '');
-    const hashIndex = safeSrc.indexOf('#');
-    const beforeHash = hashIndex === -1 ? safeSrc : safeSrc.slice(0, hashIndex);
-    const hash = hashIndex === -1 ? '' : safeSrc.slice(hashIndex + 1);
-
-    const queryIndex = beforeHash.indexOf('?');
-    if (queryIndex === -1) {
-        return { cleanSrc: safeSrc, width: null };
-    }
-
-    const base = beforeHash.slice(0, queryIndex);
-    const query = beforeHash.slice(queryIndex + 1);
-    const params = new URLSearchParams(query);
-    const widthText = params.get('axw');
-    const widthValue = widthText ? Number.parseInt(widthText, 10) : NaN;
-    const width = Number.isFinite(widthValue) && widthValue > 0 ? widthValue : null;
-
-    params.delete('axw');
-    const nextQuery = params.toString();
-    const nextBeforeHash = nextQuery ? `${base}?${nextQuery}` : base;
-    const cleanSrc = hash ? `${nextBeforeHash}#${hash}` : nextBeforeHash;
-    return { cleanSrc, width };
-}
-
-function buildProjectDocumentAssetUrl(parsedUrl: URL, assetPath: string): string {
-    const projectDocumentMatch = parsedUrl.pathname.match(/^\/api\/projects\/([^/]+)\/document-content$/iu);
-    if (!projectDocumentMatch) return '';
-
-    const projectId = decodeURIComponent(projectDocumentMatch[1] || '');
-    const filePath = String(parsedUrl.searchParams.get('path') || '').trim();
-    if (!projectId || !filePath) return '';
-
-    return `/api/projects/${encodeURIComponent(projectId)}/document-asset?path=${encodeURIComponent(filePath)}&asset=${encodeURIComponent(assetPath)}`;
-}
-
-function resolveMarkdownImageSrc(src: string, documentUrl?: string): string {
-    const safeSrc = String(src || '').trim();
-    if (!safeSrc) return safeSrc;
-
-    const isAbsolute = /^(?:[a-z]+:)?\/\//i.test(safeSrc)
-        || safeSrc.startsWith('data:')
-        || safeSrc.startsWith('blob:')
-        || safeSrc.startsWith('/')
-        || safeSrc.startsWith('#');
-    if (isAbsolute || typeof window === 'undefined') {
-        return safeSrc;
-    }
-
-    try {
-        const parsedUrl = new URL(documentUrl || '', window.location.origin);
-        if (parsedUrl.pathname === '/api/markdown-file') {
-            const filePath = String(parsedUrl.searchParams.get('path') || '').trim();
-            if (filePath) {
-                return `/api/markdown-file-asset?path=${encodeURIComponent(filePath)}&asset=${encodeURIComponent(safeSrc)}`;
-            }
-        }
-        const projectDocumentAssetUrl = buildProjectDocumentAssetUrl(parsedUrl, safeSrc);
-        if (projectDocumentAssetUrl) {
-            return projectDocumentAssetUrl;
-        }
-        const prototypeSpecAssetUrl = resolvePrototypeSpecAssetUrl(safeSrc, parsedUrl.toString());
-        if (prototypeSpecAssetUrl) {
-            return prototypeSpecAssetUrl;
-        }
-    } catch {
-        // noop
-    }
-
-    const buildAssetBasePath = (rawUrl?: string) => {
-        if (!rawUrl) return null;
-
-        let pathname = '';
-        try {
-            pathname = new URL(rawUrl, window.location.origin).pathname;
-        } catch {
-            return null;
-        }
-
-        const toDocsBasePath = (docPath: string) => {
-            const normalizedDocPath = decodeURIComponent(docPath).replace(/\.md$/i, '');
-            const lastSlashIndex = normalizedDocPath.lastIndexOf('/');
-            const docsSubDir = lastSlashIndex >= 0 ? normalizedDocPath.slice(0, lastSlashIndex + 1) : '';
-            return `/docs/${docsSubDir}`;
-        };
-
-        if (pathname.startsWith('/api/docs/')) {
-            return toDocsBasePath(pathname.slice('/api/docs/'.length));
-        }
-
-        if (pathname.startsWith('/docs/')) {
-            return toDocsBasePath(pathname.slice('/docs/'.length));
-        }
-
-        const typedDocMatch = pathname.match(/^\/(components|prototypes|themes)\/([^/]+)\/(spec|prd)\.md$/i);
-        if (typedDocMatch) {
-            return `/${typedDocMatch[1]}/${typedDocMatch[2]}/`;
-        }
-
-        const gitTypedDocMatch = pathname.match(/^\/api\/git\/version-file\/[^/]+\/(components|prototypes|themes)\/([^/]+)\/(spec|prd)\.md$/i);
-        if (gitTypedDocMatch) {
-            return `/${gitTypedDocMatch[1]}/${gitTypedDocMatch[2]}/`;
-        }
-
-        return null;
-    };
-
-    const assetBasePath = buildAssetBasePath(documentUrl) || window.location.pathname;
-    try {
-        return new URL(safeSrc, new URL(assetBasePath, window.location.origin)).toString();
-    } catch {
-        return safeSrc;
-    }
-}
-
 function normalizeRequestedQuickEditMode(value: unknown): 'comment' | 'edit' {
     return value === 'edit' ? 'edit' : 'comment';
 }
-
-const MarkdownImage = (props: MarkdownImageProps) => {
-    const {
-        domNode: _domNode,
-        streamStatus: _streamStatus,
-        children: _children,
-        class: _className,
-        classname: _legacyClassName,
-        src,
-        style,
-        documentUrl,
-        ...restProps
-    } = props || {};
-    const safeSrc = typeof src === 'string' ? src : '';
-    const { cleanSrc, width } = parseAxhubImageWidth(safeSrc);
-    const resolvedSrc = resolveMarkdownImageSrc(cleanSrc || safeSrc, documentUrl);
-
-    return (
-        <img
-            {...restProps}
-            src={resolvedSrc}
-            style={{
-                ...(style || {}),
-                ...(width ? { width: `${width}px` } : {}),
-                maxWidth: '100%',
-                height: 'auto',
-            }}
-        />
-    );
-};
 
 const markdownStyles = `
   body {
@@ -448,19 +307,6 @@ function buildAnchorItems(headings: HeadingItem[]): any[] {
         children: heading.children ? buildAnchorItems(heading.children) : undefined,
     }));
 }
-
-const Code: React.FC<ComponentProps> = (props) => {
-    const { className, children } = props;
-    const lang = className?.match(/language-(\w+)/)?.[1] || '';
-
-    if (typeof children !== 'string') return null;
-
-    if (lang === 'mermaid') {
-        return <Mermaid>{children}</Mermaid>;
-    }
-
-    return <code className={className}>{children}</code>;
-};
 
 const createHeading = (level: number) => {
     const HeadingComponent: React.FC<ComponentProps> = (props) => {
@@ -619,6 +465,7 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
     const localDocumentsRef = useRef(localDocuments);
     const savedContentsRef = useRef(savedContents);
     const currentDocRef = useRef<MarkdownDocument | undefined>(undefined);
+    const documentContextRef = useRef<DocumentCommentContext | null>(null);
     const quickEditModeRef = useRef<SpecQuickEditMode>(quickEditMode);
     const draftPersistTimerRef = useRef<number | null>(null);
     const draftPromptedDocKeysRef = useRef<Set<string>>(new Set());
@@ -634,6 +481,10 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
     const isQuickEditing = quickEditMode !== 'none';
     const isEditing = quickEditMode === 'edit';
     const isCommentMode = quickEditMode === 'comment';
+
+    const resolveCurrentDocumentImageSrc = useCallback((src: string) => (
+        resolveMarkdownImageSrc(src, currentDocRef.current?.url)
+    ), []);
 
     const clearPendingDraftPersist = useCallback(() => {
         if (draftPersistTimerRef.current !== null) {
@@ -671,7 +522,8 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
     const buildCommentResourceContext = useCallback((doc: MarkdownDocument | undefined) => {
         if (!doc) return null;
         const meta = resolveMarkdownQuickEditMeta(doc.url);
-        const targetPath = meta.docPath;
+        const explicitContext = documentContextRef.current;
+        const targetPath = explicitContext?.documentPath || meta.docPath;
         return {
             kind: 'markdown-document',
             id: meta.docPath || doc.url || doc.key,
@@ -683,12 +535,13 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
                 entryName: meta.entryName,
                 docType: meta.docType,
                 targetPath,
-                currentFilePath: meta.docPath,
-                docPath: meta.docPath,
+                currentFilePath: targetPath,
+                docPath: targetPath,
                 prototypeFilePath: meta.prototypePath,
-                storageScope: meta.docPath
-                    ? `markdown-doc:${meta.docPath}`
+                storageScope: targetPath
+                    ? `document:${targetPath}`
                     : `markdown-doc:${doc.key}`,
+                ...(explicitContext?.projectId ? { projectId: explicitContext.projectId } : {}),
             },
         };
     }, []);
@@ -719,6 +572,20 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
             },
             host: {
                 getResourceContext: () => buildCommentResourceContext(currentDocRef.current),
+                getCurrentHoveredElement: () => document.querySelector(':hover'),
+                getPersistenceScope: () => {
+                    const context = documentContextRef.current;
+                    return context
+                        ? createDocumentCommentsPersistenceScope(
+                            context,
+                            buildCommentResourceContext(currentDocRef.current),
+                        )
+                        : null;
+                },
+                persistenceAdapter: createDocumentCommentsPersistenceAdapter(
+                    () => documentContextRef.current,
+                ),
+                commentPersistenceMode: 'adapter-only',
             },
         });
         commentEditorRef.current = editor;
@@ -1003,6 +870,7 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
         if (
             pathname === '/api/markdown-file'
             || pathname.startsWith('/api/docs/')
+            || pathname.startsWith('/api/document-templates/')
             || PROJECT_DOCUMENT_CONTENT_PATH_RE.test(pathname)
             || PROJECT_DOCUMENT_PATH_CONTENT_RE.test(pathname)
         ) {
@@ -1384,6 +1252,18 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
             draftPromptedDocKeysRef.current.clear();
             setQuickEditModeState('comment');
         },
+        setContext(context) {
+            documentContextRef.current = context && context.documentPath && context.projectId
+                ? {
+                    projectId: context.projectId.trim(),
+                    documentPath: context.documentPath.replace(/\\/g, '/').trim(),
+                    makeServerOrigin: context.makeServerOrigin,
+                    commentFilePath: context.commentFilePath,
+                    commentAssetRoot: context.commentAssetRoot,
+                }
+                : null;
+            commentEditorRef.current?.refresh?.();
+        },
         disableQuickEdit(options) {
             if (options?.discardChanges) {
                 restoreDirtyChanges();
@@ -1416,6 +1296,15 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
             const editor = ensureCommentEditor();
             return editor.runHostToolbarAction(action);
         },
+        getDebugState() {
+            return commentEditorRef.current?.getDebugState?.() ?? null;
+        },
+        getVoiceTarget() {
+            return commentEditorRef.current?.getVoiceTarget?.() ?? null;
+        },
+        async refreshPersistedComments(deletedCommentIds = []) {
+            await commentEditorRef.current?.refreshPersistedComments?.(deletedCommentIds);
+        },
         async setQuickEditMode(mode, options) {
             return setQuickEditSessionMode(mode, options);
         },
@@ -1428,6 +1317,9 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
                 activeDocKey: activeKey,
                 quickEditMode,
             };
+        },
+        getCopyPromptText() {
+            return buildCommentPromptPayload().prompt;
         },
         handleCopyPrompt() {
             return Promise.resolve(buildCommentPromptPayload());
@@ -1496,9 +1388,9 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
         <div className="markdown-container">
             <div className="markdown-content">
                 <div>
-                    <XMarkdown
-                        className="x-markdown-light"
+                    <ReadOnlyMarkdown
                         content={previewContent}
+                        documentUrl={currentDoc?.url}
                         components={{
                             a: ((props: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
                                 const navigationTarget = resolveMarkdownDocumentLinkTarget(
@@ -1535,13 +1427,6 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
                                     />
                                 );
                             }) as any,
-                            code: Code,
-                            img: ((props: MarkdownImageProps) => (
-                                <MarkdownImage
-                                    {...props}
-                                    documentUrl={currentDoc?.url}
-                                />
-                            )) as any,
                             h1: createHeading(1),
                             h2: createHeading(2),
                             h3: createHeading(3),
@@ -1600,6 +1485,7 @@ export const MarkdownViewer = React.forwardRef<MarkdownViewerHandle, MarkdownVie
                         showThemeToggle={false}
                         toolbarPreset="full"
                         imageUpload={uploadImageToCurrentDoc}
+                        imageSrcResolver={resolveCurrentDocumentImageSrc}
                         onMarkdownChange={updateCurrentDocContent}
                     />
                 </div>

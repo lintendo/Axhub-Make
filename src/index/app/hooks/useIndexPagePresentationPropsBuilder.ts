@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
-import type { AiPanelMode, PresentationAreaGroupedProps, PrototypeCreateDialogOpenOptions } from '../../types/index-page.types';
+import type { Dispatch, ReactNode, SetStateAction } from 'react';
+import type { AiPanelMode, PresentationAreaGroupedProps, PromptExecutionMeta, PrototypeCreateDialogOpenOptions } from '../../types/index-page.types';
 import type { ViewMode } from '../../types';
 import type { ExcalidrawPropertyPanelMode, ExcalidrawPropertyPanelPosition } from '../../utils/excalidrawUiMode';
 import type { CanvasElementContextInfo } from '../../components/content/canvas-embeds/AnnotationOverlay';
@@ -8,6 +8,7 @@ import type { AcpProvider } from '@/common/assistant-context/types';
 import type { CanvasAiGenerationRequest, CanvasAiGenerationResult } from '../../domains/ai-generation/CanvasAiGenerationTool';
 import type { AssistantImageAttachmentPayload } from '../../domains/assistant/assistantContextPayload';
 import type { SettingsDialogInitialTab } from '../../components/SettingsDialog';
+import type { MakeSurfaceCapabilities } from '../makeSurface';
 
 interface UseIndexPagePresentationPropsBuilderParams {
         state: {
@@ -34,6 +35,9 @@ interface UseIndexPagePresentationPropsBuilderParams {
         selectedTheme: any;
         selectedDataTable: any;
         preferredPromptClient: any;
+        preferredModel?: string | null;
+        canvasPromptClient?: any;
+        canvasModel?: string | null;
         preferredIDE: any;
         ideAvailability?: any;
         agentAvailability?: any;
@@ -49,12 +53,15 @@ interface UseIndexPagePresentationPropsBuilderParams {
         activeProjectId?: string | null;
         webAgentPanelOpen?: boolean;
         aiPanelMode?: AiPanelMode;
+        surfaceCapabilities?: MakeSurfaceCapabilities;
         assistantApiBaseUrl?: string;
         assistantProjectPath?: string;
         prototypes?: any[];
         themes?: any[];
         defaultThemeName?: string | null;
         onOpenPrototypeCreateDialog?: (options: PrototypeCreateDialogOpenOptions) => void;
+        commentaryVoiceEntry?: ReactNode;
+        commentaryVoiceVisible?: boolean;
     };
     preview: any;
     ui?: {
@@ -91,16 +98,17 @@ interface UseIndexPagePresentationPropsBuilderParams {
         onOpenAcpWebAgent?: (targetPath?: string, provider?: AcpProvider) => void | Promise<void>;
         onOpenImageAiPanel?: () => void | Promise<void>;
         onOpenWebAgentInPanel?: (url: string) => boolean | void | Promise<boolean | void>;
-        onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+        onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
         onCloseAiPanel?: () => void;
         onCloseWebAgentPanel?: () => void;
         onPreferredIDEChange?: (ide: any) => void;
         openSettingsDialog?: (tab?: SettingsDialogInitialTab) => void;
-        onCreatePrototypeForDraftStart?: () => Promise<any | null>;
+        onToggleCommentaryVoice?: () => void;
         onUploadResourceFiles?: () => void;
         onCreateResourceCanvasFile?: () => void | Promise<void>;
         onCreateDrawioResourceFile?: () => void | Promise<void>;
         onOpenDesignImport?: () => void;
+        onRefreshThemes?: () => void | Promise<void>;
         onRefreshPrototypes?: (preferredName?: string) => Promise<any[]>;
         agentRunConcurrency?: number;
         onSubmitCanvasAssistantPrompt?: (request: CanvasAiGenerationRequest) => Promise<CanvasAiGenerationResult | boolean> | CanvasAiGenerationResult | boolean;
@@ -113,7 +121,11 @@ export function useIndexPagePresentationPropsBuilder({
     ui,
     actions,
 }: UseIndexPagePresentationPropsBuilderParams): PresentationAreaGroupedProps {
-    return useMemo(() => ({
+    return useMemo(() => {
+        const conversationUiEnabled = state.surfaceCapabilities?.conversationUi !== false;
+        const externalOpenMenu = state.surfaceCapabilities?.externalOpenMenu !== false;
+
+        return ({
         state: {
             collapsed: state.collapsed,
             selectedItem: state.selectedItem,
@@ -129,6 +141,10 @@ export function useIndexPagePresentationPropsBuilder({
             qrCodeVisible: preview.qrCodeVisible,
             quickEditAvailable: preview.quickEditAvailable,
             quickEditActive: preview.editorStatus.mode === 'quickEdit',
+            prototypeAnnotationSessionActive: preview.prototypeAnnotationSessionActive,
+            prototypeAnnotationEnabled: preview.prototypeAnnotationEnabled,
+            prototypeAnnotationEnableLoading: preview.prototypeAnnotationEnableLoading,
+            prototypeAnnotationPromptCopying: preview.prototypeAnnotationPromptCopying,
             docEditState: preview.docEditState,
             markdownPromptCopying: preview.markdownPromptCopying,
             drawioResourceEditAvailable: preview.drawioResourceEditAvailable,
@@ -152,12 +168,13 @@ export function useIndexPagePresentationPropsBuilder({
             hostToolbarState: preview.hostToolbarState,
             prototypeDecisionDataAvailable: preview.prototypeDecisionDataAvailable,
             allowLAN: state.lanAccessAllowed !== false,
-            assistantVisible: state.assistantVisible,
+            conversationUiEnabled,
+            assistantVisible: conversationUiEnabled ? state.assistantVisible : false,
             containerRef: preview.containerRef,
             previewIframeRef: preview.previewIframeRef,
             secondaryPreviewIframeRef: preview.secondaryPreviewIframeRef,
-            handlePreviewIframeLoad: () => {
-                preview.handlePreviewIframeLoad();
+            handlePreviewIframeLoad: (iframe?: HTMLIFrameElement | null) => {
+                preview.handlePreviewIframeLoad(iframe);
                 if (state.contentMode === 'prototype-spec') {
                     actions.handlePrototypeSpecPreviewReady?.();
                 }
@@ -186,6 +203,9 @@ export function useIndexPagePresentationPropsBuilder({
             selectedTheme: state.selectedTheme,
             selectedDataTable: state.selectedDataTable,
             preferredPromptClient: state.preferredPromptClient,
+            preferredModel: state.preferredModel,
+            canvasPromptClient: state.canvasPromptClient,
+            canvasModel: state.canvasModel,
             preferredIDE: state.preferredIDE,
             ideAvailability: state.ideAvailability,
             agentAvailability: state.agentAvailability,
@@ -201,14 +221,17 @@ export function useIndexPagePresentationPropsBuilder({
             standalonePanelOpen: preview.standalonePanelOpen,
             bridgeConnected: state.bridgeConnected,
             activeProjectId: state.activeProjectId,
-            webAgentPanelOpen: state.webAgentPanelOpen,
-            aiPanelMode: state.aiPanelMode,
+            webAgentPanelOpen: conversationUiEnabled ? state.webAgentPanelOpen : false,
+            aiPanelMode: conversationUiEnabled ? state.aiPanelMode : null,
+            externalOpenMenu,
             assistantApiBaseUrl: state.assistantApiBaseUrl,
             assistantProjectPath: state.assistantProjectPath,
             prototypes: state.prototypes || [],
             themes: state.themes || [],
             defaultThemeName: state.defaultThemeName,
             onOpenPrototypeCreateDialog: state.onOpenPrototypeCreateDialog,
+            commentaryVoiceEntry: state.commentaryVoiceEntry,
+            commentaryVoiceVisible: state.commentaryVoiceVisible,
         },
         actions: {
             setCollapsed: actions.setCollapsed,
@@ -225,7 +248,12 @@ export function useIndexPagePresentationPropsBuilder({
             handleChangeSplitPreviewWidth: preview.handleChangeSplitPreviewWidth,
             handleChangeSplitPreviewHeight: preview.handleChangeSplitPreviewHeight,
             handleChangePreviewScaleMode: preview.handleChangePreviewScaleMode,
+            handlePreviewContainerSizeChange: preview.handlePreviewContainerSizeChange,
             handleOpenWebEditor: preview.handleOpenWebEditor,
+            handleOpenPrototypeAnnotationSession: preview.handleOpenPrototypeAnnotationSession,
+            handleCheckPrototypeAnnotationEnabled: preview.handleCheckPrototypeAnnotationEnabled,
+            handleEnablePrototypeAnnotation: preview.handleEnablePrototypeAnnotation,
+            handleCopyPrototypeAnnotationPrompt: preview.handleCopyPrototypeAnnotationPrompt,
             handleEnableDocEdit: preview.handleEnableDocEdit,
             handleSaveDocEdit: preview.handleSaveDocEdit,
             handleExitDocEdit: preview.handleExitDocEdit,
@@ -276,36 +304,38 @@ export function useIndexPagePresentationPropsBuilder({
             onSelectResourceFolder: actions.onSelectResourceFolder,
             onSelectResourceFolderItem: actions.onSelectResourceFolderItem,
             onOpenResourceFolderInSystem: actions.onOpenResourceFolderInSystem,
-            onToggleAssistant: actions.handleToggleAssistant,
+            onToggleAssistant: conversationUiEnabled ? actions.handleToggleAssistant : undefined,
             onStartCurrentProjectServer: actions.handleStartCurrentProjectServer,
             onCopyStartServerErrorPrompt: actions.handleCopyStartServerErrorPrompt,
             setElementIframeSize: preview.setElementIframeSize,
             onStandalonePanelToggle: preview.handleStandalonePanelToggle,
             setExcalidrawPropertyPanelMode: actions.setExcalidrawPropertyPanelMode,
             setExcalidrawPropertyPanelPosition: actions.setExcalidrawPropertyPanelPosition,
-            onAddCanvasElementToContext: actions.onAddCanvasElementToContext,
-            onAddCanvasScreenshotToAI: actions.onAddCanvasScreenshotToAI,
-            onAddCanvasImageToAI: actions.onAddCanvasImageToAI,
+            onAddCanvasElementToContext: conversationUiEnabled ? actions.onAddCanvasElementToContext : undefined,
+            onAddCanvasScreenshotToAI: conversationUiEnabled ? actions.onAddCanvasScreenshotToAI : undefined,
+            onAddCanvasImageToAI: conversationUiEnabled ? actions.onAddCanvasImageToAI : undefined,
             onCanvasAnnotationsChange: actions.onCanvasAnnotationsChange,
             onOpenCanvasInIDE: actions.onOpenCanvasInIDE,
-            onOpenCanvasAgent: actions.onOpenCanvasAgent,
+            onOpenCanvasAgent: conversationUiEnabled ? actions.onOpenCanvasAgent : undefined,
             handleOpenProjectInIDE: actions.handleOpenProjectInIDE,
-            onOpenAcpWebAgent: actions.onOpenAcpWebAgent,
-            onOpenImageAiPanel: actions.onOpenImageAiPanel,
-            onOpenWebAgentInPanel: actions.onOpenWebAgentInPanel,
-            onExecutePrompt: actions.onExecutePrompt,
-            onCloseAiPanel: actions.onCloseAiPanel,
-            onCloseWebAgentPanel: actions.onCloseWebAgentPanel,
+            onOpenAcpWebAgent: conversationUiEnabled ? actions.onOpenAcpWebAgent : undefined,
+            onOpenImageAiPanel: conversationUiEnabled ? actions.onOpenImageAiPanel : undefined,
+            onOpenWebAgentInPanel: conversationUiEnabled ? actions.onOpenWebAgentInPanel : undefined,
+            onExecutePrompt: conversationUiEnabled ? actions.onExecutePrompt : undefined,
+            onCloseAiPanel: conversationUiEnabled ? actions.onCloseAiPanel : undefined,
+            onCloseWebAgentPanel: conversationUiEnabled ? actions.onCloseWebAgentPanel : undefined,
             onPreferredIDEChange: actions.onPreferredIDEChange,
             onOpenAISettings: actions.openSettingsDialog ? () => actions.openSettingsDialog?.('ai') : undefined,
-            onCreatePrototypeForDraftStart: actions.onCreatePrototypeForDraftStart,
+            onToggleCommentaryVoice: actions.onToggleCommentaryVoice,
             onUploadResourceFiles: actions.onUploadResourceFiles,
             onCreateResourceCanvasFile: actions.onCreateResourceCanvasFile,
             onCreateDrawioResourceFile: actions.onCreateDrawioResourceFile,
             onOpenDesignImport: actions.onOpenDesignImport,
+            onRefreshThemes: actions.onRefreshThemes,
             onRefreshPrototypes: actions.onRefreshPrototypes,
             agentRunConcurrency: actions.agentRunConcurrency,
             onSubmitCanvasAssistantPrompt: actions.onSubmitCanvasAssistantPrompt,
         },
-    }), [actions, preview, state, ui]) satisfies PresentationAreaGroupedProps;
+        });
+    }, [actions, preview, state, ui]) satisfies PresentationAreaGroupedProps;
 }

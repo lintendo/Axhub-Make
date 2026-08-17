@@ -41,6 +41,7 @@ import {
   cleanupProjectApiTestRoots,
   createTempRoot,
   registerProject,
+  scopeProjectApiUrl,
   startTestServer,
   writeJson,
   writeProjectMetadata as writeBaseProjectMetadata,
@@ -144,7 +145,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const response = await fetch(`${server.origin}/api/projects/resource-open-mode-client/resources`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/projects/resource-open-mode-client/resources`));
       const body = await response.json();
       const docs = body.resources.docs as Array<Record<string, unknown>>;
 
@@ -249,7 +250,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const response = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -350,7 +351,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const response = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -382,7 +383,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const current = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`).then((response) => response.json());
+      const current = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`)).then((response) => response.json());
       const archive = findNode(current.tree, (node) => node.folderPath === 'archive');
       const templates = findNode(current.tree, (node) => node.folderPath === 'templates');
       const template = findNode(current.tree, (node) => node.itemKey === 'docs/templates/prd-template.md');
@@ -390,7 +391,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
       expect(templates).toBeTruthy();
       expect(template).toBeTruthy();
 
-      const update = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`, {
+      const update = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -439,13 +440,13 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const current = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`).then((response) => response.json());
+      const current = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`)).then((response) => response.json());
       const archive = findNode(current.tree, (node) => node.folderPath === 'archive');
       const rootNotes = findNode(current.tree, (node) => node.itemKey === 'docs/notes.md');
       expect(archive).toBeTruthy();
       expect(rootNotes).toBeTruthy();
 
-      const update = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`, {
+      const update = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -496,7 +497,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const response = await fetch(`${server.origin}/api/workspace/resources/open-system`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/resources/open-system`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: 'assets/logo.png' }),
@@ -552,7 +553,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const createdFolder = await fetch(`${server.origin}/api/workspace/navigation/folders?tab=docs`, {
+      const createdFolder = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation/folders?tab=docs`), {
         method: 'POST',
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(createdFolder.status).toBe(201);
@@ -563,7 +564,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
       uploadBody.set('projectId', 'default-resource-ops-client');
       uploadBody.set('targetFolder', 'new-folder');
       uploadBody.set('file', new Blob(['# Uploaded\n'], { type: 'text/markdown' }), 'uploaded.md');
-      const uploaded = await fetch(`${server.origin}/api/docs/upload`, {
+      const uploaded = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/upload`), {
         method: 'POST',
         body: uploadBody,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -575,7 +576,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
       });
       expect(fs.readFileSync(path.join(projectRoot, 'src/resources/new-folder/uploaded.md'), 'utf8')).toBe('# Uploaded\n');
 
-      const renamed = await fetch(`${server.origin}/api/docs/${encodeURIComponent('new-folder/uploaded.md')}`, {
+      const renamed = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/${encodeURIComponent('new-folder/uploaded.md')}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId: 'default-resource-ops-client', newBaseName: 'renamed-note' }),
@@ -586,7 +587,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
       expect(fs.existsSync(path.join(projectRoot, 'src/resources/new-folder/uploaded.md'))).toBe(false);
       expect(fs.readFileSync(path.join(projectRoot, 'src/resources/new-folder/renamed-note.md'), 'utf8')).toBe('# Uploaded\n');
 
-      const copied = await fetch(`${server.origin}/api/docs/${encodeURIComponent('new-folder/renamed-note.md')}/copy`, {
+      const copied = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/${encodeURIComponent('new-folder/renamed-note.md')}/copy`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId: 'default-resource-ops-client', displayName: 'Copied Note' }),
@@ -596,14 +597,14 @@ describe('make-server resource sidebar filesystem tree API', () => {
       expect(copied.body.path).toBe('new-folder/copied-note.md');
       expect(fs.readFileSync(path.join(projectRoot, 'src/resources/new-folder/copied-note.md'), 'utf8')).toBe('# Uploaded\n');
 
-      const deleted = await fetch(`${server.origin}/api/docs/${encodeURIComponent('new-folder/copied-note.md')}`, {
+      const deleted = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/${encodeURIComponent('new-folder/copied-note.md')}`), {
         method: 'DELETE',
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(deleted.status).toBe(200);
       expect(deleted.body.success).toBe(true);
       expect(fs.existsSync(path.join(projectRoot, 'src/resources/new-folder/copied-note.md'))).toBe(false);
 
-      const current = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`).then((response) => response.json());
+      const current = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`)).then((response) => response.json());
       const archive = findNode(current.tree, (node) => node.folderPath === 'archive');
       const newFolder = findNode(current.tree, (node) => node.folderPath === 'new-folder');
       const movedDoc = findNode(current.tree, (node) => node.itemKey === 'docs/new-folder/renamed-note.md');
@@ -613,7 +614,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
       expect(movedDoc).toBeTruthy();
       expect(templates).toBeTruthy();
 
-      const moved = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`, {
+      const moved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -639,7 +640,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
       imageUploadBody.set('projectId', 'default-resource-ops-client');
       imageUploadBody.set('targetFolder', 'new-folder');
       imageUploadBody.set('file', new Blob(['PNGDATA'], { type: 'image/png' }), 'icon.png');
-      const uploadedImage = await fetch(`${server.origin}/api/docs/upload`, {
+      const uploadedImage = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/upload`), {
         method: 'POST',
         body: imageUploadBody,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -650,7 +651,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
       });
       expect(fs.readFileSync(path.join(projectRoot, 'src/resources/new-folder/icon.png'), 'utf8')).toBe('PNGDATA');
 
-      const renamedImage = await fetch(`${server.origin}/api/docs/${encodeURIComponent('new-folder/icon.png')}`, {
+      const renamedImage = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/${encodeURIComponent('new-folder/icon.png')}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId: 'default-resource-ops-client', newBaseName: 'brand-icon' }),
@@ -661,7 +662,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
       expect(fs.existsSync(path.join(projectRoot, 'src/resources/new-folder/icon.png'))).toBe(false);
       expect(fs.readFileSync(path.join(projectRoot, 'src/resources/new-folder/brand-icon.png'), 'utf8')).toBe('PNGDATA');
 
-      const copiedImage = await fetch(`${server.origin}/api/docs/${encodeURIComponent('new-folder/brand-icon.png')}/copy`, {
+      const copiedImage = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/${encodeURIComponent('new-folder/brand-icon.png')}/copy`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId: 'default-resource-ops-client', displayName: 'Brand Icon Copy' }),
@@ -671,14 +672,14 @@ describe('make-server resource sidebar filesystem tree API', () => {
       expect(copiedImage.body.path).toBe('new-folder/brand-icon-copy.png');
       expect(fs.readFileSync(path.join(projectRoot, 'src/resources/new-folder/brand-icon-copy.png'), 'utf8')).toBe('PNGDATA');
 
-      const deletedImage = await fetch(`${server.origin}/api/docs/${encodeURIComponent('new-folder/brand-icon-copy.png')}`, {
+      const deletedImage = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/${encodeURIComponent('new-folder/brand-icon-copy.png')}`), {
         method: 'DELETE',
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(deletedImage.status).toBe(200);
       expect(deletedImage.body.success).toBe(true);
       expect(fs.existsSync(path.join(projectRoot, 'src/resources/new-folder/brand-icon-copy.png'))).toBe(false);
 
-      const currentAfterImage = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`).then((response) => response.json());
+      const currentAfterImage = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`)).then((response) => response.json());
       const archiveAfterImage = findNode(currentAfterImage.tree, (node) => node.folderPath === 'archive');
       const newFolderAfterImage = findNode(currentAfterImage.tree, (node) => node.folderPath === 'new-folder');
       const imageToMove = findNode(currentAfterImage.tree, (node) => node.itemKey === 'docs/new-folder/brand-icon.png');
@@ -688,7 +689,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
       expect(imageToMove).toBeTruthy();
       expect(templatesAfterImage).toBeTruthy();
 
-      const movedImage = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`, {
+      const movedImage = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -727,7 +728,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const response = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -770,7 +771,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const response = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`));
       const body = await response.json();
 
       const ids = body.tree.map((node: { id: string }) => node.id);
@@ -789,7 +790,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const response = await fetch(`${server.origin}/api/workspace/navigation/folders?tab=docs`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation/folders?tab=docs`), {
         method: 'POST',
       });
       const body = await response.json();
@@ -811,6 +812,76 @@ describe('make-server resource sidebar filesystem tree API', () => {
     }
   });
 
+  it('ensures and reuses a named real resource folder for image AI storage', async () => {
+    const projectRoot = createTempRoot();
+    writeResourceProject(projectRoot);
+
+    const server = await startTestServer(projectRoot);
+    try {
+      const requestUrl = scopeProjectApiUrl(
+        projectRoot,
+        `${server.origin}/api/workspace/navigation/folders?tab=docs`,
+      );
+      const ensureFolder = () => fetch(requestUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderPath: 'images' }),
+      }).then(async (response) => ({ status: response.status, body: await response.json() }));
+
+      const first = await ensureFolder();
+      const second = await ensureFolder();
+
+      expect(first.status).toBe(201);
+      expect(first.body.created).toBe(true);
+      expect(first.body.folder).toMatchObject({
+        id: 'folder-docs-images',
+        kind: 'folder',
+        title: 'images',
+        path: 'images',
+        folderPath: 'images',
+      });
+      expect(first.body.absolutePath).toBe(path.join(projectRoot, 'src/resources/images'));
+      expect(second.status).toBe(200);
+      expect(second.body.created).toBe(false);
+      expect(second.body.absolutePath).toBe(first.body.absolutePath);
+      expect(fs.readdirSync(path.join(projectRoot, 'src/resources')).filter((name) => name === 'images')).toHaveLength(1);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('rejects unsafe named resource folders and non-directory collisions', async () => {
+    const projectRoot = createTempRoot();
+    writeResourceProject(projectRoot);
+
+    const server = await startTestServer(projectRoot);
+    try {
+      const requestUrl = scopeProjectApiUrl(
+        projectRoot,
+        `${server.origin}/api/workspace/navigation/folders?tab=docs`,
+      );
+      const ensureFolder = (folderPath: string) => fetch(requestUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderPath }),
+      });
+
+      for (const unsafePath of ['../outside', '/absolute', 'C:\\absolute', 'nested//empty', 'nested/./relative']) {
+        const response = await ensureFolder(unsafePath);
+        expect(response.status).toBe(400);
+      }
+
+      fs.writeFileSync(path.join(projectRoot, 'src/resources/images'), 'not a directory', 'utf8');
+      const collisionResponse = await ensureFolder('images');
+      expect(collisionResponse.status).toBe(409);
+      await expect(collisionResponse.json()).resolves.toMatchObject({
+        error: 'Resource folder path is not a directory',
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it('opens resource files and folders through the local filesystem opener', async () => {
     const projectRoot = createTempRoot();
     writeResourceProject(projectRoot);
@@ -819,7 +890,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const fileResponse = await fetch(`${server.origin}/api/workspace/resources/open-system`, {
+      const fileResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/resources/open-system`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: 'research/notes.md' }),
@@ -840,7 +911,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
       );
       expect(childProcessMock.execFile).not.toHaveBeenCalled();
 
-      const folderResponse = await fetch(`${server.origin}/api/workspace/resources/open-system`, {
+      const folderResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/resources/open-system`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: 'research', kind: 'folder' }),
@@ -888,7 +959,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const response = await fetch(`${server.origin}/api/workspace/resources/open-system`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/resources/open-system`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'themes', path: 'brand', kind: 'folder' }),
@@ -922,12 +993,12 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const escapeResponse = await fetch(`${server.origin}/api/workspace/resources/open-system`, {
+      const escapeResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/resources/open-system`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: '../secret.md' }),
       });
-      const hiddenResponse = await fetch(`${server.origin}/api/workspace/resources/open-system`, {
+      const hiddenResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/resources/open-system`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: '.hidden/secret.md' }),
@@ -975,7 +1046,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const current = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`).then((response) => response.json());
+      const current = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`)).then((response) => response.json());
       const research = findNode(current.tree, (node) => node.folderPath === 'research');
       const archive = findNode(current.tree, (node) => node.folderPath === 'archive');
       const overview = findNode(current.tree, (node) => node.itemKey === 'docs/overview.md');
@@ -992,7 +1063,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
           ],
         },
       ];
-      const update = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`, {
+      const update = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tree: nextTree }),
@@ -1019,13 +1090,13 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const current = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`).then((response) => response.json());
+      const current = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`)).then((response) => response.json());
       const archive = findNode(current.tree, (node) => node.folderPath === 'archive');
       const overview = findNode(current.tree, (node) => node.itemKey === 'docs/overview.md');
       expect(archive).toBeTruthy();
       expect(overview).toBeTruthy();
 
-      const update = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`, {
+      const update = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1060,10 +1131,10 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const current = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`).then((response) => response.json());
+      const current = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`)).then((response) => response.json());
       const filled = findNode(current.tree, (node) => node.folderPath === 'filled');
       const removeFilled = current.tree.filter((node: any) => node.folderPath !== 'filled');
-      const rejected = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`, {
+      const rejected = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tree: removeFilled }),
@@ -1079,7 +1150,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
       expect(fs.existsSync(path.join(projectRoot, 'src/resources/filled/notes.md'))).toBe(true);
 
       const removeEmpty = current.tree.filter((node: any) => node.folderPath !== 'empty');
-      const accepted = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`, {
+      const accepted = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tree: removeEmpty }),
@@ -1100,9 +1171,9 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const current = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`).then((response) => response.json());
+      const current = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`)).then((response) => response.json());
       const removeAssets = current.tree.filter((node: any) => node.folderPath !== 'assets');
-      const accepted = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`, {
+      const accepted = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tree: removeAssets }),
@@ -1124,7 +1195,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const response = await fetch(`${server.origin}/api/workspace/navigation?tab=docs`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1159,14 +1230,14 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const initial = await fetch(`${server.origin}/api/workspace/project`)
+      const initial = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/project`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(initial).toEqual({
         status: 200,
         body: { title: 'Workspace Title Client' },
       });
 
-      const blank = await fetch(`${server.origin}/api/workspace/project`, {
+      const blank = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/project`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: '   ' }),
@@ -1176,15 +1247,15 @@ describe('make-server resource sidebar filesystem tree API', () => {
         body: { success: true, title: '' },
       });
 
-      const blankReloaded = await fetch(`${server.origin}/api/workspace/project`)
+      const blankReloaded = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/project`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(blankReloaded).toEqual({
         status: 200,
         body: { title: '' },
       });
-      const blankConfig = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const blankConfig = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(blankConfig.projectInfo.name).toBe('');
-      const blankProjects = await fetch(`${server.origin}/api/projects`).then((response) => response.json());
+      const blankProjects = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/projects`)).then((response) => response.json());
       expect(blankProjects.projects).toEqual([
         expect.objectContaining({
           id: 'workspace-title-client',
@@ -1192,7 +1263,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
         }),
       ]);
 
-      const control = await fetch(`${server.origin}/api/workspace/project`, {
+      const control = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/project`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Bad\u0000Title' }),
@@ -1202,7 +1273,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
         body: { error: 'title contains invalid control characters' },
       });
 
-      const updated = await fetch(`${server.origin}/api/workspace/project`, {
+      const updated = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/project`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Renamed Workspace' }),
@@ -1211,9 +1282,9 @@ describe('make-server resource sidebar filesystem tree API', () => {
         status: 200,
         body: { success: true, title: 'Renamed Workspace' },
       });
-      const updatedConfig = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const updatedConfig = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(updatedConfig.projectInfo.name).toBe('Renamed Workspace');
-      const updatedProjects = await fetch(`${server.origin}/api/projects`).then((response) => response.json());
+      const updatedProjects = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/projects`)).then((response) => response.json());
       expect(updatedProjects.projects).toEqual([
         expect.objectContaining({
           id: 'workspace-title-client',
@@ -1238,14 +1309,14 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const invalidTab = await fetch(`${server.origin}/api/workspace/navigation?tab=unknown`)
+      const invalidTab = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=unknown`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(invalidTab).toMatchObject({
         status: 400,
         body: { error: 'Invalid tab, expected prototypes|components|docs|canvas|themes' },
       });
 
-      const createdFirst = await fetch(`${server.origin}/api/workspace/navigation/folders?tab=canvas`, {
+      const createdFirst = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation/folders?tab=canvas`), {
         method: 'POST',
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(createdFirst.status).toBe(201);
@@ -1255,7 +1326,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
         children: [],
       });
 
-      const createdSecond = await fetch(`${server.origin}/api/workspace/navigation/folders?tab=canvas`, {
+      const createdSecond = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation/folders?tab=canvas`), {
         method: 'POST',
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(createdSecond.status).toBe(201);
@@ -1264,21 +1335,21 @@ describe('make-server resource sidebar filesystem tree API', () => {
         title: '新建文件夹-2',
       });
 
-      const invalidTree = await fetch(`${server.origin}/api/workspace/navigation?tab=canvas`, {
+      const invalidTree = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=canvas`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tree: [{ id: 'bad', kind: 'item', title: 'Bad', itemKey: 'docs/bad.md' }] }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(invalidTree).toEqual({ status: 400, body: { error: 'Invalid tree payload' } });
 
-      const legacyTree = await fetch(`${server.origin}/api/workspace/navigation?tab=canvas`, {
+      const legacyTree = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=canvas`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tree: [{ id: 'legacy', kind: 'item', title: 'Legacy', itemKey: 'canvas/legacy.excalidraw' }] }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(legacyTree).toEqual({ status: 400, body: { error: 'Invalid tree payload' } });
 
-      const validTree = await fetch(`${server.origin}/api/workspace/navigation?tab=canvas`, {
+      const validTree = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=canvas`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1328,7 +1399,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
     let server = await startTestServer(serverRoot, registryHome);
     try {
       await registerProject(server.origin, clientRoot, 'design-folder-client', 'Design Folder Client');
-      const saveTree = await fetch(`${server.origin}/api/workspace/navigation?tab=themes&projectId=design-folder-client`, {
+      const saveTree = await fetch(scopeProjectApiUrl(clientRoot, `${server.origin}/api/workspace/navigation?tab=themes&projectId=design-folder-client`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1357,7 +1428,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     server = await startTestServer(serverRoot, registryHome);
     try {
-      const navigation = await fetch(`${server.origin}/api/workspace/navigation?tab=themes&projectId=design-folder-client`)
+      const navigation = await fetch(scopeProjectApiUrl(clientRoot, `${server.origin}/api/workspace/navigation?tab=themes&projectId=design-folder-client`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(navigation.status).toBe(200);
@@ -1418,7 +1489,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const response = await fetch(`${server.origin}/api/workspace/navigation?tab=prototypes`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=prototypes`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -1475,7 +1546,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
     const server = await startTestServer(projectRoot);
     try {
       await registerProject(server.origin, projectRoot, 'docs-readme-tree-client', 'Docs README Tree Client');
-      const response = await fetch(`${server.origin}/api/workspace/navigation?tab=docs&projectId=docs-readme-tree-client`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=docs&projectId=docs-readme-tree-client`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -1524,7 +1595,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const response = await fetch(`${server.origin}/api/workspace/navigation?tab=prototypes`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/navigation?tab=prototypes`));
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -1565,21 +1636,21 @@ describe('make-server resource sidebar filesystem tree API', () => {
 
     const server = await startTestServer(projectRoot);
     try {
-      const invalidType = await fetch(`${server.origin}/api/workspace/resources/order?type=unknown`)
+      const invalidType = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/resources/order?type=unknown`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(invalidType).toEqual({
         status: 400,
         body: { error: 'Invalid type, expected themes|data|templates' },
       });
 
-      const dataOrder = await fetch(`${server.origin}/api/workspace/resources/order?type=data`)
+      const dataOrder = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/resources/order?type=data`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(dataOrder).toEqual({
         status: 200,
         body: { type: 'data', version: 1, order: ['customers', 'orders'] },
       });
 
-      const invalidOrderShape = await fetch(`${server.origin}/api/workspace/resources/order?type=data`, {
+      const invalidOrderShape = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/resources/order?type=data`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order: 'orders' }),
@@ -1589,7 +1660,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
         body: { error: 'order must be an array' },
       });
 
-      const invalidKey = await fetch(`${server.origin}/api/workspace/resources/order?type=data`, {
+      const invalidKey = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/resources/order?type=data`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order: ['orders', 'missing'] }),
@@ -1599,7 +1670,7 @@ describe('make-server resource sidebar filesystem tree API', () => {
         body: { error: 'Invalid resource key: missing' },
       });
 
-      const updatedData = await fetch(`${server.origin}/api/workspace/resources/order?type=data`, {
+      const updatedData = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/resources/order?type=data`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order: ['orders', 'orders'] }),
@@ -1609,14 +1680,14 @@ describe('make-server resource sidebar filesystem tree API', () => {
         body: { success: true, type: 'data', version: 1, order: ['customers', 'orders'] },
       });
 
-      const templateOrder = await fetch(`${server.origin}/api/workspace/resources/order?type=templates`)
+      const templateOrder = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/resources/order?type=templates`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(templateOrder).toEqual({
         status: 200,
         body: { type: 'templates', version: 1, order: ['base.md', 'nested/prd.md'] },
       });
 
-      const themeOrder = await fetch(`${server.origin}/api/workspace/resources/order?type=themes`)
+      const themeOrder = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/workspace/resources/order?type=themes`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(themeOrder).toEqual({
         status: 200,

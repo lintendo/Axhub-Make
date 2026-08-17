@@ -10,10 +10,12 @@ import {
   type PreviewCommandOptions,
 } from './previewBridge.ts';
 import { readJsonBody, sendJson } from './http.ts';
+import { createMakeVoiceToolRegistry } from '../index/domains/assistant/makeVoiceTools.ts';
 
 export const AXHUB_PREVIEW_MCP_PATH = '/api/mcp/axhub-preview';
 export const AXHUB_PREVIEW_MCP_TOKEN_HEADER = 'x-axhub-preview-mcp-token';
 export const AXHUB_PREVIEW_BRIDGE_CLIENT_ID_HEADER = 'x-axhub-preview-bridge-client-id';
+export const AXHUB_PREVIEW_VOICE_TOOLS_HEADER = 'x-axhub-preview-voice-tools';
 
 type JsonRpcId = string | number | null;
 
@@ -26,11 +28,12 @@ type JsonRpcRequest = {
 
 type ToolDefinition = {
   name: string;
+  title?: string;
   description: string;
   inputSchema: Record<string, unknown>;
 };
 
-type PreviewToolName = typeof TOOL_NAMES[number];
+type PreviewToolName = typeof TOOL_NAMES[number] | typeof AXHUB_MAKE_VOICE_TOOL_NAMES[number];
 
 export interface AxhubPreviewMcpOptions {
   token: string;
@@ -54,6 +57,16 @@ const TOOL_NAMES = [
   'preview_navigate',
   'preview_capture',
   'preview_get_last_diagnostics',
+] as const;
+
+const AXHUB_MAKE_VOICE_TOOL_NAMES = [
+  'axhub_make_capture_page',
+  'axhub_make_get_page_target',
+  'axhub_make_find_page_elements',
+  'axhub_make_get_page_structure',
+  'axhub_make_activate_page_element',
+  'axhub_make_list_comments',
+  'axhub_make_get_comment_execution',
 ] as const;
 
 const COMMON_TOOL_PROPERTIES = {
@@ -181,6 +194,23 @@ const AXHUB_PREVIEW_TOOLS: ToolDefinition[] = [
   },
 ];
 
+const unavailableVoiceToolDependency = () => {
+  throw new Error('Voice tool descriptor dependencies cannot execute on the server.');
+};
+const unavailableVoiceToolMethods = new Proxy({}, {
+  get: () => unavailableVoiceToolDependency,
+});
+const AXHUB_MAKE_VOICE_TOOLS: ToolDefinition[] = createMakeVoiceToolRegistry({
+  commentary: unavailableVoiceToolMethods as any,
+  page: { url: '', title: '', capture: unavailableVoiceToolDependency },
+  comments: unavailableVoiceToolMethods as any,
+}).filter(({ confirmation }) => confirmation === 'none').map(({ name, title, description, parameters }) => ({
+  name,
+  title,
+  description,
+  inputSchema: parameters,
+}));
+
 export function createAxhubPreviewMcpToken(): string {
   return randomBytes(24).toString('base64url');
 }
@@ -243,6 +273,7 @@ export async function handleAxhubPreviewMcp(
   const response = await dispatchJsonRpcRequest(request, {
     ...options,
     bridgeClientId: normalizeHeaderValue(getHeader(req, AXHUB_PREVIEW_BRIDGE_CLIENT_ID_HEADER)),
+    voiceToolsEnabled: normalizeHeaderValue(getHeader(req, AXHUB_PREVIEW_VOICE_TOOLS_HEADER)) === '1',
   });
   sendJson(res, response);
   return true;
@@ -256,7 +287,7 @@ function isJsonRpcNotification(request: JsonRpcRequest): boolean {
 
 async function dispatchJsonRpcRequest(
   request: JsonRpcRequest,
-  options: AxhubPreviewMcpOptions & { bridgeClientId?: string },
+  options: AxhubPreviewMcpOptions & { bridgeClientId?: string; voiceToolsEnabled?: boolean },
 ): Promise<Record<string, unknown>> {
   const id = request.id ?? null;
   if (request.jsonrpc !== '2.0' || typeof request.method !== 'string') {
@@ -282,7 +313,7 @@ async function dispatchJsonRpcRequest(
       return {
         jsonrpc: '2.0',
         id,
-        result: { tools: AXHUB_PREVIEW_TOOLS },
+        result: { tools: options.voiceToolsEnabled ? [...AXHUB_PREVIEW_TOOLS, ...AXHUB_MAKE_VOICE_TOOLS] : AXHUB_PREVIEW_TOOLS },
       };
     case 'tools/call':
       try {
@@ -305,9 +336,9 @@ async function dispatchJsonRpcRequest(
 
 async function callTool(
   params: unknown,
-  options: AxhubPreviewMcpOptions & { bridgeClientId?: string },
+  options: AxhubPreviewMcpOptions & { bridgeClientId?: string; voiceToolsEnabled?: boolean },
 ): Promise<Record<string, unknown>> {
-  const { name, args } = readToolCall(params);
+  const { name, args } = readToolCall(params, options.voiceToolsEnabled === true);
   const { payload, commandOptions, captureOutput } = splitBridgeArguments(args);
 
   try {
@@ -328,11 +359,11 @@ async function callTool(
   }
 }
 
-function readToolCall(params: unknown): { name: PreviewToolName; args: Record<string, unknown> } {
+function readToolCall(params: unknown, voiceToolsEnabled: boolean): { name: PreviewToolName; args: Record<string, unknown> } {
   if (!isRecord(params) || typeof params.name !== 'string') {
     throw new PreviewBridgeError('invalid_tool_call', 'tools/call params must include a tool name.');
   }
-  if (!isPreviewToolName(params.name)) {
+  if (!isPreviewToolName(params.name, voiceToolsEnabled)) {
     throw new PreviewBridgeError('unknown_tool', `Unknown axhub preview tool "${params.name}".`);
   }
   const rawArgs = params.arguments;
@@ -563,8 +594,9 @@ function normalizeToolError(error: unknown): { code: string; message: string } {
   };
 }
 
-function isPreviewToolName(value: string): value is PreviewToolName {
-  return (TOOL_NAMES as readonly string[]).includes(value);
+function isPreviewToolName(value: string, voiceToolsEnabled: boolean): value is PreviewToolName {
+  return (TOOL_NAMES as readonly string[]).includes(value)
+    || (voiceToolsEnabled && (AXHUB_MAKE_VOICE_TOOL_NAMES as readonly string[]).includes(value));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -53,7 +53,7 @@ window.axhubReview?.clearComment?.({
 优先使用包含可编辑源数据的 `.drawio.svg`：
 
 ```html
-<img src="demo.assets/diagrams/architecture.drawio.svg" alt="系统架构图" />
+<img src="../.assets/review/demo.html/diagrams/architecture.drawio.svg" alt="系统架构图" />
 ```
 
 Make 能识别 `img`、`object` 引用的 `.drawio.svg`，以及带 `data-drawio` 或 `metadata#drawio-source` 的内嵌 SVG。普通 SVG 不会被视为可编辑 Draw.io 图。
@@ -62,11 +62,11 @@ Agent 可以创建首次引用的 `.drawio.svg`，打开、保存和回传由 Ma
 
 ## 支撑文件
 
-图表编辑产物保存在与 HTML 同名的 `.assets` 目录：
+图表编辑产物统一保存在资源根目录的 `.assets/<HTML 资源相对路径>/` 下：
 
 ```text
 src/resources/review/demo.html
-src/resources/review/demo.assets/
+src/resources/.assets/review/demo.html/
 ├── diagrams/
 ├── diagram-manifest.json
 └── .sessions/

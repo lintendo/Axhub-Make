@@ -12,6 +12,7 @@ export interface AnnotationDirectRunTaskRef {
 }
 
 export interface AnnotationDirectRunEditingTarget {
+  commentId?: string;
   pane?: 'primary' | 'secondary';
   iframe?: HTMLIFrameElement | null;
   elementKey: string;
@@ -32,14 +33,22 @@ export interface AnnotationDirectRunSubmitRequest<TContext> {
   context: TContext;
   prompt: string;
   editingTargets?: AnnotationDirectRunEditingTarget[];
+  mcpServers?: unknown[];
   signal: AbortSignal;
   onPrepared?: (payload: AnnotationDirectRunSubmitPayload) => void | Promise<void>;
   onAccepted?: (payload: AnnotationDirectRunSubmitPayload) => void | Promise<void>;
+  /** Pass-through stream callback for host-owned transcript surfaces. */
+  onEvent?: (event: unknown) => void | Promise<void>;
+}
+
+export interface AnnotationDirectRunPreflightResult {
+  kind: 'preflight-handled';
 }
 
 export type AnnotationDirectRunSubmitResult =
   | boolean
   | void
+  | AnnotationDirectRunPreflightResult
   | {
       runId?: string | null;
       threadId?: string | null;
@@ -67,6 +76,12 @@ export type AnnotationDirectRunEvent =
       editingTargets?: AnnotationDirectRunEditingTarget[];
     }
   | {
+      type: 'skipped';
+      runKey: string;
+      taskRef: AnnotationDirectRunTaskRef;
+      editingTargets?: AnnotationDirectRunEditingTarget[];
+    }
+  | {
       type: 'error';
       runKey: string;
       taskRef: AnnotationDirectRunTaskRef;
@@ -81,22 +96,49 @@ export type AnnotationDirectRunEvent =
 
 type AnnotationDirectRunTerminalEvent = Extract<
   AnnotationDirectRunEvent,
-  { type: 'completed' | 'aborted' | 'error' }
+  { type: 'completed' | 'aborted' | 'error' | 'skipped' }
 >;
 
 export type AnnotationDirectRunEventListener = (
   event: AnnotationDirectRunEvent,
 ) => void | Promise<void>;
 
+export interface AnnotationDirectRunOperationState {
+  operationId: string;
+  executionId: string;
+  phase: 'accepted' | 'running' | 'completed' | 'failed' | 'cancelled';
+}
+
+export function createAnnotationDirectRunPreflightResult(): AnnotationDirectRunPreflightResult {
+  return { kind: 'preflight-handled' };
+}
+
+function isAnnotationDirectRunPreflightResult(
+  value: AnnotationDirectRunSubmitResult,
+): value is AnnotationDirectRunPreflightResult {
+  return Boolean(
+    value
+    && typeof value === 'object'
+    && 'kind' in value
+    && value.kind === 'preflight-handled',
+  );
+}
+
 export interface AnnotationDirectRunStartOptions<TContext> {
   context: TContext;
   prompt: string;
+  /** Optional host operation id; keeps cancellation on the existing registry targeted. */
+  requestId?: string;
   maxActiveRuns: number;
   editingTargets?: AnnotationDirectRunEditingTarget[];
+  /** Existing direct-run MCP configuration supplied by the caller. */
+  mcpServers?: unknown[];
   submit: (
     request: AnnotationDirectRunSubmitRequest<TContext>,
   ) => Promise<AnnotationDirectRunSubmitResult>;
   onEvent?: AnnotationDirectRunEventListener;
+  /** Observes source stream data without creating another task/event store. */
+  onStreamEvent?: (event: unknown) => void | Promise<void>;
 }
 
 export type AnnotationDirectRunStartResult =
@@ -115,19 +157,24 @@ export type AnnotationDirectRunStartResult =
 
 interface ActiveAnnotationDirectRun {
   runKey: string;
+  operationId: string;
   controller: AbortController;
   taskRef: AnnotationDirectRunTaskRef;
   editingTargets?: AnnotationDirectRunEditingTarget[];
   onEvent?: AnnotationDirectRunEventListener;
   terminalEmitted: boolean;
+  operationState: AnnotationDirectRunOperationState | null;
 }
 
 export interface AnnotationDirectRunRegistry {
   startRun<TContext>(
     options: AnnotationDirectRunStartOptions<TContext>,
   ): AnnotationDirectRunStartResult;
+  /** Abort exactly one existing run by its host task/session/request identifier. */
+  abortRun(taskId: string): Promise<boolean>;
   abortAll(): Promise<number>;
   getActiveRunCount(): number;
+  getOperation(operationId: string): AnnotationDirectRunOperationState | null;
 }
 
 function defaultCreateRequestId(): string {
@@ -157,6 +204,13 @@ async function emitRunEvent(
   activeRun: ActiveAnnotationDirectRun,
   event: AnnotationDirectRunEvent,
 ): Promise<void> {
+  if (activeRun.operationState) {
+    if (event.type === 'started') activeRun.operationState.phase = 'running';
+    if (event.type === 'prepared' || event.type === 'accepted') activeRun.operationState.phase = 'accepted';
+    if (event.type === 'completed') activeRun.operationState.phase = 'completed';
+    if (event.type === 'aborted') activeRun.operationState.phase = 'cancelled';
+    if (event.type === 'error' || event.type === 'skipped') activeRun.operationState.phase = 'failed';
+  }
   await activeRun.onEvent?.(event);
 }
 
@@ -177,6 +231,8 @@ export function createAnnotationDirectRunRegistry(options: {
 } = {}): AnnotationDirectRunRegistry {
   const createRequestId = options.createRequestId || defaultCreateRequestId;
   const activeRuns = new Map<string, ActiveAnnotationDirectRun>();
+  const resultsByRequestId = new Map<string, Extract<AnnotationDirectRunStartResult, { started: true }>>();
+  const operationsByRequestId = new Map<string, AnnotationDirectRunOperationState>();
   let sequence = 0;
 
   function getActiveRunCount(): number {
@@ -185,9 +241,21 @@ export function createAnnotationDirectRunRegistry(options: {
       .length;
   }
 
+  function getOperation(operationId: string): AnnotationDirectRunOperationState | null {
+    const normalized = String(operationId || '').trim();
+    const operation = normalized ? operationsByRequestId.get(normalized) : null;
+    return operation ? { ...operation } : null;
+  }
+
   function startRun<TContext>(
     startOptions: AnnotationDirectRunStartOptions<TContext>,
   ): AnnotationDirectRunStartResult {
+    const requestedOperationId = String(startOptions.requestId || '').trim();
+    const requestId = requestedOperationId || createRequestId();
+    const existingResult = requestedOperationId
+      ? resultsByRequestId.get(requestedOperationId)
+      : undefined;
+    if (existingResult) return existingResult;
     const activeRunCount = getActiveRunCount();
     const maxActiveRuns = Math.max(1, Math.floor(Number(startOptions.maxActiveRuns) || 1));
     if (activeRunCount >= maxActiveRuns) {
@@ -199,11 +267,11 @@ export function createAnnotationDirectRunRegistry(options: {
     }
 
     const controller = new AbortController();
-    const requestId = createRequestId();
     sequence += 1;
     const runKey = `${requestId}-${sequence}`;
     const activeRun: ActiveAnnotationDirectRun = {
       runKey,
+      operationId: requestId,
       controller,
       taskRef: {
         provider: 'api',
@@ -213,7 +281,17 @@ export function createAnnotationDirectRunRegistry(options: {
       editingTargets: startOptions.editingTargets,
       onEvent: startOptions.onEvent,
       terminalEmitted: false,
+      operationState: requestedOperationId
+        ? {
+            operationId: requestedOperationId,
+            executionId: requestedOperationId,
+            phase: 'running',
+          }
+        : null,
     };
+    if (activeRun.operationState) {
+      operationsByRequestId.set(requestedOperationId, activeRun.operationState);
+    }
     activeRuns.set(runKey, activeRun);
 
     const promise = (async () => {
@@ -237,6 +315,7 @@ export function createAnnotationDirectRunRegistry(options: {
           context: startOptions.context,
           prompt: startOptions.prompt,
           editingTargets: activeRun.editingTargets,
+          mcpServers: startOptions.mcpServers,
           signal: controller.signal,
           onPrepared: async (payload) => {
             activeRun.taskRef = normalizeTaskRef(payload, activeRun.taskRef);
@@ -256,6 +335,9 @@ export function createAnnotationDirectRunRegistry(options: {
               editingTargets: activeRun.editingTargets,
             });
           },
+          onEvent: async (event) => {
+            await startOptions.onStreamEvent?.(event);
+          },
         });
         if (controller.signal.aborted) {
           await emitTerminalOnce(activeRun, {
@@ -265,6 +347,15 @@ export function createAnnotationDirectRunRegistry(options: {
             editingTargets: activeRun.editingTargets,
           });
           return false;
+        }
+        if (isAnnotationDirectRunPreflightResult(submitted)) {
+          await emitTerminalOnce(activeRun, {
+            type: 'skipped',
+            runKey,
+            taskRef: activeRun.taskRef,
+            editingTargets: activeRun.editingTargets,
+          });
+          return true;
         }
         if (submitted === false) {
           throw new Error('AI execution failed');
@@ -307,7 +398,7 @@ export function createAnnotationDirectRunRegistry(options: {
       }
     })();
 
-    return {
+    const result: Extract<AnnotationDirectRunStartResult, { started: true }> = {
       started: true,
       runKey,
       controller,
@@ -326,6 +417,45 @@ export function createAnnotationDirectRunRegistry(options: {
         return true;
       },
     };
+    if (!requestedOperationId) return result;
+    resultsByRequestId.set(requestedOperationId, result);
+    if (resultsByRequestId.size > 200) {
+      const activeRequestIds = new Set(
+        Array.from(activeRuns.values())
+          .map((run) => run.operationId)
+          .filter(Boolean),
+      );
+      for (const candidateRequestId of resultsByRequestId.keys()) {
+        if (candidateRequestId === requestedOperationId || activeRequestIds.has(candidateRequestId)) continue;
+        resultsByRequestId.delete(candidateRequestId);
+        operationsByRequestId.delete(candidateRequestId);
+        if (resultsByRequestId.size <= 200) break;
+      }
+    }
+    return result;
+  }
+
+  async function abortRun(taskId: string): Promise<boolean> {
+    const normalizedTaskId = String(taskId || '').trim();
+    if (!normalizedTaskId) return false;
+    const activeRun = Array.from(activeRuns.values()).find((candidate) => (
+      !candidate.controller.signal.aborted
+      && (
+        candidate.runKey === normalizedTaskId
+        || candidate.runKey.startsWith(`${normalizedTaskId}-`)
+        || candidate.taskRef.sessionId === normalizedTaskId
+        || candidate.taskRef.requestId === normalizedTaskId
+      )
+    ));
+    if (!activeRun) return false;
+    activeRun.controller.abort();
+    await emitTerminalOnce(activeRun, {
+      type: 'aborted',
+      runKey: activeRun.runKey,
+      taskRef: activeRun.taskRef,
+      editingTargets: activeRun.editingTargets,
+    });
+    return true;
   }
 
   async function abortAll(): Promise<number> {
@@ -345,7 +475,9 @@ export function createAnnotationDirectRunRegistry(options: {
 
   return {
     startRun,
+    abortRun,
     abortAll,
     getActiveRunCount,
+    getOperation,
   };
 }

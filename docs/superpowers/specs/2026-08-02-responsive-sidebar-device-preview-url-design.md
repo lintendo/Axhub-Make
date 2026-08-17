@@ -15,6 +15,7 @@ It does not change the coarse-pointer mobile workspace, split preview URL state,
 The responsive rules use these shared design targets:
 
 - Main desktop design viewport: `1440x900`.
+- Adaptive desktop activation width: `1280px`.
 - Fixed sidebar width: `240px`.
 - Preview horizontal allowance: `48px`.
 - Small desktop workspace threshold: `1728px`, derived from `1440 + 240 + 48`.
@@ -73,15 +74,17 @@ Preview state distinguishes user intent from effective rendering:
 The effective preview resolver applies these rules in order:
 
 1. If the user selected mobile, tablet, custom, split, or multi-page, preserve that selection unchanged.
-2. If the user is in the default desktop mode and the measured preview area can provide at least 1440 logical pixels, render the existing fluid desktop preview.
-3. If the user is in the default desktop mode and the measured preview area is narrower than 1440 logical pixels, render a frameless `1440x900` custom viewport scaled to the available area.
-4. When the area becomes wide enough again, return automatically to the fluid desktop preview.
+2. If the user is in the default desktop mode and the measured preview area can provide at least 1280 logical pixels, render the existing fluid desktop preview.
+3. If the user is in the default desktop mode and the measured preview area is narrower than 1280 logical pixels, render a frameless `1440x900` custom viewport scaled to the available area.
+4. When the area reaches 1280 logical pixels again, return automatically to the fluid desktop preview.
 
 The derived `1440x900` viewport behaves like a fixed browser viewport with internal iframe scrolling. It must not use the existing custom fit-screen behavior that expands the logical height to the full document and shrinks a long page into a miniature full-page preview.
 
 The toolbar reflects the effective derived state by showing the custom device icon and `1440x900` fields. This visual change does not convert the default user intent into a manual custom selection.
 
 Selecting desktop explicitly clears any manual single-device setting and returns to the default adaptive desktop behavior.
+
+Entering prototype, PRD, or HTML annotation mode may collapse the sidebar, but it must not change the current automatic viewport decision. The device state records whether the default desktop intent was fluid or derived `1440x900` before the layout change and keeps that decision for the annotation session. Exiting annotation releases the lock after restoring the sidebar. Explicit device actions clear the lock and remain effective immediately. Markdown annotation keeps its existing independent document-edit lifecycle and does not acquire this prototype viewport lock.
 
 ## URL Contract
 
@@ -114,7 +117,7 @@ The desktop workspace boundary measures the width available to the sidebar and p
 
 The sidebar controller combines the responsive default, optional explicit pinned choice, and temporary preview interaction. The sidebar shell consumes the effective pinned and temporary states, while the toolbar trigger consumes stable click, pointer, focus, Escape, and accessibility bindings.
 
-The content area already measures its preview container. A pure adaptive-preview resolver combines that measurement with the user preview configuration and produces the effective configuration used by layout and toolbar rendering.
+The content area already measures its preview container. A pure adaptive-preview resolver combines that measurement, the user preview configuration, and an optional annotation-session decision lock to produce the effective configuration used by layout and toolbar rendering.
 
 The URL parser initializes the manual preview configuration. Later manual single-device changes update the resource deep-link target, while derived adaptive changes remain outside the URL state.
 
@@ -138,8 +141,9 @@ Focused tests cover:
 - Pointer and focus retention between the trigger and floating panel.
 - Collapse click clearing temporary hover state.
 - Floating sidebar positioning below the toolbar.
-- Default desktop staying fluid at 1440px or wider.
-- Default desktop deriving a fixed, internally scrollable `1440x900` viewport below 1440px.
+- Default desktop staying fluid at 1280px or wider, including the approximately 1350px canvas in the reported embedded-browser layout.
+- Default desktop deriving a fixed, internally scrollable `1440x900` viewport below 1280px.
+- Annotation entry collapsing the sidebar without changing the automatic viewport decision, while explicit device actions remain effective.
 - Manual mobile, tablet, custom, split, and multi-page selections bypassing automatic derivation.
 - URL parsing and serialization for preset, custom, absent, and invalid `device` values.
 - Resource navigation retaining the current manual device parameter without adding history entries.

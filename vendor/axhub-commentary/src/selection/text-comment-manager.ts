@@ -48,7 +48,12 @@ export interface TextComment {
   /** Selection bounding rect (viewport coordinates) */
   boundingRect: { left: number; top: number; width: number; height: number };
   /** Per-line rects for overlay highlight rendering */
-  clientRects: Array<{ left: number; top: number; width: number; height: number }>;
+  clientRects: Array<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  }>;
   /** Snapshot of the selected DOM range */
   range: Range;
   /** Closest live element that contains the selection */
@@ -94,6 +99,7 @@ export interface TextCommentManagerOptions {
 const CONTEXT_CHARS = 50;
 const TEXT_COMMENT_HIGHLIGHT_NAME = 'axhub-web-editor-text-comment';
 const TEXT_COMMENT_HIGHLIGHT_STYLE_ID = 'axhub-web-editor-text-comment-style';
+const TEXT_COMMENT_DISABLED_SELECTOR = '[data-we-text-comment-disabled="true"]';
 
 // =============================================================================
 // Helpers
@@ -156,9 +162,8 @@ function collectSegments(range: Range): TextCommentSegment[] {
       text = text.slice(range.startOffset);
     }
     if (textNode === range.endContainer) {
-      const endSlice = textNode === range.startContainer
-        ? range.endOffset - range.startOffset
-        : range.endOffset;
+      const endSlice =
+        textNode === range.startContainer ? range.endOffset - range.startOffset : range.endOffset;
       text = text.slice(0, endSlice);
     }
 
@@ -177,17 +182,13 @@ function collectSegments(range: Range): TextCommentSegment[] {
   }
 
   // Walk all text nodes inside the range
-  const walker = document.createTreeWalker(
-    range.commonAncestorContainer,
-    NodeFilter.SHOW_TEXT,
-    {
-      acceptNode(node) {
-        // Only include text nodes that intersect the range
-        if (!range.intersectsNode(node)) return NodeFilter.FILTER_REJECT;
-        return NodeFilter.FILTER_ACCEPT;
-      },
+  const walker = document.createTreeWalker(range.commonAncestorContainer, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      // Only include text nodes that intersect the range
+      if (!range.intersectsNode(node)) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
     },
-  );
+  });
 
   let current: Node | null = walker.nextNode();
   while (current) {
@@ -217,21 +218,34 @@ function extractContext(range: Range, direction: 'before' | 'after'): string {
       return fullText.slice(start, idx).replace(/\s+/g, ' ').trim();
     } else {
       const end = idx + selectedText.length;
-      return fullText.slice(end, end + CONTEXT_CHARS).replace(/\s+/g, ' ').trim();
+      return fullText
+        .slice(end, end + CONTEXT_CHARS)
+        .replace(/\s+/g, ' ')
+        .trim();
     }
   } catch {
     return '';
   }
 }
 
-function toPlainRect(r: DOMRect): { left: number; top: number; width: number; height: number } {
+function toPlainRect(r: DOMRect): {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+} {
   return { left: r.left, top: r.top, width: r.width, height: r.height };
 }
 
 function dedupeRects(
   rects: DOMRectList,
 ): Array<{ left: number; top: number; width: number; height: number }> {
-  const out: Array<{ left: number; top: number; width: number; height: number }> = [];
+  const out: Array<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  }> = [];
   for (let i = 0; i < rects.length; i++) {
     const r = rects[i];
     if (r.width <= 0 || r.height <= 0) continue;
@@ -244,6 +258,11 @@ function resolveSelectionSourceElement(range: Range): Element | null {
   const commonAncestor = range.commonAncestorContainer;
   if (commonAncestor instanceof Element) return commonAncestor;
   return commonAncestor.parentElement;
+}
+
+function isTextCommentDisabledNode(node: Node): boolean {
+  const element = node instanceof Element ? node : node.parentElement;
+  return Boolean(element?.closest(TEXT_COMMENT_DISABLED_SELECTOR));
 }
 
 function supportsCssHighlights(): boolean {
@@ -278,7 +297,8 @@ function updateCssHighlight(range: Range | null): boolean {
 
   if (!range) return true;
 
-  const HighlightCtor = (globalThis as { Highlight: new (...ranges: Range[]) => unknown }).Highlight;
+  const HighlightCtor = (globalThis as { Highlight: new (...ranges: Range[]) => unknown })
+    .Highlight;
   highlightRegistry.set(TEXT_COMMENT_HIGHLIGHT_NAME, new HighlightCtor(range.cloneRange()));
   return true;
 }
@@ -287,9 +307,7 @@ function updateCssHighlight(range: Range | null): boolean {
 // Factory
 // =============================================================================
 
-export function createTextCommentManager(
-  options: TextCommentManagerOptions,
-): TextCommentManager {
+export function createTextCommentManager(options: TextCommentManagerOptions): TextCommentManager {
   const { isOverlayElement } = options;
   const comments = new Map<string, TextComment>();
 
@@ -303,6 +321,12 @@ export function createTextCommentManager(
 
     // Reject selections that start inside the editor overlay
     if (isOverlayElement(range.startContainer) || isOverlayElement(range.endContainer)) {
+      return null;
+    }
+    if (
+      isTextCommentDisabledNode(range.startContainer) ||
+      isTextCommentDisabledNode(range.endContainer)
+    ) {
       return null;
     }
 

@@ -13,6 +13,7 @@ import {
     Image,
     Keyboard,
     LayoutDashboard,
+    ListChecks,
     MessageSquareText,
     Mic2,
     PanelRightOpen,
@@ -32,6 +33,7 @@ type ChapterId =
     | 'quick-flow'
     | 'voice-annotation'
     | 'common-tips'
+    | 'capability-matrix'
     | 'quick-execute'
     | 'more-scenarios';
 
@@ -53,6 +55,23 @@ type ScreenshotFrameProps = {
     compact?: boolean;
 };
 
+type CapabilityRequirement = '需要' | '不需要';
+
+type CapabilityRow = {
+    feature: string;
+    executionAgent: CapabilityRequirement;
+    commentarySkill: CapabilityRequirement;
+};
+
+const capabilityRows: CapabilityRow[] = [
+    { feature: '添加/编辑批注', executionAgent: '不需要', commentarySkill: '不需要' },
+    { feature: '复制提示词', executionAgent: '不需要', commentarySkill: '不需要' },
+    { feature: '文本和样式编辑', executionAgent: '不需要', commentarySkill: '不需要' },
+    { feature: 'AI 自动读取批注', executionAgent: '不需要', commentarySkill: '需要' },
+    { feature: 'AI 执行', executionAgent: '需要', commentarySkill: '不需要' },
+    { feature: '开启需求标注', executionAgent: '不需要', commentarySkill: '不需要' },
+];
+
 const chapters: Chapter[] = [
     {
         id: 'cover',
@@ -68,7 +87,7 @@ const chapters: Chapter[] = [
         nav: '快速批注',
         title: '快速即可体验',
         kicker: 'Workflow',
-        summary: '从打开批注到复制提示词，目标是让一次局部修改在 30 秒内完成表达。',
+        summary: '从打开批注到告知 AI，目标是让一次局部修改在 30 秒内完成表达。',
         icon: PencilLine,
         tone: 'dark',
     },
@@ -91,11 +110,20 @@ const chapters: Chapter[] = [
         tone: 'light',
     },
     {
+        id: 'capability-matrix',
+        nav: '能力条件',
+        title: '批注能力条件',
+        kicker: 'Requirements',
+        summary: '不同功能对应不同使用条件，按实际需要选择即可。',
+        icon: ListChecks,
+        tone: 'light',
+    },
+    {
         id: 'quick-execute',
         nav: '快速执行',
         title: '站在你身旁的 AI',
         kicker: 'Execution',
-        summary: '可以在页面上直接执行，也可以把批注添加到侧边栏助手上下文里继续处理。',
+        summary: '上一页先说明使用条件；这里展示两条路径：在页面上直接执行，或让配套 Skill 自动读取批注。',
         icon: PanelRightOpen,
         tone: 'dark',
     },
@@ -116,6 +144,7 @@ const route = defineHashPageRoute(
         { id: 'quick-flow', title: '快速批注' },
         { id: 'voice-annotation', title: '语音批注' },
         { id: 'common-tips', title: '常用技巧' },
+        { id: 'capability-matrix', title: '能力条件' },
         { id: 'quick-execute', title: '快速执行' },
         { id: 'more-scenarios', title: '更多场景' },
     ],
@@ -148,7 +177,7 @@ function CoverSlide({ chapter }: { chapter: Chapter }) {
     const principles = [
         ['01', '位置不用解释', '批注天然绑定元素，AI 不需要猜“左上角那个卡片”到底是哪一个。'],
         ['02', '意图不离现场', '修改原因、视觉偏好、例外条件，都和页面一起进入上下文。'],
-        ['03', '交付不是截图', '最终交给 AI 的，是可执行的页面和批注，而不是聊天记录里的零散描述。'],
+        ['03', '交付不是截图', '当前页面批注可以进入本地 ACP UI、CLI Agent 或配套 Skill 的执行链路，而不是停在聊天记录里。'],
     ];
 
     return (
@@ -209,7 +238,7 @@ function QuickFlowSlide({ chapter }: { chapter: Chapter }) {
                         ['开启批注', '打开原型顶部的批注入口，让页面进入可点选状态。'],
                         ['选择元素', '选中按钮、卡片、图表或文字，任意元素都可以批注。'],
                         ['输入批注', '写一句要改什么；能说清目的，比格式漂亮更重要。'],
-                        ['复制提示词', '把页面批注整理成 AI 能执行的上下文。'],
+                        ['告知 AI', '把当前页面链接或原型名称告知 AI，即可持续处理批注。'],
                     ].map(([title, detail], index) => (
                         <article key={title}>
                             <span>{String(index + 1).padStart(2, '0')}</span>
@@ -299,6 +328,53 @@ function CommonTipsSlide({ chapter }: { chapter: Chapter }) {
     );
 }
 
+function CapabilityMatrixSlide({ chapter }: { chapter: Chapter }) {
+    const columns: Array<{ key: keyof Pick<CapabilityRow, 'executionAgent' | 'commentarySkill'>; label: string }> = [
+        { key: 'executionAgent', label: '执行 Agent' },
+        { key: 'commentarySkill', label: '批注技能' },
+    ];
+
+    return (
+        <section className="tat-slide-body tat-capability-slide">
+            <div className="tat-section-copy">
+                <p className="tat-kicker">{chapter.kicker}</p>
+                <h2>{chapter.title}</h2>
+                <p>{chapter.summary}</p>
+            </div>
+            <div className="tat-capability-table-wrap">
+                <table className="tat-capability-table">
+                    <caption className="tat-visually-hidden">批注能力使用条件</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">功能</th>
+                            {columns.map((column) => <th key={column.key} scope="col">{column.label}</th>)}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {capabilityRows.map((row) => (
+                            <tr key={row.feature}>
+                                <th scope="row">{row.feature}</th>
+                                {columns.map((column) => {
+                                    const requirement = row[column.key];
+                                    return (
+                                        <td key={column.key} className={requirement === '需要' ? 'is-required' : 'is-optional'}>
+                                            {requirement}
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <dl className="tat-capability-legend">
+                <div><dt>执行 Agent</dt><dd>在工具栏中选择的执行 Agent；完成 AI 设置后，可直接执行当前页面批注。</dd></div>
+                <div><dt>批注技能</dt><dd>设置中的推荐技能，用于让 AI 读取页面批注、定位元素并理解需求标注。</dd></div>
+            </dl>
+        </section>
+    );
+}
+
 function QuickExecuteSlide({ chapter }: { chapter: Chapter }) {
     return (
         <section className="tat-slide-body tat-execute-slide">
@@ -311,7 +387,7 @@ function QuickExecuteSlide({ chapter }: { chapter: Chapter }) {
                 <article>
                     <div className="tat-execute-label">Route A</div>
                     <h3>页面上直接执行</h3>
-                    <p>批注已经说明位置和目标，AI 直接在页面上修改，无需转发。</p>
+                    <p>当前批注能力提供页面上下文，本地 ACP UI 连接已登录的 CLI Agent 后，AI 可以直接修改关联的源文件。</p>
                     <ScreenshotFrame
                         title="批注面板"
                         src={quickExecutePromptImage}
@@ -323,7 +399,7 @@ function QuickExecuteSlide({ chapter }: { chapter: Chapter }) {
                 <article>
                     <div className="tat-execute-label">Route B</div>
                     <h3>通过技能直接读取批注</h3>
-                    <p>无需转发提示词，AI 可自动读取页面的批注内容并且进行处理。</p>
+                    <p>本地 ACP UI 配合配套 Skill 自动读取当前页面批注，不需要手动复制提示词。</p>
                     <ScreenshotFrame
                         title="技能读取批注"
                         src={quickExecuteSkillsImage}
@@ -371,6 +447,7 @@ function ChapterContent({ chapter }: { chapter: Chapter }) {
     if (chapter.id === 'quick-flow') return <QuickFlowSlide chapter={chapter} />;
     if (chapter.id === 'voice-annotation') return <VoiceAnnotationSlide chapter={chapter} />;
     if (chapter.id === 'common-tips') return <CommonTipsSlide chapter={chapter} />;
+    if (chapter.id === 'capability-matrix') return <CapabilityMatrixSlide chapter={chapter} />;
     if (chapter.id === 'quick-execute') return <QuickExecuteSlide chapter={chapter} />;
     return <MoreScenariosSlide chapter={chapter} />;
 }

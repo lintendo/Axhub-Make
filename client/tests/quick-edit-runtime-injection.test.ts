@@ -12,6 +12,7 @@ import {
 function runManagementRuntimeLoader(importBootstrap: () => Promise<unknown>) {
   const appendedScripts: any[] = [];
   const messages: Array<{ message: any; targetOrigin: string }> = [];
+  const listeners = new Map<string, Set<(event: any) => void>>();
   const windowStub: any = {
     DevTemplateBootstrap: undefined,
     __importBootstrap: vi.fn(importBootstrap),
@@ -20,6 +21,14 @@ function runManagementRuntimeLoader(importBootstrap: () => Promise<unknown>) {
         messages.push({ message, targetOrigin });
       },
     },
+    addEventListener: vi.fn((type: string, listener: (event: any) => void) => {
+      const nextListeners = listeners.get(type) || new Set();
+      nextListeners.add(listener);
+      listeners.set(type, nextListeners);
+    }),
+    removeEventListener: vi.fn((type: string, listener: (event: any) => void) => {
+      listeners.get(type)?.delete(listener);
+    }),
   };
   const documentStub: any = {
     createElement: vi.fn(() => ({
@@ -55,6 +64,11 @@ function runManagementRuntimeLoader(importBootstrap: () => Promise<unknown>) {
 
   return {
     appendedScripts,
+    emit(type: string, event: any) {
+      for (const listener of listeners.get(type) || []) {
+        listener(event);
+      }
+    },
     messages,
     promise: windowStub.__AXHUB_MANAGEMENT_RUNTIME_BOOTSTRAP__ as Promise<void>,
     windowStub,
@@ -100,6 +114,39 @@ describe('quick edit runtime injection', () => {
 
     expect(source).not.toContain('</script>');
     expect(source).toContain('\\u003c/script>');
+  });
+
+  it('captures preview errors before bootstrap resolves', () => {
+    const bootstrapPromise = new Promise<void>(() => undefined);
+    const harness = runManagementRuntimeLoader(() => bootstrapPromise);
+    const resourceTarget = {
+      tagName: 'SCRIPT',
+      src: 'http://localhost:51720/prototypes/home/__axhub-preview-loader.js',
+      href: '',
+    };
+    const rejection = new Error('Module import rejected');
+
+    harness.emit('error', {
+      target: resourceTarget,
+      message: '',
+      error: null,
+      filename: '',
+      lineno: 0,
+      colno: 0,
+    });
+    harness.emit('unhandledrejection', { reason: rejection });
+
+    expect(harness.windowStub.__AXHUB_EARLY_RUNTIME_ERROR_CAPTURE__?.queue).toEqual([
+      expect.objectContaining({
+        eventType: 'error',
+        target: resourceTarget,
+      }),
+      expect.objectContaining({
+        eventType: 'unhandledrejection',
+        reason: rejection,
+      }),
+    ]);
+    expect(harness.appendedScripts).toHaveLength(0);
   });
 
   it('waits for the editor bootstrap before appending quick-edit', async () => {

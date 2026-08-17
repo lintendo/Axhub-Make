@@ -32,23 +32,20 @@ describe('MultiPagePreviewCanvas source', () => {
     expect(hiddenIframeSource).toContain('allow="clipboard-write"');
   });
 
-  it('caps live iframes, renders all pages in the card selector, and renders page screenshots', () => {
+  it('caps live iframes, renders all pages, and reuses captured screenshots in session state', () => {
     const source = readMultiPagePreviewCanvasSource();
 
     expect(source).toContain('activateMultiPageLiveSlot(activeSlots, slotId)');
     expect(source).toContain('resolveMultiPageCardPages({ item: selectedItem })');
     expect(source).toContain('cardState.pageId');
     expect(source).toContain('pageOptions.allPages.map((page)');
-    expect(source).toContain('derivePrototypePageScreenshotUrl(screenshotPreviewUrl, selectedItem.name, page.id)');
-    expect(source).not.toContain('derivePrototypeScreenshotUrl(previewUrl)');
-    expect(source).toContain('persistPrototypeScreenshot({');
-    expect(source).toContain('pageId: page.id');
-    expect(source).toContain("import { captureSameOriginIframeScreenshot } from './canvas-embeds/parentScreenshotCapture';");
-    expect(source).toContain('async function capturePageScreenshotFromIframe({');
-    expect(source).toContain('const screenshot = await captureSameOriginIframeScreenshot({');
-    expect(source).toContain('dataUrl: screenshot.dataUrl');
-    expect(source).toContain('width: screenshot.width');
-    expect(source).toContain('height: screenshot.height');
+    expect(source).toContain("import { captureMultiPageScreenshot, type MultiPageScreenshot } from './multiPageScreenshotCapture';");
+    expect(source).toContain('const [pageScreenshots, setPageScreenshots] = React.useState<Record<string, MultiPageScreenshot>>({});');
+    expect(source).toContain('void captureMultiPageScreenshot({');
+    expect(source).toContain('[page.id]: screenshot,');
+    expect(source).toContain('const src = failure === undefined ? pageScreenshots[page.id]?.dataUrl : undefined;');
+    expect(source).not.toContain('derivePrototypePageScreenshotUrl');
+    expect(source).not.toContain('persistPrototypeScreenshot');
     expect(source).not.toContain("type: 'axhub.quickEdit.export.captureScreenshot'");
     expect(source).not.toContain("type: 'CAPTURE_SCREENSHOT'");
     expect(source).not.toContain("event.data.type === 'SCREENSHOT_FAILED'");
@@ -64,11 +61,9 @@ describe('MultiPagePreviewCanvas source', () => {
     expect(source).toContain('capturedPageIdsRef');
     expect(source).toContain('clearImageFailure(page.id)');
     expect(source).toContain('MULTI_PAGE_SCREENSHOT_LOAD_DELAY_MS');
-    expect(source).toContain('naturalWidth');
-    expect(source).toContain('naturalHeight');
-    expect(source).toContain('handleScreenshotImageLoad(page.id, failure, event)');
-    expect(source).toContain('`${src}-${logicalWidth}-${logicalHeight}`');
-    expect(source).toContain('[logicalHeight, logicalWidth]');
+    expect(source).not.toContain('naturalWidth');
+    expect(source).not.toContain('naturalHeight');
+    expect(source).toContain('key={`${page.id}-${logicalWidth}-${logicalHeight}`}');
     expect(source).toContain('双击激活页面');
     expect(source).toContain('activeSlots.includes(slotId)');
     expect(source).toContain('const visiblePageKey = React.useMemo');
@@ -76,17 +71,17 @@ describe('MultiPagePreviewCanvas source', () => {
     expect(source).toContain('[prototypeIdentityKey, visiblePageKey]');
   });
 
-  it('does not show the prototype-level latest screenshot as a multi-page card fallback', () => {
+  it('shows the current session screenshot and falls back to the activation placeholder before capture', () => {
     const source = readMultiPagePreviewCanvasSource();
     const fallbackSource = getSourceSegment(
       source,
       'const renderScreenshotFallback = (page: MultiPagePreviewPage) => {',
-      'return (',
+      '\n    return (',
     );
 
-    expect(fallbackSource).toContain('const pageScreenshotUrl = getPageScreenshotUrl(page);');
-    expect(fallbackSource).not.toContain('prototypeScreenshotUrl');
-    expect(fallbackSource).not.toContain("failure === 'page' ? prototypeScreenshotUrl : pageScreenshotUrl");
+    expect(fallbackSource).toContain('const src = failure === undefined ? pageScreenshots[page.id]?.dataUrl : undefined;');
+    expect(fallbackSource).not.toContain('pageScreenshotUrl');
+    expect(source).toContain('<div>双击激活页面</div>');
   });
 
   it('creates hidden same-origin iframes to capture missing multi-page screenshots without user activation', () => {
@@ -98,17 +93,14 @@ describe('MultiPagePreviewCanvas source', () => {
     );
 
     expect(source).toContain('buildProjectPrototypeScreenshotIframeUrl(selectedItem)');
-    expect(source).toContain('derivePrototypePageScreenshotUrl(screenshotPreviewUrl, selectedItem.name, page.id)');
-    expect(source).toContain('previewUrl: screenshotPreviewUrl');
     expect(source).toContain('const hiddenScreenshotPages = React.useMemo');
     expect(source).toContain('for (const page of [...pageOptions.visiblePages, ...cardPages])');
     expect(source).toContain('return Array.from(pageMap.values());');
     expect(source).toContain('hiddenScreenshotIframeRefs.current[page.id] = iframe;');
     expect(source).toContain('requestMissingPageScreenshots();');
     expect(source).toContain('pendingHiddenPageCapturesRef.current.add(page.id);');
-    expect(source).toContain('requestHiddenPageScreenshot(page, iframe);');
     expect(source).toContain('capturedPageIdsRef.current.add(page.id);');
-    expect(source).toContain('setScreenshotVersion((version) => version + 1);');
+    expect(source).toContain('recordCapturedScreenshot(page, screenshot);');
     expect(source).toContain('aria-hidden="true"');
     expect(source).toContain('pointerEvents: \'none\'');
     expect(source).toContain('left: -10000');
@@ -116,12 +108,12 @@ describe('MultiPagePreviewCanvas source', () => {
     expect(hiddenIframeSource).toContain('src={buildPrototypePageHashUrl(screenshotPreviewUrl, page.id)}');
   });
 
-  it('waits for persisted page screenshots before hidden recapture so entering multi-page does not always screenshot', () => {
+  it('captures each page once per multi-page session unless a refresh is forced', () => {
     const source = readMultiPagePreviewCanvasSource();
     const requestMissingSource = getSourceSegment(
       source,
       'const requestMissingPageScreenshots = React.useCallback(() => {',
-      'const persistSlotScreenshot = React.useCallback',
+      'const captureSlotScreenshot = React.useCallback',
     );
     const hiddenIframeSource = getSourceSegment(
       source,
@@ -129,11 +121,10 @@ describe('MultiPagePreviewCanvas source', () => {
       '<div className="multi-page-zoom-toolbar',
     );
 
-    expect(source).toContain('const getPageScreenshotUrl = React.useCallback');
-    expect(source).toContain('const shouldWaitForPersistedPageScreenshot = React.useCallback');
-    expect(source).toContain('imageFailures[page.id] === undefined');
-    expect(requestMissingSource).toContain('shouldWaitForPersistedPageScreenshot(page)');
+    expect(requestMissingSource).toContain('capturedPageIdsRef.current.has(page.id)');
+    expect(requestMissingSource).toContain('pendingHiddenPageCapturesRef.current.has(page.id)');
     expect(requestMissingSource).toContain('requestHiddenPageScreenshot(page, iframe, { force: forceRefresh });');
+    expect(requestMissingSource).not.toContain('shouldWaitForPersistedPageScreenshot(page)');
     expect(hiddenIframeSource).toContain('requestMissingPageScreenshots();');
     expect(hiddenIframeSource).not.toContain('requestHiddenPageScreenshot(page, iframe);');
   });
@@ -143,7 +134,7 @@ describe('MultiPagePreviewCanvas source', () => {
     const requestMissingSource = getSourceSegment(
       source,
       'const requestMissingPageScreenshots = React.useCallback(() => {',
-      'const persistSlotScreenshot = React.useCallback',
+      'const captureSlotScreenshot = React.useCallback',
     );
     const activateSlotSource = getSourceSegment(
       source,
@@ -155,48 +146,43 @@ describe('MultiPagePreviewCanvas source', () => {
     expect(source).toContain('forceHiddenPageScreenshotIdsRef.current = new Set();');
     expect(requestMissingSource).toContain('const forceRefresh = forceHiddenPageScreenshotIdsRef.current.has(page.id);');
     expect(requestMissingSource).toContain('if ((!forceRefresh && capturedPageIdsRef.current.has(page.id)) || pendingHiddenPageCapturesRef.current.has(page.id))');
-    expect(requestMissingSource).toContain('if (!forceRefresh && shouldWaitForPersistedPageScreenshot(page))');
     expect(activateSlotSource).toContain('const page = cardPagesRef.current[slotIndex];');
     expect(activateSlotSource).toContain('forceHiddenPageScreenshotIdsRef.current.add(page.id);');
     expect(activateSlotSource).toContain('capturedPageIdsRef.current.delete(page.id);');
     expect(activateSlotSource).toContain('requestHiddenPageScreenshot(page, iframe, { force: true });');
   });
 
-  it('keeps stale persisted screenshots visible while scheduling a refresh instead of blanking the card', () => {
+  it('clears session screenshots when the prototype identity or capture size changes', () => {
     const source = readMultiPagePreviewCanvasSource();
-    const imageLoadSource = getSourceSegment(
+    const identityResetSource = getSourceSegment(
       source,
-      'const handleScreenshotImageLoad = React.useCallback((',
-      'const handleFitView = React.useCallback',
+      'React.useEffect(() => {',
+      'const cardWidth = layout.card.viewportWidth;',
+    );
+    const sizeResetSource = getSourceSegment(
+      source,
+      'React.useEffect(() => {\n        captureGenerationRef.current += 1;',
+      'React.useEffect(() => {\n        requestMissingPageScreenshots();',
     );
 
-    expect(source).toContain('const stalePageScreenshotIdsRef = React.useRef<Set<string>>(new Set());');
-    expect(imageLoadSource).toContain('capturedPageIdsRef.current.add(pageId);');
-    expect(imageLoadSource).toContain('if (failure === undefined) {');
-    expect(imageLoadSource).toContain('stalePageScreenshotIdsRef.current.add(pageId);');
-    expect(imageLoadSource).toContain('requestHiddenPageScreenshot(page, iframe);');
-    expect(imageLoadSource).toContain('return;');
-    expect(imageLoadSource).not.toContain("failure === 'page' ? 'prototype' : 'page'");
-    expect(source).toContain("const src = failure === undefined ? pageScreenshotUrl : undefined;");
-    expect(source).toContain("[page.id]: 'page'");
+    expect(identityResetSource).toContain('setPageScreenshots({});');
+    expect(identityResetSource).toContain('[prototypeIdentityKey, visiblePageKey]');
+    expect(sizeResetSource).toContain('setPageScreenshots({});');
+    expect(sizeResetSource).toContain('[logicalHeight, logicalWidth]');
+    expect(source).not.toContain('stalePageScreenshotIdsRef');
   });
 
-  it('captures multi-page screenshots from the parent page without iframe postMessage protocols', () => {
+  it('captures multi-page screenshots through the session helper without persistence or postMessage protocols', () => {
     const source = readMultiPagePreviewCanvasSource();
     const captureSource = getSourceSegment(
       source,
-      'function capturePageScreenshotFromIframe({',
-      'export default function MultiPagePreviewCanvas',
+      'const requestPageScreenshot = React.useCallback',
+      'const requestMissingPageScreenshots = React.useCallback',
     );
 
-    expect(captureSource).toContain('await captureSameOriginIframeScreenshot({');
-    expect(captureSource).toContain('await persistPrototypeScreenshot({');
-    expect(captureSource.indexOf('await captureSameOriginIframeScreenshot({')).toBeLessThan(
-      captureSource.indexOf('await persistPrototypeScreenshot({'),
-    );
-    expect(captureSource).toContain('return true;');
-    expect(captureSource).toContain('catch {');
-    expect(captureSource).toContain('return false;');
+    expect(captureSource).toContain('captureMultiPageScreenshot({');
+    expect(captureSource).toContain('recordCapturedScreenshot(page, screenshot);');
+    expect(captureSource).not.toContain('persistPrototypeScreenshot');
     expect(captureSource).not.toContain('postMessage');
     expect(captureSource).not.toContain('addEventListener');
     expect(captureSource).not.toContain('removeEventListener');

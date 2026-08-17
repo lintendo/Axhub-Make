@@ -504,6 +504,21 @@ function createResourceClientUrl(clientOrigin, resourceKind, resourceName) {
   return `${normalizedOrigin}${pathname}`;
 }
 
+function findMainPrototypeSpec(prototypeDir) {
+  const specDir = path.join(prototypeDir, '.spec');
+  for (const name of ['spec.html', 'spec.md']) {
+    const specPath = path.join(specDir, name);
+    try {
+      if (fs.statSync(specPath).isFile()) {
+        return specPath;
+      }
+    } catch {
+      // A missing or invalid spec does not make the prototype discoverable.
+    }
+  }
+  return null;
+}
+
 function collectPrototypes(projectRoot, clientOrigin, options = {}) {
   const roots = resourceLayout.prototypes.map((dir) => path.join(projectRoot, dir));
   const runtimeEntryKeys = readRuntimeEntryKeys(projectRoot);
@@ -512,21 +527,27 @@ function collectPrototypes(projectRoot, clientOrigin, options = {}) {
     if (!fs.existsSync(root)) continue;
     for (const entry of fs.readdirSync(root, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       if (!entry.isDirectory()) continue;
-      const indexFile = path.join(root, entry.name, 'index.tsx');
-      if (!fs.existsSync(indexFile)) continue;
-      const filePath = toPosix(path.relative(projectRoot, indexFile));
-      const route = extractHashRouteMetadata(path.join(root, entry.name));
-      const placeholder = isGeneratedEmptyPrototypePlaceholder(path.join(root, entry.name), indexFile);
+      const prototypeDir = path.join(root, entry.name);
+      const indexFile = path.join(prototypeDir, 'index.tsx');
+      const hasIndex = fs.existsSync(indexFile);
+      const specFile = findMainPrototypeSpec(prototypeDir);
+      if (!hasIndex && !specFile) continue;
+      const filePath = hasIndex ? toPosix(path.relative(projectRoot, indexFile)) : '';
+      const specFilePath = specFile ? toPosix(path.relative(projectRoot, specFile)) : '';
+      const route = hasIndex ? extractHashRouteMetadata(prototypeDir) : null;
+      const placeholder = hasIndex ? isGeneratedEmptyPrototypePlaceholder(prototypeDir, indexFile) : false;
       const item = {
         id: entry.name,
         name: entry.name,
-        title: readDisplayName(indexFile, entry.name),
+        title: hasIndex ? readDisplayName(indexFile, entry.name) : entry.name,
         clientUrl: createResourceClientUrl(clientOrigin, 'prototypes', entry.name),
         previewMode: 'clientRuntime',
+        ...(hasIndex ? {} : { previewDisabled: true }),
         description: '',
         updatedAt: DETERMINISTIC_UPDATED_AT,
-        filePath,
-        ...(options.includeAbsoluteFilePaths === false ? {} : { absoluteFilePath: path.resolve(indexFile) }),
+        ...(filePath ? { filePath } : {}),
+        ...(specFilePath ? { specFilePath } : {}),
+        ...(hasIndex && options.includeAbsoluteFilePaths !== false ? { absoluteFilePath: path.resolve(indexFile) } : {}),
         ...(route ? { pages: route.pages, defaultPageId: route.defaultPageId } : {}),
         ...(placeholder ? { placeholder: true, placeholderGuide: PROTOTYPE_PLACEHOLDER_GUIDE } : {}),
       };

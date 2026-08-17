@@ -1,0 +1,1090 @@
+{
+  "sourceId": "src-001",
+  "product": "康宝宝",
+  "prototype": "MOB005【教育】婴幼儿早教移动端原型模板V2.0",
+  "accessDate": "2026-08-14",
+  "projectPageCount": 33,
+  "businessPageCount": 32,
+  "sitemap": {
+    "rootNodes": [
+      {
+        "id": "gd40pc",
+        "pageName": "作品首页",
+        "type": "Wireframe",
+        "url": "作品首页.html"
+      },
+      {
+        "id": "hpiylj",
+        "pageName": "启动页",
+        "type": "Wireframe",
+        "url": "启动页.html"
+      },
+      {
+        "id": "ixbp9u",
+        "pageName": "登录",
+        "type": "Wireframe",
+        "url": "登录.html"
+      },
+      {
+        "id": "6xknfw",
+        "pageName": "首页",
+        "type": "Wireframe",
+        "url": "首页.html",
+        "children": [
+          {
+            "id": "1w9pcr",
+            "pageName": "我的宝宝",
+            "type": "Wireframe",
+            "url": "我的宝宝.html",
+            "children": [
+              {
+                "id": "9bqpw8",
+                "pageName": "宝宝性别",
+                "type": "Wireframe",
+                "url": "宝宝性别.html"
+              },
+              {
+                "id": "ldz1kt",
+                "pageName": "宝宝信息",
+                "type": "Wireframe",
+                "url": "宝宝信息.html"
+              }
+            ]
+          },
+          {
+            "id": "wn0mtp",
+            "pageName": "修改宝宝信息",
+            "type": "Wireframe",
+            "url": "修改宝宝信息.html",
+            "children": [
+              {
+                "id": "5k9u49",
+                "pageName": "修改昵称",
+                "type": "Wireframe",
+                "url": "修改昵称.html"
+              }
+            ]
+          },
+          {
+            "id": "vzxuv9",
+            "pageName": "身高记录",
+            "type": "Wireframe",
+            "url": "身高记录.html",
+            "children": [
+              {
+                "id": "6xvli2",
+                "pageName": "体重记录",
+                "type": "Wireframe",
+                "url": "体重记录.html"
+              },
+              {
+                "id": "x5jvd9",
+                "pageName": "增加/编辑记录",
+                "type": "Wireframe",
+                "url": "增加_编辑记录.html"
+              }
+            ]
+          },
+          {
+            "id": "mzc71b",
+            "pageName": "疫苗接种",
+            "type": "Wireframe",
+            "url": "疫苗接种.html",
+            "children": [
+              {
+                "id": "2ya3d8",
+                "pageName": "接种详情",
+                "type": "Wireframe",
+                "url": "接种详情.html"
+              }
+            ]
+          },
+          {
+            "id": "ljc520",
+            "pageName": "宝宝日记",
+            "type": "Wireframe",
+            "url": "宝宝日记.html",
+            "children": [
+              {
+                "id": "rok618",
+                "pageName": "日记详情",
+                "type": "Wireframe",
+                "url": "日记详情.html"
+              },
+              {
+                "id": "ff40hv",
+                "pageName": "发布日记",
+                "type": "Wireframe",
+                "url": "发布日记.html"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "r5eoqh",
+        "pageName": "百科",
+        "type": "Wireframe",
+        "url": "百科.html",
+        "children": [
+          {
+            "id": "gn5fv9",
+            "pageName": "百科列表",
+            "type": "Wireframe",
+            "url": "百科列表.html"
+          },
+          {
+            "id": "xgmjd3",
+            "pageName": "百科详情",
+            "type": "Wireframe",
+            "url": "百科详情.html"
+          }
+        ]
+      },
+      {
+        "id": "kxzyy1",
+        "pageName": "菜谱",
+        "type": "Wireframe",
+        "url": "菜谱.html",
+        "children": [
+          {
+            "id": "ejmrvw",
+            "pageName": "菜谱列表",
+            "type": "Wireframe",
+            "url": "菜谱列表.html"
+          },
+          {
+            "id": "43ucha",
+            "pageName": "菜谱详情",
+            "type": "Wireframe",
+            "url": "菜谱详情.html"
+          }
+        ]
+      },
+      {
+        "id": "7r7b8e",
+        "pageName": "我的",
+        "type": "Wireframe",
+        "url": "我的.html",
+        "children": [
+          {
+            "id": "z0jmv8",
+            "pageName": "修改昵称",
+            "type": "Wireframe",
+            "url": "修改昵称_1.html"
+          },
+          {
+            "id": "kzfn9q",
+            "pageName": "百科收藏",
+            "type": "Wireframe",
+            "url": "百科收藏.html"
+          },
+          {
+            "id": "2wpfho",
+            "pageName": "菜谱收藏",
+            "type": "Wireframe",
+            "url": "菜谱收藏.html"
+          },
+          {
+            "id": "maci3k",
+            "pageName": "关于康宝宝",
+            "type": "Wireframe",
+            "url": "关于康宝宝.html"
+          },
+          {
+            "id": "ax6fug",
+            "pageName": "消息通知",
+            "type": "Wireframe",
+            "url": "消息通知.html"
+          },
+          {
+            "id": "razp2t",
+            "pageName": "设置",
+            "type": "Wireframe",
+            "url": "设置.html",
+            "children": [
+              {
+                "id": "j6bz4o",
+                "pageName": "更换手机",
+                "type": "Wireframe",
+                "url": "更换手机.html"
+              },
+              {
+                "id": "wl3s8m",
+                "pageName": "输入验证码",
+                "type": "Wireframe",
+                "url": "输入验证码.html"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "q8s8sj",
+        "pageName": "搜索",
+        "type": "Wireframe",
+        "url": "搜索.html"
+      }
+    ]
+  },
+  "pages": [
+    {
+      "sourceId": "src-001",
+      "pageIndex": 1,
+      "pageId": "gd40pc",
+      "pageName": "作品首页",
+      "sitemapPath": "作品首页",
+      "requestedPath": "作品首页.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.51.43/%E4%BD%9C%E5%93%81%E9%A6%96%E9%A1%B5.html",
+      "dataUrl": "http://127.0.0.1:32768/20.51.43/files/%E4%BD%9C%E5%93%81%E9%A6%96%E9%A1%B5/data.js",
+      "generationDate": "2026-08-14T12:51:43.872Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 1200,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "001-work-cover-default-desktop.png",
+      "notes": {},
+      "labelsCount": 3,
+      "fieldsCount": 0,
+      "panelsCount": 2,
+      "interactionsCount": 13
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 2,
+      "pageId": "hpiylj",
+      "pageName": "启动页",
+      "sitemapPath": "启动页",
+      "requestedPath": "启动页.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.58.46/%E5%90%AF%E5%8A%A8%E9%A1%B5.html",
+      "dataUrl": "http://127.0.0.1:32768/20.58.46/files/%E5%90%AF%E5%8A%A8%E9%A1%B5/data.js",
+      "generationDate": "2026-08-14T12:58:46.360Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "002-splash-default-desktop.png",
+      "notes": {},
+      "labelsCount": 8,
+      "fieldsCount": 0,
+      "panelsCount": 1,
+      "interactionsCount": 14
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 3,
+      "pageId": "ixbp9u",
+      "pageName": "登录",
+      "sitemapPath": "登录",
+      "requestedPath": "登录.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.58.47/%E7%99%BB%E5%BD%95.html",
+      "dataUrl": "http://127.0.0.1:32768/20.58.47/files/%E7%99%BB%E5%BD%95/data.js",
+      "generationDate": "2026-08-14T12:58:47.060Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "003-login-default-desktop.png",
+      "notes": {},
+      "labelsCount": 12,
+      "fieldsCount": 2,
+      "panelsCount": 2,
+      "interactionsCount": 24
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 4,
+      "pageId": "6xknfw",
+      "pageName": "首页",
+      "sitemapPath": "首页",
+      "requestedPath": "首页.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.55.27/%E9%A6%96%E9%A1%B5.html",
+      "dataUrl": "http://127.0.0.1:32768/20.55.27/files/%E9%A6%96%E9%A1%B5/data.js",
+      "generationDate": "2026-08-14T12:55:27.256Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "004-home-default-desktop.png",
+      "notes": {},
+      "labelsCount": 16,
+      "fieldsCount": 0,
+      "panelsCount": 4,
+      "interactionsCount": 26
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 5,
+      "pageId": "1w9pcr",
+      "pageName": "我的宝宝",
+      "sitemapPath": "首页 / 我的宝宝",
+      "requestedPath": "我的宝宝.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.58.48/%E6%88%91%E7%9A%84%E5%AE%9D%E5%AE%9D.html",
+      "dataUrl": "http://127.0.0.1:32768/20.58.48/files/%E6%88%91%E7%9A%84%E5%AE%9D%E5%AE%9D/data.js",
+      "generationDate": "2026-08-14T12:58:48.046Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "005-my-baby-default-desktop.png",
+      "notes": {},
+      "labelsCount": 6,
+      "fieldsCount": 0,
+      "panelsCount": 3,
+      "interactionsCount": 23
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 6,
+      "pageId": "9bqpw8",
+      "pageName": "宝宝性别",
+      "sitemapPath": "首页 / 我的宝宝 / 宝宝性别",
+      "requestedPath": "宝宝性别.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.58.48/%E5%AE%9D%E5%AE%9D%E6%80%A7%E5%88%AB.html",
+      "dataUrl": "http://127.0.0.1:32768/20.58.48/files/%E5%AE%9D%E5%AE%9D%E6%80%A7%E5%88%AB/data.js",
+      "generationDate": "2026-08-14T12:58:48.714Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "006-baby-gender-default-desktop.png",
+      "notes": {},
+      "labelsCount": 9,
+      "fieldsCount": 0,
+      "panelsCount": 2,
+      "interactionsCount": 14
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 7,
+      "pageId": "ldz1kt",
+      "pageName": "宝宝信息",
+      "sitemapPath": "首页 / 我的宝宝 / 宝宝信息",
+      "requestedPath": "宝宝信息.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.58.49/%E5%AE%9D%E5%AE%9D%E4%BF%A1%E6%81%AF.html",
+      "dataUrl": "http://127.0.0.1:32768/20.58.49/files/%E5%AE%9D%E5%AE%9D%E4%BF%A1%E6%81%AF/data.js",
+      "generationDate": "2026-08-14T12:58:49.497Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "007-baby-info-default-desktop.png",
+      "notes": {},
+      "labelsCount": 8,
+      "fieldsCount": 1,
+      "panelsCount": 1,
+      "interactionsCount": 17
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 8,
+      "pageId": "wn0mtp",
+      "pageName": "修改宝宝信息",
+      "sitemapPath": "首页 / 修改宝宝信息",
+      "requestedPath": "修改宝宝信息.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.58.50/%E4%BF%AE%E6%94%B9%E5%AE%9D%E5%AE%9D%E4%BF%A1%E6%81%AF.html",
+      "dataUrl": "http://127.0.0.1:32768/20.58.50/files/%E4%BF%AE%E6%94%B9%E5%AE%9D%E5%AE%9D%E4%BF%A1%E6%81%AF/data.js",
+      "generationDate": "2026-08-14T12:58:50.355Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "008-edit-baby-info-default-desktop.png",
+      "notes": {},
+      "labelsCount": 7,
+      "fieldsCount": 0,
+      "panelsCount": 1,
+      "interactionsCount": 18
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 9,
+      "pageId": "5k9u49",
+      "pageName": "修改昵称",
+      "sitemapPath": "首页 / 修改宝宝信息 / 修改昵称",
+      "requestedPath": "修改昵称.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.00/%E4%BF%AE%E6%94%B9%E6%98%B5%E7%A7%B0.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.00/files/%E4%BF%AE%E6%94%B9%E6%98%B5%E7%A7%B0/data.js",
+      "generationDate": "2026-08-14T12:59:00.120Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "009-edit-baby-nickname-default-desktop.png",
+      "notes": {},
+      "labelsCount": 4,
+      "fieldsCount": 1,
+      "panelsCount": 1,
+      "interactionsCount": 17
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 10,
+      "pageId": "vzxuv9",
+      "pageName": "身高记录",
+      "sitemapPath": "首页 / 身高记录",
+      "requestedPath": "身高记录.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.00/%E8%BA%AB%E9%AB%98%E8%AE%B0%E5%BD%95.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.00/files/%E8%BA%AB%E9%AB%98%E8%AE%B0%E5%BD%95/data.js",
+      "generationDate": "2026-08-14T12:59:00.537Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "010-height-record-default-desktop.png",
+      "notes": {},
+      "labelsCount": 7,
+      "fieldsCount": 0,
+      "panelsCount": 2,
+      "interactionsCount": 20
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 11,
+      "pageId": "6xvli2",
+      "pageName": "体重记录",
+      "sitemapPath": "首页 / 身高记录 / 体重记录",
+      "requestedPath": "体重记录.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.00/%E4%BD%93%E9%87%8D%E8%AE%B0%E5%BD%95.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.00/files/%E4%BD%93%E9%87%8D%E8%AE%B0%E5%BD%95/data.js",
+      "generationDate": "2026-08-14T12:59:00.902Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "011-weight-record-default-desktop.png",
+      "notes": {},
+      "labelsCount": 7,
+      "fieldsCount": 0,
+      "panelsCount": 2,
+      "interactionsCount": 20
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 12,
+      "pageId": "x5jvd9",
+      "pageName": "增加/编辑记录",
+      "sitemapPath": "首页 / 身高记录 / 增加/编辑记录",
+      "requestedPath": "增加_编辑记录.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.01/%E5%A2%9E%E5%8A%A0_%E7%BC%96%E8%BE%91%E8%AE%B0%E5%BD%95.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.01/files/%E5%A2%9E%E5%8A%A0_%E7%BC%96%E8%BE%91%E8%AE%B0%E5%BD%95/data.js",
+      "generationDate": "2026-08-14T12:59:01.298Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "012-edit-growth-record-default-desktop.png",
+      "notes": {},
+      "labelsCount": 6,
+      "fieldsCount": 2,
+      "panelsCount": 1,
+      "interactionsCount": 15
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 13,
+      "pageId": "mzc71b",
+      "pageName": "疫苗接种",
+      "sitemapPath": "首页 / 疫苗接种",
+      "requestedPath": "疫苗接种.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.01/%E7%96%AB%E8%8B%97%E6%8E%A5%E7%A7%8D.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.01/files/%E7%96%AB%E8%8B%97%E6%8E%A5%E7%A7%8D/data.js",
+      "generationDate": "2026-08-14T12:59:01.702Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "013-vaccination-default-desktop.png",
+      "notes": {},
+      "labelsCount": 5,
+      "fieldsCount": 0,
+      "panelsCount": 8,
+      "interactionsCount": 22
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 14,
+      "pageId": "2ya3d8",
+      "pageName": "接种详情",
+      "sitemapPath": "首页 / 疫苗接种 / 接种详情",
+      "requestedPath": "接种详情.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.02/%E6%8E%A5%E7%A7%8D%E8%AF%A6%E6%83%85.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.02/files/%E6%8E%A5%E7%A7%8D%E8%AF%A6%E6%83%85/data.js",
+      "generationDate": "2026-08-14T12:59:02.125Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "014-vaccination-detail-default-desktop.png",
+      "notes": {},
+      "labelsCount": 4,
+      "fieldsCount": 0,
+      "panelsCount": 1,
+      "interactionsCount": 8
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 15,
+      "pageId": "ljc520",
+      "pageName": "宝宝日记",
+      "sitemapPath": "首页 / 宝宝日记",
+      "requestedPath": "宝宝日记.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.02/%E5%AE%9D%E5%AE%9D%E6%97%A5%E8%AE%B0.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.02/files/%E5%AE%9D%E5%AE%9D%E6%97%A5%E8%AE%B0/data.js",
+      "generationDate": "2026-08-14T12:59:02.509Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "015-baby-diary-default-desktop.png",
+      "notes": {},
+      "labelsCount": 5,
+      "fieldsCount": 0,
+      "panelsCount": 2,
+      "interactionsCount": 13
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 16,
+      "pageId": "rok618",
+      "pageName": "日记详情",
+      "sitemapPath": "首页 / 宝宝日记 / 日记详情",
+      "requestedPath": "日记详情.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.03/%E6%97%A5%E8%AE%B0%E8%AF%A6%E6%83%85.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.03/files/%E6%97%A5%E8%AE%B0%E8%AF%A6%E6%83%85/data.js",
+      "generationDate": "2026-08-14T12:59:03.009Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "016-diary-detail-default-desktop.png",
+      "notes": {},
+      "labelsCount": 6,
+      "fieldsCount": 0,
+      "panelsCount": 1,
+      "interactionsCount": 23
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 17,
+      "pageId": "ff40hv",
+      "pageName": "发布日记",
+      "sitemapPath": "首页 / 宝宝日记 / 发布日记",
+      "requestedPath": "发布日记.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.44/%E5%8F%91%E5%B8%83%E6%97%A5%E8%AE%B0.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.44/files/%E5%8F%91%E5%B8%83%E6%97%A5%E8%AE%B0/data.js",
+      "generationDate": "2026-08-14T12:59:44.423Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "017-publish-diary-default-desktop.png",
+      "notes": {},
+      "labelsCount": 6,
+      "fieldsCount": 1,
+      "panelsCount": 1,
+      "interactionsCount": 18
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 18,
+      "pageId": "r5eoqh",
+      "pageName": "百科",
+      "sitemapPath": "百科",
+      "requestedPath": "百科.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.45/%E7%99%BE%E7%A7%91.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.45/files/%E7%99%BE%E7%A7%91/data.js",
+      "generationDate": "2026-08-14T12:59:45.274Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "018-encyclopedia-default-desktop.png",
+      "notes": {},
+      "labelsCount": 11,
+      "fieldsCount": 1,
+      "panelsCount": 2,
+      "interactionsCount": 18
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 19,
+      "pageId": "gn5fv9",
+      "pageName": "百科列表",
+      "sitemapPath": "百科 / 百科列表",
+      "requestedPath": "百科列表.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.46/%E7%99%BE%E7%A7%91%E5%88%97%E8%A1%A8.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.46/files/%E7%99%BE%E7%A7%91%E5%88%97%E8%A1%A8/data.js",
+      "generationDate": "2026-08-14T12:59:46.124Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "019-encyclopedia-list-default-desktop.png",
+      "notes": {},
+      "labelsCount": 5,
+      "fieldsCount": 0,
+      "panelsCount": 1,
+      "interactionsCount": 9
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 20,
+      "pageId": "xgmjd3",
+      "pageName": "百科详情",
+      "sitemapPath": "百科 / 百科详情",
+      "requestedPath": "百科详情.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.46/%E7%99%BE%E7%A7%91%E8%AF%A6%E6%83%85.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.46/files/%E7%99%BE%E7%A7%91%E8%AF%A6%E6%83%85/data.js",
+      "generationDate": "2026-08-14T12:59:46.605Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "020-encyclopedia-detail-default-desktop.png",
+      "notes": {},
+      "labelsCount": 5,
+      "fieldsCount": 0,
+      "panelsCount": 5,
+      "interactionsCount": 13
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 21,
+      "pageId": "kxzyy1",
+      "pageName": "菜谱",
+      "sitemapPath": "菜谱",
+      "requestedPath": "菜谱.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.47/%E8%8F%9C%E8%B0%B1.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.47/files/%E8%8F%9C%E8%B0%B1/data.js",
+      "generationDate": "2026-08-14T12:59:47.125Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "021-recipes-default-desktop.png",
+      "notes": {},
+      "labelsCount": 10,
+      "fieldsCount": 1,
+      "panelsCount": 2,
+      "interactionsCount": 18
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 22,
+      "pageId": "ejmrvw",
+      "pageName": "菜谱列表",
+      "sitemapPath": "菜谱 / 菜谱列表",
+      "requestedPath": "菜谱列表.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.47/%E8%8F%9C%E8%B0%B1%E5%88%97%E8%A1%A8.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.47/files/%E8%8F%9C%E8%B0%B1%E5%88%97%E8%A1%A8/data.js",
+      "generationDate": "2026-08-14T12:59:47.947Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "022-recipe-list-default-desktop.png",
+      "notes": {},
+      "labelsCount": 4,
+      "fieldsCount": 0,
+      "panelsCount": 1,
+      "interactionsCount": 9
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 23,
+      "pageId": "43ucha",
+      "pageName": "菜谱详情",
+      "sitemapPath": "菜谱 / 菜谱详情",
+      "requestedPath": "菜谱详情.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.48/%E8%8F%9C%E8%B0%B1%E8%AF%A6%E6%83%85.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.48/files/%E8%8F%9C%E8%B0%B1%E8%AF%A6%E6%83%85/data.js",
+      "generationDate": "2026-08-14T12:59:48.617Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "023-recipe-detail-default-desktop.png",
+      "notes": {},
+      "labelsCount": 5,
+      "fieldsCount": 0,
+      "panelsCount": 5,
+      "interactionsCount": 13
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 24,
+      "pageId": "7r7b8e",
+      "pageName": "我的",
+      "sitemapPath": "我的",
+      "requestedPath": "我的.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.49/%E6%88%91%E7%9A%84.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.49/files/%E6%88%91%E7%9A%84/data.js",
+      "generationDate": "2026-08-14T12:59:49.197Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "024-profile-default-desktop.png",
+      "notes": {},
+      "labelsCount": 10,
+      "fieldsCount": 0,
+      "panelsCount": 2,
+      "interactionsCount": 21
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 25,
+      "pageId": "z0jmv8",
+      "pageName": "修改昵称",
+      "sitemapPath": "我的 / 修改昵称",
+      "requestedPath": "修改昵称_1.html",
+      "resolvedUrl": "http://127.0.0.1:32768/20.59.59/%E4%BF%AE%E6%94%B9%E6%98%B5%E7%A7%B0_1.html",
+      "dataUrl": "http://127.0.0.1:32768/20.59.59/files/%E4%BF%AE%E6%94%B9%E6%98%B5%E7%A7%B0_1/data.js",
+      "generationDate": "2026-08-14T12:59:59.169Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "025-profile-edit-nickname-default-desktop.png",
+      "notes": {},
+      "labelsCount": 5,
+      "fieldsCount": 1,
+      "panelsCount": 1,
+      "interactionsCount": 16
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 26,
+      "pageId": "kzfn9q",
+      "pageName": "百科收藏",
+      "sitemapPath": "我的 / 百科收藏",
+      "requestedPath": "百科收藏.html",
+      "resolvedUrl": "http://127.0.0.1:32768/21.00.00/%E7%99%BE%E7%A7%91%E6%94%B6%E8%97%8F.html",
+      "dataUrl": "http://127.0.0.1:32768/21.00.00/files/%E7%99%BE%E7%A7%91%E6%94%B6%E8%97%8F/data.js",
+      "generationDate": "2026-08-14T13:00:00.064Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "026-encyclopedia-favorites-default-desktop.png",
+      "notes": {},
+      "labelsCount": 4,
+      "fieldsCount": 0,
+      "panelsCount": 1,
+      "interactionsCount": 9
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 27,
+      "pageId": "2wpfho",
+      "pageName": "菜谱收藏",
+      "sitemapPath": "我的 / 菜谱收藏",
+      "requestedPath": "菜谱收藏.html",
+      "resolvedUrl": "http://127.0.0.1:32768/21.00.00/%E8%8F%9C%E8%B0%B1%E6%94%B6%E8%97%8F.html",
+      "dataUrl": "http://127.0.0.1:32768/21.00.00/files/%E8%8F%9C%E8%B0%B1%E6%94%B6%E8%97%8F/data.js",
+      "generationDate": "2026-08-14T13:00:00.814Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "027-recipe-favorites-default-desktop.png",
+      "notes": {},
+      "labelsCount": 4,
+      "fieldsCount": 0,
+      "panelsCount": 1,
+      "interactionsCount": 9
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 28,
+      "pageId": "maci3k",
+      "pageName": "关于康宝宝",
+      "sitemapPath": "我的 / 关于康宝宝",
+      "requestedPath": "关于康宝宝.html",
+      "resolvedUrl": "http://127.0.0.1:32768/21.00.01/%E5%85%B3%E4%BA%8E%E5%BA%B7%E5%AE%9D%E5%AE%9D.html",
+      "dataUrl": "http://127.0.0.1:32768/21.00.01/files/%E5%85%B3%E4%BA%8E%E5%BA%B7%E5%AE%9D%E5%AE%9D/data.js",
+      "generationDate": "2026-08-14T13:00:01.333Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "028-about-default-desktop.png",
+      "notes": {},
+      "labelsCount": 4,
+      "fieldsCount": 0,
+      "panelsCount": 1,
+      "interactionsCount": 8
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 29,
+      "pageId": "ax6fug",
+      "pageName": "消息通知",
+      "sitemapPath": "我的 / 消息通知",
+      "requestedPath": "消息通知.html",
+      "resolvedUrl": "http://127.0.0.1:32768/21.00.01/%E6%B6%88%E6%81%AF%E9%80%9A%E7%9F%A5.html",
+      "dataUrl": "http://127.0.0.1:32768/21.00.01/files/%E6%B6%88%E6%81%AF%E9%80%9A%E7%9F%A5/data.js",
+      "generationDate": "2026-08-14T13:00:01.938Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "029-notifications-default-desktop.png",
+      "notes": {},
+      "labelsCount": 4,
+      "fieldsCount": 0,
+      "panelsCount": 1,
+      "interactionsCount": 8
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 30,
+      "pageId": "razp2t",
+      "pageName": "设置",
+      "sitemapPath": "我的 / 设置",
+      "requestedPath": "设置.html",
+      "resolvedUrl": "http://127.0.0.1:32768/21.00.02/%E8%AE%BE%E7%BD%AE.html",
+      "dataUrl": "http://127.0.0.1:32768/21.00.02/files/%E8%AE%BE%E7%BD%AE/data.js",
+      "generationDate": "2026-08-14T13:00:02.553Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "030-settings-default-desktop.png",
+      "notes": {},
+      "labelsCount": 7,
+      "fieldsCount": 0,
+      "panelsCount": 4,
+      "interactionsCount": 35
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 31,
+      "pageId": "j6bz4o",
+      "pageName": "更换手机",
+      "sitemapPath": "我的 / 设置 / 更换手机",
+      "requestedPath": "更换手机.html",
+      "resolvedUrl": "http://127.0.0.1:32768/21.00.03/%E6%9B%B4%E6%8D%A2%E6%89%8B%E6%9C%BA.html",
+      "dataUrl": "http://127.0.0.1:32768/21.00.03/files/%E6%9B%B4%E6%8D%A2%E6%89%8B%E6%9C%BA/data.js",
+      "generationDate": "2026-08-14T13:00:03.218Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "031-change-phone-default-desktop.png",
+      "notes": {},
+      "labelsCount": 5,
+      "fieldsCount": 1,
+      "panelsCount": 1,
+      "interactionsCount": 12
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 32,
+      "pageId": "wl3s8m",
+      "pageName": "输入验证码",
+      "sitemapPath": "我的 / 设置 / 输入验证码",
+      "requestedPath": "输入验证码.html",
+      "resolvedUrl": "http://127.0.0.1:32768/21.00.03/%E8%BE%93%E5%85%A5%E9%AA%8C%E8%AF%81%E7%A0%81.html",
+      "dataUrl": "http://127.0.0.1:32768/21.00.03/files/%E8%BE%93%E5%85%A5%E9%AA%8C%E8%AF%81%E7%A0%81/data.js",
+      "generationDate": "2026-08-14T13:00:03.644Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "032-verification-code-default-desktop.png",
+      "notes": {},
+      "labelsCount": 11,
+      "fieldsCount": 1,
+      "panelsCount": 2,
+      "interactionsCount": 25
+    },
+    {
+      "sourceId": "src-001",
+      "pageIndex": 33,
+      "pageId": "q8s8sj",
+      "pageName": "搜索",
+      "sitemapPath": "搜索",
+      "requestedPath": "搜索.html",
+      "resolvedUrl": "http://127.0.0.1:32768/21.00.04/%E6%90%9C%E7%B4%A2.html",
+      "dataUrl": "http://127.0.0.1:32768/21.00.04/files/%E6%90%9C%E7%B4%A2/data.js",
+      "generationDate": "2026-08-14T13:00:04.060Z",
+      "defaultAdaptiveView": {
+        "name": "",
+        "cursor": 1,
+        "size": {
+          "width": 420,
+          "height": 0
+        }
+      },
+      "adaptiveViews": [],
+      "screenshot": "033-search-default-desktop.png",
+      "notes": {},
+      "labelsCount": 4,
+      "fieldsCount": 1,
+      "panelsCount": 2,
+      "interactionsCount": 12
+    }
+  ]
+}

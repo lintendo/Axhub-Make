@@ -17,6 +17,7 @@ import {
 import { readJsonBody, sendJson } from './http.ts';
 import { runLocalCommand } from './localCommand.ts';
 import type { ManagementApiOptions } from './managementApi.ts';
+import { isResourceAssetSidecarDirectoryName } from './resourceFiles.ts';
 
 interface WorkspaceProjectContext {
   project: RegisteredProject;
@@ -216,6 +217,7 @@ function scanResourceSidebarTree(resourceRoot: string, relativePath = ''): Sideb
     const entryRelativePath = normalizePath(path.join(relativePath, entry.name));
     if (isIgnoredResourceRelativePath(entryRelativePath)) continue;
     if (entry.isDirectory()) {
+      if (isResourceAssetSidecarDirectoryName(entry.name)) continue;
       folders.push({
         id: createResourceFolderNodeId(entryRelativePath),
         kind: 'folder',
@@ -238,6 +240,68 @@ function scanResourceSidebarTree(resourceRoot: string, relativePath = ''): Sideb
 
   const byTitle = (a: SidebarTreeNode, b: SidebarTreeNode) => a.title.localeCompare(b.title);
   return [...folders.sort(byTitle), ...files.sort(byTitle)];
+}
+
+function findResourceFolderNode(nodes: SidebarTreeNode[], folderPath: string): SidebarTreeNode | null {
+  for (const node of nodes) {
+    if (node.kind !== 'folder') continue;
+    if (normalizeResourceRelativePath(node.folderPath || node.path) === folderPath) {
+      return node;
+    }
+    const nested = findResourceFolderNode(node.children || [], folderPath);
+    if (nested) {
+      return nested;
+    }
+  }
+  return null;
+}
+
+function ensureResourceFolder(resourceRoot: string, value: unknown): {
+  ok: true;
+  folder: SidebarTreeNode;
+  absolutePath: string;
+  tree: SidebarTreeNode[];
+  created: boolean;
+} | {
+  ok: false;
+  status: number;
+  error: string;
+} {
+  const rawPath = String(value || '').trim();
+  const slashNormalizedPath = rawPath.replace(/\\/g, '/');
+  const rawSegments = slashNormalizedPath.split('/');
+  const folderPath = normalizeResourceRelativePath(rawPath);
+  if (
+    !folderPath
+    || /^[a-zA-Z]:\//u.test(slashNormalizedPath)
+    || slashNormalizedPath.startsWith('//')
+    || rawSegments.some((segment) => !segment || segment === '.' || segment === '..')
+  ) {
+    return { ok: false, status: 400, error: 'Invalid resource folder path' };
+  }
+
+  const absolutePath = resolveResourcePath(resourceRoot, folderPath);
+  if (!absolutePath) {
+    return { ok: false, status: 400, error: 'Invalid resource folder path' };
+  }
+  if (fs.existsSync(absolutePath) && !fs.statSync(absolutePath).isDirectory()) {
+    return { ok: false, status: 409, error: 'Resource folder path is not a directory' };
+  }
+
+  const created = !fs.existsSync(absolutePath);
+  fs.mkdirSync(absolutePath, { recursive: true });
+  const tree = scanResourceSidebarTree(resourceRoot);
+  const folder = findResourceFolderNode(tree, folderPath);
+  if (!folder) {
+    return { ok: false, status: 500, error: 'Resource folder was not found after creation' };
+  }
+  return {
+    ok: true,
+    folder,
+    absolutePath,
+    tree,
+    created,
+  };
 }
 
 function shouldUseFilesystemResourceRoot(
@@ -338,9 +402,12 @@ function normalizeResourceSidebarTreePayload(tree: unknown): {
       if (!title) {
         return null;
       }
+      const sourceBaseName = sourcePath ? path.basename(sourcePath) : '';
       const targetName = kind === 'folder'
-        ? sanitizeFolderName(title) || (sourcePath ? path.basename(sourcePath) : '')
-        : sourcePath ? path.basename(sourcePath) : '';
+        ? title === sourceBaseName && sourceBaseName
+          ? sourceBaseName
+          : sanitizeFolderName(title) || sourceBaseName
+        : sourceBaseName;
       const targetPath = normalizeResourceRelativePath(parentPath ? `${parentPath}/${targetName}` : targetName);
       if (!targetPath) {
         return null;
@@ -441,23 +508,123 @@ function movePathIfNeeded(sourcePath: string, targetPath: string): void {
   fs.renameSync(resolvedSource, resolvedTarget);
 }
 
+type ResourceMove = {
+  previousPath: string;
+  nextPath: string;
+};
+
+type ResourceMoveOperation = ResourceMove & {
+  kind: 'file' | 'folder';
+  sourcePath: string;
+  targetPath: string;
+  originalSourcePath: string;
+};
+
+function isFolderMoveImpliedByAncestor(move: ResourceMove, moves: ResourceMove[]): boolean {
+  return moves.some((ancestor) => {
+    if (ancestor === move || !move.previousPath.startsWith(`${ancestor.previousPath}/`)) {
+      return false;
+    }
+    const suffix = move.previousPath.slice(ancestor.previousPath.length + 1);
+    return move.nextPath === `${ancestor.nextPath}/${suffix}`;
+  });
+}
+
+function reduceImpliedFolderMoves(moves: ResourceMove[]): ResourceMove[] {
+  return moves.filter((move) => !isFolderMoveImpliedByAncestor(move, moves));
+}
+
+function resolvePathAfterFolderMoves(
+  previousPath: string,
+  folderMoves: ResourceMove[],
+  excludedMove?: ResourceMove,
+): string {
+  const ancestor = folderMoves
+    .filter((move) => move !== excludedMove && previousPath.startsWith(`${move.previousPath}/`))
+    .sort((a, b) => b.previousPath.length - a.previousPath.length)[0];
+  if (!ancestor) {
+    return previousPath;
+  }
+  const suffix = previousPath.slice(ancestor.previousPath.length + 1);
+  return `${ancestor.nextPath}/${suffix}`;
+}
+
+function preflightResourceMoveOperations(
+  operations: ResourceMoveOperation[],
+): { ok: true } | { ok: false; status: number; body: Record<string, unknown> } {
+  const targetPaths = new Set<string>();
+  for (const operation of operations) {
+    if (!fs.existsSync(operation.originalSourcePath)) {
+      return {
+        ok: false,
+        status: 400,
+        body: { error: `Resource ${operation.kind} not found: ${operation.previousPath}` },
+      };
+    }
+    if (targetPaths.has(operation.targetPath) || fs.existsSync(operation.targetPath)) {
+      return {
+        ok: false,
+        status: 409,
+        body: createResourceNameConflictBody(operation.nextPath),
+      };
+    }
+    targetPaths.add(operation.targetPath);
+  }
+  return { ok: true };
+}
+
+function isPathNestedWithin(candidatePath: string, parentPath: string): boolean {
+  return candidatePath.startsWith(`${parentPath}${path.sep}`);
+}
+
+function createFolderMoveExecutionPlan(operations: ResourceMoveOperation[]): ResourceMoveOperation[] | null {
+  const pending = [...operations];
+  const plan: ResourceMoveOperation[] = [];
+  while (pending.length > 0) {
+    const nextIndex = pending.findIndex((operation) => pending.every((dependency) => (
+      dependency === operation
+        || (!isPathNestedWithin(operation.sourcePath, dependency.targetPath)
+          && !isPathNestedWithin(operation.targetPath, dependency.targetPath))
+    )));
+    if (nextIndex < 0) {
+      return null;
+    }
+    plan.push(pending.splice(nextIndex, 1)[0]);
+  }
+  return plan;
+}
+
+function createResourceAssetMoveOperation(
+  assetRoot: string,
+  resourceRoot: string,
+  operation: ResourceMoveOperation,
+): ResourceMoveOperation | null {
+  const sourceRelativePath = normalizePath(path.relative(resourceRoot, operation.sourcePath));
+  const sourcePath = resolveResourcePath(assetRoot, sourceRelativePath);
+  const targetPath = resolveResourcePath(assetRoot, operation.nextPath);
+  const originalSourcePath = resolveResourcePath(assetRoot, operation.previousPath);
+  if (!sourcePath || !targetPath || !originalSourcePath || !fs.existsSync(originalSourcePath)) {
+    return null;
+  }
+  return { ...operation, sourcePath, targetPath, originalSourcePath };
+}
+
 function applyResourceSidebarTree(resourceRoot: string, payload: {
   tree: SidebarTreeNode[];
   folders: Array<{ previousPath: string; nextPath: string }>;
   files: Array<{ previousPath: string; nextPath: string }>;
 }): { ok: true } | { ok: false; status: number; body: Record<string, unknown> } {
-  fs.mkdirSync(resourceRoot, { recursive: true });
-
   for (const { previousPath, nextPath } of [...payload.folders, ...payload.files]) {
     if (!resolveResourcePath(resourceRoot, previousPath) || !resolveResourcePath(resourceRoot, nextPath)) {
       return { ok: false, status: 403, body: { error: 'Forbidden' } };
     }
   }
 
-  const movedFolders = payload.folders
-    .filter(({ previousPath, nextPath }) => previousPath !== nextPath)
+  const changedFolderMoves = payload.folders
+    .filter(({ previousPath, nextPath }) => previousPath !== nextPath);
+  const movedFolders = reduceImpliedFolderMoves(changedFolderMoves)
     .sort((a, b) => b.previousPath.length - a.previousPath.length);
-  const movedFolderSources = new Set(movedFolders.map((move) => move.previousPath));
+  const movedFolderSources = new Set(changedFolderMoves.map((move) => move.previousPath));
   const nextFolderPaths = collectResourceFolderPaths(payload.tree);
   const currentFolderPaths = collectResourceFolderPaths(scanResourceSidebarTree(resourceRoot));
   const removedFolderPaths = Array.from(currentFolderPaths)
@@ -482,45 +649,98 @@ function applyResourceSidebarTree(resourceRoot: string, payload: {
     }
   }
 
-  for (const { previousPath, nextPath } of movedFolders) {
-    const sourcePath = resolveResourcePath(resourceRoot, previousPath);
-    const targetPath = resolveResourcePath(resourceRoot, nextPath);
-    if (!sourcePath || !targetPath) {
-      return { ok: false, status: 403, body: { error: 'Forbidden' } };
+  const createOperation = (
+    move: ResourceMove,
+    kind: ResourceMoveOperation['kind'],
+    sourceRelativePath: string,
+  ): ResourceMoveOperation | null => {
+    const sourcePath = resolveResourcePath(resourceRoot, sourceRelativePath);
+    const targetPath = resolveResourcePath(resourceRoot, move.nextPath);
+    const originalSourcePath = resolveResourcePath(resourceRoot, move.previousPath);
+    if (!sourcePath || !targetPath || !originalSourcePath) {
+      return null;
     }
-    if (!fs.existsSync(sourcePath)) continue;
-    if (fs.existsSync(targetPath)) {
-      return { ok: false, status: 409, body: createResourceNameConflictBody(nextPath) };
-    }
-    movePathIfNeeded(sourcePath, targetPath);
-  }
-
-  const resolveCurrentFileSource = (previousPath: string, nextPath: string): string => {
-    for (const folderMove of movedFolders) {
-      if (!previousPath.startsWith(`${folderMove.previousPath}/`)) continue;
-      const suffix = previousPath.slice(folderMove.previousPath.length + 1);
-      const movedPath = `${folderMove.nextPath}/${suffix}`;
-      return movedPath === nextPath ? '' : movedPath;
-    }
-    return previousPath;
+    return { ...move, kind, sourcePath, targetPath, originalSourcePath };
   };
 
-  for (const { previousPath, nextPath } of payload.files) {
-    if (previousPath === nextPath) continue;
-    const currentSourcePath = resolveCurrentFileSource(previousPath, nextPath);
-    if (!currentSourcePath) continue;
-    const sourcePath = resolveResourcePath(resourceRoot, currentSourcePath);
-    const targetPath = resolveResourcePath(resourceRoot, nextPath);
-    if (!sourcePath || !targetPath) {
+  const folderOperations: ResourceMoveOperation[] = [];
+  for (const move of movedFolders) {
+    const operation = createOperation(
+      move,
+      'folder',
+      resolvePathAfterFolderMoves(move.previousPath, movedFolders, move),
+    );
+    if (!operation) {
       return { ok: false, status: 403, body: { error: 'Forbidden' } };
     }
-    if (!fs.existsSync(sourcePath)) {
-      return { ok: false, status: 400, body: { error: `Resource file not found: ${previousPath}` } };
+    folderOperations.push(operation);
+  }
+
+  const fileOperations: ResourceMoveOperation[] = [];
+  for (const move of payload.files) {
+    if (move.previousPath === move.nextPath) continue;
+    const sourceRelativePath = resolvePathAfterFolderMoves(move.previousPath, movedFolders);
+    if (sourceRelativePath === move.nextPath) continue;
+    const operation = createOperation(move, 'file', sourceRelativePath);
+    if (!operation) {
+      return { ok: false, status: 403, body: { error: 'Forbidden' } };
     }
-    if (fs.existsSync(targetPath)) {
-      return { ok: false, status: 409, body: createResourceNameConflictBody(nextPath) };
+    fileOperations.push(operation);
+  }
+
+  const assetRoot = path.resolve(resourceRoot, '.assets');
+  const assetFolderOperations: ResourceMoveOperation[] = [];
+  const assetFileOperations: ResourceMoveOperation[] = [];
+  for (const operation of folderOperations) {
+    const assetOperation = createResourceAssetMoveOperation(assetRoot, resourceRoot, operation);
+    if (assetOperation) {
+      assetFolderOperations.push(assetOperation);
     }
-    movePathIfNeeded(sourcePath, targetPath);
+  }
+  for (const operation of fileOperations) {
+    const assetOperation = createResourceAssetMoveOperation(assetRoot, resourceRoot, operation);
+    if (assetOperation) {
+      assetFileOperations.push(assetOperation);
+    }
+  }
+
+  const folderExecutionPlan = createFolderMoveExecutionPlan(folderOperations);
+  if (!folderExecutionPlan) {
+    return {
+      ok: false,
+      status: 409,
+      body: createResourceNameConflictBody(folderOperations[0]?.nextPath || ''),
+    };
+  }
+  const assetFolderExecutionPlan = createFolderMoveExecutionPlan(assetFolderOperations);
+  if (!assetFolderExecutionPlan) {
+    return {
+      ok: false,
+      status: 409,
+      body: createResourceNameConflictBody(assetFolderOperations[0]?.nextPath || ''),
+    };
+  }
+  const preflight = preflightResourceMoveOperations([
+    ...folderOperations,
+    ...fileOperations,
+    ...assetFolderOperations,
+    ...assetFileOperations,
+  ]);
+  if (preflight.ok === false) {
+    return preflight;
+  }
+
+  for (const operation of folderExecutionPlan) {
+    movePathIfNeeded(operation.sourcePath, operation.targetPath);
+  }
+  for (const operation of fileOperations) {
+    movePathIfNeeded(operation.sourcePath, operation.targetPath);
+  }
+  for (const operation of assetFolderExecutionPlan) {
+    movePathIfNeeded(operation.sourcePath, operation.targetPath);
+  }
+  for (const operation of assetFileOperations) {
+    movePathIfNeeded(operation.sourcePath, operation.targetPath);
   }
 
   for (const folderPath of removedFolderPaths) {
@@ -1127,6 +1347,29 @@ export function handleWorkspaceApi(
       ];
       sidebarTreeStore.setTree(tab, nextTree);
       sendJson(res, { success: true, tab, version: SIDEBAR_TREE_VERSION, tree: nextTree, createdFolderId }, { status: 201 });
+      return true;
+    }
+    if (req.method === 'PUT') {
+      if (tab !== 'docs' || !shouldUseFilesystemResourceRoot(projectRoot, context.metadata, 'docs')) {
+        sendJson(res, { error: 'Named folders are only supported for filesystem resources' }, { status: 400 });
+        return true;
+      }
+      readJsonBody(req).then((body) => {
+        const result = ensureResourceFolder(getDocsResourceRoot(projectRoot), body?.folderPath);
+        if (result.ok === false) {
+          sendJson(res, { error: result.error }, { status: result.status });
+          return;
+        }
+        sendJson(res, {
+          success: true,
+          tab,
+          version: SIDEBAR_TREE_VERSION,
+          tree: result.tree,
+          folder: result.folder,
+          absolutePath: result.absolutePath,
+          created: result.created,
+        }, { status: result.created ? 201 : 200 });
+      }).catch((error) => sendJson(res, { error: error.message }, { status: 400 }));
       return true;
     }
   }

@@ -1,11 +1,14 @@
+import { notificationDiagnostics, type NotificationDiagnostics } from './notificationDiagnostics';
 import type { NotificationIntent } from './notificationCoordinator';
 
 type TerminalRunState = 'completed' | 'error' | 'aborted';
 type AcpRunState = 'running' | TerminalRunState;
+const TERMINAL_SIGNAL_DEDUPE_MS = 2_000;
 
 type AcpThreadEvent = {
   threadId: string;
   runState: AcpRunState;
+  terminalMessageId?: string;
 };
 
 export interface AssistantNotificationTracker {
@@ -75,8 +78,28 @@ export function readAcpThreadEvent(data: unknown): AcpThreadEvent | null {
   }
 
   if (payload.kind === 'thread.messages.changed') {
+    const notification = isRecord(payload.notification) ? payload.notification : null;
+    if (
+      notification?.kind === 'run-terminal'
+      && notification.actor === 'assistant'
+      && notification.finalized === true
+    ) {
+      const messageId = readText(notification.messageId);
+      const state = readRunState(notification.runState);
+      if (
+        messageId
+        && (state === 'completed' || state === 'error' || state === 'aborted')
+      ) {
+        return { threadId, runState: state, terminalMessageId: messageId };
+      }
+    }
+
     const state = readFinalizedAssistantRunState(payload.messages, threadId, payload.headId);
-    return state ? { threadId, runState: state } : null;
+    if (state) return { threadId, runState: state };
+
+    // ACP 0.1.11 emits this only after its current isRunning state becomes false,
+    // but sends only a lightweight messageCount/changedAt payload.
+    return { threadId, runState: 'completed' };
   }
 
   if (payload.kind === 'thread.idle') {
@@ -89,8 +112,12 @@ export function readAcpThreadEvent(data: unknown): AcpThreadEvent | null {
   return null;
 }
 
-export function createAssistantNotificationTracker(): AssistantNotificationTracker {
+export function createAssistantNotificationTracker(
+  diagnostics: NotificationDiagnostics = notificationDiagnostics,
+): AssistantNotificationTracker {
   const activeRuns = new Map<string, number>();
+  const seenTerminalMessages = new Set<string>();
+  const recentTerminalSignals = new Map<string, { runState: TerminalRunState; at: number }>();
   let nextRunSequence = 0;
 
   return {
@@ -101,20 +128,58 @@ export function createAssistantNotificationTracker(): AssistantNotificationTrack
       if (event.runState === 'running') {
         nextRunSequence += 1;
         activeRuns.set(event.threadId, nextRunSequence);
+        recentTerminalSignals.delete(event.threadId);
         return null;
+      }
+
+      if (event.terminalMessageId) {
+        activeRuns.delete(event.threadId);
+        const terminalKey = `${event.threadId}:${event.terminalMessageId}:${event.runState}`;
+        if (seenTerminalMessages.has(terminalKey)) return null;
+        seenTerminalMessages.add(terminalKey);
+        if (event.runState === 'aborted') return null;
+        const now = Date.now();
+        const recentTerminal = recentTerminalSignals.get(event.threadId);
+        if (
+          recentTerminal?.runState === event.runState
+          && now - recentTerminal.at < TERMINAL_SIGNAL_DEDUPE_MS
+        ) {
+          return null;
+        }
+        recentTerminalSignals.set(event.threadId, { runState: event.runState, at: now });
+
+        const intent: NotificationIntent = {
+          source: 'assistant-thread',
+          scopeKey: event.threadId,
+          outcome: event.runState === 'error' ? 'error' : 'completed',
+          eventId: `assistant:${event.threadId}:message:${event.terminalMessageId}:${event.runState}`,
+        };
+        diagnostics.record('assistant.intent.created', {
+          threadId: event.threadId,
+          outcome: intent.outcome,
+          eventId: intent.eventId ?? null,
+        });
+        return intent;
       }
 
       const sequence = activeRuns.get(event.threadId);
       if (!sequence) return null;
       activeRuns.delete(event.threadId);
       if (event.runState === 'aborted') return null;
+      recentTerminalSignals.set(event.threadId, { runState: event.runState, at: Date.now() });
 
-      return {
+      const intent: NotificationIntent = {
         source: 'assistant-thread',
         scopeKey: event.threadId,
         outcome: event.runState === 'error' ? 'error' : 'completed',
         eventId: `assistant:${event.threadId}:${sequence}`,
       };
+      diagnostics.record('assistant.intent.created', {
+        threadId: event.threadId,
+        outcome: intent.outcome,
+        eventId: intent.eventId ?? null,
+      });
+      return intent;
     },
   };
 }

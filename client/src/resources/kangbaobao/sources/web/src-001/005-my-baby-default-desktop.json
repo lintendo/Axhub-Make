@@ -1,0 +1,292 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 5,
+  "pageId": "1w9pcr",
+  "pageName": "我的宝宝",
+  "sitemapPath": "首页 / 我的宝宝",
+  "requestedPath": "我的宝宝.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.58.48/%E6%88%91%E7%9A%84%E5%AE%9D%E5%AE%9D.html",
+  "dataUrl": "http://127.0.0.1:32768/20.58.48/files/%E6%88%91%E7%9A%84%E5%AE%9D%E5%AE%9D/data.js",
+  "generationDate": "2026-08-14T12:58:48.046Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 我的宝宝\n- paragraph: 添加宝宝\n- paragraph: 梓宁宝宝\n- paragraph: 6个月\n- paragraph: 梓宁宝宝\n- paragraph: 6个月\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "005-my-baby-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "导航",
+    "卡片",
+    "弹层",
+    "删除成功",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [],
+  "panels": [
+    {
+      "scope": "page:我的宝宝 / 卡片",
+      "label": "卡片",
+      "visible": true,
+      "states": [
+        "初始",
+        "删除"
+      ]
+    },
+    {
+      "scope": "page:我的宝宝 / 卡片",
+      "label": "卡片",
+      "visible": true,
+      "states": [
+        "初始",
+        "删除"
+      ]
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:我的宝宝 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:我的宝宝 / 导航 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 宝宝性别 in Current window",
+      "target": "宝宝性别.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:我的宝宝 / 卡片",
+      "event": "Swiped left",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set 卡片 to&nbsp; to 删除 slide left none 200ms ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:我的宝宝 / 卡片",
+      "event": "Swiped right",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set 卡片 to&nbsp; to 初始 slide right none 200ms ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:我的宝宝 / 卡片 / state:初始 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 首页 in Current window",
+      "target": "首页.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:我的宝宝 / 卡片 / state:删除 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 弹层",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:我的宝宝 / 卡片",
+      "event": "Swiped left",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set 卡片 to&nbsp; to 删除 slide left none 200ms ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:我的宝宝 / 卡片",
+      "event": "Swiped right",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set 卡片 to&nbsp; to 初始 slide right none 200ms ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:我的宝宝 / 卡片 / state:初始 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 首页 in Current window",
+      "target": "首页.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:我的宝宝 / 卡片 / state:删除 / Group / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 弹层",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:我的宝宝 / 弹层 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹层fade none 300ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:我的宝宝 / 弹层 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 删除成功fade none 300ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:我的宝宝 / 弹层 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "wait",
+      "description": "Wait 1500 ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:我的宝宝 / 弹层 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 删除成功fade none 300ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:我的宝宝 / 弹层 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 我的宝宝 in Current window",
+      "target": "我的宝宝.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:我的宝宝 / 弹层 / Rectangle",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹层fade none 300ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

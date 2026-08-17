@@ -55,7 +55,11 @@ async function parseResponseError(response: Response) {
     return `导出失败（${response.status}）`;
 }
 
-export async function downloadExportHtmlArchive(targetPath?: string, options: { includeSource?: boolean } = {}) {
+export async function downloadExportHtmlArchive(
+    targetPath: string | undefined,
+    scope: ProjectScope,
+    options: { includeSource?: boolean } = {},
+) {
     const query = new URLSearchParams();
     if (targetPath) {
         query.set('path', targetPath);
@@ -64,7 +68,7 @@ export async function downloadExportHtmlArchive(targetPath?: string, options: { 
         query.set('includeSource', '1');
     }
     const suffix = query.toString();
-    const url = `/api/export-html${suffix ? `?${suffix}` : ''}`;
+    const url = withProjectScope(`/api/export-html${suffix ? `?${suffix}` : ''}`, scope);
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -91,3 +95,5 @@ export async function downloadExportHtmlArchive(targetPath?: string, options: { 
 
     return fileName;
 }
+import type { ProjectScope } from '../../services/projectScope';
+import { withProjectScope } from '../../services/projectScope';

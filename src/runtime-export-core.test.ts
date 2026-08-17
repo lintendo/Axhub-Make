@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { captureDocumentScreenshot } from './runtime-export-core';
 
 const snapdomToPng = vi.fn();
+const snapdomToJpg = vi.fn();
 
 class FakeHTMLElement {
   style: Record<string, string> & {
@@ -90,7 +91,9 @@ const originalGlobals = {
 describe('runtime-export-core captureDocumentScreenshot', () => {
   beforeEach(() => {
     snapdomToPng.mockReset();
+    snapdomToJpg.mockReset();
     (globalThis as any).__AXHUB_RUNTIME_EXPORT_CORE_TEST_SNAPDOM_TO_PNG__ = snapdomToPng;
+    (globalThis as any).__AXHUB_RUNTIME_EXPORT_CORE_TEST_SNAPDOM_TO_JPG__ = snapdomToJpg;
     globalThis.HTMLElement = FakeHTMLElement as any;
     globalThis.HTMLImageElement = FakeHTMLImageElement as any;
     globalThis.window = {
@@ -116,6 +119,7 @@ describe('runtime-export-core captureDocumentScreenshot', () => {
 
   afterEach(() => {
     delete (globalThis as any).__AXHUB_RUNTIME_EXPORT_CORE_TEST_SNAPDOM_TO_PNG__;
+    delete (globalThis as any).__AXHUB_RUNTIME_EXPORT_CORE_TEST_SNAPDOM_TO_JPG__;
     globalThis.HTMLElement = originalGlobals.HTMLElement;
     globalThis.HTMLImageElement = originalGlobals.HTMLImageElement;
     globalThis.document = originalGlobals.document;
@@ -188,6 +192,43 @@ describe('runtime-export-core captureDocumentScreenshot', () => {
     }));
   });
 
+  it('compresses JPEG screenshots until they fit the requested byte limit', async () => {
+    const element = new FakeHTMLElement();
+    element.scrollWidth = 1440;
+    element.scrollHeight = 6746;
+    snapdomToPng.mockResolvedValue({
+      src: 'data:image/png;base64,cG5n',
+      getAttribute: vi.fn(),
+    });
+    snapdomToJpg
+      .mockResolvedValueOnce({
+        src: `data:image/jpeg;base64,${Buffer.alloc(12).toString('base64')}`,
+        getAttribute: vi.fn(),
+      })
+      .mockResolvedValueOnce({
+        src: `data:image/jpeg;base64,${Buffer.alloc(8).toString('base64')}`,
+        getAttribute: vi.fn(),
+      });
+
+    const result = await captureDocumentScreenshot(element as any, {
+      targetWidth: 1440,
+      targetHeight: 1080,
+      format: 'jpeg',
+      quality: 0.8,
+      maxBytes: 10,
+    });
+
+    expect(snapdomToPng).not.toHaveBeenCalled();
+    expect(snapdomToJpg).toHaveBeenCalledTimes(2);
+    expect(snapdomToJpg.mock.calls[0][1]).toEqual(expect.objectContaining({
+      format: 'jpeg',
+      quality: 0.8,
+    }));
+    expect(snapdomToJpg.mock.calls[1][1].quality).toBeLessThan(0.8);
+    expect(result.dataUrl).toMatch(/^data:image\/jpeg;base64,/);
+    expect(Buffer.from(result.dataUrl.split(',')[1], 'base64')).toHaveLength(8);
+  });
+
   it('uses requested screenshot dimensions as the viewport and exports the full scroll size', async () => {
     const element = new FakeHTMLElement();
     element.clientWidth = 1440;
@@ -222,6 +263,36 @@ describe('runtime-export-core captureDocumentScreenshot', () => {
       dataUrl: 'data:image/png;base64,c25hcGRvbQ==',
       width: 1440,
       height: 1995,
+    });
+  });
+
+  it('captures only the requested viewport without expanding to the full scroll size', async () => {
+    const element = new FakeHTMLElement();
+    element.clientWidth = 390;
+    element.clientHeight = 846;
+    element.offsetWidth = 390;
+    element.offsetHeight = 846;
+    element.scrollWidth = 390;
+    element.scrollHeight = 1995;
+    snapdomToPng.mockResolvedValue({
+      src: 'data:image/png;base64,c25hcGRvbQ==',
+      getAttribute: vi.fn(),
+    });
+
+    const result = await captureDocumentScreenshot(element as any, {
+      targetWidth: 390,
+      targetHeight: 846,
+      scope: 'viewport',
+    });
+
+    expect(snapdomToPng.mock.calls[0]?.[1]).toEqual(expect.objectContaining({
+      width: 390,
+      height: 846,
+    }));
+    expect(result).toEqual({
+      dataUrl: 'data:image/png;base64,c25hcGRvbQ==',
+      width: 390,
+      height: 846,
     });
   });
 

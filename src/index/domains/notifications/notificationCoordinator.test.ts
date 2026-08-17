@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createNotificationDiagnostics } from './notificationDiagnostics';
 import { createNotificationCoordinator } from './notificationCoordinator';
 
 describe('notification coordinator', () => {
@@ -20,10 +21,12 @@ describe('notification coordinator', () => {
   });
 
   it('skips disabled sounds and aborted intents', async () => {
+    const diagnostics = createNotificationDiagnostics({ enabled: true });
     const play = vi.fn().mockResolvedValue(true);
     const coordinator = createNotificationCoordinator({
       getSettings: () => ({ completionEnabled: false, reminderEnabled: true }),
       player: { play },
+      diagnostics,
     });
 
     await coordinator.notify({
@@ -40,6 +43,37 @@ describe('notification coordinator', () => {
     });
 
     expect(play).not.toHaveBeenCalled();
+    expect(diagnostics.snapshot().map((entry) => ({
+      stage: entry.stage,
+      reason: entry.details?.reason,
+      completionEnabled: entry.details?.completionEnabled,
+      reminderEnabled: entry.details?.reminderEnabled,
+    }))).toEqual([
+      {
+        stage: 'notification.intent.received',
+        reason: undefined,
+        completionEnabled: false,
+        reminderEnabled: true,
+      },
+      {
+        stage: 'notification.intent.skipped',
+        reason: 'sound-disabled',
+        completionEnabled: false,
+        reminderEnabled: true,
+      },
+      {
+        stage: 'notification.intent.received',
+        reason: undefined,
+        completionEnabled: false,
+        reminderEnabled: true,
+      },
+      {
+        stage: 'notification.intent.skipped',
+        reason: 'aborted',
+        completionEnabled: false,
+        reminderEnabled: true,
+      },
+    ]);
   });
 
   it('remembers a disabled terminal event so enabling sound later does not replay it', async () => {

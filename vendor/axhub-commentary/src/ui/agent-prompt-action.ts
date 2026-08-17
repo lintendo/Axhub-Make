@@ -163,6 +163,7 @@ export function getAgentPromptBubbleActionState(options: {
   visible: boolean;
   disabled: boolean;
   loading: boolean;
+  dismissBubble: boolean;
   title: string;
   requiresConfirm: boolean;
 } {
@@ -180,22 +181,26 @@ export function getAgentPromptBubbleActionState(options: {
     : 'sleeping';
   const blockReason = options.getSendCurrentElementPromptToAgentBlockReason?.();
   const title = blockReason
-    ?? (!connected && !canWakeAgent
-      ? 'AI 连接未建立，请稍后重试。'
-      : canAppendToCurrentSession
-        ? '继续追加到当前 AI 对话'
-        : waitingForCurrentSession
-          ? resolveRunningConversationTitle(false)
-          : '发送给 AI');
+    ?? (currentTaskRunning
+      ? resolveRunningConversationTitle(currentTaskSessionReady)
+      : !connected && !canWakeAgent
+        ? 'AI 连接未建立，请稍后重试。'
+        : canAppendToCurrentSession
+          ? '继续追加到当前 AI 对话'
+          : waitingForCurrentSession
+            ? resolveRunningConversationTitle(false)
+            : '发送给 AI');
 
   return {
     visible: Boolean(options.onSendCurrentElementPromptToAgent),
     disabled:
       !options.onSendCurrentElementPromptToAgent
       || (!connected && !canWakeAgent)
+      || currentTaskRunning
       || waitingForCurrentSession
       || Boolean(blockReason),
-    loading: Boolean(options.sending),
+    loading: Boolean(options.sending || currentTaskRunning),
+    dismissBubble: currentTaskRunning,
     title,
     requiresConfirm: false,
   };

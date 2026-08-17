@@ -13,14 +13,20 @@ description: Generate or edit raster images and visual assets, including UI and 
 2. 内部图片生成工具不可用时，读取 Axhub Make 服务端图片配置：
    - 只读取 `<AXHUB_MAKE_HOME_DIR or user home>/.axhub/make/server.config.json`。
    - 使用 `ai.imageGeneration.baseUrl`、`ai.imageGeneration.apiKey` 和 `ai.imageGeneration.model`。
-3. 如果服务端配置缺失或不完整，再读取本地 Codex 配置/认证路径：
+3. 服务端图片配置完整时，直接执行本技能内置的 `scripts/request-image.mjs`：
+   - 将最终提示词写入项目 `.local/` 下的临时文本文件。
+   - 单张请求使用：`node "<当前技能目录>/scripts/request-image.mjs" --prompt-file "<提示词文件>" --out "<输出图片>" --size "<WxH>" --quality "<auto|low|medium|high>"`。
+   - 有参考图时重复追加 `--image "<本地图片路径>"`；脚本只负责把参考图随生成请求上传，不处理 mask、抠图、缩放或其他本地图片编辑。
+   - 脚本直接读取配置并请求远程图片 provider，不调用或启动 Axhub Make 服务端、代理服务器或其他本地服务。
+   - 不要先检查或安装 Python、`uv`、OpenAI SDK 或 npm 依赖，也不要临时编写其他 API runner。
+4. 如果服务端配置缺失或不完整，再读取本地 Codex 配置/认证路径：
    - 始终检查 `CODEX_HOME`，然后检查用户 home 下的 `.codex`。
    - Windows 还要检查 AppData/ProgramData 下的 Codex 配置目录。
    - macOS/Linux 还要检查 XDG Codex 配置目录。
    - 从 `config.toml` 读取 provider `base_url`；从 `auth.json` 读取 API key。
-4. 配置完整时，直接以 `baseUrl`、`apiKey`、`model` 作为 Image Gen provider settings 执行；现有配置即授权使用该 provider/model，不再追加 CLI/API 确认，其他生成规则继续遵循系统 `imagegen` 技能。
-5. 如果当前 MCP、工具或 API 不支持单次生成多张图片，而用户需要多张图片，应发起多次生成请求，不要把需求降级成只生成一张。
-6. 生成派生产物时（例如基于现有图片/原型做变体、扩图、局部重绘、风格迁移、素材补图或素材拆分），必须把原图或相关原型截图作为参考图传给图片生成工具；传参使用本地文件路径，不要只在提示词里文字描述，也不要传远程 URL。如果当前只有页面或预览链接，先导出真实运行截图到本地，再把该本地路径传入。
+5. 配置完整时，现有配置即授权使用该 provider/model，不再追加 CLI/API 确认，其他生成规则继续遵循系统 `imagegen` 技能。
+6. 如果当前 MCP、工具或 API 不支持单次生成多张图片，而用户需要多张图片，应发起多次生成请求，不要把需求降级成只生成一张。使用内置脚本时，为每张图片指定不同的 `--out` 并分别执行。
+7. 生成派生产物时（例如基于现有图片/原型做变体、扩图、局部重绘、风格迁移、素材补图或素材拆分），必须把原图或相关原型截图作为参考图传给图片生成工具；使用内置脚本时通过重复的 `--image` 传入本地文件路径，不要只在提示词里文字描述，也不要传远程 URL。如果当前只有页面或预览链接，先导出真实运行截图到本地，再把该本地路径传入。
 
 如果没有项目服务端配置或本地配置，则回退到系统 `imagegen` 的默认行为。
 

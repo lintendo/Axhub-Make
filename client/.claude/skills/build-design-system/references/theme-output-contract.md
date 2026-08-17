@@ -153,7 +153,7 @@ node scripts/check-app-ready.mjs /themes/[主题名]
 验收重点：
 
 - `READY` 后访问目标页面，检查预览图、色板、字体、圆角、间距、边框、阴影和使用建议是否与 `DESIGN.md` 一致。
-- 向用户提供主题预览时使用 ready 检查返回的 `targetUrl`；`/themes/<theme-key>` 只作为脚本参数或运行时路径。
+- 向用户提供主题预览时优先使用 ready 检查返回的 `serverUrl`；管理端不可用时才使用 `targetUrl`。
 - 若出现 `ERROR`，优先修复入口、资源路径、JSON 结构和 CSS 导入。
 - 若出现 `TIMEOUT`，排查 dev server、依赖安装、构建缓存或长任务。
 - 视觉问题按用户当前明确要求、`DESIGN.md`、`rules/requirements-alignment-guide.md` 的顺序判断，不以自动生成结果为准。

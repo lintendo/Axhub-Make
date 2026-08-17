@@ -10,6 +10,7 @@ interface NewElementCanvasProps {
     scale: number;
     rc: RoughCanvas;
     renderConfig: StaticCanvasRenderConfig;
+    zIndex?: number;
 }
 declare const NewElementCanvas: (props: NewElementCanvasProps) => import("react/jsx-runtime").JSX.Element;
 export default NewElementCanvas;

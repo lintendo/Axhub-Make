@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { spawnSync as nodeSpawnSync } from 'node:child_process';
 
 import {
@@ -50,6 +51,65 @@ const WEB_AGENT_COMMANDS: Record<WebAgent, string[]> = {
 const LOCAL_APP_AGENT_COMMANDS: Record<LocalAppAgent, string[]> = {
   codex: ['codex'],
   opencode: ['opencode'],
+  workbuddy: [],
+  traework: ['trae-solo', 'trae-solo-cn'],
+  qoderwork: [],
+  trae: ['trae', 'trae-cn'],
+};
+
+const LOCAL_APP_AGENT_APPLICATION_PATHS: Record<LocalAppAgent, Record<'darwin' | 'win32', string[]>> = {
+  codex: {
+    darwin: [
+      '/Applications/Codex.app/Contents/MacOS/Codex',
+      '/Applications/Codex.app/Contents/MacOS/ChatGPT',
+      '/Applications/ChatGPT.app/Contents/MacOS/ChatGPT',
+    ],
+    win32: ['%LOCALAPPDATA%/Programs/Codex/Codex.exe', '%LOCALAPPDATA%/Programs/ChatGPT/ChatGPT.exe'],
+  },
+  opencode: {
+    darwin: ['/Applications/OpenCode.app/Contents/MacOS/OpenCode'],
+    win32: ['%LOCALAPPDATA%/Programs/OpenCode/OpenCode.exe'],
+  },
+  workbuddy: {
+    darwin: ['/Applications/WorkBuddy.app/Contents/MacOS/Electron'],
+    win32: ['%LOCALAPPDATA%/Programs/WorkBuddy/WorkBuddy.exe'],
+  },
+  traework: {
+    darwin: [
+      '/Applications/TRAE SOLO.app/Contents/MacOS/Electron',
+      '/Applications/TRAE SOLO CN.app/Contents/MacOS/Electron',
+    ],
+    win32: [
+      '%LOCALAPPDATA%/Programs/TRAE SOLO/TRAE SOLO.exe',
+      'C:/Program Files/TRAE SOLO/TRAE SOLO.exe',
+      '%LOCALAPPDATA%/Programs/TRAE SOLO CN/TRAE SOLO CN.exe',
+      'C:/Program Files/TRAE SOLO CN/TRAE SOLO CN.exe',
+    ],
+  },
+  qoderwork: {
+    darwin: [
+      '/Applications/QoderWork.app/Contents/MacOS/QoderWork',
+      '/Applications/QoderWork CN.app/Contents/MacOS/QoderWork CN',
+    ],
+    win32: [
+      '%LOCALAPPDATA%/Programs/QoderWork/QoderWork.exe',
+      'C:/Program Files/QoderWork/QoderWork.exe',
+      '%LOCALAPPDATA%/Programs/QoderWork CN/QoderWork CN.exe',
+      'C:/Program Files/QoderWork CN/QoderWork CN.exe',
+    ],
+  },
+  trae: {
+    darwin: [
+      '/Applications/Trae.app/Contents/MacOS/Electron',
+      '/Applications/Trae CN.app/Contents/MacOS/Electron',
+    ],
+    win32: [
+      '%LOCALAPPDATA%/Programs/Trae/Trae.exe',
+      'C:/Program Files/Trae/Trae.exe',
+      '%LOCALAPPDATA%/Programs/Trae CN/Trae CN.exe',
+      'C:/Program Files/Trae CN/Trae CN.exe',
+    ],
+  },
 };
 
 function toText(value: unknown): string {
@@ -113,6 +173,23 @@ function resolveCommandPath(
   return null;
 }
 
+function expandApplicationPath(candidate: string, platform: NodeJS.Platform): string {
+  if (platform === 'win32') {
+    return candidate
+      .replace(/^%LOCALAPPDATA%/u, process.env.LOCALAPPDATA || '%LOCALAPPDATA%')
+      .replace(/^%APPDATA%/u, process.env.APPDATA || '%APPDATA%');
+  }
+  return candidate;
+}
+
+function resolveApplicationPath(agent: LocalAppAgent, platform: NodeJS.Platform): string | null {
+  if (platform !== 'darwin' && platform !== 'win32') return null;
+  return LOCAL_APP_AGENT_APPLICATION_PATHS[agent]
+    [platform]
+    .map((candidate) => expandApplicationPath(candidate, platform))
+    .find((candidate) => fs.existsSync(candidate)) || null;
+}
+
 export function createAgentAvailabilityDetector(options: AgentAvailabilityDetectorOptions = {}) {
   const platform = options.platform ?? process.platform;
   const spawnSync = options.spawnSync ?? nodeSpawnSync;
@@ -158,9 +235,16 @@ export function createAgentAvailabilityDetector(options: AgentAvailabilityDetect
       : detectCommands(WEB_AGENT_COMMANDS[agent] || [], 'web-agent', WEB_AGENT_APP_NAMES[agent])
   );
 
-  const detectLocalAppAgentAvailability = (agent: LocalAppAgent): AgentAvailabilityInfo => (
-    detectCommands(LOCAL_APP_AGENT_COMMANDS[agent] || [], 'local-app-agent', LOCAL_APP_AGENT_APP_NAMES[agent])
-  );
+  const detectLocalAppAgentAvailability = (agent: LocalAppAgent): AgentAvailabilityInfo => {
+    const applicationPath = resolveApplicationPath(agent, platform);
+    if (applicationPath) {
+      return createInfo('installed', 'high', getCheckedAt(), {
+        source: 'local-app-agent-application',
+        path: applicationPath,
+      });
+    }
+    return detectCommands(LOCAL_APP_AGENT_COMMANDS[agent] || [], 'local-app-agent', LOCAL_APP_AGENT_APP_NAMES[agent]);
+  };
 
   const detectAllCLIAgentAvailability = (): AgentAvailabilityMap<CLIAgent> => (
     Object.fromEntries(

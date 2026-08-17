@@ -38,6 +38,8 @@ describe('build-design-system skill', () => {
     expect(frontmatterKeys).toEqual(['name', 'description']);
     expect(frontmatter).toContain('name: build-design-system');
     expect(frontmatter).toContain('description: Use when');
+    expect(frontmatter).toContain('explicitly asks');
+    expect(frontmatter).toContain('$search-design-system');
     for (const trigger of [
       '主题',
       'theme',
@@ -67,6 +69,7 @@ describe('build-design-system skill', () => {
     expect(metadata).toContain('$build-design-system');
     expect(metadata).not.toContain('icon_small');
     expect(metadata).not.toContain('icon_large');
+    expect(skill).toContain('如果只是从当前项目本地候选或 Design Knowledge 主题库候选中选择已有设计基底，停止本技能并使用 `$search-design-system`。');
   });
 
   it('plans sources and follow-up work while completing phase one in the same workflow', () => {

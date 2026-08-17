@@ -12,7 +12,10 @@ describe('useIdeActions source', () => {
     expect(source).toContain('ideAvailability?: IDEAvailabilityMap;');
     expect(source).toContain('preferredIDE: resolveVisibleIDEPreference(preferredIDE, ideAvailability),');
     expect(source).toContain('projectId?: string;');
-    expect(source).toContain('projectId: projectId?.trim() || activeProjectId?.trim() || undefined,');
+    expect(source).toContain('projectId: requireProjectScope(projectId?.trim() || activeProjectId).projectId,');
+    expect(source).toContain('fetch(withProjectScope(endpoint, requireProjectScope(projectId)))');
+    expect(source).toContain('resolveResourceProjectId(effectiveItem) || activeProjectId,');
+    expect(source).not.toContain('fetch(endpoint)');
     expect(source).toContain('let copySucceeded = false;');
     expect(source).toContain('console.warn(\'Failed to copy IDE helper text:\', error);');
     expect(source).toContain('activeProjectId: string | null;');

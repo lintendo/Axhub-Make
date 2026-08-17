@@ -38,6 +38,40 @@ const LOCAL_PROMPT_CLIENT_SET: ReadonlySet<string> = new Set([
   'local:qoder',
 ]);
 
+export type AiPurposePromptClientKey =
+  | 'conversationPromptClient'
+  | 'annotationPromptClient'
+  | 'canvasPromptClient';
+
+export interface AiPurposePromptClientPreferences {
+  conversationPromptClient: PromptClientPreference;
+  annotationPromptClient: PromptClientPreference;
+  canvasPromptClient: PromptClientPreference;
+}
+
+export function fillUnsetAiPurposePromptClients<T extends AiPurposePromptClientPreferences>(
+  previous: T,
+  key: AiPurposePromptClientKey,
+  value: PromptClientPreference,
+): T {
+  if (!value) {
+    return { ...previous, [key]: null };
+  }
+
+  return {
+    ...previous,
+    conversationPromptClient: key === 'conversationPromptClient'
+      ? value
+      : previous.conversationPromptClient || value,
+    annotationPromptClient: key === 'annotationPromptClient'
+      ? value
+      : previous.annotationPromptClient || value,
+    canvasPromptClient: key === 'canvasPromptClient'
+      ? value
+      : previous.canvasPromptClient || value,
+  };
+}
+
 export function normalizePromptClientPreference(value: unknown): PromptClientPreference {
   if (value === null || value === undefined) return null;
   if (typeof value !== 'string') return null;

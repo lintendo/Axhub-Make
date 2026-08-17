@@ -65,7 +65,14 @@ export function computePromptCardPosition(options: ComputePromptCardPositionOpti
   const safeRightX = propertyPanelEnabled
     ? viewportWidth - (propertyPanelWidth + propertyPanelRight + safePaddingPx)
     : viewportWidth - safePaddingPx;
-  const maxLeft = Math.min(viewportWidth - safePaddingPx - cardWidth, safeRightX - cardWidth);
+  const viewportMaxLeft = Math.max(
+    safePaddingPx,
+    viewportWidth - safePaddingPx - cardWidth,
+  );
+  const propertyPanelMaxLeft = safeRightX - cardWidth;
+  const maxLeft = propertyPanelEnabled && propertyPanelMaxLeft >= safePaddingPx
+    ? Math.min(viewportMaxLeft, propertyPanelMaxLeft)
+    : viewportMaxLeft;
   const preferredRightLeft = anchorRect.left + anchorRect.width + anchorGapPx;
   const preferredLeftLeft = anchorRect.left - anchorGapPx - cardWidth;
   const fitsRight = preferredRightLeft >= safePaddingPx && preferredRightLeft <= maxLeft;

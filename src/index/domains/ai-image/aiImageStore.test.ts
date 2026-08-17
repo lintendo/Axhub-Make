@@ -85,12 +85,12 @@ describe('AI image task store', () => {
     });
     const store = createAiImageTaskStore({ storage: null });
 
-    await store.configure({ targetPath: 'prototypes/home' });
+    await store.configure({ projectId: 'project-b', targetPath: 'prototypes/home' });
     store.deleteTask('missing-task');
 
     expect(fetchMock.mock.calls.some((call) => String(call[0]).startsWith('/api/ai-image/history'))).toBe(false);
-    expect(fetchMock).toHaveBeenCalledWith('/api/ai/generation-tasks?targetPath=prototypes%2Fhome');
-    expect(fetchMock).toHaveBeenCalledWith('/api/ai/artifact-history?targetPath=prototypes%2Fhome');
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai/generation-tasks?targetPath=prototypes%2Fhome&projectId=project-b');
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai/artifact-history?targetPath=prototypes%2Fhome&projectId=project-b');
     expect(store.getTasks()[0]).toMatchObject({
       id: 'task-from-history',
       prompt: 'reload 后的提示词',
@@ -114,10 +114,10 @@ describe('AI image task store', () => {
     }), { status: 200 }));
     const store = createAiImageTaskStore({ storage: null });
 
-    await store.configure({ targetPath: 'src/resources/flows/home.excalidraw' });
+    await store.configure({ projectId: 'project-b', targetPath: 'src/resources/flows/home.excalidraw' });
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/ai/generation-tasks?targetPath=src%2Fresources%2Fflows%2Fhome.excalidraw');
-    expect(fetchMock).toHaveBeenCalledWith('/api/ai/artifact-history?targetPath=src%2Fresources%2Fflows%2Fhome.excalidraw');
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai/generation-tasks?targetPath=src%2Fresources%2Fflows%2Fhome.excalidraw&projectId=project-b');
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai/artifact-history?targetPath=src%2Fresources%2Fflows%2Fhome.excalidraw&projectId=project-b');
   });
 
   it('tracks running, incremental images, done state, and only submits through /api/ai/runs', async () => {
@@ -169,7 +169,7 @@ describe('AI image task store', () => {
       .mockReturnValueOnce(1000)
       .mockReturnValueOnce(1600);
     const store = createAiImageTaskStore({ now, storage: null });
-    await store.configure({ targetPath: 'prototypes/home' });
+    await store.configure({ projectId: 'project-b', targetPath: 'prototypes/home' });
     const seenImageCounts: number[] = [];
     store.subscribe((state) => {
       seenImageCounts.push(state.tasks[0]?.outputImages.length || 0);
@@ -207,14 +207,15 @@ describe('AI image task store', () => {
     });
     expect(store.getImage(task.outputImages[1])?.dataUrl).toBe('data:image/webp;base64,two');
     expect(seenImageCounts).toEqual(expect.arrayContaining([1, 2]));
-    const runCall = fetchMock.mock.calls.find((call) => String(call[0]) === '/api/ai/runs');
+    const runCall = fetchMock.mock.calls.find((call) => String(call[0]) === '/api/ai/runs?projectId=project-b');
     expect(runCall).toBeTruthy();
-    expect(fetchMock).toHaveBeenCalledWith('/api/ai/runs', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai/runs?projectId=project-b', expect.objectContaining({
       method: 'POST',
       body: expect.any(String),
     }));
     const runBody = JSON.parse(String(runCall?.[1]?.body));
     expect(runBody).toMatchObject({
+      projectId: 'project-b',
       scene: 'image',
       ...request,
       taskId: task.id,
@@ -240,7 +241,7 @@ describe('AI image task store', () => {
       });
     });
     const store = createAiImageTaskStore({ storage: null });
-    await store.configure({ targetPath: 'prototypes/home' });
+    await store.configure({ projectId: 'project-b', targetPath: 'prototypes/home' });
     const request: AiImageGenerateRequest = {
       prompt: '批量历史',
       params: {
@@ -262,5 +263,97 @@ describe('AI image task store', () => {
       prompt: '批量历史 31',
       status: 'done',
     });
+  });
+
+  it('reloads a shared target path for a new project and ignores the old project load', async () => {
+    let resolveProjectATasks: ((response: Response) => void) | undefined;
+    const projectATasks = new Promise<Response>((resolve) => {
+      resolveProjectATasks = resolve;
+    });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('projectId=project-a') && url.startsWith('/api/ai/generation-tasks')) {
+        return projectATasks;
+      }
+      if (url.startsWith('/api/ai/generation-tasks')) {
+        return Promise.resolve(new Response(JSON.stringify({
+          tasks: [{
+            id: 'task-b',
+            taskId: 'task-b',
+            prompt: 'Project B',
+            params: {},
+            status: 'error',
+            createdAt: 2,
+            updatedAt: 2,
+            metadata: {},
+          }],
+        }), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ artifacts: [] }), { status: 200 }));
+    });
+    const store = createAiImageTaskStore({ storage: null });
+
+    const projectALoad = store.configure({ projectId: 'project-a', targetPath: 'prototypes/home' });
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/ai/generation-tasks?targetPath=prototypes%2Fhome&projectId=project-a');
+    });
+    await store.configure({ projectId: 'project-b', targetPath: 'prototypes/home' });
+    resolveProjectATasks?.(new Response(JSON.stringify({
+      tasks: [{
+        id: 'task-a',
+        taskId: 'task-a',
+        prompt: 'Project A',
+        params: {},
+        status: 'error',
+        createdAt: 1,
+        updatedAt: 1,
+        metadata: {},
+      }],
+    }), { status: 200 }));
+    await projectALoad;
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai/generation-tasks?targetPath=prototypes%2Fhome&projectId=project-b');
+    expect(store.getTasks()).toEqual([expect.objectContaining({ id: 'task-b' })]);
+  });
+
+  it('does not publish a previous project generation result after switching scope', async () => {
+    let resolveProjectARun: ((response: Response) => void) | undefined;
+    const projectARun = new Promise<Response>((resolve) => {
+      resolveProjectARun = resolve;
+    });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = String(input);
+      if (url === '/api/ai/runs?projectId=project-a') return projectARun;
+      if (url.startsWith('/api/ai/generation-tasks')) {
+        return Promise.resolve(new Response(JSON.stringify({ tasks: [] }), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ artifacts: [] }), { status: 200 }));
+    });
+    const store = createAiImageTaskStore({ storage: null });
+    await store.configure({ projectId: 'project-a', targetPath: 'prototypes/home' });
+
+    const projectATask = store.submit({
+      prompt: 'Project A image',
+      params: {
+        size: '1024x1024',
+        quality: 'high',
+        output_format: 'png',
+        output_compression: null,
+        moderation: 'auto',
+        n: 1,
+      },
+    });
+    await vi.waitFor(() => {
+      const runCall = fetchMock.mock.calls.find(([url]) => String(url) === '/api/ai/runs?projectId=project-a');
+      expect(JSON.parse(String(runCall?.[1]?.body))).toMatchObject({
+        projectId: 'project-a',
+        targetPath: 'prototypes/home',
+      });
+    });
+    await store.configure({ projectId: 'project-b', targetPath: 'prototypes/home' });
+    resolveProjectARun?.(imageRunResponse());
+    await projectATask;
+
+    expect(store.getTasks()).toEqual([]);
   });
 });

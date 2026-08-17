@@ -39,6 +39,11 @@ describe('prototype spec workspace integration', () => {
     expect(indexSource).toContain('handlePrototypeSpecPreviewReady');
     expect(indexSource).toContain("preview.handleEnableDocEdit('comment', { disableSelectionMode: true, preserveSidebar: true })");
     expect(previewReadyHandler).toContain(".endsWith('.md')) return;");
+    expect(indexSource).toContain('const prototypeSpecAnnotationAttemptIdRef = useRef(0);');
+    expect(indexSource).toContain('currentPrototypeSpecItemRef.current = prototypeSpec.currentItem;');
+    expect(previewReadyHandler).toContain('const annotationEnabled = await preview.handleEnableDocEdit');
+    expect(previewReadyHandler).toContain('shouldClosePrototypeSpecAfterAnnotationAttempt({');
+    expect(previewReadyHandler).toContain('prototypeSpec.close();');
     expect(previewReadyHandler).not.toContain('prototypeSpecAnnotationActiveRef.current = true;');
     expect(indexSource).toContain('onPrototypeSpecExit: prototypeSpec.close');
     expect(indexSource).not.toContain('prototypeSpecAnnotationActiveRef');

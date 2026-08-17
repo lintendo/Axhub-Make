@@ -36,6 +36,31 @@ function writePrototypeProject(projectRoot: string): void {
   fs.writeFileSync(path.join(prototypeDir, 'index.tsx'), 'export default function Home() { return null; }\n', 'utf8');
 }
 
+function writeSpecOnlyPrototypeProject(projectRoot: string): void {
+  writeProjectMetadata(projectRoot, {
+    resources: {
+      prototypes: [{
+        id: 'home',
+        name: 'home',
+        title: 'Home',
+        clientUrl: '/prototypes/home',
+        previewDisabled: true,
+        specFilePath: 'src/prototypes/home/.spec/spec.html',
+      }],
+      themes: [],
+    },
+    navigation: { prototypes: ['home'] },
+    orders: { themes: [] },
+    resourceWriteTargets: {
+      prototypes: { type: 'project-relative-path', path: 'src/prototypes' },
+      templates: { type: 'project-relative-path', path: 'src/resources/templates' },
+    },
+  });
+  const specDir = path.join(projectRoot, 'src/prototypes/home/.spec');
+  fs.mkdirSync(specDir, { recursive: true });
+  fs.writeFileSync(path.join(specDir, 'spec.html'), '<!doctype html><html><body><h1>Spec only</h1></body></html>', 'utf8');
+}
+
 async function startActivatedProjectServer(projectRoot: string): Promise<Awaited<ReturnType<typeof startTestServer>>> {
   const server = await startTestServer(projectRoot);
   const projectId = path.basename(projectRoot);
@@ -54,6 +79,96 @@ afterEach(() => {
 });
 
 describe('prototype spec API', () => {
+  it('serves a main HTML spec when the prototype has no runtime entry yet', async () => {
+    const projectRoot = createTempRoot('axhub-make-prototype-spec-');
+    writeSpecOnlyPrototypeProject(projectRoot);
+    const server = await startActivatedProjectServer(projectRoot);
+
+    try {
+      const resourcesResponse = await fetch(`${server.origin}/api/projects/${encodeURIComponent(path.basename(projectRoot))}/resources`);
+      expect(resourcesResponse.status).toBe(200);
+      expect((await resourcesResponse.json()).resources.prototypes).toEqual([
+        expect.objectContaining({
+          id: 'home',
+          specFilePath: 'src/prototypes/home/.spec/spec.html',
+          previewDisabled: true,
+        }),
+      ]);
+
+      const descriptorResponse = await fetch(specUrl(server.origin, projectRoot));
+      expect(descriptorResponse.status).toBe(200);
+      expect(await descriptorResponse.json()).toMatchObject({
+        exists: true,
+        format: 'html',
+        activePath: 'spec.html',
+      });
+
+      const contentResponse = await fetch(specUrl(server.origin, projectRoot, '/content'));
+      expect(contentResponse.status).toBe(200);
+      expect(await contentResponse.text()).toContain('<h1>Spec only</h1>');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('enables runtime preview metadata after index.tsx is added to a spec-only prototype', async () => {
+    const projectRoot = createTempRoot('axhub-make-prototype-spec-');
+    writeSpecOnlyPrototypeProject(projectRoot);
+    const server = await startActivatedProjectServer(projectRoot);
+
+    try {
+      const prototypeDir = path.join(projectRoot, 'src/prototypes/home');
+      fs.writeFileSync(path.join(prototypeDir, 'index.tsx'), 'export default function Home() { return null; }\n', 'utf8');
+
+      const resourcesResponse = await fetch(`${server.origin}/api/projects/${encodeURIComponent(path.basename(projectRoot))}/resources`);
+      expect(resourcesResponse.status).toBe(200);
+      const prototype = (await resourcesResponse.json()).resources.prototypes[0];
+      expect(prototype).toMatchObject({
+        id: 'home',
+        filePath: 'src/prototypes/home/index.tsx',
+        absoluteFilePath: path.join(prototypeDir, 'index.tsx'),
+        specFilePath: 'src/prototypes/home/.spec/spec.html',
+      });
+      expect(prototype).not.toHaveProperty('previewDisabled');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('keeps the spec review available after a runtime entry is removed', async () => {
+    const projectRoot = createTempRoot('axhub-make-prototype-spec-');
+    writePrototypeProject(projectRoot);
+    const prototypeDir = path.join(projectRoot, 'src/prototypes/home');
+    const specDir = path.join(prototypeDir, '.spec');
+    fs.mkdirSync(specDir, { recursive: true });
+    fs.writeFileSync(path.join(specDir, 'spec.html'), '<h1>Spec after runtime</h1>', 'utf8');
+    const server = await startActivatedProjectServer(projectRoot);
+
+    try {
+      fs.rmSync(path.join(prototypeDir, 'index.tsx'));
+
+      const resourcesResponse = await fetch(`${server.origin}/api/projects/${encodeURIComponent(path.basename(projectRoot))}/resources`);
+      expect(resourcesResponse.status).toBe(200);
+      const prototype = (await resourcesResponse.json()).resources.prototypes[0];
+      expect(prototype).toMatchObject({
+        id: 'home',
+        previewDisabled: true,
+        specFilePath: 'src/prototypes/home/.spec/spec.html',
+      });
+      expect(prototype).not.toHaveProperty('filePath');
+      expect(prototype).not.toHaveProperty('absoluteFilePath');
+
+      const descriptorResponse = await fetch(specUrl(server.origin, projectRoot));
+      expect(descriptorResponse.status).toBe(200);
+      expect(await descriptorResponse.json()).toMatchObject({
+        exists: true,
+        activePath: 'spec.html',
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it('reports a missing main spec without exposing an absolute path', async () => {
     const projectRoot = createTempRoot('axhub-make-prototype-spec-');
     writePrototypeProject(projectRoot);

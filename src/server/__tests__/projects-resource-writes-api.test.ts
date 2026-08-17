@@ -11,6 +11,7 @@ import {
   cleanupProjectApiTestRoots,
   createTempRoot,
   registerProject,
+  scopeProjectApiUrl,
   startTestServer,
   writeJson,
   writeProjectMetadata,
@@ -65,7 +66,7 @@ describe('make-server project declared resource write APIs', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const docCreate = await fetch(`${server.origin}/api/docs/manual-create`, {
+      const docCreate = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/manual-create`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: 'Manual Doc' }),
@@ -73,7 +74,7 @@ describe('make-server project declared resource write APIs', () => {
       expect(docCreate).toMatchObject({ status: 404, body: { error: 'Not found' } });
       expect(fs.existsSync(path.join(projectRoot, 'content/docs/manual-doc.md'))).toBe(false);
 
-      const templateCopy = await fetch(`${server.origin}/api/docs/templates/base.md/copy`, {
+      const templateCopy = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/templates/base.md/copy`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: 'Base Copy' }),
@@ -88,7 +89,7 @@ describe('make-server project declared resource write APIs', () => {
       });
       expect(fs.readFileSync(path.join(templateDir, 'base-copy.md'), 'utf8')).toBe('# Base\n');
 
-      const tableCreate = await fetch(`${server.origin}/api/data/tables`, {
+      const tableCreate = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/data/tables`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tableName: 'Customers' }),
@@ -107,7 +108,7 @@ describe('make-server project declared resource write APIs', () => {
         records: [],
       });
 
-      const themeCreate = await fetch(`${server.origin}/api/themes`, {
+      const themeCreate = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'Brand Theme', displayName: 'Brand Theme', design: '# Brand\n' }),
@@ -274,7 +275,7 @@ describe('make-server project declared resource write APIs', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const docCreate = await fetch(`${server.origin}/api/docs`, {
+      const docCreate = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: 'API Doc', content: '# API Doc\nBody\n' }),
@@ -282,7 +283,7 @@ describe('make-server project declared resource write APIs', () => {
       expect(docCreate).toMatchObject({ status: 404, body: { error: 'Not found' } });
       expect(fs.existsSync(path.join(projectRoot, 'content/docs/api-doc.md'))).toBe(false);
 
-      const templateCreate = await fetch(`${server.origin}/api/docs/templates`, {
+      const templateCreate = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/templates`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: 'API Template', content: '# Template\n' }),
@@ -300,7 +301,7 @@ describe('make-server project declared resource write APIs', () => {
       const formData = new FormData();
       formData.append('path', 'icons');
       formData.append('file', new File(['<svg />'], 'logo.svg', { type: 'image/svg+xml' }));
-      const mediaUpload = await fetch(`${server.origin}/api/media/upload`, {
+      const mediaUpload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/media/upload`), {
         method: 'POST',
         body: formData,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -315,7 +316,7 @@ describe('make-server project declared resource write APIs', () => {
       });
       expect(fs.readFileSync(path.join(projectRoot, 'public/media/icons/logo.svg'), 'utf8')).toBe('<svg />');
 
-      const docsUpload = await fetch(`${server.origin}/api/upload-docs`, {
+      const docsUpload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload-docs`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -327,7 +328,7 @@ describe('make-server project declared resource write APIs', () => {
       expect(docsUpload).toMatchObject({ status: 404, body: { error: 'Not found' } });
       expect(fs.existsSync(path.join(projectRoot, 'content/docs/uploaded-guide.md'))).toBe(false);
 
-      const mediaList = await fetch(`${server.origin}/api/media?path=${encodeURIComponent('icons')}`).then((response) => response.json());
+      const mediaList = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/media?path=${encodeURIComponent('icons')}`)).then((response) => response.json());
       expect(mediaList).toEqual([
         expect.objectContaining({
           name: 'logo.svg',
@@ -335,14 +336,14 @@ describe('make-server project declared resource write APIs', () => {
           type: 'image',
         }),
       ]);
-      const mediaFile = await fetch(`${server.origin}/api/media/file/icons/logo.svg`);
+      const mediaFile = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/media/file/icons/logo.svg`));
       expect(mediaFile.status).toBe(200);
       expect(await mediaFile.text()).toBe('<svg />');
 
       const unsafeFormData = new FormData();
       unsafeFormData.append('path', '../outside');
       unsafeFormData.append('file', new File(['x'], 'escape.svg', { type: 'image/svg+xml' }));
-      const unsafeUpload = await fetch(`${server.origin}/api/media/upload`, {
+      const unsafeUpload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/media/upload`), {
         method: 'POST',
         body: unsafeFormData,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -377,7 +378,7 @@ describe('make-server project declared resource write APIs', () => {
       const formData = new FormData();
       formData.append('file', new File(['# 中文标题\n正文\n'], '中文资源.md', { type: 'text/markdown' }));
 
-      const upload = await fetch(`${server.origin}/api/docs/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/upload`), {
         method: 'POST',
         body: formData,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -433,7 +434,7 @@ describe('make-server project declared resource write APIs', () => {
       formData.append('file', new File(['first'], 'pasted-image.png', { type: 'image/png' }));
       formData.append('file', new File(['second'], 'hero.webp', { type: 'image/webp' }));
 
-      const upload = await fetch(`${server.origin}/api/docs/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/upload`), {
         method: 'POST',
         body: formData,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -462,7 +463,7 @@ describe('make-server project declared resource write APIs', () => {
       expect(fs.readFileSync(path.join(docsDir, 'assets/screens/hero.webp'), 'utf8')).toBe('second');
       expect(fs.existsSync(path.join(docsDir, 'pasted-image-2.png'))).toBe(false);
 
-      const docsList = await fetch(`${server.origin}/api/docs?projectId=nested-upload-client`)
+      const docsList = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs?projectId=nested-upload-client`))
         .then((response) => response.json());
       expect(docsList).toEqual(expect.arrayContaining([
         expect.objectContaining({
@@ -477,7 +478,7 @@ describe('make-server project declared resource write APIs', () => {
         }),
       ]));
 
-      const rename = await fetch(`${server.origin}/api/docs/${encodeURIComponent('assets/screens/hero.webp')}?projectId=nested-upload-client`, {
+      const rename = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/${encodeURIComponent('assets/screens/hero.webp')}?projectId=nested-upload-client`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newBaseName: 'renamed-hero' }),
@@ -529,7 +530,7 @@ describe('make-server project declared resource write APIs', () => {
         formData.append('targetFolder', targetFolder);
         formData.append('file', new File(['x'], 'escape.png', { type: 'image/png' }));
 
-        const upload = await fetch(`${server.origin}/api/docs/upload`, {
+        const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/upload`), {
           method: 'POST',
           body: formData,
         }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -594,7 +595,7 @@ describe('make-server project declared resource write APIs', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const docCopy = await fetch(`${server.origin}/api/docs/base.md/copy`, {
+      const docCopy = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/base.md/copy`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: 'Base Copy' }),
@@ -604,7 +605,7 @@ describe('make-server project declared resource write APIs', () => {
         body: { success: true, name: 'base-copy.md' },
       });
 
-      const docRename = await fetch(`${server.origin}/api/docs/base.md`, {
+      const docRename = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/base.md`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newBaseName: 'Renamed Doc' }),
@@ -612,7 +613,7 @@ describe('make-server project declared resource write APIs', () => {
       expect(docRename.status).toBe(200);
       expect(docRename.body.name).toBe('Renamed-Doc.md');
 
-      const templateRename = await fetch(`${server.origin}/api/docs/templates/base.md`, {
+      const templateRename = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/templates/base.md`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newBaseName: 'Template Renamed' }),
@@ -620,7 +621,7 @@ describe('make-server project declared resource write APIs', () => {
       expect(templateRename.status).toBe(200);
       expect(templateRename.body.name).toBe('Template-Renamed.md');
 
-      const dataRename = await fetch(`${server.origin}/api/data/tables/orders`, {
+      const dataRename = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/data/tables/orders`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName: 'customers', tableName: 'Customers' }),
@@ -630,7 +631,7 @@ describe('make-server project declared resource write APIs', () => {
         body: { success: true, fileName: 'customers', previousFileName: 'orders' },
       });
 
-      const themeRename = await fetch(`${server.origin}/api/themes/brand`, {
+      const themeRename = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes/brand`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'brand-new', displayName: 'Brand New' }),
@@ -640,13 +641,13 @@ describe('make-server project declared resource write APIs', () => {
         body: { success: true, name: 'brand-new', previousName: 'brand' },
       });
 
-      const templateDelete = await fetch(`${server.origin}/api/docs/templates/Template-Renamed.md`, { method: 'DELETE' });
+      const templateDelete = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/templates/Template-Renamed.md`), { method: 'DELETE' });
       expect(templateDelete.status).toBe(200);
-      const dataDelete = await fetch(`${server.origin}/api/data/tables/customers`, { method: 'DELETE' });
+      const dataDelete = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/data/tables/customers`), { method: 'DELETE' });
       expect(dataDelete.status).toBe(200);
-      const themeDelete = await fetch(`${server.origin}/api/themes/brand-new`, { method: 'DELETE' });
+      const themeDelete = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/themes/brand-new`), { method: 'DELETE' });
       expect(themeDelete.status).toBe(200);
-      const docDelete = await fetch(`${server.origin}/api/docs/Renamed-Doc.md`, { method: 'DELETE' });
+      const docDelete = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs/Renamed-Doc.md`), { method: 'DELETE' });
       expect(docDelete.status).toBe(200);
 
       const metadata = JSON.parse(fs.readFileSync(getProjectMetadataPath(projectRoot), 'utf8'));

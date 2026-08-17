@@ -425,68 +425,40 @@ const SHADOW_HOST_STYLES = /* css */ `
     z-index: 9996;
   }
 
-  @keyframes we-change-marker-task-pulse {
-    0% {
-      opacity: 0.9;
-      transform: scale(0.92);
-      box-shadow: 0 0 0 0 rgba(0, 143, 93, 0.2);
-    }
-    62% {
-      opacity: 0.28;
-      transform: scale(1.22);
-      box-shadow: 0 0 0 7px rgba(0, 143, 93, 0);
-    }
-    100% {
-      opacity: 0;
-      transform: scale(1.28);
-      box-shadow: 0 0 0 8px rgba(0, 143, 93, 0);
-    }
-  }
-
-  @keyframes we-change-marker-task-sweep {
-    0% {
-      background-position: -34px 0;
-      opacity: 0;
-    }
-    18% {
-      opacity: 0.72;
-    }
-    72% {
-      opacity: 0.5;
-    }
-    100% {
-      background-position: 34px 0;
-      opacity: 0;
+  @keyframes we-change-marker-task-spin {
+    to {
+      transform: rotate(360deg);
     }
   }
 
   .we-change-marker {
     position: fixed;
     transform: translate(-50%, -50%);
-    width: 22px;
-    height: 22px;
+    width: 26px;
+    height: 26px;
     border-radius: 999px;
-    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+    background: #1C2736;
     color: #ffffff;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     line-height: 1;
     letter-spacing: 0;
     box-shadow:
-      0 8px 18px rgba(15, 23, 42, 0.22),
-      0 0 0 2px rgba(255, 255, 255, 0.95);
+      0 5px 12px rgba(22, 30, 42, 0.2),
+      0 0 0 2px #FFFFFF;
     pointer-events: auto;
     cursor: pointer;
     transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
     isolation: isolate;
-    --we-change-marker-task-accent: #008F5D;
+    --we-change-marker-task-accent: #778290;
+    --we-change-marker-task-ring: rgba(119, 130, 144, 0.5);
+    --we-change-marker-task-ring-hover: rgba(119, 130, 144, 0.58);
   }
 
-  .we-change-marker::before,
-  .we-change-marker::after {
+  .we-change-marker::before {
     content: "";
     position: absolute;
     border-radius: inherit;
@@ -494,23 +466,21 @@ const SHADOW_HOST_STYLES = /* css */ `
     opacity: 0;
   }
 
-  .we-change-marker::before {
-    inset: -5px;
-    z-index: -1;
-  }
-
   .we-change-marker::after {
-    inset: 2px;
+    content: "";
+    position: absolute;
     z-index: 1;
+    inset: -8px;
+    border-radius: inherit;
   }
 
   .we-change-marker:hover,
   .we-change-marker:focus-visible {
-    transform: translate(-50%, -50%) scale(1.06);
+    transform: translate(-50%, -50%);
     box-shadow:
-      0 10px 22px rgba(15, 23, 42, 0.28),
-      0 0 0 2px rgba(255, 255, 255, 0.95),
-      0 0 0 5px rgba(0, 143, 93, 0.18);
+      0 7px 16px rgba(22, 30, 42, 0.24),
+      0 0 0 2px #FFFFFF,
+      0 0 0 5px var(--we-change-marker-task-ring-hover);
     outline: none;
   }
 
@@ -520,72 +490,62 @@ const SHADOW_HOST_STYLES = /* css */ `
 
   .we-change-marker--annotation-note:hover,
   .we-change-marker--annotation-note:focus-visible {
-    transform: translate(8px, -50%) scale(1.03);
+    transform: translate(8px, -50%);
   }
 
   .we-change-marker--task-editing {
-    --we-change-marker-task-accent: #008F5D;
+    --we-change-marker-task-accent: #14815F;
+    --we-change-marker-task-ring: rgba(20, 129, 95, 0.5);
+    --we-change-marker-task-ring-hover: rgba(20, 129, 95, 0.58);
     cursor: progress;
     box-shadow:
-      0 8px 18px rgba(15, 23, 42, 0.22),
-      0 0 0 2px rgba(255, 255, 255, 0.95),
-      0 0 0 5px rgba(0, 143, 93, 0.2),
-      0 0 18px rgba(0, 143, 93, 0.28);
+      0 5px 12px rgba(22, 30, 42, 0.2),
+      0 0 0 2px #FFFFFF;
   }
 
   .we-change-marker--task-editing::before {
+    inset: -6px;
+    z-index: -1;
     opacity: 1;
-    border: 1px solid rgba(0, 143, 93, 0.72);
-    animation: we-change-marker-task-pulse 1.65s ease-out infinite;
-  }
-
-  .we-change-marker--task-editing::after {
-    background:
-      linear-gradient(
-        115deg,
-        transparent 0%,
-        transparent 39%,
-        rgba(255, 255, 255, 0.18) 47%,
-        rgba(0, 214, 143, 0.24) 51%,
-        transparent 62%,
-        transparent 100%
-      );
-    background-size: 42px 42px;
-    animation: we-change-marker-task-sweep 1.8s linear infinite;
+    background: conic-gradient(
+      from 10deg,
+      transparent 0 42%,
+      #14815F 44% 76%,
+      transparent 78%
+    );
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
+    mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
+    animation: we-change-marker-task-spin 1.4s linear infinite;
   }
 
   .we-change-marker--task-error {
-    --we-change-marker-task-accent: #EF4444;
+    --we-change-marker-task-accent: #D04444;
+    --we-change-marker-task-ring: rgba(208, 68, 68, 0.5);
+    --we-change-marker-task-ring-hover: rgba(208, 68, 68, 0.58);
     box-shadow:
-      0 8px 18px rgba(15, 23, 42, 0.22),
-      0 0 0 2px rgba(239, 68, 68, 0.9),
-      0 0 0 5px rgba(239, 68, 68, 0.16),
-      0 0 18px rgba(239, 68, 68, 0.2);
+      0 5px 12px rgba(22, 30, 42, 0.2),
+      0 0 0 2px #FFFFFF,
+      0 0 0 4px var(--we-change-marker-task-ring);
   }
 
-  .we-change-marker--task-error::before {
-    inset: -4px;
-    opacity: 1;
-    border: 1px solid rgba(239, 68, 68, 0.68);
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  .we-change-marker--task-idle {
+    --we-change-marker-task-accent: #7A8592;
+    --we-change-marker-task-ring: rgba(122, 133, 146, 0.5);
+    --we-change-marker-task-ring-hover: rgba(122, 133, 146, 0.58);
+    box-shadow:
+      0 5px 12px rgba(22, 30, 42, 0.2),
+      0 0 0 2px #FFFFFF,
+      0 0 0 4px var(--we-change-marker-task-ring);
   }
 
-  .we-change-marker--task-editing:hover,
-  .we-change-marker--task-editing:focus-visible {
+  .we-change-marker--task-completed {
+    --we-change-marker-task-accent: #248A58;
+    --we-change-marker-task-ring: rgba(36, 138, 88, 0.5);
+    --we-change-marker-task-ring-hover: rgba(36, 138, 88, 0.58);
     box-shadow:
-      0 10px 22px rgba(15, 23, 42, 0.28),
-      0 0 0 2px rgba(255, 255, 255, 0.95),
-      0 0 0 5px rgba(0, 143, 93, 0.26),
-      0 0 20px rgba(0, 143, 93, 0.34);
-  }
-
-  .we-change-marker--task-error:hover,
-  .we-change-marker--task-error:focus-visible {
-    box-shadow:
-      0 10px 22px rgba(15, 23, 42, 0.28),
-      0 0 0 2px rgba(239, 68, 68, 0.94),
-      0 0 0 6px rgba(239, 68, 68, 0.2),
-      0 0 22px rgba(239, 68, 68, 0.24);
+      0 5px 12px rgba(22, 30, 42, 0.2),
+      0 0 0 2px #FFFFFF,
+      0 0 0 4px var(--we-change-marker-task-ring);
   }
 
   .we-change-marker__body {
@@ -597,6 +557,37 @@ const SHADOW_HOST_STYLES = /* css */ `
     white-space: nowrap;
     position: relative;
     z-index: 2;
+  }
+
+  .we-change-marker__task-status {
+    position: absolute;
+    z-index: 3;
+    right: -5px;
+    bottom: -5px;
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid #FFFFFF;
+    background: var(--we-change-marker-task-accent);
+    color: #FFFFFF;
+    font-size: 8px;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 2px 4px rgba(20, 28, 38, 0.2);
+  }
+
+  .we-change-marker--task-completed .we-change-marker__task-status,
+  .we-change-marker--task-error .we-change-marker__task-status {
+    display: inline-flex;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .we-change-marker--task-editing::before {
+      animation: none;
+    }
   }
 
   .we-change-marker__tooltip {
@@ -702,6 +693,10 @@ export function mountShadowHost(_options: ShadowHostOptions = {}): ShadowHostMan
   // Create host element
   const host = document.createElement('div');
   host.id = WEB_EDITOR_V2_HOST_ID;
+  // Figma's fullscreen canvas retargets events crossing the Shadow DOM boundary
+  // to this host. Mark it like Figma's own draggable controls so the canvas does
+  // not claim pointermove after a drag starts inside the commentary UI.
+  host.classList.add('data-fullscreen-prevent-event-capture');
   host.setAttribute('data-mcp-web-editor', 'v2');
 
   // Apply host styles with !important to resist page CSS

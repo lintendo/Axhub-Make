@@ -33,7 +33,7 @@ describe('generation artifact history store', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const store = createGenerationArtifactHistoryStore();
-    await store.configure({ targetPath: 'prototypes/home' });
+    await store.configure({ projectId: 'project-b', targetPath: 'prototypes/home' });
     await store.upsertArtifactAndPersist({
       id: 'new',
       kind: 'document',
@@ -80,7 +80,7 @@ describe('generation artifact history store', () => {
       createdAt: 2,
     });
     expect(lastBody.artifact.prompt).toBeUndefined();
-    expect(writeCalls[1][0]).toBe('/api/ai/artifact-history?targetPath=prototypes%2Fhome');
+    expect(writeCalls[1][0]).toBe('/api/ai/artifact-history?targetPath=prototypes%2Fhome&projectId=project-b');
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false);
   });
 
@@ -110,12 +110,12 @@ describe('generation artifact history store', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const store = createGenerationArtifactHistoryStore();
-    await store.configure({ targetPath: 'prototypes/home' });
+    await store.configure({ projectId: 'project-b', targetPath: 'prototypes/home' });
     await store.deleteArtifact('old');
 
     const deleteCalls = fetchMock.mock.calls.filter(([, init]) => init?.method === 'DELETE');
     expect(deleteCalls).toHaveLength(1);
-    expect(deleteCalls[0][0]).toBe('/api/ai/artifact-history?targetPath=prototypes%2Fhome');
+    expect(deleteCalls[0][0]).toBe('/api/ai/artifact-history?targetPath=prototypes%2Fhome&projectId=project-b');
     expect(JSON.parse(String(deleteCalls[0][1]?.body))).toEqual({ id: 'old' });
     expect(store.getState().artifacts).toEqual([]);
   });
@@ -130,7 +130,7 @@ describe('generation artifact history store', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const store = createGenerationArtifactHistoryStore();
-    await store.configure({ targetPath: 'src/resources/flows/home.excalidraw' });
+    await store.configure({ projectId: 'project-b', targetPath: 'src/resources/flows/home.excalidraw' });
     await store.upsertArtifactAndPersist({
       id: 'resource-canvas-artifact',
       kind: 'document',
@@ -144,8 +144,8 @@ describe('generation artifact history store', () => {
       metadata: {},
     }, { status: 'done' });
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/ai/artifact-history?targetPath=src%2Fresources%2Fflows%2Fhome.excalidraw');
-    expect(fetchMock).toHaveBeenCalledWith('/api/ai/artifact-history?targetPath=src%2Fresources%2Fflows%2Fhome.excalidraw', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai/artifact-history?targetPath=src%2Fresources%2Fflows%2Fhome.excalidraw&projectId=project-b');
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai/artifact-history?targetPath=src%2Fresources%2Fflows%2Fhome.excalidraw&projectId=project-b', expect.objectContaining({
       method: 'POST',
     }));
   });
@@ -160,7 +160,7 @@ describe('generation artifact history store', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const store = createGenerationArtifactHistoryStore();
-    await store.configure({ targetPath: 'prototypes/canvas-regression' });
+    await store.configure({ projectId: 'project-b', targetPath: 'prototypes/canvas-regression' });
 
     for (const artifact of [
       { id: 'artifact-image', kind: 'image', title: '图片产物', target: { path: 'src/resources/image.png' } },
@@ -190,5 +190,83 @@ describe('generation artifact history store', () => {
       ['Drawio 产物'],
     ]);
     expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(4);
+  });
+
+  it('reloads the same target path when project changes and ignores the previous project response', async () => {
+    let resolveProjectA: ((response: Response) => void) | undefined;
+    const projectAResponse = new Promise<Response>((resolve) => {
+      resolveProjectA = resolve;
+    });
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes('projectId=project-a')) return projectAResponse;
+      return Promise.resolve(new Response(JSON.stringify({
+        artifacts: [{
+          id: 'artifact-b',
+          kind: 'document',
+          operation: 'created',
+          title: 'Project B',
+          source: {},
+          target: {},
+          createdAt: 2,
+          updatedAt: 2,
+          status: 'done',
+          metadata: {},
+        }],
+      }), { status: 200 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const store = createGenerationArtifactHistoryStore();
+    const projectALoad = store.configure({ projectId: 'project-a', targetPath: 'prototypes/home' });
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/ai/artifact-history?targetPath=prototypes%2Fhome&projectId=project-a');
+    });
+    await store.configure({ projectId: 'project-b', targetPath: 'prototypes/home' });
+    resolveProjectA?.(new Response(JSON.stringify({
+      artifacts: [{
+        id: 'artifact-a',
+        kind: 'document',
+        operation: 'created',
+        title: 'Project A',
+        source: {},
+        target: {},
+        createdAt: 1,
+        updatedAt: 1,
+        status: 'done',
+        metadata: {},
+      }],
+    }), { status: 200 }));
+    await projectALoad;
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai/artifact-history?targetPath=prototypes%2Fhome&projectId=project-b');
+    expect(store.getState()).toMatchObject({
+      projectId: 'project-b',
+      targetPath: 'prototypes/home',
+      artifacts: [expect.objectContaining({ id: 'artifact-b' })],
+    });
+  });
+
+  it('ignores streamed artifacts from a different project scope', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ artifacts: [] }), { status: 200 })));
+    const store = createGenerationArtifactHistoryStore();
+    await store.configure({ projectId: 'project-b', targetPath: 'prototypes/home' });
+
+    store.upsertArtifact({
+      id: 'artifact-a',
+      kind: 'document',
+      operation: 'created',
+      title: 'Project A',
+      source: {},
+      target: {},
+      createdAt: 1,
+      updatedAt: 1,
+      status: 'done',
+      metadata: {},
+    }, {
+      status: 'done',
+      scope: { projectId: 'project-a', targetPath: 'prototypes/home' },
+    });
+
+    expect(store.getState().artifacts).toEqual([]);
   });
 });

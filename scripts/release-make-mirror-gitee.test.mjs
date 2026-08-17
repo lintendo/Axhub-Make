@@ -101,7 +101,7 @@ describe('gitee make release mirror helper', () => {
     );
   });
 
-  it('creates the Gitee release, uploads the template zip and latest manifest, and verifies mirror URLs', async () => {
+  it('creates the versioned release and replaces an existing latest manifest', async () => {
     const token = 'test-token';
     const logs = [];
     const { manifestPath } = createFixture();
@@ -111,7 +111,7 @@ describe('gitee make release mirror helper', () => {
           return new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 });
         }
         if (url.includes('/releases/tags/make-client-template-latest')) {
-          return new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 });
+          return new Response(JSON.stringify({ id: 43, tag_name: 'make-client-template-latest' }), { status: 200 });
         }
         return null;
       },
@@ -119,13 +119,13 @@ describe('gitee make release mirror helper', () => {
         if (url.endsWith('/api/v5/repos/axhub/Axhub-Make/releases') && init.method === 'POST') {
           assert.equal(init.body.get('access_token'), token);
           const tagName = init.body.get('tag_name');
-          assert(['make-client-template-v1.2.3-beta.4', 'make-client-template-latest'].includes(tagName));
+          assert.equal(tagName, 'make-client-template-v1.2.3-beta.4');
           assert.equal(init.body.get('name'), 'Axhub Make Client Template 1.2.3-beta.4');
           assert.equal(init.body.get('body'), 'Axhub Make client template 1.2.3-beta.4 mirror release.');
           assert.equal(init.body.get('prerelease'), 'true');
           assert.equal(init.body.get('target_commitish'), 'main');
           return new Response(JSON.stringify({
-            id: tagName === 'make-client-template-latest' ? 43 : 42,
+            id: 42,
             tag_name: tagName,
           }), { status: 201 });
         }
@@ -136,7 +136,15 @@ describe('gitee make release mirror helper', () => {
           return new Response(JSON.stringify([]), { status: 200 });
         }
         if (url.includes('/releases/43/attach_files') && !url.includes('/download')) {
-          return new Response(JSON.stringify([]), { status: 200 });
+          return new Response(JSON.stringify([
+            { id: 8, name: 'axhub-make-client-template.latest.json' },
+          ]), { status: 200 });
+        }
+        return null;
+      },
+      (url, init) => {
+        if (url.endsWith('/api/v5/repos/axhub/Axhub-Make/releases/43/attach_files/8') && init.method === 'DELETE') {
+          return new Response(null, { status: 204 });
         }
         return null;
       },
@@ -177,6 +185,7 @@ describe('gitee make release mirror helper', () => {
     assert.equal(result.verified, true);
     assert.equal(result.latestManifest.uploaded, true);
     assert.equal(result.latestManifest.verified, true);
+    assert.equal(fetchImpl.calls.some((call) => call.init.method === 'DELETE'), true);
     assert.equal(logs.join('\n').includes(token), false);
   });
 

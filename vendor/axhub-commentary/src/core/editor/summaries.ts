@@ -3,12 +3,14 @@ import type {
   CommentaryCopyPromptContext,
   CommentaryHostResource,
   CommentaryModifiedElementSummary,
+  CommentarySkillOption,
   CommentaryStyleChangeSet,
   CommentaryTargetedTextChange,
   CommentaryTextChange,
   PrototypeEditCommentEntry,
   PrototypeEditCommentImageEntry,
   PrototypeEditCommentsDocument,
+  PrototypeEditCommentsPersistenceScope,
   Transaction,
 } from '../../web-editor-types';
 import { aggregateTransactionsByElement } from '../transaction-aggregator';
@@ -51,6 +53,7 @@ type SaveRunCommentMeta = {
   actions: string[];
   imageCount: number;
   imageAssetPaths: string[];
+  targetScreenshotAssetPath: string;
   dirtySince: number;
 };
 
@@ -63,6 +66,7 @@ type CopyPromptPersistedCommentMeta = {
   skillIds?: string[];
   actions: string[];
   imageAssetPaths: string[];
+  targetScreenshotAssetPath: string;
 };
 
 type ElementSnapshot = {
@@ -103,21 +107,26 @@ const ANNOTATION_PROTO_DEV_KEY = '__AXHUB_PROTO_DEV__';
 const ANNOTATION_TEXT_MAX_LENGTH = 280;
 
 function normalizeNote(value: string): string {
-  return String(value ?? '').replace(/\r\n/g, '\n').trim();
+  return String(value ?? '')
+    .replace(/\r\n/g, '\n')
+    .trim();
 }
 
 function buildPromptNoteWithSkills(
   note: string,
   payload: { skillIds?: readonly unknown[] | null } | null | undefined,
+  skillOptions: readonly CommentarySkillOption[] = [],
 ): string {
   return mergePromptCardSkillsIntoPromptNote(
     normalizeNote(note),
-    deserializePromptCardSkillSelection(payload),
+    deserializePromptCardSkillSelection(payload, undefined, skillOptions),
   );
 }
 
 function normalizeInlineText(value: unknown): string {
-  return String(value ?? '').replace(/\s+/g, ' ').trim();
+  return String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function normalizePathValue(value: unknown): string {
@@ -151,7 +160,9 @@ function sanitizeAssetBaseName(value: unknown, fallback: string): string {
 }
 
 function inferPromptImageAssetPath(
-  image: Pick<PromptImageAttachment, 'id' | 'name' | 'mimeType'> & { assetPath?: string },
+  image: Pick<PromptImageAttachment, 'id' | 'name' | 'mimeType'> & {
+    assetPath?: string;
+  },
   index: number,
 ): string {
   const assetPath = normalizePathValue(image.assetPath).replace(/\\/g, '/').replace(/^\/+/u, '');
@@ -163,35 +174,93 @@ function inferPromptImageAssetPath(
 }
 
 function collectPromptImageAssetPaths(
-  images: readonly (Pick<PromptImageAttachment, 'id' | 'name' | 'mimeType'> & { assetPath?: string })[] | null | undefined,
+  images:
+    | readonly (Pick<PromptImageAttachment, 'id' | 'name' | 'mimeType' | 'source'> & {
+        assetPath?: string;
+      })[]
+    | null
+    | undefined,
 ): string[] {
-  return dedupeStrings((images ?? []).map((image, index) => inferPromptImageAssetPath(image, index)));
+  return dedupeStrings(
+    (images ?? [])
+      .filter((image) => image.source !== 'target-screenshot')
+      .map((image, index) => inferPromptImageAssetPath(image, index)),
+  );
+}
+
+function collectPromptTargetScreenshotAssetPath(
+  images:
+    | readonly (Pick<PromptImageAttachment, 'id' | 'name' | 'mimeType' | 'source'> & {
+        assetPath?: string;
+      })[]
+    | null
+    | undefined,
+): string {
+  const entries = images ?? [];
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const image = entries[index];
+    if (image.source === 'target-screenshot') {
+      return inferPromptImageAssetPath(image, 0);
+    }
+  }
+  return '';
 }
 
 function collectPersistedImageAssetPathsForComment(
   images: readonly PrototypeEditCommentImageEntry[],
-  comment: Pick<PrototypeEditCommentEntry, 'elementKey' | 'pageScope'>,
+  comment: Pick<PrototypeEditCommentEntry, 'id' | 'pageScope'>,
 ): string[] {
-  const elementKey = normalizePathValue(comment.elementKey);
+  const commentId = normalizePathValue(comment.id);
   const pageScope = normalizePathValue(comment.pageScope);
-  if (!elementKey) return [];
+  if (!commentId) return [];
 
   return dedupeStrings(
     images
       .filter((image) => {
-        if (normalizePathValue(image.elementKey) !== elementKey) return false;
+        if (normalizePathValue(image.commentId) !== commentId) return false;
+        if (image.source === 'target-screenshot') return false;
         const imagePageScope = normalizePathValue(image.pageScope);
         return !pageScope || !imagePageScope || imagePageScope === pageScope;
       })
-      .map((image, index) => (
-        normalizePathValue(image.assetPath)
-        || inferPromptImageAssetPath({
-          id: normalizePathValue(image.id),
-          name: normalizePathValue(image.name),
-          mimeType: normalizePathValue(image.mimeType),
-        }, index)
-      )),
+      .map(
+        (image, index) =>
+          normalizePathValue(image.assetPath) ||
+          inferPromptImageAssetPath(
+            {
+              id: normalizePathValue(image.id),
+              name: normalizePathValue(image.name),
+              mimeType: normalizePathValue(image.mimeType),
+            },
+            index,
+          ),
+      ),
   );
+}
+
+function collectPersistedTargetScreenshotAssetPathForComment(
+  images: readonly PrototypeEditCommentImageEntry[],
+  comment: Pick<PrototypeEditCommentEntry, 'id' | 'pageScope'>,
+): string {
+  const commentId = normalizePathValue(comment.id);
+  const pageScope = normalizePathValue(comment.pageScope);
+  if (!commentId) return '';
+  let target: PrototypeEditCommentImageEntry | undefined;
+  for (let index = images.length - 1; index >= 0; index -= 1) {
+    const image = images[index];
+    if (image.source !== 'target-screenshot') continue;
+    if (normalizePathValue(image.commentId) !== commentId) continue;
+    const imagePageScope = normalizePathValue(image.pageScope);
+    if (!pageScope || !imagePageScope || imagePageScope === pageScope) {
+      target = image;
+      break;
+    }
+  }
+  if (!target) return '';
+  return normalizePathValue(target.assetPath) || inferPromptImageAssetPath({
+    id: normalizePathValue(target.id),
+    name: normalizePathValue(target.name),
+    mimeType: normalizePathValue(target.mimeType),
+  }, 0);
 }
 
 function readElementAttr(element: Element | null, attr: string): string {
@@ -255,9 +324,8 @@ function formatAnnotationControl(
 ): string {
   const attributeId = normalizePathValue(control.attributeId);
   const displayName = normalizeInlineText(control.displayName) || attributeId || '控件';
-  const label = attributeId && attributeId !== displayName
-    ? `${displayName}(${attributeId})`
-    : displayName;
+  const label =
+    attributeId && attributeId !== displayName ? `${displayName}(${attributeId})` : displayName;
   const details: string[] = [];
 
   const initialValue = formatAnnotationControlValue(control.initialValue);
@@ -296,7 +364,7 @@ function readAnnotationSourceNode(nodeId: string): AnnotationPromptNode | null {
   if (!nodeId) return null;
 
   const matched = readAnnotationSourceNodes().find((node) => node.id === nodeId);
-  return matched?.raw && isPlainObject(matched.raw) ? matched.raw as AnnotationPromptNode : null;
+  return matched?.raw && isPlainObject(matched.raw) ? (matched.raw as AnnotationPromptNode) : null;
 }
 
 function readAnnotationProtoDevState(): Record<string, unknown> | null {
@@ -446,10 +514,7 @@ function resolvePromptContext(
   projectPath: string | undefined,
 ): ResolvedPromptContext {
   return {
-    workspacePaths: dedupeStrings([
-      projectPath ?? '',
-      ...(promptContext?.workspacePaths ?? []),
-    ]),
+    workspacePaths: dedupeStrings([projectPath ?? '', ...(promptContext?.workspacePaths ?? [])]),
     relatedFiles: dedupeStrings(promptContext?.relatedFiles ?? []),
     extraContext: dedupeStrings(promptContext?.extraContext ?? []),
   };
@@ -468,14 +533,20 @@ export function createEditorSummariesService(options: {
   promptContext?: WebEditorV2PromptContextOptions;
   projectPath?: string;
   getResourceContext?: () => CommentaryHostResource | null;
+  getPersistenceScope?: () => PrototypeEditCommentsPersistenceScope | null;
   getPersistedPrototypeCommentsDocument?: () => PrototypeEditCommentsDocument | null;
   buildCopyPromptOverride?: (context: CommentaryCopyPromptContext) => string;
+  getCommentarySkillOptions?: () => readonly CommentarySkillOption[];
 }): EditorSummariesService {
   const { state, buildCopyPromptOverride } = options;
   const promptContext = resolvePromptContext(options.promptContext, options.projectPath);
   const getResourceContext = options.getResourceContext ?? (() => null);
   const readPersistedPrototypeCommentsDocument =
     options.getPersistedPrototypeCommentsDocument ?? (() => null);
+  const buildPromptNote = (
+    note: string,
+    payload: { skillIds?: readonly unknown[] | null } | null | undefined,
+  ) => buildPromptNoteWithSkills(note, payload, options.getCommentarySkillOptions?.() ?? []);
 
   function resolvePromptPageUrl(): string {
     if (typeof window === 'undefined') return '';
@@ -505,8 +576,9 @@ export function createEditorSummariesService(options: {
       }
       const sortedParams = new URLSearchParams();
       Array.from(params.entries())
-        .sort(([leftKey, leftValue], [rightKey, rightValue]) =>
-          leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue),
+        .sort(
+          ([leftKey, leftValue], [rightKey, rightValue]) =>
+            leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue),
         )
         .forEach(([key, value]) => sortedParams.append(key, value));
       const search = sortedParams.toString();
@@ -531,8 +603,42 @@ export function createEditorSummariesService(options: {
     return state.transactionManager?.getUndoStack() ?? [];
   }
 
+  function collectCurrentPageCompletedElementKeys(): Set<string> {
+    const document = resolvePersistedPrototypeCommentsDocument();
+    const currentPageScope = normalizePathValue(resolveCurrentPageScope());
+    const completedElementKeys = new Set<string>();
+
+    for (const comment of document?.comments ?? []) {
+      if (comment.state !== 'completed') continue;
+      const commentPageScope = normalizePathValue(comment.pageScope);
+      if (commentPageScope && commentPageScope !== currentPageScope) continue;
+      const runtimeMeta = Array.from(state.editMetaByKey.values()).find(
+        (meta) => meta.commentId === comment.id,
+      );
+      const element = runtimeMeta ? null : locateElement(comment.locator);
+      const elementKey = runtimeMeta?.elementKey || (element?.isConnected
+        ? resolveElementKey(element)
+        : locatorKey(comment.locator));
+      if (elementKey) {
+        completedElementKeys.add(elementKey);
+      }
+    }
+
+    return completedElementKeys;
+  }
+
+  function isCompletedCurrentPageComment(elementKey: string): boolean {
+    return collectCurrentPageCompletedElementKeys().has(String(elementKey ?? '').trim());
+  }
+
   function getActiveTransactions(): readonly Transaction[] {
-    return filterUnprocessedTransactions(state, getUndoStack());
+    const completedElementKeys = collectCurrentPageCompletedElementKeys();
+    return filterUnprocessedTransactions(state, getUndoStack()).filter((transaction) => {
+      const elementKey = String(
+        transaction.elementKey ?? locatorKey(transaction.targetLocator),
+      ).trim();
+      return !completedElementKeys.has(elementKey);
+    });
   }
 
   function resolveElementKey(element: Element | null): string {
@@ -553,7 +659,8 @@ export function createEditorSummariesService(options: {
       normalizePathValue(resource?.path) ||
       readResourceMetaString(resource, 'targetPath') ||
       inferTargetPathFromCurrentFilePath(
-        readResourceMetaString(resource, 'filePath') || readResourceMetaString(resource, 'currentFilePath'),
+        readResourceMetaString(resource, 'filePath') ||
+          readResourceMetaString(resource, 'currentFilePath'),
       );
     if (resourcePath) return resourcePath;
 
@@ -617,7 +724,9 @@ export function createEditorSummariesService(options: {
     return 'element';
   }
 
-  function collectMoveSummariesWithKeys(transactions: readonly Transaction[]): InternalMoveSummary[] {
+  function collectMoveSummariesWithKeys(
+    transactions: readonly Transaction[],
+  ): InternalMoveSummary[] {
     const indexed = transactions.map((tx, index) => ({ tx, index }));
     indexed.sort((a, b) => {
       const at = Number(a.tx.timestamp ?? 0);
@@ -670,7 +779,9 @@ export function createEditorSummariesService(options: {
   }
 
   function collectMoveSummaries(transactions: readonly Transaction[]): MoveSummary[] {
-    return collectMoveSummariesWithKeys(transactions).map(({ elementKey: _elementKey, ...summary }) => summary);
+    return collectMoveSummariesWithKeys(transactions).map(
+      ({ elementKey: _elementKey, ...summary }) => summary,
+    );
   }
 
   function collectTextChanges(): CommentaryTextChange[] {
@@ -707,12 +818,14 @@ export function createEditorSummariesService(options: {
       const after = normalizeInlineText(textChange.after);
       if (before === after) return [];
 
-      return [{
-        elementKey: summary.elementKey,
-        locator: summary.netEffect.locator,
-        before,
-        after,
-      }];
+      return [
+        {
+          elementKey: summary.elementKey,
+          locator: summary.netEffect.locator,
+          before,
+          after,
+        },
+      ];
     });
   }
 
@@ -745,9 +858,7 @@ export function createEditorSummariesService(options: {
     };
   }
 
-  function collectNoteOnlyMetas(
-    summarizedKeys: ReadonlySet<string>,
-  ): Array<{
+  function collectNoteOnlyMetas(summarizedKeys: ReadonlySet<string>): Array<{
     elementKey: string;
     label: string;
     locator: ElementLocator;
@@ -755,35 +866,35 @@ export function createEditorSummariesService(options: {
     skillIds?: string[];
     actions: string[];
     imageAssetPaths: string[];
+    targetScreenshotAssetPath: string;
     dirtySince: number;
   }> {
     return Array.from(state.editMetaByKey.values())
+      .filter((meta) => !isCompletedCurrentPageComment(meta.elementKey))
       .map((meta) => ({
         elementKey: String(meta.elementKey),
         label: meta.label,
         locator: meta.locator,
-        note: buildPromptNoteWithSkills(meta.note, meta),
+        note: buildPromptNote(meta.note, meta),
         skillIds: meta.skillIds?.slice(),
         actions: buildMetaActionLines(meta),
         imageAssetPaths: collectPromptImageAssetPaths(meta.images),
+        targetScreenshotAssetPath: collectPromptTargetScreenshotAssetPath(meta.images),
         dirtySince: Number(meta.dirtySince ?? 0),
       }))
       .filter(
         (meta) =>
           !summarizedKeys.has(meta.elementKey) &&
-          (
-            Boolean(meta.note)
-            || (meta.skillIds?.length ?? 0) > 0
-            || meta.actions.length > 0
-            || meta.imageAssetPaths.length > 0
-          ),
+          (Boolean(meta.note) ||
+            (meta.skillIds?.length ?? 0) > 0 ||
+            meta.actions.length > 0 ||
+            meta.imageAssetPaths.length > 0 ||
+            Boolean(meta.targetScreenshotAssetPath)),
       )
       .sort((a, b) => b.dirtySince - a.dirtySince || a.label.localeCompare(b.label));
   }
 
-  function collectSaveRunCommentOnlyMetas(
-    summarizedKeys: ReadonlySet<string>,
-  ): Array<{
+  function collectSaveRunCommentOnlyMetas(summarizedKeys: ReadonlySet<string>): Array<{
     elementKey: string;
     label: string;
     locator: ElementLocator;
@@ -792,24 +903,33 @@ export function createEditorSummariesService(options: {
     actions: string[];
     imageCount: number;
     imageAssetPaths: string[];
+    targetScreenshotAssetPath: string;
     dirtySince: number;
   }> {
     return Array.from(state.editMetaByKey.values())
+      .filter((meta) => !isCompletedCurrentPageComment(meta.elementKey))
       .map((meta) => ({
         elementKey: String(meta.elementKey),
         label: meta.label,
         locator: meta.locator,
-        note: buildPromptNoteWithSkills(meta.note, meta),
+        note: buildPromptNote(meta.note, meta),
         skillIds: meta.skillIds?.slice(),
         actions: buildMetaActionLines(meta),
-        imageCount: Array.isArray(meta.images) ? meta.images.length : 0,
+        imageCount: Array.isArray(meta.images)
+          ? meta.images.filter((image) => image.source !== 'target-screenshot').length
+          : 0,
         imageAssetPaths: collectPromptImageAssetPaths(meta.images),
+        targetScreenshotAssetPath: collectPromptTargetScreenshotAssetPath(meta.images),
         dirtySince: Number(meta.dirtySince ?? 0),
       }))
       .filter(
         (meta) =>
           !summarizedKeys.has(meta.elementKey) &&
-          (Boolean(meta.note) || (meta.skillIds?.length ?? 0) > 0 || meta.imageCount > 0 || meta.actions.length > 0),
+          (Boolean(meta.note) ||
+            (meta.skillIds?.length ?? 0) > 0 ||
+            meta.imageCount > 0 ||
+            Boolean(meta.targetScreenshotAssetPath) ||
+            meta.actions.length > 0),
       )
       .sort((a, b) => b.dirtySince - a.dirtySince || a.label.localeCompare(b.label));
   }
@@ -844,12 +964,15 @@ export function createEditorSummariesService(options: {
     return normalized;
   }
 
-  function appendPromptContextSection(lines: string[], params: {
-    includePageUrl: boolean;
-    includeTargetPath?: boolean;
-    currentFilePath: string;
-    prototypeFilePath?: string;
-  }): void {
+  function appendPromptContextSection(
+    lines: string[],
+    params: {
+      includePageUrl: boolean;
+      includeTargetPath?: boolean;
+      currentFilePath: string;
+      prototypeFilePath?: string;
+    },
+  ): void {
     const pageUrl = params.includePageUrl ? resolvePromptPageUrl() : '';
     const targetPath = params.includeTargetPath ? resolveTargetPath() : null;
 
@@ -868,11 +991,13 @@ export function createEditorSummariesService(options: {
   }
 
   function resolveAnnotationPromptContext(locator: ElementLocator): AnnotationPromptContext | null {
-    const nodeId = resolveAnnotationNodeIdFromLocator(locator) || (() => {
-      const element = tryLocateElement(locator);
-      if (readElementAttr(element, ANNOTATION_PANEL_TARGET_ATTR) !== 'true') return '';
-      return readElementAttr(element, ANNOTATION_PANEL_NODE_ID_ATTR);
-    })();
+    const nodeId =
+      resolveAnnotationNodeIdFromLocator(locator) ||
+      (() => {
+        const element = tryLocateElement(locator);
+        if (readElementAttr(element, ANNOTATION_PANEL_TARGET_ATTR) !== 'true') return '';
+        return readElementAttr(element, ANNOTATION_PANEL_NODE_ID_ATTR);
+      })();
     if (!nodeId) return null;
 
     return {
@@ -881,10 +1006,7 @@ export function createEditorSummariesService(options: {
     };
   }
 
-  function appendAnnotationPromptContext(
-    lines: string[],
-    context: AnnotationPromptContext,
-  ): void {
+  function appendAnnotationPromptContext(lines: string[], context: AnnotationPromptContext): void {
     const node = context.node;
 
     lines.push('  - 当前选择: @axhub/annotation 标注节点');
@@ -911,9 +1033,9 @@ export function createEditorSummariesService(options: {
     const runtimeState = readAnnotationProtoDevState();
     const controls = Array.isArray(node?.controls)
       ? node.controls
-        .filter(isPlainObject)
-        .map((control) => formatAnnotationControl(control, runtimeState))
-        .filter(Boolean)
+          .filter(isPlainObject)
+          .map((control) => formatAnnotationControl(control, runtimeState))
+          .filter(Boolean)
       : [];
     if (controls.length > 0) {
       lines.push('  - 节点控件:');
@@ -922,7 +1044,9 @@ export function createEditorSummariesService(options: {
       }
     }
 
-    lines.push('  - 定位说明: 当前选中的是标注面板；请根据这个标注节点的 locator 定位真实原型元素，不要把标注面板本身当作修改对象。');
+    lines.push(
+      '  - 定位说明: 当前选中的是标注面板；请根据这个标注节点的 locator 定位真实原型元素，不要把标注面板本身当作修改对象。',
+    );
   }
 
   function appendChangeItem(
@@ -935,6 +1059,7 @@ export function createEditorSummariesService(options: {
       debugFileHint?: string;
       pageScope?: string;
       imageAssetPaths?: readonly string[];
+      targetScreenshotAssetPath?: string;
       actions: string[];
       note?: string;
     },
@@ -957,19 +1082,25 @@ export function createEditorSummariesService(options: {
     if (params.pageScope) lines.push(`  - 页面范围: ${params.pageScope}`);
     if (params.debugFileHint) lines.push(`  - 可能相关文件: ${params.debugFileHint}`);
     const imageAssetPaths = dedupeStrings(params.imageAssetPaths ?? []);
+    const targetScreenshotAssetPath = normalizePathValue(params.targetScreenshotAssetPath);
+    if (targetScreenshotAssetPath) {
+      lines.push(`  - 目标截图（用于精确定位当前批注元素）：${targetScreenshotAssetPath}`);
+    }
     if (imageAssetPaths.length > 0) {
       lines.push(`  - 本地图片素材: ${imageAssetPaths.join(', ')}`);
     }
     const allActions = [...params.actions];
     if (
-      imageAssetPaths.length > 0
-      && !allActions.some((action) => String(action ?? '').includes('本地图片素材'))
+      imageAssetPaths.length > 0 &&
+      !allActions.some((action) => String(action ?? '').includes('本地图片素材'))
     ) {
       allActions.push('请结合本地图片素材调整当前元素');
     }
     if (params.note) allActions.push(params.note);
     for (const action of allActions) {
-      for (const line of String(action ?? '').replace(/\r\n/g, '\n').split('\n')) {
+      for (const line of String(action ?? '')
+        .replace(/\r\n/g, '\n')
+        .split('\n')) {
         const normalizedLine = line.trim();
         if (!normalizedLine) continue;
         lines.push(`  → ${normalizedLine}`);
@@ -1014,7 +1145,9 @@ export function createEditorSummariesService(options: {
     return state.textCommentManager?.getComments().get(elementKey) ?? null;
   }
 
-  function buildSummaryActionLines(summary: ReturnType<typeof aggregateTransactionsByElement>[number]): string[] {
+  function buildSummaryActionLines(
+    summary: ReturnType<typeof aggregateTransactionsByElement>[number],
+  ): string[] {
     const actionLines: string[] = [];
 
     const textChange = summary.netEffect.textChange;
@@ -1041,16 +1174,23 @@ export function createEditorSummariesService(options: {
         const before = String((styleChanges.before ?? {})[prop] ?? '').trim();
         const after = String((styleChanges.after ?? {})[prop] ?? '').trim();
         if (before === after) continue;
-        actionLines.push(`样式 ${prop}: "${formatStyleValue(before)}" -> "${formatStyleValue(after)}"`);
+        actionLines.push(
+          `样式 ${prop}: "${formatStyleValue(before)}" -> "${formatStyleValue(after)}"`,
+        );
       }
     }
 
     return actionLines;
   }
 
-  function buildMetaActionLines(meta: {
-    tweakSummaryLines?: string[];
-  } | null | undefined): string[] {
+  function buildMetaActionLines(
+    meta:
+      | {
+          tweakSummaryLines?: string[];
+        }
+      | null
+      | undefined,
+  ): string[] {
     if (!meta) return [];
     return [...(meta.tweakSummaryLines ?? [])];
   }
@@ -1058,7 +1198,11 @@ export function createEditorSummariesService(options: {
   function resolvePersistedPrototypeCommentsDocument(): PrototypeEditCommentsDocument | null {
     try {
       const document = readPersistedPrototypeCommentsDocument();
-      if (!document || document.kind !== 'prototype-edit-comments' || !Array.isArray(document.comments)) {
+      if (
+        !document ||
+        document.kind !== 'prototype-edit-comments' ||
+        !Array.isArray(document.comments)
+      ) {
         return null;
       }
       return document;
@@ -1092,7 +1236,9 @@ export function createEditorSummariesService(options: {
         const before = String((styleChanges.before ?? {})[prop] ?? '').trim();
         const after = String((styleChanges.after ?? {})[prop] ?? '').trim();
         if (before === after) continue;
-        actionLines.push(`样式 ${prop}: "${formatStyleValue(before)}" -> "${formatStyleValue(after)}"`);
+        actionLines.push(
+          `样式 ${prop}: "${formatStyleValue(before)}" -> "${formatStyleValue(after)}"`,
+        );
       }
     }
 
@@ -1105,25 +1251,41 @@ export function createEditorSummariesService(options: {
     const images = Array.isArray(document.images) ? document.images : [];
 
     return document.comments
-      .map((comment) => ({
-        elementKey: String(comment.elementKey ?? '').trim(),
-        label: String(comment.label ?? '').trim() || String(comment.elementKey ?? '').trim() || 'element',
-        locator: comment.locator,
-        pageScope: String(comment.pageScope ?? '').trim(),
-        note: buildPromptNoteWithSkills(comment.comment ?? '', comment),
-        skillIds: comment.skillIds?.slice(),
-        actions: buildPersistedCommentActionLines(comment),
-        imageAssetPaths: collectPersistedImageAssetPathsForComment(images, comment),
-      }))
+      .filter((comment) => comment.state !== 'completed')
+      .map((comment) => {
+        const runtimeMeta = Array.from(state.editMetaByKey.values()).find(
+          (meta) => meta.commentId === comment.id,
+        );
+        const element = runtimeMeta ? null : locateElement(comment.locator);
+        const elementKey = runtimeMeta?.elementKey || (element?.isConnected
+          ? resolveElementKey(element)
+          : locatorKey(comment.locator));
+        return {
+          elementKey,
+          label:
+            String(runtimeMeta?.label ?? '').trim() ||
+            String(comment.label ?? '').trim() ||
+            'element',
+          locator: comment.locator,
+          pageScope: String(comment.pageScope ?? '').trim(),
+          note: buildPromptNote(comment.comment ?? '', comment),
+          skillIds: comment.skillIds?.slice(),
+          actions: buildPersistedCommentActionLines(comment),
+          imageAssetPaths: collectPersistedImageAssetPathsForComment(images, comment),
+          targetScreenshotAssetPath: collectPersistedTargetScreenshotAssetPathForComment(
+            images,
+            comment,
+          ),
+        };
+      })
       .filter(
         (comment) =>
           Boolean(comment.locator) &&
-          (
-            Boolean(comment.note)
-            || (comment.skillIds?.length ?? 0) > 0
-            || comment.actions.length > 0
-            || comment.imageAssetPaths.length > 0
-          ),
+          (Boolean(comment.note) ||
+            (comment.skillIds?.length ?? 0) > 0 ||
+            comment.actions.length > 0 ||
+            comment.imageAssetPaths.length > 0 ||
+            Boolean(comment.targetScreenshotAssetPath)),
       );
   }
 
@@ -1134,7 +1296,9 @@ export function createEditorSummariesService(options: {
     const normalizedPageScope = normalizePathValue(meta.pageScope);
     const normalizedCurrentPageScope = normalizePathValue(currentPageScope);
     if (!normalizedPageScope) return true;
-    return Boolean(normalizedCurrentPageScope && normalizedPageScope === normalizedCurrentPageScope);
+    return Boolean(
+      normalizedCurrentPageScope && normalizedPageScope === normalizedCurrentPageScope,
+    );
   }
 
   function buildDefaultCopyPrompt(): string {
@@ -1147,9 +1311,7 @@ export function createEditorSummariesService(options: {
     );
     const currentPageScope = resolveCurrentPageScope();
     const hasCurrentPageRuntimeItems =
-      summaries.length > 0
-      || noteOnlyMetas.length > 0
-      || moveSummaries.length > 0;
+      summaries.length > 0 || noteOnlyMetas.length > 0 || moveSummaries.length > 0;
     const effectivePersistedCommentMetas = hasCurrentPageRuntimeItems
       ? persistedCommentMetas.filter((meta) => !isPersistedCurrentPageMeta(meta, currentPageScope))
       : persistedCommentMetas;
@@ -1204,6 +1366,7 @@ export function createEditorSummariesService(options: {
         actions: meta.actions,
         pageScope: meta.pageScope,
         imageAssetPaths: meta.imageAssetPaths,
+        targetScreenshotAssetPath: meta.targetScreenshotAssetPath,
         note: meta.note,
       });
       itemIndex += 1;
@@ -1211,18 +1374,21 @@ export function createEditorSummariesService(options: {
 
     for (const summary of summaries) {
       const meta = state.editMetaByKey.get(summary.elementKey);
-      const note = buildPromptNoteWithSkills(meta?.note ?? '', meta);
+      const note = buildPromptNote(meta?.note ?? '', meta);
       const actions = [...buildMetaActionLines(meta), ...buildSummaryActionLines(summary)];
       const imageAssetPaths = collectPromptImageAssetPaths(meta?.images);
+      const targetScreenshotAssetPath = collectPromptTargetScreenshotAssetPath(meta?.images);
 
       appendChangeItem(lines, {
         index: itemIndex,
         locator: summary.netEffect.locator,
         fallbackLabel: summary.fullLabel || summary.label,
-        fallbackText: summary.netEffect.textChange?.after ?? summary.netEffect.textChange?.before ?? '',
+        fallbackText:
+          summary.netEffect.textChange?.after ?? summary.netEffect.textChange?.before ?? '',
         debugFileHint: includeDebugFileHint ? formatDebugSource(summary.debugSource) : '',
         pageScope: currentPageScope,
         imageAssetPaths,
+        targetScreenshotAssetPath,
         actions,
         note,
       });
@@ -1230,9 +1396,7 @@ export function createEditorSummariesService(options: {
     }
 
     for (const meta of noteOnlyMetas) {
-      const comment = isTextCommentKey(meta.elementKey)
-        ? findTextComment(meta.elementKey)
-        : null;
+      const comment = isTextCommentKey(meta.elementKey) ? findTextComment(meta.elementKey) : null;
 
       if (comment) {
         appendTextCommentItem(lines, {
@@ -1241,10 +1405,11 @@ export function createEditorSummariesService(options: {
           note: meta.note,
         });
       } else if (
-        meta.note
-        || (meta.skillIds?.length ?? 0) > 0
-        || meta.actions.length > 0
-        || meta.imageAssetPaths.length > 0
+        meta.note ||
+        (meta.skillIds?.length ?? 0) > 0 ||
+        meta.actions.length > 0 ||
+        meta.imageAssetPaths.length > 0 ||
+        Boolean(meta.targetScreenshotAssetPath)
       ) {
         appendChangeItem(lines, {
           index: itemIndex,
@@ -1253,6 +1418,7 @@ export function createEditorSummariesService(options: {
           actions: meta.actions,
           pageScope: currentPageScope,
           imageAssetPaths: meta.imageAssetPaths,
+          targetScreenshotAssetPath: meta.targetScreenshotAssetPath,
           note: meta.note,
         });
       }
@@ -1290,14 +1456,18 @@ export function createEditorSummariesService(options: {
 
   function collectModifiedElementSummaries(): CommentaryModifiedElementSummary[] {
     return Array.from(state.editMetaByKey.values())
-      .filter((meta) => meta.dirtySince !== null)
+      .filter(
+        (meta) =>
+          meta.dirtySince !== null && !isCompletedCurrentPageComment(meta.elementKey),
+      )
       .map((meta) => ({
+        ...(meta.commentId ? { commentId: meta.commentId } : {}),
         elementKey: meta.elementKey,
         locator: stripLocatorDebugSource(meta.locator),
         label: meta.label,
-        note: buildPromptNoteWithSkills(meta.note, meta),
+        note: buildPromptNote(meta.note, meta),
         skillIds: meta.skillIds?.slice(),
-        imageCount: meta.images.length,
+        imageCount: meta.images.filter((image) => image.source !== 'target-screenshot').length,
         changeKinds: meta.changeKinds.slice(),
       }));
   }
@@ -1352,11 +1522,8 @@ export function createEditorSummariesService(options: {
   }): string {
     const { summaries, commentOnlyMetas, moveSummaries } = params;
     const mode = params.mode ?? 'initial';
-    if (
-      summaries.length === 0
-      && commentOnlyMetas.length === 0
-      && moveSummaries.length === 0
-    ) return '';
+    if (summaries.length === 0 && commentOnlyMetas.length === 0 && moveSummaries.length === 0)
+      return '';
 
     const currentFilePath = resolveCurrentFilePath();
     const includeDebugFileHint = !hasExplicitHostFilePath();
@@ -1365,7 +1532,9 @@ export function createEditorSummariesService(options: {
     if (mode === 'append') {
       lines.push('继续修改。不要提问，直接执行。');
     } else {
-      lines.push('请直接执行以下代码修改。要求：尽快处理，简洁回复（只列改了什么文件和结果），不要和用户交互提问，不使用非必要的技能和 MCP。完成后回复完成即可，阻塞时简短说明。');
+      lines.push(
+        '请直接执行以下代码修改。要求：尽快处理，简洁回复（只列改了什么文件和结果），不要和用户交互提问，不使用非必要的技能和 MCP。完成后回复完成即可，阻塞时简短说明。',
+      );
     }
     lines.push('收到消息后，按以下格式立即回复：我开始修改 xxx 节点');
     lines.push('');
@@ -1386,17 +1555,20 @@ export function createEditorSummariesService(options: {
 
     for (const summary of summaries) {
       const meta = state.editMetaByKey.get(summary.elementKey);
-      const note = buildPromptNoteWithSkills(meta?.note ?? '', meta);
+      const note = buildPromptNote(meta?.note ?? '', meta);
       const actions = [...buildMetaActionLines(meta), ...buildSummaryActionLines(summary)];
       const imageAssetPaths = collectPromptImageAssetPaths(meta?.images);
+      const targetScreenshotAssetPath = collectPromptTargetScreenshotAssetPath(meta?.images);
 
       appendChangeItem(lines, {
         index: itemIndex,
         locator: summary.netEffect.locator,
         fallbackLabel: summary.fullLabel || summary.label,
-        fallbackText: summary.netEffect.textChange?.after ?? summary.netEffect.textChange?.before ?? '',
+        fallbackText:
+          summary.netEffect.textChange?.after ?? summary.netEffect.textChange?.before ?? '',
         debugFileHint: includeDebugFileHint ? formatDebugSource(summary.debugSource) : '',
         imageAssetPaths,
+        targetScreenshotAssetPath,
         actions,
         note,
       });
@@ -1404,9 +1576,7 @@ export function createEditorSummariesService(options: {
     }
 
     for (const meta of commentOnlyMetas) {
-      const comment = isTextCommentKey(meta.elementKey)
-        ? findTextComment(meta.elementKey)
-        : null;
+      const comment = isTextCommentKey(meta.elementKey) ? findTextComment(meta.elementKey) : null;
 
       if (comment) {
         appendTextCommentItem(lines, {
@@ -1421,6 +1591,7 @@ export function createEditorSummariesService(options: {
           locator: meta.locator,
           fallbackLabel: meta.label,
           imageAssetPaths: meta.imageAssetPaths,
+          targetScreenshotAssetPath: meta.targetScreenshotAssetPath,
           actions,
           note: meta.note,
         });
@@ -1450,7 +1621,10 @@ export function createEditorSummariesService(options: {
   function buildSaveRunPrompt(): string {
     const undoStack = getActiveTransactions();
     const summaries = aggregateTransactionsByElement(undoStack);
-    const moveSummaries = collectMoveSummaries(undoStack);
+    const moveSummariesWithKeys = collectMoveSummariesWithKeys(undoStack);
+    const moveSummaries = moveSummariesWithKeys.map(
+      ({ elementKey: _elementKey, ...summary }) => summary,
+    );
     const commentOnlyMetas = collectSaveRunCommentOnlyMetas(
       new Set(summaries.map((summary) => String(summary.elementKey))),
     );
@@ -1465,7 +1639,10 @@ export function createEditorSummariesService(options: {
   function buildAppendSaveRunPrompt(): string {
     const undoStack = getActiveTransactions();
     const summaries = aggregateTransactionsByElement(undoStack);
-    const moveSummaries = collectMoveSummaries(undoStack);
+    const moveSummariesWithKeys = collectMoveSummariesWithKeys(undoStack);
+    const moveSummaries = moveSummariesWithKeys.map(
+      ({ elementKey: _elementKey, ...summary }) => summary,
+    );
     const commentOnlyMetas = collectSaveRunCommentOnlyMetas(
       new Set(summaries.map((summary) => String(summary.elementKey))),
     );
@@ -1487,8 +1664,9 @@ export function createEditorSummariesService(options: {
     if (!normalizedElementKey) return '';
 
     const undoStack = getActiveTransactions();
-    const summaries = aggregateTransactionsByElement(undoStack)
-      .filter((summary) => String(summary.elementKey) === normalizedElementKey);
+    const summaries = aggregateTransactionsByElement(undoStack).filter(
+      (summary) => String(summary.elementKey) === normalizedElementKey,
+    );
     const commentOnlyMetas = collectSaveRunCommentOnlyMetas(
       new Set(summaries.map((summary) => String(summary.elementKey))),
     ).filter((meta) => meta.elementKey === normalizedElementKey);
@@ -1508,8 +1686,9 @@ export function createEditorSummariesService(options: {
     if (!elementKey) return '';
 
     const undoStack = getActiveTransactions();
-    const summaries = aggregateTransactionsByElement(undoStack)
-      .filter((summary) => String(summary.elementKey) === elementKey);
+    const summaries = aggregateTransactionsByElement(undoStack).filter(
+      (summary) => String(summary.elementKey) === elementKey,
+    );
     const commentOnlyMetas = collectSaveRunCommentOnlyMetas(
       new Set(summaries.map((summary) => String(summary.elementKey))),
     ).filter((meta) => meta.elementKey === elementKey);
@@ -1595,6 +1774,7 @@ export function createEditorSummariesService(options: {
     formatElementLabelFromLocator,
     collectTextChanges,
     collectTargetedTextChanges,
+    collectModifiedElementSummaries,
     collectStyleCss,
     collectStyleChanges,
     collectMoveSummaries,

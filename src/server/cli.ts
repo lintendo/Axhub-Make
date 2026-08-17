@@ -22,6 +22,10 @@ import {
   type MakeServiceInspection,
   type MakeServiceResult,
 } from './makeServiceLifecycle.ts';
+import {
+  isInheritedMakeServiceStartGate,
+  withMakeServiceStartGate,
+} from './makeServiceStartGate.ts';
 
 export interface MakeServerCliOptions {
   projectRoot: string;
@@ -75,6 +79,10 @@ export interface RunCliDependencies {
   isInteractive?: () => boolean;
   confirmRestart?: NonNullable<MakeCliAppOpenDependencies['confirmRestart']>;
   entryPath?: string;
+  selfContainedExecutable?: boolean;
+  withMakeServiceStartGate?: typeof withMakeServiceStartGate;
+  inheritedStartGateClaim?: string;
+  parentPid?: number;
 }
 
 export const CLI_USAGE = `Usage:
@@ -451,6 +459,10 @@ export async function runCli(
     isInteractive: () => Boolean(process.stdin.isTTY && process.stdout.isTTY),
     confirmRestart: confirmCliRestart,
     entryPath: process.argv[1],
+    selfContainedExecutable: false,
+    withMakeServiceStartGate,
+    inheritedStartGateClaim: process.env.AXHUB_MAKE_START_GATE_CLAIM,
+    parentPid: process.ppid,
     ...suppliedDependencies,
   };
   const options = parseCliArgs(args);
@@ -488,6 +500,9 @@ export async function runCli(
       const result = await dependencies.startMakeServiceInBackground({
         args,
         entryPath: dependencies.entryPath,
+        selfContainedExecutable: dependencies.selfContainedExecutable,
+        host: options.host,
+        port: options.port,
         ...(options.logFile ? { logFile: options.logFile } : {}),
       });
       if (!result.ok || !result.origin) {
@@ -498,30 +513,69 @@ export async function runCli(
       reusedServer = result.reusedServer === true;
       serviceResult = { ...result, background: true };
     } else {
-      const diagnosticLog = options.logFile ? dependencies.startDiagnosticLog(options.logFile) : null;
-      try {
-        foregroundServer = await dependencies.startMakeServer({
-          ...serverStartOptions(options),
-          ...(diagnosticLog ? { diagnosticLog } : {}),
-        });
-      } catch (error) {
-        if (!isPortInUseError(error)) throw error;
-        inspection = await dependencies.inspectMakeService();
-        if (inspection.status === 'running' && inspection.origin) {
-          origin = inspection.origin;
-          reusedServer = true;
-        } else {
-          const result: MakeCliResult = {
-            ok: false,
-            code: 'make-port-occupied',
-            message: formatPortInUseMessage(error, options),
-            background: false,
-          };
-          renderCliResult(result, options.json);
-          return 1;
+      const startForeground = async () => {
+        const latest = await dependencies.inspectMakeService();
+        if (latest.status !== 'stopped') {
+          return { kind: latest.status, inspection: latest } as const;
         }
+        const diagnosticLog = options.logFile ? dependencies.startDiagnosticLog(options.logFile) : null;
+        try {
+          const server = await dependencies.startMakeServer({
+            ...serverStartOptions(options),
+            ...(diagnosticLog ? { diagnosticLog } : {}),
+          });
+          return { kind: 'started', server } as const;
+        } catch (error) {
+          if (!isPortInUseError(error)) throw error;
+          const raced = await dependencies.inspectMakeService();
+          if (raced.status === 'running' && raced.origin) {
+            return { kind: 'running', inspection: raced } as const;
+          }
+          return { kind: 'port-occupied', error } as const;
+        }
+      };
+      const inheritedGate = isInheritedMakeServiceStartGate({
+        stateDirectory: options.projectRoot,
+        claimPath: dependencies.inheritedStartGateClaim,
+        parentPid: dependencies.parentPid,
+      });
+      const gated = inheritedGate
+        ? { acquired: true as const, value: await startForeground() }
+        : await dependencies.withMakeServiceStartGate({
+          stateDirectory: options.projectRoot,
+        }, startForeground);
+      if (!gated.acquired) {
+        const result: MakeCliResult = {
+          ok: false,
+          code: 'make-start-timeout',
+          message: 'Timed out waiting for another Axhub Make startup to finish.',
+          background: false,
+        };
+        renderCliResult(result, options.json);
+        return 1;
       }
-      if (foregroundServer) {
+      const outcome = gated.value;
+      if (outcome.kind === 'stale') {
+        serviceResult = inspectionResult(outcome.inspection);
+        renderCliResult(serviceResult, options.json);
+        return 1;
+      }
+      if (outcome.kind === 'port-occupied') {
+        const result: MakeCliResult = {
+          ok: false,
+          code: 'make-port-occupied',
+          message: formatPortInUseMessage(outcome.error, options),
+          background: false,
+        };
+        renderCliResult(result, options.json);
+        return 1;
+      }
+      if (outcome.kind === 'running') {
+        inspection = outcome.inspection;
+        origin = outcome.inspection.origin;
+        reusedServer = true;
+      } else {
+        foregroundServer = outcome.server;
         origin = foregroundServer.origin;
         serviceResult = {
           ok: true,

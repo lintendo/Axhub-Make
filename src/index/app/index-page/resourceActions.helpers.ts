@@ -1,11 +1,12 @@
 import type { ItemData } from '../../types';
+import { requireProjectScope, withProjectScope, withProjectScopeBody } from '../../services/projectScope';
 import {
     generateDeleteDocReferencePrompt,
     generateDeleteTemplateReferencePrompt,
     generateRenameDocReferencePrompt,
     generateRenameTemplateReferencePrompt,
 } from '../../utils';
-import { getExplicitLocalPath, stripIndexFilePath } from '../../utils/localPath';
+import { getExplicitLocalPath, getPrototypeLocalBasePath, stripIndexFilePath } from '../../utils/localPath';
 import type { DocReferenceCheckResult } from '../index-page.helpers';
 
 export function ensureStringArray(value: unknown): string[] {
@@ -18,6 +19,31 @@ export function getLocalPathForItem(item: unknown): string {
 
 export function getLocalBasePathForItem(item: unknown): string {
     return stripIndexFilePath(getLocalPathForItem(item));
+}
+
+export function getPrototypeBasePathForItem(item: unknown): string {
+    return getPrototypeLocalBasePath(item);
+}
+
+export function getProjectRelativeResourcePathForItem(item: unknown): string {
+    const localPath = getLocalPathForItem(item)
+        .replace(/\\/g, '/')
+        .trim()
+        .replace(/^(?:\.\/)+/u, '');
+    if (!localPath) {
+        return '';
+    }
+    const resourceRoot = 'src/resources/';
+    if (localPath.startsWith(resourceRoot)) {
+        return localPath;
+    }
+    const isAbsolutePath = localPath.startsWith('/') || /^[a-z]:\//iu.test(localPath);
+    if (isAbsolutePath) {
+        const absoluteResourceRoot = `/${resourceRoot}`;
+        const resourceRootIndex = localPath.lastIndexOf(absoluteResourceRoot);
+        return resourceRootIndex >= 0 ? localPath.slice(resourceRootIndex + 1) : '';
+    }
+    return `${resourceRoot}${localPath}`;
 }
 
 export function buildLocalSiblingPath(localPath: string, siblingName: string): string {
@@ -33,37 +59,22 @@ export function buildLocalSiblingPath(localPath: string, siblingName: string): s
     return `${normalizedPath.slice(0, slashIndex + 1)}${normalizedName}`;
 }
 
-export function withResourceProject(url: string, projectId?: string | null): string {
-    const normalizedProjectId = String(projectId || '').trim();
-    if (!normalizedProjectId) {
-        return url;
-    }
-    const [path, query = ''] = url.split('?');
-    const params = new URLSearchParams(query);
-    params.set('projectId', normalizedProjectId);
-    const nextQuery = params.toString();
-    return nextQuery ? `${path}?${nextQuery}` : path;
+export function withResourceProject(url: string, projectId: string | null): string {
+    return withProjectScope(url, requireProjectScope(projectId));
 }
 
 export function withResourceProjectBody<T extends Record<string, unknown>>(
     body: T,
-    projectId?: string | null,
-): T & { projectId?: string } {
-    const normalizedProjectId = String(projectId || '').trim();
-    if (!normalizedProjectId) {
-        return body;
-    }
-    return {
-        ...body,
-        projectId: normalizedProjectId,
-    };
+    projectId: string | null,
+): T & { projectId: string } {
+    return withProjectScopeBody(body, requireProjectScope(projectId));
 }
 
 export async function checkDocReferencesRequest(
     docName: string,
     action: 'rename' | 'delete',
-    nextBaseName?: string,
-    projectId?: string | null,
+    nextBaseName: string | undefined,
+    projectId: string | null,
 ): Promise<DocReferenceCheckResult> {
     const response = await fetch(withResourceProject('/api/docs/check-references', projectId), {
         method: 'POST',
@@ -93,8 +104,8 @@ export async function checkDocReferencesRequest(
 export async function checkTemplateReferencesRequest(
     templateName: string,
     action: 'rename' | 'delete',
-    nextBaseName?: string,
-    projectId?: string | null,
+    nextBaseName: string | undefined,
+    projectId: string | null,
 ): Promise<DocReferenceCheckResult> {
     const response = await fetch(withResourceProject('/api/docs/templates/check-references', projectId), {
         method: 'POST',

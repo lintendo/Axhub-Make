@@ -11,7 +11,7 @@ describe('AxhubPublishDialog hosted review reports', () => {
   it('selects the Axhub project from the current resource latest publish record', () => {
     const source = readSource();
 
-    expect(source).toContain('apiService.getCloudPublishingLatest(targetPath, projectId)');
+    expect(source).toContain('apiService.getCloudPublishingLatest(targetPath, requireProjectScope(projectId))');
     expect(source).toContain('const boundProjectId = String(latest.targets.axhub?.axhubProjectId || \'\');');
     expect(source).toContain('result.projects?.some((project) => String(project.pid) === boundProjectId)');
     expect(source).toContain('return boundProjectId;');

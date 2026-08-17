@@ -28,6 +28,7 @@ type InteractiveCanvasProps = {
     onTouchMove: Exclude<DOMAttributes<HTMLCanvasElement>["onTouchMove"], undefined>;
     onPointerDown: Exclude<DOMAttributes<HTMLCanvasElement>["onPointerDown"], undefined>;
     onDoubleClick: Exclude<DOMAttributes<HTMLCanvasElement>["onDoubleClick"], undefined>;
+    zIndex?: number;
 };
 export declare const INTERACTIVE_SCENE_ANIMATION_KEY = "animateInteractiveScene";
 declare const _default: React.MemoExoticComponent<(props: InteractiveCanvasProps) => import("react/jsx-runtime").JSX.Element>;

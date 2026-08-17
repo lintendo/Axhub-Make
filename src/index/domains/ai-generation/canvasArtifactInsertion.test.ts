@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyGenerationArtifactsToCanvasElements } from './canvasArtifactInsertion';
+import { applyGenerationArtifactsToCanvasElements as applyProjectArtifacts } from './canvasArtifactInsertion';
+
+function applyGenerationArtifactsToCanvasElements(
+  options: Omit<Parameters<typeof applyProjectArtifacts>[0], 'projectId'> & { projectId?: string },
+) {
+  return applyProjectArtifacts({ ...options, projectId: options.projectId || 'client-project' });
+}
 import type { GenerationArtifactRecord } from './generationArtifactHistoryStore';
 
 function artifact(overrides: Partial<GenerationArtifactRecord> = {}): GenerationArtifactRecord {
@@ -24,6 +30,7 @@ function artifact(overrides: Partial<GenerationArtifactRecord> = {}): Generation
 describe('canvas artifact insertion helper', () => {
   it('inserts multiple artifacts horizontally in the visible canvas area', () => {
     const result = applyGenerationArtifactsToCanvasElements({
+      projectId: 'client-project',
       elements: [],
       appState: {
         scrollX: -100,
@@ -303,7 +310,7 @@ describe('canvas artifact insertion helper', () => {
     expect(result.insertedElementIds).toHaveLength(1);
     expect(result.elements[0]).toMatchObject({
       type: 'embeddable',
-      link: '/api/markdown-file?path=src%2Fprototypes%2Ferp-home%2F.spec%2F2026-06-10-supply-chain-home.md',
+      link: '/api/markdown-file?path=src%2Fprototypes%2Ferp-home%2F.spec%2F2026-06-10-supply-chain-home.md&projectId=client-project',
       customData: {
         type: 'axhub-doc',
         title: 'Supply Chain Spec',
@@ -314,6 +321,7 @@ describe('canvas artifact insertion helper', () => {
         embedViewMode: 'preview',
         artifactResourceKey: 'document:src/prototypes/erp-home/.spec/2026-06-10-supply-chain-home.md',
         sourceArtifactId: 'artifact-prototype-spec-doc',
+        projectId: 'client-project',
       },
     });
     expect(result.elements[0].customData).not.toHaveProperty('embedContentScale');

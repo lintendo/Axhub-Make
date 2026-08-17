@@ -8,10 +8,11 @@ export interface TemplateLibraryCardItem {
     id: string;
     title: string;
     slug?: string;
-    sourcePath: string;
+    sourcePath?: string;
     sourceUrl?: string;
     coverPath?: string;
-    coverUrl: string;
+    coverUrl?: string;
+    metaLabel?: string;
     description: string;
     author?: string;
     authorUrl?: string;
@@ -19,6 +20,7 @@ export interface TemplateLibraryCardItem {
     extraDependencies?: string[];
     canDirectImport?: boolean;
     directImportDisabledReason?: string;
+    platform?: 'desktop' | 'mobile';
 }
 
 interface TemplateLibraryCardProps {
@@ -51,7 +53,8 @@ export default function TemplateLibraryCard({
     const previewHint = template.previewUrl ? '点击打开在线预览' : '该模板暂不支持在线预览';
     const canCopyPrompt = Boolean(onCopyPrompt || renderCopyPromptAction);
     const canDirectImport = Boolean(onDirectImport);
-    const metaTitle = authorLabel ? `作者：${authorLabel}` : template.sourcePath;
+    const metaLabel = String(template.metaLabel || template.sourcePath || '').trim();
+    const metaTitle = authorLabel ? `作者：${authorLabel}` : metaLabel;
     const shouldRenderCoverImage = Boolean(template.coverUrl) && !coverLoadFailed;
 
     React.useEffect(() => {
@@ -86,7 +89,11 @@ export default function TemplateLibraryCard({
                             loading="lazy"
                             onError={() => setCoverLoadFailed(true)}
                         />
-                    ) : null}
+                    ) : (
+                        <div className="flex h-full items-center justify-center text-[12px] text-muted-foreground">
+                            暂无封面
+                        </div>
+                    )}
                 </div>
                 <div className="grid min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3">
                     <div className="flex items-start justify-between gap-3">
@@ -110,6 +117,8 @@ export default function TemplateLibraryCard({
                                     ) : (
                                         <span>作者：{authorLabel}</span>
                                     )
+                                ) : template.metaLabel ? (
+                                    <span>{template.metaLabel}</span>
                                 ) : (
                                     <span>{template.sourcePath}</span>
                                 )}

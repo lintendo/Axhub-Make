@@ -7,6 +7,7 @@ import {
   openProjectAndEntry,
   type AgentSurfaceConfig,
   type HostId,
+  type HostInspection,
   type OpenProjectAndEntryOptions,
   type OpenResult,
   type OpenOptions,
@@ -164,6 +165,25 @@ function resolveDesktopPlatform(platform: NodeJS.Platform): DesktopClientPlatfor
   throw new Error(`Agent Surface does not support ${platform}.`);
 }
 
+export function mapMakeAgentSurfaceInspection(
+  platform: DesktopClientPlatform,
+  inspection: HostInspection,
+): DesktopIntegrationInspection {
+  const appPathRequired = inspection.code === 'configuration-required';
+  return {
+    platform,
+    ready: Boolean(inspection.target),
+    running: inspection.processRunning,
+    installed: Boolean(inspection.appPath),
+    integrationInstalled: true,
+    appPath: inspection.appPath || '',
+    ...(appPathRequired ? {
+      appPathRequired: true,
+      detail: inspection.message,
+    } : {}),
+  };
+}
+
 export async function inspectMakeAgentSurfaceHost(
   provider: AgentSurfaceDesktopProvider,
   options: {
@@ -177,14 +197,7 @@ export async function inspectMakeAgentSurfaceHost(
     platform: desktopPlatform,
     ...(options.appPath ? { config: { appPath: options.appPath } } : {}),
   });
-  return {
-    platform: desktopPlatform,
-    ready: Boolean(inspection.target),
-    running: inspection.processRunning,
-    installed: Boolean(inspection.appPath),
-    integrationInstalled: true,
-    appPath: inspection.appPath || '',
-  };
+  return mapMakeAgentSurfaceInspection(desktopPlatform, inspection);
 }
 
 export async function closeMakeAgentSurfaceHost(

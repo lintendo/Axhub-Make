@@ -1,3 +1,9 @@
+import type { Options as HtmlToImageOptions } from 'html-to-image/lib/types';
+import {
+  WEB_EDITOR_V2_COLORS,
+  WEB_EDITOR_V2_SELECTION_LINE_WIDTH,
+} from '../../constants';
+
 const SCREENSHOT_IMAGE_PROXY_PATH = '/api/export/image-proxy';
 const SCREENSHOT_SETTLE_DELAY_MS = 80;
 
@@ -332,6 +338,158 @@ export interface EditorElementScreenshot {
   data: string;
   width: number;
   height: number;
+}
+
+export interface TargetScreenshotRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export interface TargetScreenshotBounds {
+  captureRect: TargetScreenshotRect;
+  targetRect: TargetScreenshotRect;
+}
+
+export interface TargetContextScreenshotOptions {
+  isEditorUi?: (node: unknown) => boolean;
+  render?: (
+    node: HTMLElement,
+    options: HtmlToImageOptions,
+  ) => Promise<HTMLCanvasElement>;
+}
+
+function isFinitePositive(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
+}
+
+export function calculateTargetScreenshotBounds(
+  targetRect: Pick<DOMRectReadOnly, 'left' | 'top' | 'right' | 'bottom' | 'width' | 'height'>,
+  viewportWidth: number,
+  viewportHeight: number,
+): TargetScreenshotBounds | null {
+  if (
+    !isFinitePositive(targetRect.width)
+    || !isFinitePositive(targetRect.height)
+    || !isFinitePositive(viewportWidth)
+    || !isFinitePositive(viewportHeight)
+  ) {
+    return null;
+  }
+
+  const visibleLeft = Math.max(0, targetRect.left);
+  const visibleTop = Math.max(0, targetRect.top);
+  const visibleRight = Math.min(viewportWidth, targetRect.right);
+  const visibleBottom = Math.min(viewportHeight, targetRect.bottom);
+  if (visibleRight <= visibleLeft || visibleBottom <= visibleTop) return null;
+
+  const padding = Math.max(32, Math.min(targetRect.width, targetRect.height) * 0.08);
+  const captureLeft = Math.max(0, targetRect.left - padding);
+  const captureTop = Math.max(0, targetRect.top - padding);
+  const captureRight = Math.min(viewportWidth, targetRect.right + padding);
+  const captureBottom = Math.min(viewportHeight, targetRect.bottom + padding);
+
+  return {
+    captureRect: {
+      left: captureLeft,
+      top: captureTop,
+      width: captureRight - captureLeft,
+      height: captureBottom - captureTop,
+    },
+    targetRect: {
+      left: visibleLeft - captureLeft,
+      top: visibleTop - captureTop,
+      width: visibleRight - visibleLeft,
+      height: visibleBottom - visibleTop,
+    },
+  };
+}
+
+export async function captureTargetContextScreenshot(
+  element: Element,
+  options: TargetContextScreenshotOptions = {},
+): Promise<EditorElementScreenshot> {
+  if (!(element instanceof HTMLElement || element instanceof SVGElement)) {
+    throw new Error('当前元素不支持截图。');
+  }
+
+  const rootElement = document.documentElement;
+  if (!(rootElement instanceof HTMLElement)) {
+    throw new Error('当前页面不支持截图。');
+  }
+
+  const bounds = calculateTargetScreenshotBounds(
+    element.getBoundingClientRect(),
+    window.innerWidth,
+    window.innerHeight,
+  );
+  if (!bounds) {
+    throw new Error('当前元素不在可截图区域内。');
+  }
+
+  const width = roundDimension(bounds.captureRect.width);
+  const height = roundDimension(bounds.captureRect.height);
+  const pixelRatio = Math.max(1, Math.min(2, window.devicePixelRatio || 2));
+  const backgroundColor = resolveScreenshotBackgroundColor(element);
+  const restoreImageUrls = rewriteElementImageUrlsForScreenshot(rootElement);
+  const render = options.render ?? (async (node, renderOptions) => {
+    const htmlToImage = await import('html-to-image');
+    return htmlToImage.toCanvas(node, renderOptions);
+  });
+
+  try {
+    await prepareElementForScreenshot(rootElement);
+
+    const canvas = await render(rootElement, {
+      width,
+      height,
+      canvasWidth: width,
+      canvasHeight: height,
+      pixelRatio,
+      skipAutoScale: true,
+      backgroundColor,
+      skipFonts: false,
+      cacheBust: false,
+      includeQueryParams: true,
+      filter: (node) => !options.isEditorUi?.(node),
+      style: {
+        width: `${Math.max(rootElement.scrollWidth, window.innerWidth)}px`,
+        height: `${Math.max(rootElement.scrollHeight, window.innerHeight)}px`,
+        transform: `translate(-${window.scrollX + bounds.captureRect.left}px, -${window.scrollY + bounds.captureRect.top}px)`,
+        transformOrigin: 'top left',
+        margin: '0',
+      },
+    });
+
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('无法绘制目标元素选中框。');
+
+    const lineWidth = WEB_EDITOR_V2_SELECTION_LINE_WIDTH;
+    const inset = lineWidth / 2;
+    context.save();
+    context.scale(pixelRatio, pixelRatio);
+    context.beginPath();
+    context.strokeStyle = WEB_EDITOR_V2_COLORS.selected;
+    context.lineWidth = lineWidth;
+    context.setLineDash([]);
+    context.strokeRect(
+      bounds.targetRect.left + inset,
+      bounds.targetRect.top + inset,
+      Math.max(0, bounds.targetRect.width - lineWidth),
+      Math.max(0, bounds.targetRect.height - lineWidth),
+    );
+    context.restore();
+
+    return {
+      name: 'target-screenshot.png',
+      data: canvas.toDataURL('image/png'),
+      width,
+      height,
+    };
+  } finally {
+    restoreImageUrls();
+  }
 }
 
 export async function captureElementScreenshot(

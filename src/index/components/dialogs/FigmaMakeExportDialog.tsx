@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import type { IDEAvailabilityMap, MainIDEPreference } from '../../../common/ide';
 import type { PromptClientPreference } from '../../types';
 import { apiService, type ExportMakeProbeResponse } from '../../services/api';
+import { requireProjectScope, withProjectScope } from '../../services/projectScope';
 import PromptActionButton from '../PromptActionButton';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,6 +23,7 @@ interface FigmaMakeExportDialogProps {
     itemName?: string | null;
     itemDisplayName?: string | null;
     targetPath?: string | null;
+    projectId: string;
     ideTargetPath?: string | null;
     preferredPromptClient: PromptClientPreference;
     preferredIDE: MainIDEPreference;
@@ -52,6 +54,7 @@ export default function FigmaMakeExportDialog({
     onOpenChange,
     itemName,
     targetPath,
+    projectId,
     ideTargetPath,
     preferredPromptClient,
     preferredIDE,
@@ -63,6 +66,7 @@ export default function FigmaMakeExportDialog({
 }: FigmaMakeExportDialogProps) {
     const resolvedTargetPath = String(targetPath || '').trim();
     const resolvedIdeTargetPath = String(ideTargetPath || '').trim();
+    const scope = React.useMemo(() => requireProjectScope(projectId), [projectId]);
     const [probe, setProbe] = React.useState<ExportMakeProbeResponse | null>(null);
     const [loading, setLoading] = React.useState(false);
     const [downloading, setDownloading] = React.useState(false);
@@ -75,7 +79,7 @@ export default function FigmaMakeExportDialog({
 
         setLoading(true);
         try {
-            const result = await apiService.probeExportMake(resolvedTargetPath);
+            const result = await apiService.probeExportMake(resolvedTargetPath, scope);
             setProbe(result);
         } catch (nextError: any) {
             setProbe(null);
@@ -83,7 +87,7 @@ export default function FigmaMakeExportDialog({
         } finally {
             setLoading(false);
         }
-    }, [resolvedTargetPath]);
+    }, [resolvedTargetPath, scope]);
 
     React.useEffect(() => {
         if (!open) {
@@ -100,7 +104,7 @@ export default function FigmaMakeExportDialog({
 
         setDownloading(true);
         try {
-            const response = await fetch(`/api/export-make?path=${encodeURIComponent(resolvedTargetPath)}`);
+            const response = await fetch(withProjectScope(`/api/export-make?path=${encodeURIComponent(resolvedTargetPath)}`, scope));
             if (!response.ok) {
                 const result = await response.json().catch(() => ({}));
                 throw new Error(result?.error || '下载 .fig 失败');
@@ -125,7 +129,7 @@ export default function FigmaMakeExportDialog({
         } finally {
             setDownloading(false);
         }
-    }, [itemName, loadProbe, onDownloadFailure, onDownloadSuccess, probe?.fileName, resolvedTargetPath]);
+    }, [itemName, loadProbe, onDownloadFailure, onDownloadSuccess, probe?.fileName, resolvedTargetPath, scope]);
 
     const canDownload = Boolean(probe?.hasMakeAssets) && !probe?.hasDriftRisk && !loading && !downloading;
     const fileName = probe?.fileName || `${itemName || 'project'}.fig`;
@@ -209,7 +213,7 @@ export default function FigmaMakeExportDialog({
                             if (!resolvedTargetPath) {
                                 throw new Error('请先选择一个原型页面');
                             }
-                            const result = await apiService.getExportMakePrompt(resolvedTargetPath);
+                            const result = await apiService.getExportMakePrompt(resolvedTargetPath, scope);
                             return result.prompt;
                         }}
                         getTargetPath={() => resolvedIdeTargetPath || resolvedTargetPath || null}

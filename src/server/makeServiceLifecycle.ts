@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import path from 'node:path';
 
 import {
@@ -12,6 +13,9 @@ import {
   readServerInfo,
   type AxhubServerInfo,
 } from './projectCore/index.ts';
+import { DEFAULT_MAKE_SERVER_PORT } from './defaults.ts';
+import { removeOwnedServerInfoFile } from './serverInfoRecord.ts';
+import { withMakeServiceStartGate } from './makeServiceStartGate.ts';
 
 const DEFAULT_START_TIMEOUT_MS = 10_000;
 const DEFAULT_STOP_TIMEOUT_MS = 5_000;
@@ -41,8 +45,12 @@ export interface MakeServiceOptions {
   platform?: NodeJS.Platform;
   args?: string[];
   entryPath?: string;
+  selfContainedExecutable?: boolean;
+  host?: string;
+  port?: number;
   logFile?: string;
   startTimeoutMs?: number;
+  startLockTimeoutMs?: number;
   stopTimeoutMs?: number;
   pollIntervalMs?: number;
 }
@@ -63,9 +71,11 @@ export interface MakeServiceDependencies {
   mkdirSync?: typeof fs.mkdirSync;
   openSync?: typeof fs.openSync;
   closeSync?: typeof fs.closeSync;
-  unlinkSync?: typeof fs.unlinkSync;
+  removeOwnedServerInfoFile?: typeof removeOwnedServerInfoFile;
+  isPortAvailable?: (host: string | undefined, port: number) => Promise<boolean>;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
+  pid?: number;
 }
 
 interface ResolvedDependencies {
@@ -82,9 +92,31 @@ interface ResolvedDependencies {
   mkdirSync: typeof fs.mkdirSync;
   openSync: typeof fs.openSync;
   closeSync: typeof fs.closeSync;
-  unlinkSync: typeof fs.unlinkSync;
+  removeOwnedServerInfoFile: typeof removeOwnedServerInfoFile;
+  isPortAvailable: (host: string | undefined, port: number) => Promise<boolean>;
   now: () => number;
   sleep: (ms: number) => Promise<void>;
+  pid: number;
+}
+
+function probePortAvailability(host: string | undefined, port: number): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.unref();
+    server.once('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        resolve(false);
+        return;
+      }
+      reject(error);
+    });
+    server.listen({ port, ...(host ? { host } : {}) }, () => {
+      server.close((error) => {
+        if (error) reject(error);
+        else resolve(true);
+      });
+    });
+  });
 }
 
 function resolveDependencies(dependencies: MakeServiceDependencies = {}): ResolvedDependencies {
@@ -102,9 +134,11 @@ function resolveDependencies(dependencies: MakeServiceDependencies = {}): Resolv
     mkdirSync: fs.mkdirSync,
     openSync: fs.openSync,
     closeSync: fs.closeSync,
-    unlinkSync: fs.unlinkSync,
+    removeOwnedServerInfoFile,
+    isPortAvailable: probePortAvailability,
     now: Date.now,
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    pid: process.pid,
     ...dependencies,
   };
 }
@@ -129,7 +163,10 @@ function isMatchingAdminIdentity(
     && server !== null
     && server.pid === info.pid
     && server.port === info.port
+    && server.host === info.host
     && server.origin === info.origin
+    && server.startedAt === info.startedAt
+    && server.timestamp === info.timestamp
     && isSamePath(info.projectRoot, projectRoot)
     && isSamePath(server.projectRoot, projectRoot);
 }
@@ -217,12 +254,16 @@ async function waitForInspection(
   options: MakeServiceOptions,
   dependencies: ResolvedDependencies,
   timeoutMs: number,
+  shouldAbort: () => boolean = () => false,
 ): Promise<MakeServiceInspection | null> {
   const deadline = dependencies.now() + timeoutMs;
   do {
     const inspection = await inspectMakeService(options, dependencies);
     if (inspection.status === 'running') {
       return inspection;
+    }
+    if (shouldAbort()) {
+      break;
     }
     if (dependencies.now() >= deadline) {
       break;
@@ -237,96 +278,174 @@ export async function startMakeServiceInBackground(
   suppliedDependencies: MakeServiceDependencies = {},
 ): Promise<MakeServiceResult> {
   const dependencies = resolveDependencies(suppliedDependencies);
-  const current = await inspectMakeService(options, dependencies);
-  if (current.status === 'running') {
+  const gate = await withMakeServiceStartGate({
+    stateDirectory: dependencies.getGlobalMakeStateDir(options.homeDir),
+    timeoutMs: options.startLockTimeoutMs,
+    pollIntervalMs: options.pollIntervalMs,
+  }, async (lease): Promise<MakeServiceResult> => {
+    const current = await inspectMakeService(options, dependencies);
+    if (current.status === 'running') {
+      return {
+        ok: true,
+        code: 'make-running',
+        message: 'Axhub Make is already running.',
+        origin: current.origin,
+        pid: current.pid,
+        reusedServer: true,
+      };
+    }
+    if (current.status === 'stale') {
+      return {
+        ok: false,
+        code: 'server-identity-mismatch',
+        message: 'The recorded Axhub Make server could not be identified safely.',
+      };
+    }
+
+    const host = options.host ?? '0.0.0.0';
+    const port = options.port ?? DEFAULT_MAKE_SERVER_PORT;
+    try {
+      if (!await dependencies.isPortAvailable(host, port)) {
+        const raced = await inspectMakeService(options, dependencies);
+        if (raced.status === 'running') {
+          return {
+            ok: true,
+            code: 'make-running',
+            message: 'Axhub Make is already running.',
+            origin: raced.origin,
+            pid: raced.pid,
+            reusedServer: true,
+          };
+        }
+        return {
+          ok: false,
+          code: 'make-port-occupied',
+          message: `Axhub Make cannot start because port ${port} is already in use.`,
+        };
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        code: 'make-start-failed',
+        message: `Unable to check port ${port}: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+
+    const entryPath = options.entryPath || process.argv[1];
+    if (!options.selfContainedExecutable && !entryPath) {
+      return {
+        ok: false,
+        code: 'make-start-failed',
+        message: 'Unable to determine the Axhub Make CLI entry path.',
+      };
+    }
+    const logFile = options.logFile || dependencies.getGlobalMakeServiceLogPath(options.homeDir);
+    dependencies.mkdirSync(path.dirname(logFile), { recursive: true });
+    const logFd = dependencies.openSync(logFile, 'a');
+    let childExited = false;
+    let childFailure: Error | null = null;
+    try {
+      const childArgs = options.selfContainedExecutable
+        ? buildBackgroundServeArgs(options)
+        : [...process.execArgv, entryPath!, ...buildBackgroundServeArgs(options)];
+      const child = dependencies.spawn(process.execPath, childArgs, {
+        detached: true,
+        shell: false,
+        stdio: ['ignore', logFd, logFd],
+        env: {
+          ...process.env,
+          AXHUB_MAKE_START_GATE_CLAIM: lease.entryPath,
+        },
+      });
+      child.once?.('error', (error) => {
+        childFailure = error;
+      });
+      child.once?.('exit', () => {
+        childExited = true;
+      });
+      child.unref();
+    } catch (error) {
+      return {
+        ok: false,
+        code: 'make-start-failed',
+        message: `Unable to start Axhub Make: ${error instanceof Error ? error.message : String(error)}`,
+        logFile,
+      };
+    } finally {
+      dependencies.closeSync(logFd);
+    }
+
+    const ready = await waitForInspection(
+      options,
+      dependencies,
+      options.startTimeoutMs ?? DEFAULT_START_TIMEOUT_MS,
+      () => childExited || childFailure !== null,
+    );
+    if (!ready) {
+      try {
+        if (!await dependencies.isPortAvailable(host, port)) {
+          const raced = await inspectMakeService(options, dependencies);
+          if (raced.status === 'running') {
+            return {
+              ok: true,
+              code: 'make-running',
+              message: 'Axhub Make is already running.',
+              origin: raced.origin,
+              pid: raced.pid,
+              reusedServer: true,
+            };
+          }
+          return {
+            ok: false,
+            code: 'make-port-occupied',
+            message: `Axhub Make cannot start because port ${port} is already in use.`,
+            logFile,
+          };
+        }
+      } catch {
+        // Preserve the startup result below when a follow-up port probe is inconclusive.
+      }
+      if (childExited || childFailure) {
+        return {
+          ok: false,
+          code: 'make-start-failed',
+          message: childFailure
+            ? `Unable to start Axhub Make: ${childFailure.message}`
+            : 'Axhub Make exited before it became ready.',
+          logFile,
+        };
+      }
+      return {
+        ok: false,
+        code: 'make-start-timeout',
+        message: 'Axhub Make did not become ready in time.',
+        logFile,
+      };
+    }
     return {
       ok: true,
-      code: 'make-running',
-      message: 'Axhub Make is already running.',
-      origin: current.origin,
-      pid: current.pid,
-      reusedServer: true,
-    };
-  }
-  if (current.status === 'stale') {
-    return {
-      ok: false,
-      code: 'server-identity-mismatch',
-      message: 'The recorded Axhub Make server could not be identified safely.',
-    };
-  }
-
-  const entryPath = options.entryPath || process.argv[1];
-  if (!entryPath) {
-    return {
-      ok: false,
-      code: 'make-start-failed',
-      message: 'Unable to determine the Axhub Make CLI entry path.',
-    };
-  }
-  const logFile = options.logFile || dependencies.getGlobalMakeServiceLogPath(options.homeDir);
-  dependencies.mkdirSync(path.dirname(logFile), { recursive: true });
-  const logFd = dependencies.openSync(logFile, 'a');
-  try {
-    const child = dependencies.spawn(process.execPath, [
-      ...process.execArgv,
-      entryPath,
-      ...buildBackgroundServeArgs(options),
-    ], {
-      detached: true,
-      shell: false,
-      stdio: ['ignore', logFd, logFd],
-    });
-    child.unref();
-  } catch (error) {
-    return {
-      ok: false,
-      code: 'make-start-failed',
-      message: `Unable to start Axhub Make: ${error instanceof Error ? error.message : String(error)}`,
+      code: 'make-started',
+      message: 'Axhub Make started in the background.',
+      origin: ready.origin,
+      pid: ready.pid,
       logFile,
+      reusedServer: false,
     };
-  } finally {
-    dependencies.closeSync(logFd);
-  }
+  }, {
+    isProcessAlive: dependencies.isProcessAlive,
+    now: dependencies.now,
+    sleep: dependencies.sleep,
+    pid: dependencies.pid,
+  });
 
-  const ready = await waitForInspection(options, dependencies, options.startTimeoutMs ?? DEFAULT_START_TIMEOUT_MS);
-  if (!ready) {
+  if (!gate.acquired) {
     return {
       ok: false,
       code: 'make-start-timeout',
-      message: 'Axhub Make did not become ready in time.',
-      logFile,
+      message: 'Timed out waiting for another Axhub Make startup to finish.',
     };
   }
-  return {
-    ok: true,
-    code: 'make-started',
-    message: 'Axhub Make started in the background.',
-    origin: ready.origin,
-    pid: ready.pid,
-    logFile,
-    reusedServer: false,
-  };
-}
-
-function removeRecord(infoPath: string, dependencies: ResolvedDependencies): void {
-  try {
-    dependencies.unlinkSync(infoPath);
-  } catch (error: any) {
-    if (String(error?.code || '') !== 'ENOENT') {
-      throw error;
-    }
-  }
-}
-
-function isSameServerInfo(left: AxhubServerInfo, right: AxhubServerInfo): boolean {
-  return left.pid === right.pid
-    && left.port === right.port
-    && left.host === right.host
-    && left.origin === right.origin
-    && left.startedAt === right.startedAt
-    && left.timestamp === right.timestamp
-    && isSamePath(left.projectRoot, right.projectRoot);
+  return gate.value;
 }
 
 function removeMatchingRecord(
@@ -334,10 +453,10 @@ function removeMatchingRecord(
   expected: AxhubServerInfo,
   dependencies: ResolvedDependencies,
 ): void {
-  const recorded = getRecordedInfo(options, dependencies);
-  if (recorded.info && isSameServerInfo(recorded.info, expected)) {
-    removeRecord(recorded.infoPath, dependencies);
-  }
+  dependencies.removeOwnedServerInfoFile(
+    dependencies.getGlobalAdminServerInfoPath(options.homeDir),
+    expected,
+  );
 }
 
 async function waitForProcessExit(

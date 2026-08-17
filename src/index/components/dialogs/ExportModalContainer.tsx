@@ -11,6 +11,7 @@ export default function ExportModalContainer({ state, actions }: ExportModalCont
     return (
         <ExportModal
             open={state.open}
+            projectId={state.projectId}
             preferencesStorageKey={state.preferencesStorageKey}
             onClose={actions.onClose}
             imageConfig={state.imageConfig}

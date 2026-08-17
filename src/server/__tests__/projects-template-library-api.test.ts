@@ -10,6 +10,7 @@ import {
   cleanupProjectApiTestRoots,
   createTempRoot,
   registerProject,
+  scopeProjectApiUrl,
   setActiveProject,
   startTestServer,
   writeProjectMetadata,
@@ -162,7 +163,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-library-client');
 
     try {
-      const listed = await fetchJson(`${server.origin}/api/template-library`);
+      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library`));
 
       expect(listed.status).toBe(200);
       expect(listed.body).toMatchObject({
@@ -216,7 +217,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-library-client');
 
     try {
-      const listed = await fetchJson(`${server.origin}/api/template-library`);
+      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library`));
 
       expect(listed.status).toBe(502);
       expect(listed.body).toMatchObject({
@@ -251,7 +252,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-library-client');
 
     try {
-      const listed = await fetchJson(`${server.origin}/api/template-library`);
+      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library`));
 
       expect(listed.status).toBe(200);
       expect(listed.body.templates).toEqual([
@@ -290,7 +291,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-library-client');
 
     try {
-      const listed = await fetchJson(`${server.origin}/api/template-library`);
+      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library`));
 
       expect(listed.status).toBe(200);
       expect(listed.body.templates).toEqual([
@@ -333,7 +334,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-library-client');
 
     try {
-      const listed = await fetchJson(`${server.origin}/api/template-library`);
+      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library`));
 
       expect(listed.status).toBe(502);
       expect(listed.body).toMatchObject({
@@ -373,7 +374,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-library-client');
 
     try {
-      const listed = await fetchJson(`${server.origin}/api/template-library`);
+      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library`));
 
       expect(listed.status).toBe(502);
       expect(listed.body).toMatchObject({
@@ -402,7 +403,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-import-client');
 
     try {
-      const imported = await fetchJson(`${server.origin}/api/template-library/import`, {
+      const imported = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library/import`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ templateId: 'ref-free' }),
@@ -485,7 +486,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-overwrite-client');
 
     try {
-      const imported = await fetchJson(`${server.origin}/api/template-library/import`, {
+      const imported = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library/import`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ templateId: 'ref-free', targetPrototypeName: 'untitled' }),
@@ -564,7 +565,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-invalid-target-client');
 
     try {
-      const imported = await fetchJson(`${server.origin}/api/template-library/import`, {
+      const imported = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library/import`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ templateId: 'ref-free', targetPrototypeName }),
@@ -606,7 +607,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-preview-import-client');
 
     try {
-      const imported = await fetchJson(`${server.origin}/api/template-library/import`, {
+      const imported = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library/import`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ templateId: 'ref-free' }),
@@ -644,7 +645,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-extra-deps-client');
 
     try {
-      const imported = await fetchJson(`${server.origin}/api/template-library/import`, {
+      const imported = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library/import`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ templateId: 'ref-three' }),
@@ -675,7 +676,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-existing-target-client');
 
     try {
-      const imported = await fetchJson(`${server.origin}/api/template-library/import`, {
+      const imported = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library/import`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ templateId: 'ref-free' }),
@@ -711,7 +712,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-no-target-client');
 
     try {
-      const imported = await fetchJson(`${server.origin}/api/template-library/import`, {
+      const imported = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library/import`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ templateId: 'ref-free' }),
@@ -735,7 +736,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-library-client');
 
     try {
-      const listed = await fetchJson(`${server.origin}/api/template-library`);
+      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library`));
 
       expect(listed.status).toBe(502);
       expect(listed.body).toMatchObject({
@@ -754,7 +755,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-library-client');
 
     try {
-      const listed = await fetchJson(`${server.origin}/api/template-library`);
+      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library`));
 
       expect(listed.status).toBe(200);
       expect(listed.body).toMatchObject({
@@ -794,7 +795,7 @@ describe('make-server project template library APIs', () => {
     const server = await startTemplateLibraryTestServer(projectRoot, 'template-library-client');
 
     try {
-      const listed = await fetchJson(`${server.origin}/api/template-library`);
+      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/template-library`));
 
       expect(listed.status).toBe(200);
       expect(listed.body.templates).toEqual([

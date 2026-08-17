@@ -35,7 +35,7 @@ interface PrototypeSpecApiHandlers {
     req: IncomingMessage,
     res: ServerResponse,
     options: ManagementApiOptions,
-    mode: 'active-fallback',
+    mode: 'explicit-required',
     body?: unknown,
   ) => PrototypeSpecProjectContext | null;
 }
@@ -77,18 +77,36 @@ function resolvePrototypeSpec(
 ): ResolvedPrototypeSpec | null {
   const resource = context.metadata.resources.prototypes.find((item) => item.id === prototypeId);
   const filePath = String(resource?.filePath || '').trim();
-  if (!resource || !filePath) return null;
+  const specFilePath = String(resource?.specFilePath || '').trim();
+  if (!resource || (!filePath && !specFilePath)) return null;
 
   let sourcePath: string;
+  let prototypeDir: string;
+  let specDir: string;
   try {
-    sourcePath = resolveProjectPath(context.project.root, filePath);
+    sourcePath = resolveProjectPath(context.project.root, filePath || specFilePath);
+    if (filePath) {
+      prototypeDir = path.dirname(sourcePath);
+      specDir = path.join(prototypeDir, '.spec');
+    } else {
+      specDir = path.dirname(sourcePath);
+      prototypeDir = path.dirname(specDir);
+      if (path.basename(specDir) !== '.spec') return null;
+    }
   } catch {
     return null;
   }
   if (!isPathInside(context.project.root, sourcePath)) return null;
-  const prototypeDir = path.dirname(sourcePath);
-  const specDir = path.join(prototypeDir, '.spec');
   if (!isPathInside(context.project.root, prototypeDir) || !isPathInside(prototypeDir, specDir)) return null;
+  if (specFilePath) {
+    let declaredSpecPath: string;
+    try {
+      declaredSpecPath = resolveProjectPath(context.project.root, specFilePath);
+    } catch {
+      return null;
+    }
+    if (!isPathInside(specDir, declaredSpecPath)) return null;
+  }
   let realProjectRoot: string;
   let realPrototypeDir: string;
   try {
@@ -297,7 +315,7 @@ export function handlePrototypeSpecApi(
     sendSpecError(res, 400, 'INVALID_SPEC_PATH', '项目或原型 ID 无效');
     return true;
   }
-  const context = handlers.resolveProjectContext(req, res, options, 'active-fallback', { projectId });
+  const context = handlers.resolveProjectContext(req, res, options, 'explicit-required', { projectId });
   if (!context) return true;
   const apiBasePath = `/api/projects/${encodeURIComponent(projectId)}/prototypes/${encodeURIComponent(prototypeId)}/spec`;
   const resolved = resolvePrototypeSpec(context, prototypeId, apiBasePath);

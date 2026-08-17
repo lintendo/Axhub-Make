@@ -4,15 +4,21 @@ import { X } from 'lucide-react';
 import type { AcpContextItem } from '../../domains/assistant/assistantAcpContext';
 import { ASSISTANT_CONTEXT_DRAG_MIME, parseAssistantContextDragPayload } from '../../domains/assistant/assistantContextDrag';
 
+export interface AssistantIframeRenderEntry {
+    key: string;
+    src: string;
+}
+
 interface AssistantPanelProps {
     mounted: boolean;
     visible: boolean;
     width: number;
     minWidth: number;
     maxWidth: number;
-    iframeSrc: string;
-    iframeRef: React.Ref<HTMLIFrameElement>;
-    onLoad: () => void;
+    iframeEntries: AssistantIframeRenderEntry[];
+    activeIframeKey: string | null;
+    onIframeRef: (key: string, iframe: HTMLIFrameElement | null) => void;
+    onIframeLoad: (key: string) => void;
     onResize: (nextWidth: number) => void;
     onAddContextItems: (items: AcpContextItem[]) => boolean | Promise<boolean>;
     onToggle: () => void;
@@ -28,9 +34,10 @@ export default function AssistantPanel({
     width,
     minWidth,
     maxWidth,
-    iframeSrc,
-    iframeRef,
-    onLoad,
+    iframeEntries,
+    activeIframeKey,
+    onIframeRef,
+    onIframeLoad,
     onResize,
     onAddContextItems,
     onToggle,
@@ -171,14 +178,22 @@ export default function AssistantPanel({
                 >
                     <X aria-hidden="true" style={{ width: 13, height: 13, strokeWidth: 2 }} />
                 </button>
-                <iframe
-                    ref={iframeRef}
-                    src={iframeSrc}
-                    title="ACP UI"
-                    allow="clipboard-write"
-                    onLoad={onLoad}
-                    style={{ border: 'none', width: '100%', height: '100%' }}
-                />
+                {iframeEntries.map((entry) => (
+                    <iframe
+                        key={entry.key}
+                        ref={(iframe) => onIframeRef(entry.key, iframe)}
+                        src={entry.src}
+                        title="ACP UI"
+                        allow="clipboard-write"
+                        onLoad={() => onIframeLoad(entry.key)}
+                        style={{
+                            border: 'none',
+                            width: '100%',
+                            height: '100%',
+                            display: entry.key === activeIframeKey ? 'block' : 'none',
+                        }}
+                    />
+                ))}
                 {assistantContextDragging ? (
                     <div
                         style={{

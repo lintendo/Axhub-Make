@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ImageOff } from 'lucide-react';
 import {
     AXHUB_EMBED_ACTIVE_PREVIEW_CHANGED_EVENT,
@@ -12,7 +12,6 @@ import {
     shouldRequestEmbedScreenshot,
     type EmbedContentScale,
 } from './embedContentScale';
-import { shouldActivateEmbedOverlayClick } from './embedActivationIntent';
 import { captureSameOriginIframeScreenshot } from './parentScreenshotCapture';
 
 interface AxhubWebEmbedProps {
@@ -102,7 +101,6 @@ const SCREENSHOT_HMR_DEBOUNCE_MS = 1200;
 const SCREENSHOT_INITIAL_DELAY_MS = 600;
 const SCREENSHOT_DESELECT_DELAY_MS = 120;
 const SCREENSHOT_TIMEOUT_MS = 10_000;
-const EMBED_CLICK_ACTIVATION_MOVEMENT_THRESHOLD = 5;
 
 function createScreenshotRequestId(elementId: string, sequence: number): string {
     return `${elementId}:${Date.now()}:${sequence}`;
@@ -186,7 +184,6 @@ function AxhubWebEmbedInner({
 
     const iframeContainerRef = useRef<HTMLDivElement>(null);
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
-    const selectedRef = useRef(false);
     const activatedRef = useRef(activated);
     const captureOnlyRef = useRef(captureOnly);
     const iframeLoadCountRef = useRef(0);
@@ -224,56 +221,9 @@ function AxhubWebEmbedInner({
     const selectionHandlerRef = useRef<(event: Event) => void>(() => undefined);
     const resizeHandlerRef = useRef<(event: Event) => void>(() => undefined);
     const exitPreviewHandlerRef = useRef<(event: Event) => void>(() => undefined);
-    const overlayPointerIntentRef = useRef<{
-        pointerId: number;
-        startX: number;
-        startY: number;
-        selectedAtPointerDown: boolean;
-        moved: boolean;
-        cancelled: boolean;
-    } | null>(null);
-    const shouldActivateFromOverlayClickRef = useRef<() => boolean>(() => true);
 
     activatedRef.current = activated;
     captureOnlyRef.current = captureOnly;
-
-    const handleActivate = useCallback(() => {
-        const ctx = latestContextRef.current;
-        logEmbedDebug('web', 'click:activated', { elementId: ctx.elementId, url: ctx.url, title: ctx.title });
-        pendingIframeTeardownRef.current = false;
-        setExitCaptureInProgress(false);
-        setActivated(true);
-    }, []);
-
-    const handleOverlayPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-        overlayPointerIntentRef.current = {
-            pointerId: event.pointerId,
-            startX: event.clientX,
-            startY: event.clientY,
-            selectedAtPointerDown: selectedRef.current,
-            moved: false,
-            cancelled: false,
-        };
-    }, []);
-
-    const handleOverlayPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-        const pointerIntent = overlayPointerIntentRef.current;
-        if (!pointerIntent || pointerIntent.pointerId !== event.pointerId) return;
-
-        if (
-            Math.abs(event.clientX - pointerIntent.startX) > EMBED_CLICK_ACTIVATION_MOVEMENT_THRESHOLD
-            || Math.abs(event.clientY - pointerIntent.startY) > EMBED_CLICK_ACTIVATION_MOVEMENT_THRESHOLD
-        ) {
-            pointerIntent.moved = true;
-        }
-    }, []);
-
-    const handleOverlayPointerCancel = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-        const pointerIntent = overlayPointerIntentRef.current;
-        if (pointerIntent && pointerIntent.pointerId === event.pointerId) {
-            pointerIntent.cancelled = true;
-        }
-    }, []);
 
     function syncIframeRootSize(iframe: HTMLIFrameElement | null = iframeRef.current) {
         const latest = latestContextRef.current;
@@ -302,18 +252,6 @@ function AxhubWebEmbedInner({
         iframe.style.height = `${latest.viewportHeight}px`;
         iframe.style.transform = latest.contentScale === 1 ? '' : `scale(${latest.contentScale})`;
     }
-
-    shouldActivateFromOverlayClickRef.current = () => {
-        const pointerIntent = overlayPointerIntentRef.current;
-        if (!pointerIntent) return true;
-        const shouldActivate = shouldActivateEmbedOverlayClick({
-            selectedAtPointerDown: pointerIntent.selectedAtPointerDown,
-            moved: pointerIntent.moved,
-            cancelled: pointerIntent.cancelled,
-        });
-        overlayPointerIntentRef.current = null;
-        return shouldActivate;
-    };
 
     const persistedScreenshotUsable = isEmbedScreenshotUsable({
         screenshotUrl: screenshotUrl && !imgError ? screenshotUrl : '',
@@ -588,7 +526,6 @@ function AxhubWebEmbedInner({
         if (!detail || detail.elementId !== ctx.elementId) return;
 
         if (detail.isSelected) {
-            selectedRef.current = true;
             if (detail.activationMode !== 'activate') {
                 logEmbedDebug('web', 'selection:select-only', { elementId: ctx.elementId, url: ctx.url, title: ctx.title });
                 return;
@@ -600,7 +537,6 @@ function AxhubWebEmbedInner({
             return;
         }
 
-        selectedRef.current = false;
         deactivatePreviewRef.current('deselect');
     };
 
@@ -770,14 +706,6 @@ function AxhubWebEmbedInner({
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer', background: '#f8fafc', zIndex: 2,
-                    }}
-                    onPointerDown={handleOverlayPointerDown}
-                    onPointerMove={handleOverlayPointerMove}
-                    onPointerCancel={handleOverlayPointerCancel}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        if (!shouldActivateFromOverlayClickRef.current()) return;
-                        handleActivate();
                     }}
                 >
                     {effectiveScreenshot ? (

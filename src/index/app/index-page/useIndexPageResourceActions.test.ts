@@ -17,8 +17,10 @@ describe('useIndexPageResourceActions source', () => {
   it('uses explicit local source paths for prototype filesystem operations', () => {
     const source = readResourceActionsSource();
 
-    expect(source).toContain("import { getExplicitLocalPath, stripIndexFilePath } from '../../utils/localPath';");
-    expect(source).toContain('const localBasePath = getLocalBasePathForItem(item);');
+    expect(source).toContain("import { getExplicitLocalPath, getPrototypeLocalBasePath, stripIndexFilePath } from '../../utils/localPath';");
+    expect(source).toContain('export function getPrototypeBasePathForItem(item: unknown): string');
+    expect((source.match(/getPrototypeBasePathForItem\(item\)/gu) || [])).toHaveLength(6);
+    expect(source).toContain('const localBasePath = getPrototypeBasePathForItem(item);');
     expect(source).toContain('if (!localBasePath)');
     expect(source).toContain('fetch(buildResourceUrl(`/api/prototypes/${encodeURIComponent(item.name)}`)');
     expect(source).toContain('body: JSON.stringify(buildResourceBody({ displayName: trimmedName }))');
@@ -27,6 +29,7 @@ describe('useIndexPageResourceActions source', () => {
     expect(source).toContain('targetPath: buildLocalSiblingPath(localBasePath, newName),');
     expect(source).toContain('const deleteTargetLabel = item.displayName || item.name;');
     expect(source).toContain('getIdeTargetPath={() => localBasePath}');
+    expect(source).toContain('setCurrentVersionItem({ ...item, filePath: localBasePath });');
     expect(source).not.toContain('const sourcePath = `prototypes/${item.name}`;');
     expect(source).not.toContain('sourcePath: `src/${itemTypePath}/${item.name}`');
     expect(source).not.toContain('targetPath: `src/${itemTypePath}/${newName}`');
@@ -47,6 +50,7 @@ describe('useIndexPageResourceActions source', () => {
 
     expect(source).toContain('if (!hasExplicitLocalPath(item))');
     expect(source).toContain('messageApi.warning(\'当前资源未声明本地文件路径，无法导出源码\');');
+    expect(source).toContain('const baseUrl = buildResourceUrl(`/api/zip?path=${encodeURIComponent(targetPath)}`);');
     expect(source).toContain('void handleDownloadZipByPath(getLocalBasePathForItem(item), `${item.name}.zip`);');
     expect(source).not.toContain('void handleDownloadZipByPath(`themes/${item.name}`, `${item.name}.zip`);');
   });
@@ -95,7 +99,19 @@ describe('useIndexPageResourceActions source', () => {
     expect(rootSource).toContain('checkTemplateReferencesRequest(templateName, action, nextBaseName, activeProjectId)');
     expect(combinedSource).toContain('export function withResourceProject(');
     expect(combinedSource).toContain('export function withResourceProjectBody');
-    expect(combinedSource).toContain('projectId: normalizedProjectId');
+    expect(combinedSource).toContain('withProjectScope(url, requireProjectScope(projectId))');
+    expect(combinedSource).toContain('withProjectScopeBody(body, requireProjectScope(projectId))');
+    expect(rootSource).toContain("sidebarApi.saveResourceOrder('themes', nextOrder, requireProjectScope(activeProjectId))");
+    expect(rootSource).toContain('sidebarApi.saveSidebarTree(tab, normalizedTree, requireProjectScope(activeProjectId))');
+    expect(rootSource).toContain('sidebarApi.updateProjectTitle(nextTitle, requireProjectScope(activeProjectId))');
+    expect(rootSource).toContain("fetch(buildResourceUrl('/api/config'))");
+    expect(rootSource).toContain("fetch(buildResourceUrl('/api/config'), {");
+    expect(rootSource).toContain("fetch(buildResourceUrl('/api/themes/sync-design'), {");
+    expect(rootSource).toContain('fetch(buildResourceUrl(`/api/themes/${encodeURIComponent(item.name)}`), {');
+    expect(rootSource).toContain('fetch(buildResourceUrl(`/api/data/tables/${encodeURIComponent(item.fileName)}`), {');
+    expect(rootSource).not.toContain("fetch('/api/config')");
+    expect(rootSource).not.toContain('fetch(`/api/themes/${encodeURIComponent(item.name)}`');
+    expect(rootSource).not.toContain('fetch(`/api/data/tables/${encodeURIComponent(item.fileName)}`');
     expect(prototypeRenameSource).toContain('fetch(buildResourceUrl(`/api/prototypes/${encodeURIComponent(item.name)}`),');
     expect(prototypeRenameSource).toContain('body: JSON.stringify(buildResourceBody({ displayName: trimmedName }))');
     expect(prototypeDuplicateSource).toContain("fetch(buildResourceUrl('/api/copy'),");
@@ -208,7 +224,8 @@ describe('useIndexPageResourceActions source', () => {
     expect(source).not.toContain('const handleGenerateThemeFromPrototype = useCallback');
     expect(source).not.toContain('generateCreateThemePrompt(');
     expect(source).not.toContain('setSelectedThemeReferencePages');
-    expect(source).toContain("setInitialThemeDialogTab('import')");
+    expect(source).not.toContain('initialThemeDialogTab');
+    expect(source).not.toContain('setInitialThemeDialogTab');
     expect(source).toContain("setThemeCreateDialogVisible(true)");
   });
 
@@ -221,11 +238,11 @@ describe('useIndexPageResourceActions source', () => {
     expect(source).toContain('const [defaultThemeName, setDefaultThemeName] = useState<string | null>(null);');
     expect(handlerSource).toContain('const nextValue = defaultThemeName === themeName ? null : themeName;');
     expect(handlerSource).toContain('setDefaultThemeName(nextValue);');
-    expect(handlerSource).toContain("const currentConfigResponse = await fetch('/api/config');");
+    expect(handlerSource).toContain("const currentConfigResponse = await fetch(buildResourceUrl('/api/config'));");
     expect(handlerSource).toContain('projectDefaults: {');
     expect(handlerSource).toContain('defaultTheme: nextValue,');
-    expect(handlerSource).toContain("fetch('/api/config', {");
-    expect(handlerSource).toContain("fetch('/api/themes/sync-design', {");
+    expect(handlerSource).toContain("fetch(buildResourceUrl('/api/config'), {");
+    expect(handlerSource).toContain("fetch(buildResourceUrl('/api/themes/sync-design'), {");
     expect(handlerSource).toContain("body: JSON.stringify({ themeName: nextValue || '' })");
     expect(handlerSource).toContain("messageApi.success(nextValue ? '已设为默认设计' : '已取消默认设计');");
     expect(source).toContain('defaultThemeName,');
@@ -259,7 +276,9 @@ describe('useIndexPageResourceActions source', () => {
     expect(source).toContain("const createdName = buildUniqueResourceFileName(docsItems, targetFolder, 'untitled.drawio');");
     expect(source).toContain("body: JSON.stringify(buildResourceBody({ content: EMPTY_DRAWIO_RESOURCE_CONTENT }))");
     expect(source).toContain('await openDrawioResourceEditor({');
-    expect(source).toContain('resource: createdDoc,');
+    expect(source).toContain('resource: {');
+    expect(source).toContain('...createdDoc,');
+    expect(source).toContain('projectId: requireProjectScope(activeProjectId).projectId,');
     expect(source).toContain("kind: 'doc',");
     expect(source).toContain('onSaved: reloadDocsItems,');
     expect(source).toContain('setSelectedDoc(createdDoc);');
@@ -277,10 +296,33 @@ describe('useIndexPageResourceActions source', () => {
     const handlerEnd = source.indexOf('const handleVersionManagement', handlerStart);
     const handlerSource = source.slice(handlerStart, handlerEnd);
 
-    expect(handlerSource).toContain('await sidebarApi.saveSidebarTree(tab, normalizedTree)');
+    expect(handlerSource).toContain('await sidebarApi.saveSidebarTree(tab, normalizedTree, requireProjectScope(activeProjectId))');
     expect(handlerSource).toMatch(/const latestItems = tab === 'docs'\s+\? await reloadDocsItems\(\)\s+: getSidebarTabItems\(tab\);/);
-    expect(handlerSource.indexOf('await sidebarApi.saveSidebarTree(tab, normalizedTree)'))
+    expect(handlerSource.indexOf('await sidebarApi.saveSidebarTree(tab, normalizedTree, requireProjectScope(activeProjectId))'))
       .toBeLessThan(handlerSource.indexOf('await reloadDocsItems()'));
+  });
+
+  it('prepares and selects the canonical image AI resource folder', () => {
+    const source = readResourceRootSource();
+    const handlerStart = source.indexOf('const prepareImageAiResourceFolder = useCallback');
+    const handlerEnd = source.indexOf('const handleSidebarTreeChange', handlerStart);
+    const handlerSource = source.slice(handlerStart, handlerEnd);
+
+    expect(handlerStart).toBeGreaterThanOrEqual(0);
+    expect(handlerSource).toContain('sidebarApi.ensureSidebarFolder(folderPath, requireProjectScope(activeProjectId))');
+    expect(handlerSource).toContain("sanitizeSidebarTree('docs', Array.isArray(response.tree) ? response.tree : [], items)");
+    expect(handlerSource).toContain("setSidebarTrees((previous: Record<SidebarTreeTab, SidebarTreeNode[]>) => ({ ...previous, docs: nextTree }))");
+    expect(handlerSource).toContain("handleSelectResourceFolder(response.folder, 'docs');");
+    expect(handlerSource).toContain("folder: toSelectedResourceFolder(response.folder, 'docs'),");
+    expect(handlerSource).toContain('absolutePath: response.absolutePath,');
+    expect(handlerSource).toContain("messageApi.error(error?.message || '准备图片保存文件夹失败');");
+    expect(source).toContain('prepareImageAiResourceFolder,');
+  });
+
+  it('exposes the existing docs refresh callback for host-side image save events', () => {
+    const source = readResourceRootSource();
+    expect(source).toContain('const refreshDocsResources = useCallback(async () => {');
+    expect(source).toContain('refreshDocsResources,');
   });
 
   it('selects the uploaded document resource after paste upload refreshes docs metadata', () => {
@@ -349,5 +391,16 @@ describe('useIndexPageResourceActions source', () => {
 
     expect(handlerSource).toContain("messageApi.error(error?.message || '删除失败');");
     expect(handlerSource).not.toContain('return Promise.reject(error);');
+  });
+
+  it('copies document resource paths relative to the project root', () => {
+    const source = readResourceRootSource();
+    const handlerStart = source.indexOf('const handleCopyDocPath = useCallback');
+    const handlerEnd = source.indexOf('const handleDocVersionManagement', handlerStart);
+    const handlerSource = source.slice(handlerStart, handlerEnd);
+
+    expect(handlerSource).toContain('const localPath = getProjectRelativeResourcePathForItem(item);');
+    expect(handlerSource).toContain('await navigator.clipboard.writeText(localPath);');
+    expect(handlerSource).not.toContain('const localPath = getLocalPathForItem(item);');
   });
 });

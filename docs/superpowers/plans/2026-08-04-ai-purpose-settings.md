@@ -158,7 +158,7 @@ Run the Step 3 command. Expected: both test files pass.
 
 - [ ] **Step 1: Write failing settings tests**
 
-Require `AI 用途配置`, all three purpose row labels, installed-only filtering, six saved fields, `aria-expanded={localAcpDetailsOpen}`, and `aria-expanded={agentDiagnosticsOpen}`. Reject the old default `RadioGroup` and any test-status filtering of config choices.
+Require `AI 用途配置`, all three purpose row labels, installed-only filtering, six saved fields, `aria-expanded={localAcpDetailsOpen}`, and `aria-expanded={agentDiagnosticsOpen}`. Require the visible title `本地 CLI Agent`, and reject the old `Agent 检测` title, default `RadioGroup`, and any test-status filtering of config choices.
 
 - [ ] **Step 2: Run RED**
 
@@ -180,7 +180,7 @@ Preserve an unavailable saved value through a disabled current-value item and wa
 
 - [ ] **Step 4: Implement the responsive table**
 
-Render one shared row for each purpose with a Select and Input. Put annotation concurrency below the table. Use a compact desktop table and a label-above-control narrow layout without horizontal scrolling.
+Render one shared row for each purpose with a Select and Input. Put annotation concurrency 12px below the table. Use a compact semantic desktop table with `88px / minmax(0, 1fr) / minmax(0, 1fr)` columns, `border-border` outer/row borders, a muted header, and a label-above-control narrow layout without horizontal scrolling.
 
 - [ ] **Step 5: Implement diagnostic disclosure**
 
@@ -330,7 +330,7 @@ Run `pnpm server:build` and `pnpm admin:build`. Expected: both exit 0.
 
 - [ ] **Step 3: Start the admin server**
 
-Run `pnpm admin:dev --host 127.0.0.1`, using a free port when needed, and leave it running for review.
+Run `pnpm server:dev -- --host 127.0.0.1 --no-open` and leave it running for review.
 
 - [ ] **Step 4: Perform browser QA**
 

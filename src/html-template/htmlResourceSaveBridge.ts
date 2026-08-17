@@ -1,3 +1,11 @@
+import {
+  buildQuickEditSaveConfirmation,
+  type QuickEditSaveAction,
+  type QuickEditSaveCommitResult,
+  type QuickEditSaveDraft,
+  type QuickEditSavePreflight,
+} from '../common/quickEditSave';
+
 interface HtmlResourceSaveLocator {
   selectors?: string[];
   fingerprint?: string;
@@ -33,9 +41,13 @@ export interface HtmlResourceSaveBridgeOptions {
 }
 
 export interface HtmlResourceSaveBridge {
+  saveAllChanges(): Promise<QuickEditSaveCommitResult>;
   saveTextChanges(): Promise<void>;
   saveStyleChanges(): Promise<void>;
   clearForcedStyles(): Promise<void>;
+  prepareQuickEditSave(action: QuickEditSaveAction): Promise<QuickEditSaveDraft | null>;
+  preflightQuickEditSave(draft: QuickEditSaveDraft): Promise<QuickEditSavePreflight>;
+  commitQuickEditSave(draft: QuickEditSaveDraft): Promise<QuickEditSaveCommitResult>;
 }
 
 type SaveResponse = {
@@ -91,6 +103,7 @@ async function requestParentConfirm(message: string): Promise<boolean | null> {
   const requestId = nextParentDialogRequestId();
   return await new Promise((resolve) => {
     let settled = false;
+    let parentAcknowledged = false;
     const finish = (value: boolean | null) => {
       if (settled) return;
       settled = true;
@@ -100,10 +113,19 @@ async function requestParentConfirm(message: string): Promise<boolean | null> {
     };
     const handleMessage = (event: MessageEvent) => {
       const payload = event.data as ParentDialogResponse | undefined;
-      if (payload?.type !== 'WEB_EDITOR_DIALOG_RESPONSE' || payload.requestId !== requestId) return;
+      if (!payload || payload.requestId !== requestId) return;
+      if (payload.type === 'WEB_EDITOR_DIALOG_ACK') {
+        parentAcknowledged = true;
+        window.clearTimeout(timeoutId);
+        return;
+      }
+      if (payload.type !== 'WEB_EDITOR_DIALOG_RESPONSE') return;
       finish(payload.confirmed ?? true);
     };
-    const timeoutId = window.setTimeout(() => finish(null), 60_000);
+    const timeoutId = window.setTimeout(() => {
+      if (parentAcknowledged) return;
+      finish(false);
+    }, 60_000);
     window.addEventListener('message', handleMessage);
     window.parent.postMessage({
       type: 'WEB_EDITOR_DIALOG_REQUEST',
@@ -235,9 +257,9 @@ export function createHtmlResourceSaveBridge(
     return '';
   }
 
-  async function run(action: () => Promise<void>): Promise<void> {
+  async function run<T>(action: () => Promise<T>): Promise<T> {
     try {
-      await action();
+      return await action();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       notify('error', message);
@@ -245,73 +267,176 @@ export function createHtmlResourceSaveBridge(
     }
   }
 
-  return {
-    async saveTextChanges() {
-      await run(async () => {
-        const editor = getEditor();
-        const changes = editor.getTargetedTextChanges();
-        if (changes.length === 0) {
-          notify('info', '当前没有可保存的文本修改。');
-          return;
+  function readSaveResource() {
+    const context = getContext();
+    return {
+      engine: 'html' as const,
+      projectId: context.projectId,
+      path: context.path,
+      revision: readRevision(),
+    };
+  }
+
+  function assertCurrentDraft(draft: QuickEditSaveDraft): void {
+    const resource = readSaveResource();
+    if (
+      draft.resource.engine !== 'html'
+      || normalizeString(draft.resource.projectId) !== resource.projectId
+      || normalizeString(draft.resource.path) !== resource.path
+    ) {
+      throw new Error('当前 HTML 资源已发生变化，请刷新后重新保存。');
+    }
+    if (normalizeString(draft.resource.revision) !== resource.revision) {
+      throw new Error('源文件已更新，请刷新后重新修改。');
+    }
+  }
+
+  async function prepareQuickEditSave(action: QuickEditSaveAction): Promise<QuickEditSaveDraft | null> {
+    const editor = getEditor();
+    const resource = readSaveResource();
+    if (action === 'save-text') {
+      const edits = editor.getTargetedTextChanges().map((change) => {
+        const key = locateTextKey(change);
+        if (!key) {
+          throw new Error('部分文本无法精确定位，未保存任何修改。请刷新页面后重新编辑。');
         }
-        const edits = changes.map((change) => {
-          const key = locateTextKey(change);
-          if (!key) {
-            throw new Error('部分文本无法精确定位，未保存任何修改。请刷新页面后重新编辑。');
-          }
-          return { key, before: change.before, after: change.after };
-        });
-        if (!await Promise.resolve(confirm(`将保存 ${edits.length} 处文本修改。保存后 HTML 文档会刷新，是否继续？`))) {
-          return;
-        }
-        const context = getContext();
+        return { key, before: change.before, after: change.after };
+      });
+      return edits.length > 0 ? { kind: 'html-text', action, resource, edits } : null;
+    }
+    if (action === 'save-style') {
+      const cssText = editor.getStyleChanges().cssText.trim();
+      return cssText ? { kind: 'style', action, resource, cssText } : null;
+    }
+    return { kind: 'clear-style', action, resource };
+  }
+
+  async function preflightQuickEditSave(draft: QuickEditSaveDraft): Promise<QuickEditSavePreflight> {
+    assertCurrentDraft(draft);
+    if (draft.kind === 'html-text') {
+      if (draft.edits.length === 0) throw new Error('当前没有可保存的文本修改。');
+      return { action: 'save-text', changeCount: draft.edits.length, affectedCount: draft.edits.length };
+    }
+    if (draft.kind === 'style') {
+      if (!draft.cssText.trim()) throw new Error('当前没有可保存的强制样式调整。');
+      return { action: 'save-style', changeCount: 1, affectedCount: 1 };
+    }
+    if (draft.kind === 'clear-style') {
+      return { action: 'clear-style', changeCount: 1, affectedCount: 1 };
+    }
+    throw new Error('当前保存草稿不属于 HTML 资源。');
+  }
+
+  async function commitQuickEditSave(draft: QuickEditSaveDraft): Promise<QuickEditSaveCommitResult> {
+    assertCurrentDraft(draft);
+    const editor = getEditor();
+    if (draft.kind === 'html-text') {
+      const payload = await request('/api/html-review/text-edits', 'POST', {
+        path: draft.resource.path,
+        revision: draft.resource.revision,
+        edits: draft.edits,
+      });
+      editor.acknowledgeSavedTextChanges();
+      const changedCount = Number(payload.changedCount ?? draft.edits.length);
+      const message = `文本已保存，共更新 ${changedCount} 处。`;
+      notify('success', message);
+      reload();
+      return { changed: true, changedCount, message };
+    }
+    if (draft.kind === 'style') {
+      await request('/api/html-review/style-hack', 'PUT', {
+        path: draft.resource.path,
+        revision: draft.resource.revision,
+        cssText: draft.cssText,
+      });
+      editor.acknowledgeSavedStyleChanges();
+      const message = '临时强制样式已保存。';
+      notify('success', message);
+      reload();
+      return { changed: true, changedCount: 1, message };
+    }
+    if (draft.kind === 'clear-style') {
+      await request('/api/html-review/style-hack', 'DELETE', {
+        path: draft.resource.path,
+        revision: draft.resource.revision,
+      });
+      editor.acknowledgeSavedStyleChanges();
+      const message = '已清空临时强制样式。';
+      notify('success', message);
+      reload();
+      return { changed: true, changedCount: 1, message };
+    }
+    throw new Error('当前保存草稿不属于 HTML 资源。');
+  }
+
+  async function runStandaloneQuickEditSave(action: QuickEditSaveAction): Promise<void> {
+    await run(async () => {
+      const draft = await prepareQuickEditSave(action);
+      if (!draft) {
+        notify(
+          'info',
+          action === 'save-text' ? '当前没有可保存的文本修改。' : '当前没有可保存的强制样式调整。',
+        );
+        return;
+      }
+      const preflight = await preflightQuickEditSave(draft);
+      if (!await Promise.resolve(confirm(buildQuickEditSaveConfirmation(preflight).description))) return;
+      await commitQuickEditSave(draft);
+    });
+  }
+
+  async function saveAllChanges(): Promise<QuickEditSaveCommitResult> {
+    const textDraft = await prepareQuickEditSave('save-text');
+    const styleDraft = await prepareQuickEditSave('save-style');
+    const textChangeCount = textDraft?.kind === 'html-text' ? textDraft.edits.length : 0;
+    const hasStyleChange = styleDraft?.kind === 'style' && Boolean(styleDraft.cssText.trim());
+    if (textChangeCount === 0 && !hasStyleChange) {
+      const message = '当前没有可保存的文本或样式修改。';
+      notify('info', message);
+      return { changed: false, changedCount: 0, message };
+    }
+    const description = `确认保存 ${textChangeCount} 处文本修改${hasStyleChange ? '和样式修改' : ''}？`;
+    if (!await Promise.resolve(confirm(description))) {
+      return { changed: false, changedCount: 0, message: '已取消保存。' };
+    }
+
+    return await run(async () => {
+      const editor = getEditor();
+      let revision = readSaveResource().revision;
+      let changedCount = 0;
+      if (textDraft?.kind === 'html-text') {
         const payload = await request('/api/html-review/text-edits', 'POST', {
-          path: context.path,
-          revision: readRevision(),
-          edits,
+          path: textDraft.resource.path,
+          revision,
+          edits: textDraft.edits,
         });
+        revision = normalizeString(payload.revision) || revision;
+        changedCount += Number(payload.changedCount ?? textDraft.edits.length);
         editor.acknowledgeSavedTextChanges();
-        notify('success', `文本已保存，共更新 ${Number(payload.changedCount ?? edits.length)} 处。`);
-        reload();
-      });
-    },
-
-    async saveStyleChanges() {
-      await run(async () => {
-        const editor = getEditor();
-        const cssText = editor.getStyleChanges().cssText.trim();
-        if (!cssText) {
-          notify('info', '当前没有可保存的强制样式调整。');
-          return;
-        }
-        if (!await Promise.resolve(confirm('将把当前样式调整保存为临时覆盖样式。后续修改资源时应将其合并到正式样式并清理临时 hack。'))) {
-          return;
-        }
-        const context = getContext();
+      }
+      if (styleDraft?.kind === 'style' && hasStyleChange) {
         await request('/api/html-review/style-hack', 'PUT', {
-          path: context.path,
-          revision: readRevision(),
-          cssText,
+          path: styleDraft.resource.path,
+          revision,
+          cssText: styleDraft.cssText,
         });
+        changedCount += 1;
         editor.acknowledgeSavedStyleChanges();
-        notify('success', '临时强制样式已保存。');
-        reload();
-      });
-    },
+      }
+      const message = 'HTML 文本和样式已保存。';
+      notify('success', message);
+      reload();
+      return { changed: true, changedCount, message };
+    });
+  }
 
-    async clearForcedStyles() {
-      await run(async () => {
-        if (!await Promise.resolve(confirm('确定清空当前 HTML 文档的临时强制样式吗？'))) return;
-        const editor = getEditor();
-        const context = getContext();
-        await request('/api/html-review/style-hack', 'DELETE', {
-          path: context.path,
-          revision: readRevision(),
-        });
-        editor.acknowledgeSavedStyleChanges();
-        notify('success', '已清空临时强制样式。');
-        reload();
-      });
-    },
+  return {
+    saveAllChanges,
+    saveTextChanges: () => runStandaloneQuickEditSave('save-text'),
+    saveStyleChanges: () => runStandaloneQuickEditSave('save-style'),
+    clearForcedStyles: () => runStandaloneQuickEditSave('clear-style'),
+    prepareQuickEditSave,
+    preflightQuickEditSave,
+    commitQuickEditSave,
   };
 }

@@ -38,6 +38,7 @@ export interface PrototypeGenerationComposerSettings {
 }
 
 export interface PrototypeGenerationComposerProps {
+  projectId: string;
   allowAttachments?: true;
   assistantProjectPath?: string;
   canPasteReferenceImages?: boolean;
@@ -88,6 +89,7 @@ function FieldLabelWithHint({ label, hint }: { label: string; hint: string }) {
 }
 
 export default function PrototypeGenerationComposer({
+  projectId,
   assistantProjectPath,
   canPasteReferenceImages,
   defaultThemeName,
@@ -160,6 +162,7 @@ export default function PrototypeGenerationComposer({
 
   return (
     <CanvasGenerationComposer
+      projectId={projectId}
       scene="page"
       dataAttribute="data-axhub-prototype-composer"
       className="aui-root ax-ai-image-composer-host pointer-events-auto absolute z-[1200]"

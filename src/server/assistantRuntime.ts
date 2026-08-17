@@ -18,13 +18,17 @@ const ACP_UI_NPM_COMMAND = 'npm';
 const ACP_UI_START_CHECK_DELAY_MS = 500;
 const ACP_UI_READY_CHECK_TIMEOUT_MS = 120_000;
 const ACP_UI_READY_CHECK_INTERVAL_MS = 500;
-const ACP_UI_ENDPOINT_PROBE_TIMEOUT_MS = 1_500;
+const ACP_UI_DEVELOPMENT_ENDPOINT_PROBE_TIMEOUT_MS = 15_000;
+const ACP_UI_PRODUCTION_ENDPOINT_PROBE_TIMEOUT_MS = 3_000;
 const COMMAND_AVAILABILITY_TIMEOUT_MS = 2_000;
 const ACP_UI_SERVICE_ID = '@axhub/acp';
-const DEFAULT_ACP_UI_CORS_ORIGINS = new Set([
+const ACP_UI_DEFAULT_CORS_ORIGINS = [
   'http://localhost:53817',
   'http://127.0.0.1:53817',
-]);
+  'chrome-extension://cndglokmgjecikflojjieeeajbljgfae',
+  'chrome-extension://inmihdeflblgkefcngaljagdmhdkghka',
+] as const;
+const ACP_UI_DEFAULT_CORS_ORIGIN_SET = new Set<string>(ACP_UI_DEFAULT_CORS_ORIGINS);
 
 export type AssistantHealthStatus =
   | 'ready'
@@ -143,10 +147,16 @@ export function resolveAssistantMakeCorsOrigins(
     env.AXHUB_ACP_UI_CORS_ORIGIN,
     env.ACP_UI_CORS_ORIGINS,
   );
-  const currentOrigins = normalizeCorsOriginList(corsOrigin)
+  const requestedOrigins = normalizeCorsOriginList(explicitOrigins, corsOrigin)
     .split(',')
-    .filter((origin) => origin && !DEFAULT_ACP_UI_CORS_ORIGINS.has(origin));
-  return normalizeCorsOriginList(explicitOrigins, currentOrigins.join(','));
+    .filter(Boolean);
+  const additionalOrigins = requestedOrigins.filter((origin) => !ACP_UI_DEFAULT_CORS_ORIGIN_SET.has(origin));
+  if (additionalOrigins.length === 0) {
+    return '';
+  }
+
+  // ACP's --cors-origin replaces its defaults, so every override must carry the defaults forward.
+  return normalizeCorsOriginList(ACP_UI_DEFAULT_CORS_ORIGINS.join(','), additionalOrigins.join(','));
 }
 
 function normalizeLocalAcpUiProjectRoot(value: unknown): string {
@@ -372,7 +382,11 @@ function shouldRestartLocalEndpointForAutoStart(
   return endpoints.source !== 'env'
     && !probe.ok
     && isLocalAssistantEndpoint(endpoints.webBaseUrl)
-    && (isAssistantEndpointNetworkFailure(probe.message) || isAssistantEndpointCorsFailure(probe.message));
+    && isAssistantEndpointNetworkFailure(probe.message);
+}
+
+function formatPreservedSharedAcpMessage(probeMessage: string): string {
+  return `${probeMessage}；ACP UI 已在运行，为保留共享服务配置，Make 未自动重启`;
 }
 
 function formatRuntimeUnreachableMessage(
@@ -413,7 +427,7 @@ async function runAcpUiCommandInBackground(
     const child = spawn(spawnSpec.command, spawnSpec.args, {
       cwd: startSpec.cwd,
       detached: true,
-      stdio: ['ignore', 'ignore', 'pipe'],
+      stdio: 'ignore',
       windowsHide: spawnSpec.windowsHide,
       shell: false,
       env: buildAcpUiStartEnv({ corsOrigin: options.corsOrigin }),
@@ -475,10 +489,19 @@ function getCommandSourceForEndpointSource(source: AssistantEndpointSource): Ass
   return source === 'default' ? 'default' : source;
 }
 
+export function resolveAssistantEndpointProbeTimeoutMs(
+  options: { argv?: readonly string[] } = {},
+): number {
+  const argv = options.argv || process.argv;
+  return argv.includes('--dev')
+    ? ACP_UI_DEVELOPMENT_ENDPOINT_PROBE_TIMEOUT_MS
+    : ACP_UI_PRODUCTION_ENDPOINT_PROBE_TIMEOUT_MS;
+}
+
 async function fetchEndpoint(url: string, options: RequestInit = {}) {
   return fetch(url, {
     ...options,
-    signal: AbortSignal.timeout(ACP_UI_ENDPOINT_PROBE_TIMEOUT_MS),
+    signal: AbortSignal.timeout(resolveAssistantEndpointProbeTimeoutMs()),
   });
 }
 
@@ -735,6 +758,22 @@ export async function resolveAssistantRuntime(params: {
     };
   }
 
+  if (isAssistantEndpointCorsFailure(initialProbe.message)) {
+    return {
+      webBaseUrl: endpoints.webBaseUrl,
+      apiBaseUrl: endpoints.apiBaseUrl,
+      projectPath: params.projectPath,
+      source: endpoints.source,
+      health: createAssistantHealthInfo({
+        status: 'runtime_unreachable',
+        message: formatPreservedSharedAcpMessage(initialProbe.message),
+        commandSource: getCommandSourceForEndpointSource(endpoints.source),
+        port: resolvePortFromUrl(endpoints.webBaseUrl) || DEFAULT_ASSISTANT_PORT_NUMBER,
+        corsOrigin: params.makeOrigin,
+      }),
+    };
+  }
+
   const shouldAutoStart = params.autoStart !== false;
   if (!shouldAutoStart) {
     return {
@@ -756,7 +795,7 @@ export async function resolveAssistantRuntime(params: {
     const shouldRestartSameEndpoint = shouldRestartLocalEndpointForAutoStart(endpoints, initialProbe);
     const startEndpoints = shouldRestartSameEndpoint ? endpoints : resolveStartEndpoints(endpoints);
     const startPort = resolvePortFromUrl(startEndpoints.webBaseUrl) || DEFAULT_ASSISTANT_PORT_NUMBER;
-    if (shouldRestartSameEndpoint || startPort === DEFAULT_ASSISTANT_PORT_NUMBER) {
+    if (shouldRestartSameEndpoint) {
       releaseListeningProcessesOnPort(startPort);
     }
     await runAcpUiCommandInBackground(params.projectPath, {
@@ -820,11 +859,35 @@ export async function runAssistantBootstrap(params: {
   };
   const endpoints = resolveRuntimeEndpoints({ configAssistant, envAssistant });
 
+  if (params.mode === 'restart_existing' && !isLocalAssistantEndpoint(endpoints.webBaseUrl)) {
+    throw new Error('只能重启本机 ACP 服务，请检查 assistant.webBaseUrl 配置');
+  }
+
+  const runningProbe = await verifyAssistantRuntimeEndpoint(endpoints);
+  if (runningProbe.ok) {
+    const endpointProbe = await verifyAssistantRuntimeEndpoint({
+      ...endpoints,
+      makeOrigin: params.makeOrigin,
+    });
+    return {
+      webBaseUrl: endpoints.webBaseUrl,
+      apiBaseUrl: endpoints.apiBaseUrl,
+      projectPath: params.projectPath,
+      source: endpoints.source,
+      health: createAssistantHealthInfo({
+        status: endpointProbe.ok ? 'ready' : 'runtime_unreachable',
+        message: endpointProbe.ok
+          ? endpointProbe.message
+          : formatPreservedSharedAcpMessage(endpointProbe.message),
+        commandSource: getCommandSourceForEndpointSource(endpoints.source),
+        port: resolvePortFromUrl(endpoints.webBaseUrl) || DEFAULT_ASSISTANT_PORT_NUMBER,
+        corsOrigin: params.makeOrigin,
+      }),
+    };
+  }
+
   let startEndpoints = endpoints;
   if (params.mode === 'restart_existing') {
-    if (!isLocalAssistantEndpoint(endpoints.webBaseUrl)) {
-      throw new Error('只能重启本机 ACP 服务，请检查 assistant.webBaseUrl 配置');
-    }
     const port = resolvePortFromUrl(endpoints.webBaseUrl);
     if (!port) {
       throw new Error('无法解析本机 ACP 服务端口');

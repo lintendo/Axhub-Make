@@ -34,9 +34,13 @@ describe('downloadExportHtmlArchive', () => {
             revokeObjectURL: vi.fn(),
         });
 
-        await expect(downloadExportHtmlArchive('prototypes/home', { includeSource: true })).resolves.toBe('home-html.zip');
+        await expect(downloadExportHtmlArchive(
+            'prototypes/home',
+            { projectId: 'project-b' },
+            { includeSource: true },
+        )).resolves.toBe('home-html.zip');
 
-        expect(fetchMock).toHaveBeenCalledWith('/api/export-html?path=prototypes%2Fhome&includeSource=1');
+        expect(fetchMock).toHaveBeenCalledWith('/api/export-html?path=prototypes%2Fhome&includeSource=1&projectId=project-b');
         expect(click).toHaveBeenCalledTimes(1);
         expect(appendChild).toHaveBeenCalledTimes(1);
         expect(removeChild).toHaveBeenCalledTimes(1);

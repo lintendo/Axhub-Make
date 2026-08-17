@@ -1,0 +1,338 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 4,
+  "pageId": "6xknfw",
+  "pageName": "首页",
+  "sitemapPath": "首页",
+  "requestedPath": "首页.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.55.27/%E9%A6%96%E9%A1%B5.html",
+  "dataUrl": "http://127.0.0.1:32768/20.55.27/files/%E9%A6%96%E9%A1%B5/data.js",
+  "generationDate": "2026-08-14T12:55:27.256Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 首页\n- paragraph: 百科\n- paragraph: 菜谱\n- paragraph: 我的\n- paragraph: 今天\n- paragraph: 第 210 天\n- paragraph: 今天是初一，带宝贝看电影《小猪佩奇过大年》，之后去迪卡侬，本来是要去给她买轮滑鞋的，但她过去尝试打球，踢球，之后去打乒乓，打羽毛球，我们都试了，我感觉费了好大劲教她，她都学不会。最后我们决定一\n- paragraph: 全文\n- paragraph: 3小时前\n- paragraph: 昨天\n- paragraph: 第 209 天\n- paragraph: 08：59\n- paragraph: 身高 55 cm\n- paragraph: 体重 15 kg\n- paragraph: 头围 30 cm\n- paragraph: 2019/05/12\n- paragraph: 第 152 天\n- paragraph: 13:15\n- paragraph: 宝宝第一次走路\n- paragraph: 宝宝终于迈出第一步啦！开心！！！\n- paragraph: 数据加载中\n- paragraph: 成长记录\n- paragraph: 宝宝日记\n- paragraph: 疫苗接种\n- paragraph: 梓宁宝宝\n- paragraph: 6个月\n- paragraph: 首页\n- paragraph: 切换账号\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "004-home-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "内容",
+    "背景",
+    "宝宝信息",
+    "金刚区",
+    "顶部信息",
+    "编辑按钮",
+    "弹层",
+    "导航2",
+    "导航",
+    "标签栏",
+    "首页",
+    "百科",
+    "菜谱",
+    "我的",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [],
+  "panels": [
+    {
+      "scope": "page:首页 / 内容",
+      "label": "内容",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    },
+    {
+      "scope": "page:首页 / 内容 / state:State1 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    },
+    {
+      "scope": "master:底部tab / 标签栏",
+      "label": "标签栏",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:首页",
+      "event": "Page loaded",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of (底部tab)/首页 equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:首页 / 内容 / state:State1 / Dynamic panel",
+      "event": "Scrolled",
+      "case": "Case 1",
+      "condition": "if \"[[This.scrollY]]\" is greater than or equals \"100\"",
+      "action": "fadeWidget",
+      "description": "Show 导航2fade none 300ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:首页 / 内容 / state:State1 / Dynamic panel",
+      "event": "Scrolled",
+      "case": "Case 2",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 导航2fade none 300ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:首页 / 内容 / state:State1 / Dynamic panel / state:State1 / 宝宝信息 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 日记详情 in Current window",
+      "target": "日记详情.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:首页 / 内容 / state:State1 / Dynamic panel / state:State1 / 宝宝信息 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 身高记录 in Current window",
+      "target": "身高记录.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:首页 / 内容 / state:State1 / Dynamic panel / state:State1 / 宝宝信息 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 日记详情 in Current window",
+      "target": "日记详情.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:首页 / 内容 / state:State1 / Dynamic panel / state:State1 / 金刚区 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 身高记录 in Current window",
+      "target": "身高记录.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:首页 / 内容 / state:State1 / Dynamic panel / state:State1 / 金刚区 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 宝宝日记 in Current window",
+      "target": "宝宝日记.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:首页 / 内容 / state:State1 / Dynamic panel / state:State1 / 金刚区 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 疫苗接种 in Current window",
+      "target": "疫苗接种.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:首页 / 内容 / state:State1 / Dynamic panel / state:State1 / 顶部信息 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 修改宝宝信息 in Current window",
+      "target": "修改宝宝信息.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:首页 / 内容 / state:State1 / Dynamic panel / state:State1 / 顶部信息 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 我的宝宝 in Current window",
+      "target": "我的宝宝.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:首页 / 编辑按钮",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show 弹层",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:首页 / 弹层 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 增加/编辑记录 in Current window",
+      "target": "增加_编辑记录.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:首页 / 弹层 / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 发布日记 in Current window",
+      "target": "发布日记.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:首页 / 弹层 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide 弹层",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:底部tab / 标签栏 / state:State1 / 首页",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 首页 in Current window",
+      "target": "首页.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "master:底部tab / 标签栏 / state:State1 / 百科",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 百科 in Current window",
+      "target": "百科.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "master:底部tab / 标签栏 / state:State1 / 菜谱",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 菜谱 in Current window",
+      "target": "菜谱.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "master:底部tab / 标签栏 / state:State1 / 我的",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 我的 in Current window",
+      "target": "我的.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

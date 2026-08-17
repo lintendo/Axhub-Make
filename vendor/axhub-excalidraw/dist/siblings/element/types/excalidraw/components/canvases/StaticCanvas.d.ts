@@ -14,6 +14,7 @@ type StaticCanvasProps = {
     scale: number;
     appState: StaticCanvasAppState;
     renderConfig: StaticCanvasRenderConfig;
+    zIndex?: number;
 };
 declare const _default: React.MemoExoticComponent<(props: StaticCanvasProps) => import("react/jsx-runtime").JSX.Element>;
 export default _default;

@@ -1,0 +1,312 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 3,
+  "pageId": "ixbp9u",
+  "pageName": "登录",
+  "sitemapPath": "登录",
+  "requestedPath": "登录.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.58.47/%E7%99%BB%E5%BD%95.html",
+  "dataUrl": "http://127.0.0.1:32768/20.58.47/files/%E7%99%BB%E5%BD%95/data.js",
+  "generationDate": "2026-08-14T12:58:47.060Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 登 录\n- textbox: 请输入手机号\n- textbox: 请输入验证码\n- paragraph: 获取验证码\n- paragraph: 手机号码快速登录\n- paragraph: 登录即代表同意 用户协议\n- paragraph: 微信\n- paragraph: 微信\n- paragraph: 微信\n- paragraph: 其他登录方式\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "003-login-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "内容",
+    "手机号",
+    "2",
+    "验证码",
+    "3",
+    "botton",
+    "option",
+    "其他登录方式",
+    "toast",
+    "背景",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [
+    {
+      "scope": "page:登录 / 内容 / 手机号 / Text field",
+      "label": "",
+      "type": "Text field",
+      "visible": true
+    },
+    {
+      "scope": "page:登录 / 内容 / 验证码 / Text field",
+      "label": "",
+      "type": "Text field",
+      "visible": true
+    }
+  ],
+  "panels": [
+    {
+      "scope": "page:登录 / 内容 / 验证码 / option",
+      "label": "option",
+      "visible": false,
+      "states": [
+        "State1",
+        "State2"
+      ]
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:登录 / 内容 / Rectangle",
+      "event": "Click or tap",
+      "case": "漏填错填提示",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show toast",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:登录 / 内容 / Rectangle",
+      "event": "Click or tap",
+      "case": "漏填错填提示",
+      "condition": "",
+      "action": "wait",
+      "description": "Wait 1500 ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:登录 / 内容 / Rectangle",
+      "event": "Click or tap",
+      "case": "漏填错填提示",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Hide toast",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:登录 / 内容 / Rectangle",
+      "event": "Click or tap",
+      "case": "验证通过（初次登录）",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show toast",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:登录 / 内容 / Rectangle",
+      "event": "Click or tap",
+      "case": "验证通过（初次登录）",
+      "condition": "",
+      "action": "wait",
+      "description": "Wait 1500 ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:登录 / 内容 / Rectangle",
+      "event": "Click or tap",
+      "case": "验证通过（初次登录）",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 宝宝性别 in Current window",
+      "target": "宝宝性别.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:登录 / 内容 / Rectangle",
+      "event": "Click or tap",
+      "case": "验证通过（非初次登录）",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show toast",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:登录 / 内容 / Rectangle",
+      "event": "Click or tap",
+      "case": "验证通过（非初次登录）",
+      "condition": "",
+      "action": "wait",
+      "description": "Wait 1500 ms",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:登录 / 内容 / Rectangle",
+      "event": "Click or tap",
+      "case": "验证通过（非初次登录）",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 首页 in Current window",
+      "target": "首页.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:登录 / 内容 / 验证码 / botton",
+      "event": "Click or tap",
+      "case": "手机号码正确",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set value of timer equal to \"60\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:登录 / 内容 / 验证码 / botton",
+      "event": "Click or tap",
+      "case": "手机号码正确",
+      "condition": "",
+      "action": "enableDisableWidgets",
+      "description": "Disable botton",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:登录 / 内容 / 验证码 / botton",
+      "event": "Click or tap",
+      "case": "手机号码正确",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set option to&nbsp; to Next wrap repeat every 1000 ms delay first change ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:登录 / 内容 / 验证码 / botton",
+      "event": "Click or tap",
+      "case": "手机号码正确",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show/hide widget",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:登录 / 内容 / 验证码 / option",
+      "event": "Panel state changed",
+      "case": "Case 1",
+      "condition": "if value of timer is greater than \"0\"",
+      "action": "setFunction",
+      "description": "Set text on botton equal to \"[[timer]]s\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:登录 / 内容 / 验证码 / option",
+      "event": "Panel state changed",
+      "case": "Case 1",
+      "condition": "if value of timer is greater than \"0\"",
+      "action": "setFunction",
+      "description": "Set value of timer equal to \"[[timer-1]]\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:登录 / 内容 / 验证码 / option",
+      "event": "Panel state changed",
+      "case": "Case 2",
+      "condition": "",
+      "action": "enableDisableWidgets",
+      "description": "Enable botton",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:登录 / 内容 / 验证码 / option",
+      "event": "Panel state changed",
+      "case": "Case 2",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set text on botton equal to \"再次获取\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

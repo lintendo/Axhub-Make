@@ -2,6 +2,16 @@ export type GenerationArtifactKind = 'image' | 'prototype' | 'document' | 'drawi
 export type GenerationArtifactOperation = 'created' | 'updated';
 export type GenerationArtifactStatus = 'running' | 'done' | 'error';
 
+export interface GenerationArtifactScope {
+  projectId: string;
+  targetPath?: string | null;
+}
+
+export interface GenerationArtifactUpdateOptions {
+  status?: GenerationArtifactStatus;
+  scope?: GenerationArtifactScope;
+}
+
 export interface GenerationArtifactRecord {
   id: string;
   artifactId: string;
@@ -23,6 +33,7 @@ export interface GenerationArtifactRecord {
 }
 
 export interface GenerationArtifactHistoryState {
+  projectId?: string;
   targetPath?: string;
   artifacts: GenerationArtifactRecord[];
   loading: boolean;
@@ -30,17 +41,24 @@ export interface GenerationArtifactHistoryState {
 }
 
 export interface GenerationArtifactHistoryStore {
-  configure(options: { targetPath?: string | null }): Promise<void>;
+  configure(options: { projectId: string; targetPath?: string | null }): Promise<void>;
   load(): Promise<void>;
   subscribe(listener: (state: GenerationArtifactHistoryState) => void): () => void;
   getState(): GenerationArtifactHistoryState;
-  upsertArtifact(artifact: unknown, options?: { status?: GenerationArtifactStatus }): void;
-  upsertArtifactAndPersist(artifact: unknown, options?: { status?: GenerationArtifactStatus }): Promise<void>;
+  upsertArtifact(artifact: unknown, options?: GenerationArtifactUpdateOptions): void;
+  upsertArtifactAndPersist(artifact: unknown, options?: GenerationArtifactUpdateOptions): Promise<void>;
   deleteArtifact(id: string): Promise<void>;
 }
 
-function endpoint(targetPath: string): string {
-  return `/api/ai/artifact-history?targetPath=${encodeURIComponent(targetPath)}`;
+function endpoint(projectId: string, targetPath: string): string {
+  return withProjectScope(
+    `/api/ai/artifact-history?targetPath=${encodeURIComponent(targetPath)}`,
+    { projectId },
+  );
+}
+
+function createScopeKey(projectId: string | undefined, targetPath: string | undefined): string {
+  return projectId && targetPath ? `${projectId}:${targetPath}` : '';
 }
 
 function normalizeTargetPath(value: string | null | undefined): string | undefined {
@@ -161,9 +179,17 @@ export function createGenerationArtifactHistoryStore(): GenerationArtifactHistor
     emit();
   };
 
+  const matchesScope = (scope: GenerationArtifactScope | undefined): boolean => {
+    if (!scope) return true;
+    return createScopeKey(scope.projectId.trim(), normalizeTargetPath(scope.targetPath))
+      === createScopeKey(state.projectId, state.targetPath);
+  };
+
   const persistArtifact = async (artifact: GenerationArtifactRecord) => {
-    if (!state.targetPath) return;
-    const response = await fetch(endpoint(state.targetPath), {
+    const { projectId, targetPath } = state;
+    if (!projectId || !targetPath) return;
+    const scopeKey = createScopeKey(projectId, targetPath);
+    const response = await fetch(endpoint(projectId, targetPath), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ artifact }),
@@ -171,6 +197,7 @@ export function createGenerationArtifactHistoryStore(): GenerationArtifactHistor
     if (!response.ok) {
       throw new Error(`保存生成记录失败 (${response.status})`);
     }
+    if (scopeKey !== createScopeKey(state.projectId, state.targetPath)) return;
   };
 
   const upsertNormalizedArtifact = (
@@ -200,19 +227,28 @@ export function createGenerationArtifactHistoryStore(): GenerationArtifactHistor
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    async configure({ targetPath }) {
+    async configure({ projectId, targetPath }) {
+      const scope = requireProjectScope(projectId);
       const nextTargetPath = normalizeTargetPath(targetPath);
-      if (nextTargetPath === state.targetPath) return;
+      const nextScopeKey = createScopeKey(scope.projectId, nextTargetPath);
+      if (nextScopeKey === createScopeKey(state.projectId, state.targetPath)) return;
       loadRevision += 1;
-      setState({ targetPath: nextTargetPath, artifacts: [], loading: Boolean(nextTargetPath), error: null });
+      setState({
+        projectId: scope.projectId,
+        targetPath: nextTargetPath,
+        artifacts: [],
+        loading: Boolean(nextTargetPath),
+        error: null,
+      });
       if (nextTargetPath) await this.load();
     },
     async load() {
-      if (!state.targetPath) return;
+      const { projectId, targetPath } = state;
+      if (!projectId || !targetPath) return;
       const revision = loadRevision;
       setState({ ...state, loading: true, error: null });
       try {
-        const response = await fetch(endpoint(state.targetPath));
+        const response = await fetch(endpoint(projectId, targetPath));
         if (!response.ok) {
           throw new Error(`加载生成记录失败 (${response.status})`);
         }
@@ -234,19 +270,25 @@ export function createGenerationArtifactHistoryStore(): GenerationArtifactHistor
       }
     },
     upsertArtifact(artifact, options = {}) {
+      if (!matchesScope(options.scope)) return;
       upsertNormalizedArtifact(artifact, options.status || 'running');
     },
     async upsertArtifactAndPersist(artifact, options = {}) {
+      if (!matchesScope(options.scope)) return;
+      const scopeKey = createScopeKey(state.projectId, state.targetPath);
       const normalized = upsertNormalizedArtifact(artifact, options.status || 'running');
       if (!normalized) return;
       await persistArtifact(normalized).catch((error) => {
+        if (scopeKey !== createScopeKey(state.projectId, state.targetPath)) return;
         setState({ ...state, error: error instanceof Error ? error.message : String(error) });
       });
     },
     async deleteArtifact(id) {
       setState({ ...state, artifacts: state.artifacts.filter((artifact) => artifact.id !== id) });
-      if (!state.targetPath) return;
-      await fetch(endpoint(state.targetPath), {
+      const { projectId, targetPath } = state;
+      if (!projectId || !targetPath) return;
+      const scopeKey = createScopeKey(projectId, targetPath);
+      await fetch(endpoint(projectId, targetPath), {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
@@ -255,6 +297,7 @@ export function createGenerationArtifactHistoryStore(): GenerationArtifactHistor
           throw new Error(`删除生成记录失败 (${response.status})`);
         }
       }).catch((error) => {
+        if (scopeKey !== createScopeKey(state.projectId, state.targetPath)) return;
         setState({ ...state, error: error instanceof Error ? error.message : String(error) });
       });
     },
@@ -267,3 +310,4 @@ export function getGenerationArtifactHistoryStore(): GenerationArtifactHistorySt
   if (!singleton) singleton = createGenerationArtifactHistoryStore();
   return singleton;
 }
+import { requireProjectScope, withProjectScope } from '../../services/projectScope';

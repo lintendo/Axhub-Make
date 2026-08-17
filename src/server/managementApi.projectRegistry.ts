@@ -13,6 +13,7 @@ import {
 } from './projectCore/index.ts';
 
 import { getRequestUrl, readJsonBody, sendFile, sendJson } from './http.ts';
+import { sendHtmlDocumentPreview } from './htmlDocumentPreview.ts';
 import { LocalCommandError } from './localCommand.ts';
 import { backfillMakeClientResourcePreviewLinks } from './makeClientRuntimeLinks.ts';
 import { getMakeClientDevStatus } from './makeClientProject.ts';
@@ -37,6 +38,65 @@ interface FilesystemDocResource {
   fileSize?: number;
   absoluteFilePath?: string;
   openMode?: ResourceFileOpenMode;
+}
+
+function hasExplicitThemeLocalPath(theme: ProjectMetadata['resources']['themes'][number]): boolean {
+  return ['sourcePath', 'path', 'filePath', 'absoluteFilePath'].some((key) => {
+    const value = theme[key];
+    return typeof value === 'string' && value.trim().length > 0;
+  });
+}
+
+function collectLocalThemeDirectories(projectRoot: string, themesDir: string): Map<string, string> | null {
+  if (!fs.existsSync(themesDir)) {
+    return null;
+  }
+  try {
+    const realProjectRoot = fs.realpathSync.native(projectRoot);
+    const realThemesDir = fs.realpathSync.native(themesDir);
+    if (!isPathInside(realProjectRoot, realThemesDir)) {
+      return null;
+    }
+
+    const directories = new Map<string, string>();
+    for (const entry of fs.readdirSync(themesDir, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name.startsWith('.')) {
+        continue;
+      }
+      const themeDir = path.join(themesDir, entry.name);
+      const realThemeDir = fs.realpathSync.native(themeDir);
+      if (isPathInside(realThemesDir, realThemeDir)) {
+        directories.set(entry.name, themeDir);
+      }
+    }
+    return directories;
+  } catch {
+    return null;
+  }
+}
+
+function reconcilePrototypeFilesystemFields(
+  prototype: ProjectMetadata['resources']['prototypes'][number],
+  scannedPrototype: ProjectMetadata['resources']['prototypes'][number],
+): ProjectMetadata['resources']['prototypes'][number] {
+  const fields = ['filePath', 'absoluteFilePath', 'specFilePath', 'previewDisabled'] as const;
+  if (fields.every((field) => prototype[field] === scannedPrototype[field])) {
+    return prototype;
+  }
+  const {
+    filePath: _filePath,
+    absoluteFilePath: _absoluteFilePath,
+    specFilePath: _specFilePath,
+    previewDisabled: _previewDisabled,
+    ...rest
+  } = prototype;
+  return {
+    ...rest,
+    ...(scannedPrototype.filePath ? { filePath: scannedPrototype.filePath } : {}),
+    ...(scannedPrototype.absoluteFilePath ? { absoluteFilePath: scannedPrototype.absoluteFilePath } : {}),
+    ...(scannedPrototype.specFilePath ? { specFilePath: scannedPrototype.specFilePath } : {}),
+    ...(scannedPrototype.previewDisabled === true ? { previewDisabled: true } : {}),
+  };
 }
 
 /**
@@ -78,36 +138,40 @@ function reconcileMetadataWithFilesystem(
         ? scannedPrototypeByKey.get(prototype.id) ?? scannedPrototypeByKey.get(prototype.name)
         : null;
       if (scannedPrototype) {
+        const filesystemPrototype = reconcilePrototypeFilesystemFields(prototype, scannedPrototype);
+        if (filesystemPrototype !== prototype) {
+          changed = true;
+        }
         if (scannedPrototype.placeholder === true) {
-          if (prototype.placeholder === true && prototype.placeholderGuide) {
-            return prototype;
+          if (filesystemPrototype.placeholder === true && filesystemPrototype.placeholderGuide) {
+            return filesystemPrototype;
           }
           changed = true;
           return {
-            ...prototype,
+            ...filesystemPrototype,
             placeholder: true,
             placeholderGuide: scannedPrototype.placeholderGuide || PROTOTYPE_PLACEHOLDER_GUIDE,
           };
         }
-        if (scannedPrototype.generationStatus === 'waiting' && prototype.generationStatus !== 'waiting') {
+        if (scannedPrototype.generationStatus === 'waiting' && filesystemPrototype.generationStatus !== 'waiting') {
           changed = true;
-          const { placeholder: _placeholder, placeholderGuide: _placeholderGuide, ...rest } = prototype;
+          const { placeholder: _placeholder, placeholderGuide: _placeholderGuide, ...rest } = filesystemPrototype;
           return {
             ...rest,
             generationStatus: 'waiting',
           };
         }
-        if (prototype.placeholder === true || prototype.placeholderGuide) {
+        if (filesystemPrototype.placeholder === true || filesystemPrototype.placeholderGuide) {
           changed = true;
-          const { placeholder: _placeholder, placeholderGuide: _placeholderGuide, ...rest } = prototype;
+          const { placeholder: _placeholder, placeholderGuide: _placeholderGuide, ...rest } = filesystemPrototype;
           return rest;
         }
-        if (scannedPrototype.generationStatus !== 'waiting' && prototype.generationStatus) {
+        if (scannedPrototype.generationStatus !== 'waiting' && filesystemPrototype.generationStatus) {
           changed = true;
-          const { generationStatus: _generationStatus, ...rest } = prototype;
+          const { generationStatus: _generationStatus, ...rest } = filesystemPrototype;
           return rest;
         }
-        return prototype;
+        return filesystemPrototype;
       }
       if (prototype.placeholder !== true || prototype.placeholderGuide) {
         return prototype;
@@ -143,21 +207,32 @@ function reconcileMetadataWithFilesystem(
 
   let reconciledThemes = metadata.resources.themes;
   const discoveredThemes: typeof metadata.resources.themes = [];
-  if (fs.existsSync(themesDir)) {
+  const localThemeDirectories = collectLocalThemeDirectories(projectRoot, themesDir);
+  if (localThemeDirectories) {
     // Remove stale themes (directory deleted from disk)
     const existingThemeIds = new Set(metadata.resources.themes.map((t) => t.id));
-    reconciledThemes = metadata.resources.themes.filter((theme) => {
-      const themeSubDir = path.join(themesDir, theme.id);
-      return fs.existsSync(themeSubDir);
+    reconciledThemes = metadata.resources.themes.flatMap((theme) => {
+      const themeSubDir = localThemeDirectories.get(theme.id);
+      if (!themeSubDir) {
+        return [];
+      }
+      if (hasExplicitThemeLocalPath(theme)) {
+        return [theme];
+      }
+      changed = true;
+      return [{
+        ...theme,
+        sourcePath: createProjectRelativePath(projectRoot, themeSubDir),
+      }];
     });
     // Discover new themes (directories in src/themes not in metadata)
-    for (const entry of fs.readdirSync(themesDir, { withFileTypes: true })) {
-      if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
-      if (existingThemeIds.has(entry.name)) continue;
+    for (const [themeName, themeDir] of localThemeDirectories) {
+      if (existingThemeIds.has(themeName)) continue;
       discoveredThemes.push({
-        id: entry.name,
-        name: entry.name,
-        title: entry.name,
+        id: themeName,
+        name: themeName,
+        title: themeName,
+        sourcePath: createProjectRelativePath(projectRoot, themeDir),
       });
     }
     if (reconciledThemes.length !== metadata.resources.themes.length || discoveredThemes.length > 0) {
@@ -293,6 +368,30 @@ function readMarkdownTitle(filePath: string): string {
   }
 }
 
+function findMainPrototypeSpec(prototypeDir: string): string | null {
+  const specDir = path.join(prototypeDir, '.spec');
+  for (const name of ['spec.html', 'spec.md']) {
+    const specPath = path.join(specDir, name);
+    try {
+      if (fs.statSync(specPath).isFile()) return specPath;
+    } catch {
+      // Missing or invalid specs are not discoverable resources.
+    }
+  }
+  return null;
+}
+
+function readPrototypeSpecTitle(filePath: string, fallback: string): string {
+  try {
+    const source = fs.readFileSync(filePath, 'utf8');
+    return path.extname(filePath).toLowerCase() === '.md'
+      ? readMarkdownTitle(filePath) || fallback
+      : source.match(/<title[^>]*>\s*([^<]+?)\s*<\/title>/iu)?.[1]?.trim() || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function createProjectRelativePath(projectRoot: string, absolutePath: string): string {
   return path.relative(projectRoot, absolutePath).split(path.sep).join('/');
 }
@@ -310,8 +409,24 @@ function scanFilesystemPrototypeResources(
     if (!entry.isDirectory() || entry.name.startsWith('.')) {
       continue;
     }
-    const indexFilePath = path.join(prototypesDir, entry.name, 'index.tsx');
-    if (!fs.existsSync(indexFilePath)) {
+    const prototypeDir = path.join(prototypesDir, entry.name);
+    const indexFilePath = path.join(prototypeDir, 'index.tsx');
+    const specFilePath = findMainPrototypeSpec(prototypeDir);
+    if (!fs.existsSync(indexFilePath) && !specFilePath) {
+      continue;
+    }
+    if (!fs.existsSync(indexFilePath) && specFilePath) {
+      prototypes.push({
+        id: entry.name,
+        name: entry.name,
+        title: readPrototypeSpecTitle(specFilePath, entry.name),
+        clientUrl: `/prototypes/${encodeURIComponent(entry.name)}`,
+        previewMode: 'clientRuntime',
+        previewDisabled: true,
+        description: '',
+        updatedAt: readFileUpdatedAt(specFilePath),
+        specFilePath: createProjectRelativePath(projectRoot, specFilePath),
+      });
       continue;
     }
     const hasGeneratedPlaceholder = hasGeneratedPlaceholderSource(indexFilePath);
@@ -329,6 +444,7 @@ function scanFilesystemPrototypeResources(
       updatedAt: readFileUpdatedAt(indexFilePath),
       filePath: createProjectRelativePath(projectRoot, indexFilePath),
       absoluteFilePath: indexFilePath,
+      ...(specFilePath ? { specFilePath: createProjectRelativePath(projectRoot, specFilePath) } : {}),
       ...(placeholder ? { placeholder: true, placeholderGuide: PROTOTYPE_PLACEHOLDER_GUIDE } : {}),
       ...(generationStatus ? { generationStatus } : {}),
     });
@@ -437,6 +553,12 @@ function isIgnoredResourceRelativePath(relativePath: string): boolean {
   return normalized.split('/').some((segment) => segment.startsWith('.'));
 }
 
+function isIgnoredProjectDocumentPath(relativePath: string): boolean {
+  const normalized = String(relativePath || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  if (!normalized) return true;
+  return normalized.split('/').some((segment) => ['.git', '.axhub'].includes(segment.toLowerCase()));
+}
+
 function normalizeDocContentRequestPath(value: string): string {
   const rawValue = String(value || '').trim().replace(/\\/g, '/');
   if (!rawValue || rawValue.includes('\0') || rawValue.startsWith('/') || path.win32.isAbsolute(rawValue) || path.posix.isAbsolute(rawValue)) {
@@ -506,13 +628,28 @@ function normalizeProjectDocumentRequestPath(value: string): string {
     return '';
   }
   const normalized = segments.join('/');
-  if (isIgnoredResourceRelativePath(normalized)) {
+  if (isIgnoredProjectDocumentPath(normalized)) {
     return '';
   }
-  if (path.extname(normalized).toLowerCase() !== '.md') {
+  if (!['.md', '.htm', '.html'].includes(path.extname(normalized).toLowerCase())) {
     return '';
   }
   return normalized;
+}
+
+function isResolvedProjectPathSafe(projectRoot: string, candidatePath: string): boolean {
+  try {
+    const realProjectRoot = fs.realpathSync.native(projectRoot);
+    let existingPath = candidatePath;
+    while (!fs.existsSync(existingPath)) {
+      const parentPath = path.dirname(existingPath);
+      if (parentPath === existingPath) return false;
+      existingPath = parentPath;
+    }
+    return isPathInside(realProjectRoot, fs.realpathSync.native(existingPath));
+  } catch {
+    return false;
+  }
 }
 
 function resolveProjectDocumentContentFile(projectRoot: string, requestedPath: string): {
@@ -524,7 +661,7 @@ function resolveProjectDocumentContentFile(projectRoot: string, requestedPath: s
     return null;
   }
   const targetPath = path.resolve(projectRoot, projectRelativePath);
-  if (!isPathInside(projectRoot, targetPath)) {
+  if (!isPathInside(projectRoot, targetPath) || !isResolvedProjectPathSafe(projectRoot, targetPath)) {
     return null;
   }
   return {
@@ -533,16 +670,39 @@ function resolveProjectDocumentContentFile(projectRoot: string, requestedPath: s
   };
 }
 
+function buildProjectDocumentPreviewResourceUrl(
+  projectId: string,
+  documentPath: string,
+  rawValue: string,
+): { value: string } {
+  const value = String(rawValue || '').trim();
+  if (!value || value.startsWith('#') || value.startsWith('?') || value.startsWith('/') || /^[a-z][a-z0-9+.-]*:/iu.test(value)) {
+    return { value: rawValue };
+  }
+  const hashIndex = value.indexOf('#');
+  const hash = hashIndex >= 0 ? value.slice(hashIndex) : '';
+  const withoutHash = hashIndex >= 0 ? value.slice(0, hashIndex) : value;
+  const queryIndex = withoutHash.indexOf('?');
+  const encodedAssetPath = queryIndex >= 0 ? withoutHash.slice(0, queryIndex) : withoutHash;
+  const query = queryIndex >= 0 ? withoutHash.slice(queryIndex + 1) : '';
+  let assetPath = encodedAssetPath;
+  try {
+    assetPath = decodeURIComponent(encodedAssetPath);
+  } catch {
+    return { value: rawValue };
+  }
+  const params = new URLSearchParams({ path: documentPath, asset: assetPath });
+  for (const [key, paramValue] of new URLSearchParams(query)) params.append(key, paramValue);
+  return { value: `/api/projects/${encodeURIComponent(projectId)}/document-asset?${params.toString()}${hash}` };
+}
+
 function normalizeProjectDocumentAssetPath(value: string): string {
   const rawValue = String(value || '').trim().replace(/\\/g, '/');
   if (!rawValue || rawValue.includes('\0') || rawValue.startsWith('/') || path.win32.isAbsolute(rawValue) || path.posix.isAbsolute(rawValue)) {
     return '';
   }
-  const segments = rawValue.split('/').filter(Boolean);
-  if (segments.length === 0 || segments.some((segment) => segment === '.' || segment === '..')) {
-    return '';
-  }
-  return segments.join('/');
+  const normalized = path.posix.normalize(rawValue).replace(/^\.\/+/, '');
+  return normalized && normalized !== '.' ? normalized : '';
 }
 
 const projectDocumentImagePlaceholderPattern = /^__ANNOTATION_IMAGE_([A-Z0-9]+(?:_[A-Z0-9]+)*)__$/u;
@@ -615,7 +775,8 @@ function resolveProjectDocumentAssetFile(projectRoot: string, requestedDocPath: 
 
   const docDir = path.dirname(doc.path);
   const targetPath = path.resolve(docDir, assetPath);
-  return isPathInside(docDir, targetPath) && isPathInside(projectRoot, targetPath)
+  return isPathInside(projectRoot, targetPath)
+    && isResolvedProjectPathSafe(projectRoot, targetPath)
     ? targetPath
     : null;
 }
@@ -873,6 +1034,7 @@ export function handleProjectRegistryApi(
           reconcileMetadataWithFilesystem(metadataStore, project.root),
           project.root,
           options.runtimeOrigin,
+          req,
         );
       } catch (error) {
         sendProjectMetadataError(res, error, { project, projectId });
@@ -939,6 +1101,17 @@ export function handleProjectRegistryApi(
           path: doc.path,
           projectRelativePath: doc.projectRelativePath,
         }, { status: 404 });
+        return true;
+      }
+      if (sendHtmlDocumentPreview(req, res, doc.path, {
+        documentName: doc.projectRelativePath,
+        projectId,
+        rewriteRelativeUrl: (value) => buildProjectDocumentPreviewResourceUrl(
+          projectId,
+          doc.projectRelativePath,
+          value,
+        ),
+      })) {
         return true;
       }
       sendJson(res, {

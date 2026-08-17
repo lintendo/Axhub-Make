@@ -31,6 +31,8 @@ export function createInteractionService(options: {
   agentBridge: EditorAgentBridgeService;
   logPrefix: string;
   onStatusChange?: () => void;
+  onSelectionChange?: () => void;
+  onHoverChange?: () => void;
 }): EditorInteractionService {
   const { state, agentBridge } = options;
 
@@ -79,6 +81,7 @@ export function createInteractionService(options: {
 
     state.positionTracker?.setHoverElement(element);
     state.positionTracker?.forceUpdate();
+    if (prevElement !== element) options.onHoverChange?.();
   }
 
   function closeAnnotationBridgeSelection(nextTarget: Element | null): void {
@@ -102,9 +105,10 @@ export function createInteractionService(options: {
     element: Element,
     modifiers: EventModifiers,
     selectionAnchor?: { clientX: number; clientY: number },
-  ): void {
-    if (agentBridge.isElementInteractionLocked(element)) {
-      return;
+    initialSelectionElement?: Element,
+  ): boolean {
+    if (!element.isConnected || agentBridge.isElementInteractionLocked(element)) {
+      return false;
     }
     if (state.activeTextComment) {
       state.activeTextComment = null;
@@ -118,6 +122,7 @@ export function createInteractionService(options: {
     options.changes.rememberSelectionAnchor(element, selectionAnchor);
 
     state.selectedElement = element;
+    state.initialSelectionElement = initialSelectionElement ?? element;
     state.hoveredElement = null;
 
     state.positionTracker?.setHoverElement(null);
@@ -130,15 +135,27 @@ export function createInteractionService(options: {
     state.handlesController?.setTarget(element);
     state.parentSelectController?.setTarget(element);
     options.onStatusChange?.();
+    options.onSelectionChange?.();
 
     const modInfo = modifiers.alt ? ' (Alt: drill-up)' : '';
     console.log(`${options.logPrefix} Selected${modInfo}:`, element.tagName, element);
+    return true;
+  }
+
+  function activatePageTarget(
+    element: Element,
+    selectionAnchor?: { clientX: number; clientY: number },
+  ): boolean {
+    if (!element.isConnected || agentBridge.isElementInteractionLocked(element)) return false;
+    closeAnnotationBridgeSelection(element);
+    return selectResolvedElement(element, DEFAULT_MODIFIERS, selectionAnchor);
   }
 
   async function handleSelect(
     element: Element,
     modifiers: EventModifiers,
     selectionAnchor?: { clientX: number; clientY: number },
+    initialSelectionElement?: Element,
   ): Promise<void> {
     if (agentBridge.isElementInteractionLocked(element)) {
       return;
@@ -149,12 +166,17 @@ export function createInteractionService(options: {
       if (!bridgeSelection) return;
       closeAnnotationBridgeSelection(bridgeSelection.target);
       state.annotationBridgeSelection = bridgeSelection;
-      selectResolvedElement(bridgeSelection.target, modifiers);
+      selectResolvedElement(
+        bridgeSelection.target,
+        modifiers,
+        undefined,
+        initialSelectionElement,
+      );
       return;
     }
 
     closeAnnotationBridgeSelection(element);
-    selectResolvedElement(element, modifiers, selectionAnchor);
+    selectResolvedElement(element, modifiers, selectionAnchor, initialSelectionElement);
   }
 
   function handleDeselect(): void {
@@ -178,12 +200,14 @@ export function createInteractionService(options: {
       state.handlesController?.setTarget(null);
       state.parentSelectController?.setTarget(null);
       options.onStatusChange?.();
+      options.onSelectionChange?.();
 
       console.log(`${options.logPrefix} Deselected`);
       return;
     }
 
     state.selectedElement = null;
+    state.initialSelectionElement = null;
     options.changes.clearPendingSelectionAnchor();
 
     state.positionTracker?.setSelectionElement(null);
@@ -195,6 +219,7 @@ export function createInteractionService(options: {
     state.handlesController?.setTarget(null);
     state.parentSelectController?.setTarget(null);
     options.onStatusChange?.();
+    options.onSelectionChange?.();
 
     console.log(`${options.logPrefix} Deselected`);
   }
@@ -250,7 +275,7 @@ export function createInteractionService(options: {
     state.propertyPanel?.setHistory(undoCount, redoCount);
     state.breadcrumbs?.refresh();
 
-    if (action === 'undo' || action === 'redo') {
+    if (action === 'undo' || action === 'redo' || action === 'restore') {
       state.propertyPanel?.refresh();
     }
 
@@ -554,9 +579,11 @@ export function createInteractionService(options: {
     // Since text comments don't have a real target element,
     // we keep DOM selection empty and use a synthetic target node for UI plumbing.
     state.selectedElement = null;
+    state.initialSelectionElement = null;
     state.selectionAnchor = markerAnchor;
     state.hoveredElement = null;
     state.activeTextComment = comment;
+    state.positionTracker?.setHoverElement(null);
     state.positionTracker?.setSelectionElement(sourceElement);
     meta.anchor = markerAnchor;
     syncShadowHostMount(sourceElement);
@@ -588,6 +615,7 @@ export function createInteractionService(options: {
 
   return {
     handleHover,
+    activatePageTarget,
     handleSelect,
     handleDeselect,
     handlePositionUpdate,

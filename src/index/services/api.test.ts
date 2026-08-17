@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { apiService } from './api';
+import { apiService, resolveMakeApiOrigin } from './api';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -10,27 +10,120 @@ afterEach(() => {
 });
 
 describe('apiService source', () => {
-  it('includes the active project id when requesting assistant runtime config', () => {
+  it('resolves the injected Make API origin before the page origin', () => {
+    vi.stubGlobal('window', {
+      __AXHUB_MAKE_API_ORIGIN__: 'http://localhost:53817/',
+      location: {
+        origin: 'http://localhost:51720',
+      },
+    });
+
+    expect(resolveMakeApiOrigin()).toBe('http://localhost:53817');
+  });
+
+  it('opens a project-scoped desktop integration with the fixed provider contract', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      provider: 'cursor',
+      status: 'restart-required',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const desktopApi = apiService as typeof apiService & {
+      openDesktopIntegration?: (payload: {
+        projectId: string;
+        provider: 'chatgpt' | 'cursor';
+        action: 'prepare' | 'restart' | 'normal';
+        targetPath?: string;
+      }) => Promise<{ status: 'opened' | 'restart-required' }>;
+    };
+
+    expect(desktopApi.openDesktopIntegration).toBeTypeOf('function');
+    if (!desktopApi.openDesktopIntegration) return;
+
+    await expect(desktopApi.openDesktopIntegration({
+      projectId: 'make-project',
+      provider: 'cursor',
+      action: 'prepare',
+      targetPath: 'prototypes/home',
+    })).resolves.toMatchObject({ status: 'restart-required' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/desktop-integration/open?projectId=make-project',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          projectId: 'make-project',
+          provider: 'cursor',
+          action: 'prepare',
+          targetPath: 'prototypes/home',
+        }),
+      }),
+    );
+  });
+
+  it('reads project-scoped prototype annotation status without enabling it', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      enabled: true,
+      exists: true,
+      source: { format: 'axhub-annotation-source' },
+      path: 'src/prototypes/annotation-demo/annotation-source.json',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const annotationApi = apiService as typeof apiService & {
+      getPrototypeAnnotationStatus?: (
+        targetPath: string,
+        scope: { projectId: string },
+      ) => Promise<{ enabled: boolean }>;
+    };
+
+    expect(annotationApi.getPrototypeAnnotationStatus).toBeTypeOf('function');
+    if (!annotationApi.getPrototypeAnnotationStatus) return;
+
+    await expect(annotationApi.getPrototypeAnnotationStatus(
+      'prototypes/annotation-demo',
+      { projectId: 'make-project' },
+    )).resolves.toMatchObject({ enabled: true, exists: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/prototype-annotation?targetPath=prototypes%2Fannotation-demo&projectId=make-project',
+      { cache: 'no-store' },
+    );
+  });
+
+  it('forwards the Axure image asset preference to the export bundle endpoint', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      entry: { name: 'home', group: 'prototypes', displayName: 'Home', code: '' },
+      meta: { version: 1, exportedAt: '2026-07-19T00:00:00.000Z' },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await apiService.fetchExportIndexBundle(
+      'prototypes/home',
+      { projectId: 'project-b' },
+      { includeImageAssets: false },
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/export-index-bundle?path=prototypes%2Fhome&includeImages=false&projectId=project-b');
+  });
+
+  it('requires and forwards the explicit project id when requesting assistant runtime config', () => {
     const source = readFileSync(resolve(__dirname, './api.ts'), 'utf8');
 
-    expect(source).toContain('projectId?: string;');
+    expect(source).toContain('interface GetAssistantRuntimeOptions {\n    projectId: string;');
     expect(source).toContain('const query = new URLSearchParams();');
     expect(source).toContain("query.set('autoStart', options.autoStart ? 'true' : 'false');");
-    expect(source).toContain("query.set('projectId', options.projectId.trim());");
     expect(source).toContain('const suffix = query.toString();');
-    expect(source).toContain('fetch(`/api/assistant/runtime${suffix ? `?${suffix}` : \'\'}');
+    expect(source).toContain('fetch(withProjectScope(`/api/assistant/runtime${suffix ? `?${suffix}` : \'\'}`, { projectId: options.projectId }))');
   });
 
   it('exposes lightweight config bootstrap without the obsolete availability client call', () => {
     const source = readFileSync(resolve(__dirname, './api.ts'), 'utf8');
 
-    expect(source).toContain('interface GetConfigOptions {');
-    expect(source).toContain('function buildProjectScopedUrl(path: string, options?: GetConfigOptions): string');
-    expect(source).toContain("query.set('projectId', projectId);");
-    expect(source).toContain('async getConfig(options?: GetConfigOptions): Promise<ConfigResponse>');
-    expect(source).toContain("fetch(buildProjectScopedUrl('/api/config', options))");
-    expect(source).toContain('async getBootstrapConfig(options?: GetConfigOptions): Promise<ConfigResponse>');
-    expect(source).toContain("fetch(buildProjectScopedUrl('/api/config/bootstrap', options))");
+    expect(source).toContain('async getConfig(scope: ProjectScope): Promise<ConfigResponse>');
+    expect(source).toContain("fetch(withProjectScope('/api/config', scope))");
+    expect(source).toContain('async getBootstrapConfig(scope: ProjectScope): Promise<ConfigResponse>');
+    expect(source).toContain("fetch(withProjectScope('/api/config/bootstrap', scope))");
     expect(source).not.toContain('getConfigAvailability');
     expect(source).not.toContain("fetch('/api/config/availability')");
   });
@@ -53,18 +146,23 @@ describe('apiService source', () => {
     expect(source).toContain("method: 'POST'");
   });
 
-  it('exposes placeholder prototype generation start endpoint', () => {
+  it('keeps placeholder creation without exposing the obsolete waiting-generation transition', () => {
     const source = readFileSync(resolve(__dirname, './api.ts'), 'utf8');
 
     expect(source).toContain('export interface CreatePlaceholderPrototypeResponse');
     expect(source).toContain('canvasFilePath?: string;');
     expect(source).toContain('absoluteCanvasFilePath?: string;');
-    expect(source).toContain('async createPlaceholderPrototype(options?: GetConfigOptions): Promise<CreatePlaceholderPrototypeResponse>');
-    expect(source).toContain("fetch(buildProjectScopedUrl('/api/prototypes/create-placeholder', options), {");
-    expect(source).toContain('async startPlaceholderPrototypeGeneration(prototypeName: string)');
-    expect(source).toContain("const encodedPrototypeName = encodeURIComponent(prototypeName);");
-    expect(source).toContain("fetch(`/api/prototypes/${encodedPrototypeName}/start-generation`, {");
-    expect(source).toContain("method: 'POST'");
+    expect(source).toContain('async createPlaceholderPrototype(scope: ProjectScope): Promise<CreatePlaceholderPrototypeResponse>');
+    expect(source).toContain("fetch(withProjectScope('/api/prototypes/create-placeholder', scope), {");
+    expect(source).not.toContain('startPlaceholderPrototypeGeneration');
+    expect(source).not.toContain('/start-generation');
+  });
+
+  it('requires explicit scope when saving project-owned server preferences', () => {
+    const source = readFileSync(resolve(__dirname, './api.ts'), 'utf8');
+
+    expect(source).toContain('async saveServerPreferences(payload: SaveServerPreferencesRequest, scope: ProjectScope)');
+    expect(source).toContain("fetch(withProjectScope('/api/config', scope), {");
   });
 
   it('exposes cloud publishing config and publish endpoints', () => {
@@ -77,14 +175,13 @@ describe('apiService source', () => {
     expect(source).toContain('githubPages: CloudPublishingConfigured');
     expect(source).toContain('axhub: CloudPublishingConfigured<Record<string, never>>');
     expect(source).toContain('visibleTargets?: CloudPublishTarget[];');
-    expect(source).toContain('async getCloudPublishingConfig(): Promise<CloudPublishingConfigResponse>');
-    expect(source).toContain("fetch('/api/cloud-publishing/config')");
-    expect(source).toContain('async saveCloudPublishingConfig(payload: CloudPublishingConfigPayload)');
-    expect(source).toContain('async getCloudPublishingLatest(path?: string, projectId?: string | null): Promise<CloudPublishingLatestResponse>');
+    expect(source).toContain('async getCloudPublishingConfig(scope: ProjectScope): Promise<CloudPublishingConfigResponse>');
+    expect(source).toContain("fetch(withProjectScope('/api/cloud-publishing/config', scope))");
+    expect(source).toContain('async saveCloudPublishingConfig(payload: CloudPublishingConfigPayload, scope: ProjectScope)');
+    expect(source).toContain('async getCloudPublishingLatest(path: string | undefined, scope: ProjectScope): Promise<CloudPublishingLatestResponse>');
     expect(source).toContain("if (path?.trim()) query.set('path', path.trim());");
-    expect(source).toContain("if (projectId?.trim()) query.set('projectId', projectId.trim());");
-    expect(source).toContain('async publishCloudTarget(payload: CloudPublishRequest): Promise<CloudPublishResponse>');
-    expect(source).toContain("fetch('/api/cloud-publishing/publish'");
+    expect(source).toContain('async publishCloudTarget(payload: CloudPublishRequest, scope: ProjectScope): Promise<CloudPublishResponse>');
+    expect(source).toContain("fetch(withProjectScope('/api/cloud-publishing/publish', scope)");
     expect(source).toContain('export interface AxhubStatusResponse');
     expect(source).toContain('export interface AxhubHtmlProject');
     expect(source).toContain('export interface AxhubPublishResponse');
@@ -94,7 +191,7 @@ describe('apiService source', () => {
     expect(source).toContain("fetch('/api/axhub/connect-enterprise'");
     expect(source).toContain('async getAxhubHtmlProjects(keyword?: string): Promise<AxhubHtmlProjectsResponse>');
     expect(source).toContain('async createAxhubHtmlProject(name: string): Promise<AxhubHtmlProjectResponse>');
-    expect(source).toContain('async publishAxhubHtmlProject(payload: { pid: number; path: string; projectId?: string | null }): Promise<AxhubPublishResponse>');
+    expect(source).toContain('async publishAxhubHtmlProject(payload: { pid: number; path: string; projectId: string }): Promise<AxhubPublishResponse>');
   });
 
   it('does not expose the obsolete browser prompt-execute wrapper', () => {
@@ -210,7 +307,7 @@ describe('apiService source', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/agent/versions?agent=qoder', { cache: 'no-store' });
   });
 
-  it('scopes every workspace git API to the project in the current URL', async () => {
+  it('scopes every workspace git API to the explicitly requested project', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       available: true,
       changeSummary: { totalFiles: 0, groups: [] },
@@ -219,45 +316,51 @@ describe('apiService source', () => {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     }));
-    vi.stubGlobal('window', {
-      location: {
-        search: '?projectId=client-b',
-      },
-    });
     vi.stubGlobal('fetch', fetchMock);
+    const scope = { projectId: 'client-b' };
 
-    await apiService.getGitWorkspaceStatus({ gitVersion: 'abc1234', path: 'prototypes/home' });
-    await apiService.initGitWorkspace();
-    await apiService.commitGitWorkspace('更新首页原型', { path: 'prototypes/home' });
-    await apiService.switchGitWorkspaceBranch('feature');
-    await apiService.setGitWorkspaceRemote({ url: 'https://example.com/team/client-b.git' });
-    await apiService.fetchGitWorkspace();
-    await apiService.syncDownGitWorkspace();
-    await apiService.pushGitWorkspace();
-    await apiService.createGitWorkspaceRemoteRepository({ repositoryName: 'client-b', visibility: 'private' });
-    await apiService.getGitWorkspacePrompt({ scene: 'branch-management' });
+    await apiService.getGitWorkspaceStatus({
+      gitVersion: 'abc1234',
+      path: 'prototypes/home',
+      branch: 'feature/ui',
+      remoteBranch: 'feature/ui',
+    }, scope);
+    await apiService.initGitWorkspace(scope);
+    await apiService.commitGitWorkspace('更新首页原型', scope, { path: 'prototypes/home' });
+    await apiService.setGitWorkspaceRemote({ url: 'https://example.com/team/client-b.git' }, scope);
+    await apiService.fetchGitWorkspace(scope);
+    await apiService.syncDownGitWorkspace(scope);
+    await apiService.pushGitWorkspace(scope);
+    await apiService.createGitWorkspaceRemoteRepository({ repositoryName: 'client-b', visibility: 'private' }, scope);
 
     expect(fetchMock.mock.calls[0]).toEqual([
-      '/api/git/workspace/status?gitVersion=abc1234&path=prototypes%2Fhome&projectId=client-b',
+      '/api/git/workspace/status?gitVersion=abc1234&path=prototypes%2Fhome&branch=feature%2Fui&remoteBranch=feature%2Fui&projectId=client-b',
       { cache: 'no-store' },
     ]);
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-      '/api/git/workspace/status?gitVersion=abc1234&path=prototypes%2Fhome&projectId=client-b',
+      '/api/git/workspace/status?gitVersion=abc1234&path=prototypes%2Fhome&branch=feature%2Fui&remoteBranch=feature%2Fui&projectId=client-b',
       '/api/git/workspace/init?projectId=client-b',
       '/api/git/workspace/commit?projectId=client-b',
-      '/api/git/workspace/branch?projectId=client-b',
       '/api/git/workspace/remote?projectId=client-b',
       '/api/git/workspace/fetch?projectId=client-b',
       '/api/git/workspace/sync-down?projectId=client-b',
       '/api/git/workspace/push?projectId=client-b',
       '/api/git/workspace/create-remote-repository?projectId=client-b',
-      '/api/git/workspace/prompt?projectId=client-b',
     ]);
     expect(fetchMock.mock.calls[2][1]).toMatchObject({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: '更新首页原型', path: 'prototypes/home' }),
     });
+
+    const apiSource = readFileSync(resolve(__dirname, './api.ts'), 'utf8');
+    expect(apiSource).toContain('branch?: string;');
+    expect(apiSource).toContain('remoteBranch?: string;');
+    expect(apiSource).toContain('branchView?: GitWorkspaceBranchView;');
+    expect(apiSource).not.toContain('getCurrentProjectIdFromUrl');
+    expect(apiSource).not.toContain('buildCurrentProjectScopedUrl');
+    expect(apiSource).not.toContain('switchGitWorkspaceBranch');
+    expect(apiSource).not.toContain("| 'branch-management'");
   });
 
   it('ignores Vite HTML fallback responses when loading hack.css', async () => {

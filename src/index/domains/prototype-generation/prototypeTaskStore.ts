@@ -2,6 +2,7 @@ import type { ItemData, PromptClientPreference } from '../../types';
 import type { ContextBundleV2 } from '@axhub/acp/runtime';
 import { toAcpProvider } from '../../../common/promptExecution';
 import type { AcpProvider as AcpPromptProvider } from '../../../common/assistant-context/types';
+import { requireProjectScope } from '../../services/projectScope';
 import {
   runAcpPrototypeAgent,
   type PrototypeGenerationAgentEvent,
@@ -55,7 +56,7 @@ export interface PrototypeGenerationSubmitRequest {
 
 export interface PrototypeGenerationTaskStore {
   getTasks(): PrototypeGenerationTaskRecord[];
-  configure(options: { targetPath?: string | null }): Promise<void>;
+  configure(options: { projectId: string; targetPath?: string | null }): Promise<void>;
   subscribe(listener: () => void): () => void;
   submit(request: PrototypeGenerationSubmitRequest, options?: {
     onCreated?: (task: PrototypeGenerationTaskRecord) => void;
@@ -110,11 +111,16 @@ function trimPrototypeTasks(input: PrototypeGenerationTaskRecord[]): PrototypeGe
     .slice(0, HISTORY_LIMIT);
 }
 
+function createScopeKey(projectId: string | undefined, targetPath: string | undefined): string {
+  return projectId ? `${projectId}:${targetPath || ''}` : '';
+}
+
 export function createPrototypeGenerationTaskStore(
   options: PrototypeGenerationTaskStoreOptions = {},
 ): PrototypeGenerationTaskStore {
   const now = options.now || (() => Date.now());
   let tasks: PrototypeGenerationTaskRecord[] = [];
+  let projectId: string | undefined;
   let targetPath: string | undefined;
   let loadRevision = 0;
   const listeners = new Set<() => void>();
@@ -123,24 +129,32 @@ export function createPrototypeGenerationTaskStore(
     for (const listener of listeners) listener();
   };
 
-  const upsertTask = (task: PrototypeGenerationTaskRecord) => {
+  const isCurrentScope = (scopeKey: string) => scopeKey === createScopeKey(projectId, targetPath);
+
+  const upsertTask = (task: PrototypeGenerationTaskRecord, scopeKey?: string) => {
+    if (scopeKey && !isCurrentScope(scopeKey)) return;
     tasks = trimPrototypeTasks([task, ...tasks.filter((item) => item.id !== task.id)]);
     emit();
   };
 
-  const replaceTask = (previousTaskId: string, task: PrototypeGenerationTaskRecord) => {
+  const replaceTask = (previousTaskId: string, task: PrototypeGenerationTaskRecord, scopeKey?: string) => {
+    if (scopeKey && !isCurrentScope(scopeKey)) return;
     tasks = trimPrototypeTasks([task, ...tasks.filter((item) => item.id !== previousTaskId && item.id !== task.id)]);
     emit();
   };
 
-  const updateFromAgentEvent = (task: PrototypeGenerationTaskRecord, event: PrototypeGenerationAgentEvent) => {
+  const updateFromAgentEvent = (
+    task: PrototypeGenerationTaskRecord,
+    event: PrototypeGenerationAgentEvent,
+    scopeKey: string,
+  ) => {
     if (event.stage === 'activity') {
       const nextTask: PrototypeGenerationTaskRecord = {
         ...task,
         stage: 'running',
         ...(event.sessionId ? { sessionId: event.sessionId, acpxSessionName: event.sessionId } : {}),
       };
-      upsertTask(nextTask);
+      upsertTask(nextTask, scopeKey);
       return nextTask;
     }
     const nextStage: PrototypeGenerationTaskStage = event.stage === 'accepted'
@@ -156,15 +170,18 @@ export function createPrototypeGenerationTaskStore(
       ...(event.sessionId ? { sessionId: event.sessionId, acpxSessionName: event.sessionId } : {}),
       ...(event.stage === 'error' ? { status: 'error', error: event.message || 'AI 生成执行失败' } : {}),
     };
-    upsertTask(nextTask);
+    upsertTask(nextTask, scopeKey);
     return nextTask;
   };
 
   return {
     getTasks: () => tasks,
-    async configure({ targetPath: nextTargetPath }) {
+    async configure({ projectId: nextProjectId, targetPath: nextTargetPath }) {
+      const scope = requireProjectScope(nextProjectId);
       const normalizedTargetPath = normalizeTargetPath(nextTargetPath);
-      if (normalizedTargetPath === targetPath) return;
+      const nextScopeKey = createScopeKey(scope.projectId, normalizedTargetPath);
+      if (nextScopeKey === createScopeKey(projectId, targetPath)) return;
+      projectId = scope.projectId;
       targetPath = normalizedTargetPath;
       loadRevision += 1;
       tasks = [];
@@ -175,6 +192,8 @@ export function createPrototypeGenerationTaskStore(
       return () => listeners.delete(listener);
     },
     async submit(request, submitOptions = {}) {
+      const scope = requireProjectScope(projectId);
+      const submissionScopeKey = createScopeKey(scope.projectId, targetPath);
       const createdAt = now();
       let task: PrototypeGenerationTaskRecord = {
         id: createTaskId(),
@@ -193,12 +212,13 @@ export function createPrototypeGenerationTaskStore(
         ...task,
         runId: task.id,
       };
-      upsertTask(task);
+      upsertTask(task, submissionScopeKey);
       submitOptions.onCreated?.(task);
       const artifactHandlerPromises: Promise<void>[] = [];
 
       try {
         const result = await runAcpPrototypeAgent({
+          projectId: scope.projectId,
           taskId: task.id,
           provider: task.provider,
           prompt: request.prompt,
@@ -215,7 +235,8 @@ export function createPrototypeGenerationTaskStore(
           thought: request.thought,
           contextBundle: request.contextBundle,
           onEvent: (event) => {
-            task = updateFromAgentEvent(task, event);
+            if (!isCurrentScope(submissionScopeKey)) return;
+            task = updateFromAgentEvent(task, event, submissionScopeKey);
             if (event.artifact) {
               const artifactHandlerPromise = Promise.resolve(submitOptions.onArtifact?.(event.artifact, task))
                 .catch((error) => console.warn('[Axhub Prototype Generation] Failed to apply streamed artifact:', error));
@@ -223,6 +244,17 @@ export function createPrototypeGenerationTaskStore(
             }
           },
         });
+        if (!isCurrentScope(submissionScopeKey)) {
+          const finishedAt = now();
+          return {
+            ...task,
+            status: 'error',
+            stage: 'error',
+            error: '项目已切换',
+            finishedAt,
+            elapsed: Math.max(0, finishedAt - createdAt),
+          };
+        }
         await Promise.all(artifactHandlerPromises);
 
         const acpxSessionName = result.sessionId || task.acpxSessionName;
@@ -244,7 +276,7 @@ export function createPrototypeGenerationTaskStore(
           ...task,
           stage: 'refreshing',
         };
-        upsertTask(task);
+        upsertTask(task, submissionScopeKey);
 
         const createdPrototype = await submitOptions.onAgentDone?.(task);
         const finishedAt = now();
@@ -260,7 +292,7 @@ export function createPrototypeGenerationTaskStore(
           recoverable: true,
           ...(createdPrototype ? {} : { note: 'AI 生成已完成，但暂未检测到新增原型资源。' }),
         };
-        replaceTask(localTaskId, task);
+        replaceTask(localTaskId, task, submissionScopeKey);
         return task;
       } catch (error: any) {
         const finishedAt = now();
@@ -272,7 +304,7 @@ export function createPrototypeGenerationTaskStore(
           finishedAt,
           elapsed: Math.max(0, finishedAt - createdAt),
         };
-        upsertTask(task);
+        upsertTask(task, submissionScopeKey);
         return task;
       }
     },

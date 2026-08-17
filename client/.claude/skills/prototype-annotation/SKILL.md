@@ -48,6 +48,8 @@ description: 原型标注替代 PRD 时使用：把页面目录、组件说明�
 
 多原型入口优先用 `link` 指向 `/prototypes/<prototype-id>` 或完整 URL；当前原型内部页面/状态入口再用 `route`。
 
+这里的相对 `link` 只用于 annotation 运行时数据。回复用户、请求验收或给预览入口时，优先使用 ready 检查返回的完整 `serverUrl`；管理端不可用时才使用 `targetUrl`。
+
 ## 组件标注
 
 组件标注使用 `data.nodes[]`。每个节点至少需要稳定 `id`、`locator`、正文字段和时间字段。
@@ -57,6 +59,7 @@ description: 原型标注替代 PRD 时使用：把页面目录、组件说明�
 - `pageId` 可以是字符串或字符串数组，用于限制 marker 出现在哪些页面/状态。
 - `hasMarkdown: false` 使用 `annotationText` 和 `images`。
 - `hasMarkdown: true` 使用 `markdownMap[node.id]`，运行时会忽略 `annotationText` 和 `images`。
+- 页面有对话框或遮罩层时，检查实际 DOM，把包含弹窗内容的活动层根选择器写入 `presentation.layerSelectors`。
 
 ## 组件状态
 

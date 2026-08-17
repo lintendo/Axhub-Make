@@ -13,7 +13,7 @@ export type ServerPromptClientPreference =
   | 'acp:reasonix'
   | 'acp:grok-build'
   | 'manual';
-export type ServerDefaultPromptClientPreference = ServerPromptClientPreference | null;
+export type ServerAiPromptClientPreference = ServerPromptClientPreference | null;
 export type ServerAnnotationPromptClientPreference = Exclude<ServerPromptClientPreference, 'manual'> | null;
 export type ServerAcpExecutionMode = 'prompt' | 'exec';
 export type ServerAcpPermissionMode = 'approve-all';
@@ -114,8 +114,10 @@ export interface ServerCloudPublishingConfig {
 
 export interface MakeServerConfig {
   automation: {
-    defaultPromptClient: ServerDefaultPromptClientPreference;
+    conversationPromptClient: ServerAiPromptClientPreference;
+    conversationModel: string | null;
     defaultIDE: ServerIDEPreference;
+    injectLocalAiEntry: boolean;
     acp: {
       mode: ServerAcpExecutionMode;
       permission: ServerAcpPermissionMode;
@@ -123,7 +125,10 @@ export interface MakeServerConfig {
     };
     annotationPromptClient: ServerAnnotationPromptClientPreference;
     annotationModel: string | null;
+    canvasPromptClient: ServerAiPromptClientPreference;
+    canvasModel: string | null;
     agentRunConcurrency: number;
+    autoClearCompletedComments: boolean;
   };
   assistant: {
     webBaseUrl: string | null;
@@ -203,8 +208,10 @@ const DEFAULT_CLOUD_PUBLISHING_CONFIG: ServerCloudPublishingConfig = {
 
 const DEFAULT_SERVER_CONFIG: MakeServerConfig = {
   automation: {
-    defaultPromptClient: null,
+    conversationPromptClient: null,
+    conversationModel: null,
     defaultIDE: 'none',
+    injectLocalAiEntry: true,
     acp: {
       mode: 'prompt',
       permission: 'approve-all',
@@ -212,7 +219,10 @@ const DEFAULT_SERVER_CONFIG: MakeServerConfig = {
     },
     annotationPromptClient: null,
     annotationModel: null,
+    canvasPromptClient: null,
+    canvasModel: null,
     agentRunConcurrency: DEFAULT_AGENT_RUN_CONCURRENCY,
+    autoClearCompletedComments: true,
   },
   assistant: {
     webBaseUrl: null,
@@ -551,8 +561,8 @@ function normalizeAiImageGenerationConfig(
 
 function normalizePromptClient(
   value: unknown,
-  fallback: ServerDefaultPromptClientPreference,
-): ServerDefaultPromptClientPreference {
+  fallback: ServerAiPromptClientPreference,
+): ServerAiPromptClientPreference {
   if (value === null) {
     return null;
   }
@@ -759,30 +769,65 @@ function normalizeConfig(input: unknown, fallback: MakeServerConfig = DEFAULT_SE
   const accessControl = data.accessControl && typeof data.accessControl === 'object'
     ? data.accessControl as Record<string, unknown>
     : {};
+  const legacyPromptClient = hasOwn(automation, 'defaultPromptClient')
+    ? normalizePromptClient(automation.defaultPromptClient, null)
+    : null;
+  const legacyAnnotationPromptClient = legacyPromptClient === 'manual'
+    ? null
+    : legacyPromptClient;
+  const annotationPromptClientFallback = hasOwn(automation, 'defaultPromptClient')
+    ? legacyAnnotationPromptClient
+    : fallback.automation.annotationPromptClient;
+  const conversationPromptClient = hasOwn(automation, 'conversationPromptClient')
+    ? normalizePromptClient(
+      automation.conversationPromptClient,
+      fallback.automation.conversationPromptClient,
+    )
+    : legacyPromptClient || fallback.automation.conversationPromptClient;
+  const annotationPromptClient = hasOwn(automation, 'annotationPromptClient')
+    ? normalizeAnnotationPromptClient(
+      automation.annotationPromptClient,
+      annotationPromptClientFallback,
+    )
+    : annotationPromptClientFallback;
+  const canvasPromptClient = hasOwn(automation, 'canvasPromptClient')
+    ? normalizePromptClient(automation.canvasPromptClient, fallback.automation.canvasPromptClient)
+    : legacyPromptClient || fallback.automation.canvasPromptClient;
 
   return {
     automation: {
-      defaultPromptClient: hasOwn(automation, 'defaultPromptClient')
-        ? normalizePromptClient(automation.defaultPromptClient, fallback.automation.defaultPromptClient)
-        : fallback.automation.defaultPromptClient,
+      conversationPromptClient,
+      conversationModel: hasOwn(automation, 'conversationModel')
+        ? normalizeNullableString(automation.conversationModel)
+        : fallback.automation.conversationModel,
       defaultIDE: hasOwn(automation, 'defaultIDE')
         ? normalizeIDE(automation.defaultIDE, fallback.automation.defaultIDE)
         : fallback.automation.defaultIDE,
+      injectLocalAiEntry: hasOwn(automation, 'injectLocalAiEntry')
+        && typeof automation.injectLocalAiEntry === 'boolean'
+        ? automation.injectLocalAiEntry
+        : fallback.automation.injectLocalAiEntry,
       acp: hasOwn(automation, 'acp') || hasOwn(automation, 'acpx')
         ? normalizeAcpExecutionConfig(
           hasOwn(automation, 'acp') ? automation.acp : automation.acpx,
           fallback.automation.acp,
         )
         : fallback.automation.acp,
-      annotationPromptClient: hasOwn(automation, 'annotationPromptClient')
-        ? normalizeAnnotationPromptClient(automation.annotationPromptClient, fallback.automation.annotationPromptClient)
-        : fallback.automation.annotationPromptClient,
+      annotationPromptClient,
       annotationModel: hasOwn(automation, 'annotationModel')
         ? normalizeNullableString(automation.annotationModel)
         : fallback.automation.annotationModel,
+      canvasPromptClient,
+      canvasModel: hasOwn(automation, 'canvasModel')
+        ? normalizeNullableString(automation.canvasModel)
+        : fallback.automation.canvasModel,
       agentRunConcurrency: hasOwn(automation, 'agentRunConcurrency')
         ? sanitizeAgentRunConcurrency(automation.agentRunConcurrency, fallback.automation.agentRunConcurrency)
         : fallback.automation.agentRunConcurrency,
+      autoClearCompletedComments: hasOwn(automation, 'autoClearCompletedComments')
+        && typeof automation.autoClearCompletedComments === 'boolean'
+        ? automation.autoClearCompletedComments
+        : fallback.automation.autoClearCompletedComments,
     },
     assistant: {
       webBaseUrl: hasOwn(assistant, 'webBaseUrl')

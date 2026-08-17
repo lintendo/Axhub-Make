@@ -8,6 +8,8 @@
 
 **Tech Stack:** TypeScript, React, Next/Vite, Vitest, Node test, lucide-react, pnpm.
 
+**Implementation status (2026-08-11):** Complete. Make and ACP focused tests, ACP lint/typecheck/full build, ACP public package verification, and Make admin build pass. Make's broad explicit-project TypeScript audit still reports unrelated pre-existing errors outside this change; the focused server typecheck passes.
+
 ## Global Constraints
 
 - 不删除用户已有配置文件；读取旧 `appKey`/`resourceId`/`realtimeUrl` 时忽略。

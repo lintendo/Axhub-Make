@@ -6,13 +6,26 @@
 import React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
 import * as ReactDOM from 'react-dom';
-import { createCommentary, resolveCommentaryDiagramTarget, type CommentaryApi, type CommentaryExternalEditingState, type CommentaryExternalEditingTaskRef, type CommentaryExternalEditingTargetRef, type CommentaryHostToolbarAction, type CommentaryHostToolbarState, type CommentaryToolbarMode } from '@axhub/commentary';
+import { createCommentary, resolveCommentaryDiagramTarget, type CommentaryApi, type CommentaryExternalEditingState, type CommentaryExternalEditingTaskRef, type CommentaryExternalEditingTargetRef, type CommentaryHostToolbarAction, type CommentaryHostToolbarState, type CommentaryPageElementActivationResult, type CommentaryPageElementSearchResult, type CommentaryPageElementStructureResult, type CommentaryToolbarMode, type CommentaryVoiceCommentResult, type CommentaryVoiceTargets } from '@axhub/commentary';
 import { createHtmlReviewBridge, normalizeHtmlReviewDocumentPath, shouldAllowHtmlReviewPageEvent, type HtmlReviewBridge } from './htmlReviewBridge';
 import {
   createHtmlResourceSaveBridge,
   type HtmlResourceSaveBridge,
   type HtmlResourceSaveEditor,
 } from './htmlResourceSaveBridge';
+import {
+  createDocumentCommentsPersistenceAdapter,
+  createDocumentCommentsPersistenceScope,
+  type DocumentCommentContext,
+} from '../common/documentCommentsPersistence';
+import { createQuickEditRequestRegistry } from '../common/quickEditRequestRegistry';
+import { normalizeMakeServerOrigin } from '../common/makeServerOrigin';
+import type {
+  QuickEditSaveAction,
+  QuickEditSaveCommitResult,
+  QuickEditSaveDraft,
+  QuickEditSavePreflight,
+} from '../common/quickEditSave';
 
 declare global {
   interface Window {
@@ -29,13 +42,33 @@ let commentEditorDarkMode = false;
 let commentEditorAssistantPanelOpen = false;
 let htmlEditorContext: Record<string, unknown> | null = null;
 let parentEditorBridgeUnsubscribe: (() => void) | null = null;
+const parentVoiceTargetSubscriptions = new Map<string, () => void>();
 let htmlReviewBridgeRuntime: HtmlReviewBridge | null = null;
 let htmlResourceSaveBridgeRuntime: HtmlResourceSaveBridge | null = null;
+const quickEditCommitRegistry = createQuickEditRequestRegistry<QuickEditSaveCommitResult>();
+let trustedParentEditorOrigin = '';
+const PARENT_VOICE_MESSAGE_TYPES = new Set([
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_GET_TARGETS',
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_FIND_ELEMENTS',
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_GET_STRUCTURE',
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_ACTIVATE_ELEMENT',
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_CREATE_COMMENT',
+  'AXHUB_PROTOTYPE_EDITOR_VALIDATE_EDITING_TARGET',
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_REFRESH_COMMENTS',
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_SUBSCRIBE_TARGETS',
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_UNSUBSCRIBE_TARGETS',
+]);
+
+function isTrustedParentVoiceEvent(event: MessageEvent): boolean {
+  return event.source === window.parent
+    && Boolean(trustedParentEditorOrigin)
+    && event.origin === trustedParentEditorOrigin;
+}
 const MAKE_COMMENTARY_SKILL_INSTALL_SOURCE = [
-  '.agents/skills/explore-options/SKILL.md',
-  '.claude/skills/explore-options/SKILL.md',
-  '.agents/skills/prototype-comments/SKILL.md',
-  '.claude/skills/prototype-comments/SKILL.md',
+    '.agents/skills/explore-options/SKILL.md',
+    '.claude/skills/explore-options/SKILL.md',
+    '.agents/skills/handle-comments/SKILL.md',
+    '.claude/skills/handle-comments/SKILL.md',
 ].join('\n');
 
 function readUrlParam(keys: string[]): string {
@@ -53,6 +86,11 @@ function resolveHtmlResourcePath(): string {
   const contextResourceId = typeof htmlEditorContext?.resourceId === 'string'
     ? htmlEditorContext.resourceId.trim()
     : '';
+  const contextDocumentPath = typeof htmlEditorContext?.documentPath === 'string'
+    ? htmlEditorContext.documentPath.trim()
+    : '';
+  const normalizedContextDocumentPath = normalizeHtmlReviewDocumentPath(contextDocumentPath);
+  if (normalizedContextDocumentPath) return normalizedContextDocumentPath;
   const contextPath = normalizeHtmlReviewDocumentPath(contextResourceId);
   if (contextPath) return contextPath;
 
@@ -83,6 +121,9 @@ function buildHtmlResourceContext() {
   const contextProjectId = typeof context.projectId === 'string'
     ? context.projectId.trim()
     : readUrlParam(['projectId']);
+  const contextMakeServerOrigin = typeof context.makeServerOrigin === 'string'
+    ? context.makeServerOrigin.trim()
+    : '';
   const contextPane = typeof context.pane === 'string' ? context.pane.trim() : '';
   return {
     kind: 'html-document',
@@ -92,14 +133,26 @@ function buildHtmlResourceContext() {
     meta: {
       resourceKind: 'html',
       projectId: contextProjectId,
+      makeServerOrigin: contextMakeServerOrigin,
       resourceId: contextResourceId,
       pane: contextPane,
       currentFilePath: path,
       docPath: path,
       storageScope: path ? `html-doc:${path}` : `html-doc:${window.location.pathname}`,
       displayName: title,
+      documentPath: path,
     },
   };
+}
+
+function buildDocumentCommentContext(): DocumentCommentContext | null {
+  const resource = buildHtmlResourceContext();
+  const documentPath = String(resource.meta.documentPath || '').trim();
+  const projectId = String(resource.meta.projectId || '').trim();
+  const makeServerOrigin = String(resource.meta.makeServerOrigin || '').trim();
+  return documentPath && projectId
+    ? { projectId, documentPath, ...(makeServerOrigin ? { makeServerOrigin } : {}) }
+    : null;
 }
 
 function ensureHtmlReviewBridge(): HtmlReviewBridge {
@@ -158,11 +211,37 @@ function ensureCommentEditor(options?: {
     ui: {
       toolbarMode: options?.toolbarMode || 'host',
       initialDarkMode,
+      htmlFileSaveEnabled: true,
+      onHostToolbarAction: async (action) => {
+        if (action.type === 'save-html-all') {
+          return ensureHtmlResourceSaveBridge().saveAllChanges();
+        }
+        if (action.type === 'save-html-text') {
+          await ensureHtmlResourceSaveBridge().saveTextChanges();
+          return true;
+        }
+        if (action.type === 'save-html-style') {
+          await ensureHtmlResourceSaveBridge().saveStyleChanges();
+          return true;
+        }
+        if (action.type === 'clear-html-style') {
+          await ensureHtmlResourceSaveBridge().clearForcedStyles();
+          return true;
+        }
+        return false;
+      },
       getAssistantPanelOpen: () => commentEditorAssistantPanelOpen,
       skillInstallSource: MAKE_COMMENTARY_SKILL_INSTALL_SOURCE,
     },
     host: {
       getResourceContext: buildHtmlResourceContext,
+      getCurrentHoveredElement: () => document.querySelector(':hover'),
+      getPersistenceScope: () => {
+        const context = buildDocumentCommentContext();
+        return context ? createDocumentCommentsPersistenceScope(context, buildHtmlResourceContext()) : null;
+      },
+      persistenceAdapter: createDocumentCommentsPersistenceAdapter(buildDocumentCommentContext),
+      commentPersistenceMode: 'adapter-only',
       getElementTools: htmlReviewBridge.getElementTools,
       onElementToolAction: htmlReviewBridge.onElementToolAction,
       shouldAllowPageEvent: shouldAllowHtmlReviewPageEvent,
@@ -202,6 +281,14 @@ function subscribeHostToolbarState(listener: (state: CommentaryHostToolbarState)
 }
 
 async function runHostToolbarAction(action: CommentaryHostToolbarAction): Promise<boolean> {
+  if (action.type === 'clear-edits' && action.skipConfirm === true) {
+    await ensureCommentEditor().clearAllEdits({
+      skipConfirm: true,
+      scope: action.scope,
+      target: action.target,
+    });
+    return true;
+  }
   if (action.type === 'toggle-dark-mode') {
     const nextDarkMode = typeof action.darkMode === 'boolean'
       ? action.darkMode
@@ -252,6 +339,54 @@ const editorBridge = {
   getEditedSnapshot() {
     return commentEditor?.getEditedSnapshot?.() ?? null;
   },
+  getDebugState() {
+    return commentEditor?.getDebugState?.() ?? null;
+  },
+  getVoiceTarget() {
+    return commentEditor?.getVoiceTarget?.() ?? null;
+  },
+  getVoiceTargets() {
+    return commentEditor?.getVoiceTargets?.() ?? { selected: null, hovered: null, preferred: null };
+  },
+  subscribeVoiceTargets(listener: (targets: CommentaryVoiceTargets) => void) {
+    if (commentEditor?.subscribeVoiceTargets) return commentEditor.subscribeVoiceTargets(listener);
+    listener({ selected: null, hovered: null, preferred: null });
+    return () => undefined;
+  },
+  findVoiceElements(query: Parameters<CommentaryApi['findVoiceElements']>[0]) {
+    return commentEditor?.findVoiceElements?.(query) ?? { elements: [], nextCursor: null };
+  },
+  getVoiceElementStructure(query: Parameters<CommentaryApi['getVoiceElementStructure']>[0]) {
+    return commentEditor?.getVoiceElementStructure?.(query) ?? { elements: [], nextCursor: null };
+  },
+  async activateVoiceElement(targetRef: string) {
+    if (!commentEditor?.activateVoiceElement) {
+      return { activated: false as const, targetRef, error: '页面元素激活能力不可用' };
+    }
+    return commentEditor.activateVoiceElement(targetRef);
+  },
+  async createVoiceComment(
+    targetRef: string,
+    content: string,
+    options: { operationId?: string } = {},
+  ) {
+    if (!commentEditor?.createVoiceComment) {
+      return { applied: false as const, targetRef, error: '页面批注能力不可用' };
+    }
+    return commentEditor.createVoiceComment(targetRef, content, {
+      anchorPlacement: 'target',
+      operationId: String(options.operationId || ''),
+    });
+  },
+  validateExternalEditingTarget(
+    elementKey: string,
+    targetRef?: CommentaryExternalEditingTargetRef | null,
+  ) {
+    return commentEditor?.validateExternalEditingTarget?.(elementKey, targetRef ?? null) === true;
+  },
+  refreshPersistedComments(deletedCommentIds?: readonly string[]) {
+    return commentEditor?.refreshPersistedComments?.(deletedCommentIds);
+  },
   saveWebEditorTextChanges() {
     return ensureHtmlResourceSaveBridge().saveTextChanges();
   },
@@ -261,19 +396,34 @@ const editorBridge = {
   clearWebEditorForcedStyles() {
     return ensureHtmlResourceSaveBridge().clearForcedStyles();
   },
+  prepareQuickEditSave(action: QuickEditSaveAction) {
+    return ensureHtmlResourceSaveBridge().prepareQuickEditSave(action);
+  },
+  preflightQuickEditSave(draft: QuickEditSaveDraft) {
+    return ensureHtmlResourceSaveBridge().preflightQuickEditSave(draft);
+  },
+  commitQuickEditSave(draft: QuickEditSaveDraft) {
+    return ensureHtmlResourceSaveBridge().commitQuickEditSave(draft);
+  },
 };
 
 function postPrototypeEditorState(payload: {
   requestId?: unknown;
+  subscriptionId?: string;
+  targetOrigin?: string;
   success: boolean;
   handled?: boolean;
   error?: string;
   promptText?: string;
+  saveDraft?: QuickEditSaveDraft | null;
+  savePreflight?: QuickEditSavePreflight;
+  saveCommitResult?: QuickEditSaveCommitResult;
 }) {
   if (typeof window === 'undefined') return;
   window.parent.postMessage({
     type: 'AXHUB_PROTOTYPE_EDITOR_STATE',
     requestId: typeof payload.requestId === 'string' ? payload.requestId : undefined,
+    ...(payload.subscriptionId ? { subscriptionId: payload.subscriptionId } : {}),
     success: payload.success,
     active: commentEditor?.getStatus?.().active ?? false,
     mode: commentEditor?.getStatus?.().active ? 'webEditorV2' : 'none',
@@ -283,7 +433,43 @@ function postPrototypeEditorState(payload: {
     ...(typeof payload.handled === 'boolean' ? { handled: payload.handled } : {}),
     ...(payload.error ? { error: payload.error } : {}),
     ...(payload.promptText ? { promptText: payload.promptText } : {}),
-  }, '*');
+    ...(payload.saveDraft !== undefined ? { saveDraft: payload.saveDraft } : {}),
+    ...(payload.savePreflight ? { savePreflight: payload.savePreflight } : {}),
+    ...(payload.saveCommitResult ? { saveCommitResult: payload.saveCommitResult } : {}),
+  }, payload.targetOrigin || '*');
+}
+
+function teardownParentVoiceTargetSubscriptions() {
+  parentVoiceTargetSubscriptions.forEach((unsubscribe) => unsubscribe());
+  parentVoiceTargetSubscriptions.clear();
+}
+
+function postPrototypeEditorVoiceState(payload: {
+  requestId?: unknown;
+  subscriptionId?: string;
+  targetOrigin: string;
+  success: boolean;
+  error?: string;
+  voiceTargets?: CommentaryVoiceTargets;
+  voiceSearchResult?: CommentaryPageElementSearchResult;
+  voiceStructureResult?: CommentaryPageElementStructureResult;
+  voiceActivationResult?: CommentaryPageElementActivationResult;
+  voiceCommentResult?: CommentaryVoiceCommentResult;
+  editingTargetValid?: boolean;
+}) {
+  window.parent.postMessage({
+    type: 'AXHUB_PROTOTYPE_EDITOR_STATE',
+    requestId: typeof payload.requestId === 'string' ? payload.requestId : undefined,
+    success: payload.success,
+    ...(payload.subscriptionId ? { subscriptionId: payload.subscriptionId } : {}),
+    ...(payload.error ? { error: payload.error } : {}),
+    ...(payload.voiceTargets ? { voiceTargets: payload.voiceTargets } : {}),
+    ...(payload.voiceSearchResult ? { voiceSearchResult: payload.voiceSearchResult } : {}),
+    ...(payload.voiceStructureResult ? { voiceStructureResult: payload.voiceStructureResult } : {}),
+    ...(payload.voiceActivationResult ? { voiceActivationResult: payload.voiceActivationResult } : {}),
+    ...(payload.voiceCommentResult ? { voiceCommentResult: payload.voiceCommentResult } : {}),
+    ...(typeof payload.editingTargetValid === 'boolean' ? { editingTargetValid: payload.editingTargetValid } : {}),
+  }, payload.targetOrigin);
 }
 
 function ensureParentEditorBridgeHostToolbarBridge() {
@@ -315,7 +501,17 @@ function installParentEditorBridge() {
     const data = event.data;
     if (!data || typeof data !== 'object') return;
 
+    if (PARENT_VOICE_MESSAGE_TYPES.has(String(data.type || '')) && !isTrustedParentVoiceEvent(event)) {
+      return;
+    }
+
     if (event.data.type === 'AXHUB_PROTOTYPE_EDITOR_ENABLE') {
+      const requestedParentOrigin = normalizeMakeServerOrigin(data.options?.makeServerOrigin);
+      if (event.source !== window.parent || !requestedParentOrigin || requestedParentOrigin !== event.origin) {
+        return;
+      }
+      trustedParentEditorOrigin = '';
+      teardownParentVoiceTargetSubscriptions();
       try {
         editorBridge.setContext(data.context);
         await Promise.resolve(editorBridge.enable('webEditorV2', {
@@ -323,6 +519,7 @@ function installParentEditorBridge() {
           initialDarkMode: Boolean(data.options?.initialDarkMode),
           assistantPanelOpen: Boolean(data.options?.assistantPanelOpen),
         }));
+        trustedParentEditorOrigin = requestedParentOrigin;
         ensureParentEditorBridgeHostToolbarBridge();
         postPrototypeEditorState({
           requestId: data.requestId,
@@ -342,6 +539,8 @@ function installParentEditorBridge() {
       try {
         await Promise.resolve(editorBridge.disable());
         teardownParentEditorBridgeHostToolbarBridge();
+        teardownParentVoiceTargetSubscriptions();
+        trustedParentEditorOrigin = '';
         postPrototypeEditorState({
           requestId: data.requestId,
           success: true,
@@ -368,13 +567,19 @@ function installParentEditorBridge() {
           });
           return;
         }
-        if (action?.type === 'send-to-agent' && action?.elementKey) {
-          const promptText = editorBridge.getElementPromptText(String(action.elementKey || ''));
+        if (action?.type === 'send-to-agent' && (action?.elementKey || action?.commentId)) {
+          const modifiedElements = editorBridge.getEditedSnapshot()?.modifiedElements ?? [];
+          const matchedElement = action?.elementKey
+            ? null
+            : modifiedElements.find((item) => String(item?.commentId || '') === String(action?.commentId || ''));
+          const elementKey = String(action?.elementKey || matchedElement?.elementKey || '');
+          const promptText = editorBridge.getElementPromptText(elementKey);
           postPrototypeEditorState({
             requestId: data.requestId,
             success: true,
             handled: Boolean(promptText),
             promptText: promptText || undefined,
+            modifiedElements,
           });
           return;
         }
@@ -446,11 +651,158 @@ function installParentEditorBridge() {
       return;
     }
 
+    if (event.data.type === 'AXHUB_PROTOTYPE_EDITOR_PREPARE_SAVE') {
+      try {
+        const saveDraft = await editorBridge.prepareQuickEditSave(event.data.action as QuickEditSaveAction);
+        postPrototypeEditorState({
+          requestId: data.requestId,
+          success: true,
+          handled: true,
+          saveDraft: saveDraft ?? null,
+        });
+      } catch (error) {
+        postPrototypeEditorState({
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return;
+    }
+
+    if (event.data.type === 'AXHUB_PROTOTYPE_EDITOR_PREFLIGHT_SAVE') {
+      try {
+        const savePreflight = await editorBridge.preflightQuickEditSave(data.draft as QuickEditSaveDraft);
+        postPrototypeEditorState({
+          requestId: data.requestId,
+          success: true,
+          handled: true,
+          savePreflight,
+        });
+      } catch (error) {
+        postPrototypeEditorState({
+          requestId: data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return;
+    }
+
+    if (event.data.type === 'AXHUB_PROTOTYPE_EDITOR_COMMIT_SAVE') {
+      const requestId = String(data.requestId || '').trim();
+      try {
+        const saveCommitResult = await quickEditCommitRegistry.run(requestId, () =>
+          editorBridge.commitQuickEditSave(data.draft as QuickEditSaveDraft),
+        );
+        postPrototypeEditorState({
+          requestId,
+          success: true,
+          handled: true,
+          saveCommitResult,
+        });
+      } catch (error) {
+        postPrototypeEditorState({
+          requestId,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return;
+    }
+
     if (event.data.type === 'AXHUB_PROTOTYPE_EDITOR_QUERY_STATE') {
       postPrototypeEditorState({
         requestId: data.requestId,
         success: true,
       });
+      return;
+    }
+
+    if (event.source === window.parent && data.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_GET_TARGETS') {
+      postPrototypeEditorVoiceState({ requestId: data.requestId, targetOrigin: event.origin, success: true, voiceTargets: editorBridge.getVoiceTargets() });
+      return;
+    }
+    if (event.source === window.parent && data.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_FIND_ELEMENTS') {
+      try {
+        postPrototypeEditorVoiceState({ requestId: data.requestId, targetOrigin: event.origin, success: true, voiceSearchResult: editorBridge.findVoiceElements(data.query ?? {}) });
+      } catch (error) {
+        postPrototypeEditorVoiceState({ requestId: data.requestId, targetOrigin: event.origin, success: false, error: error instanceof Error ? error.message : String(error) });
+      }
+      return;
+    }
+    if (event.source === window.parent && data.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_GET_STRUCTURE') {
+      try {
+        postPrototypeEditorVoiceState({ requestId: data.requestId, targetOrigin: event.origin, success: true, voiceStructureResult: editorBridge.getVoiceElementStructure(data.query ?? {}) });
+      } catch (error) {
+        postPrototypeEditorVoiceState({ requestId: data.requestId, targetOrigin: event.origin, success: false, error: error instanceof Error ? error.message : String(error) });
+      }
+      return;
+    }
+    if (event.source === window.parent && data.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_ACTIVATE_ELEMENT') {
+      const targetRef = String(data.targetRef || '');
+      try {
+        postPrototypeEditorVoiceState({ requestId: data.requestId, targetOrigin: event.origin, success: true, voiceActivationResult: await editorBridge.activateVoiceElement(targetRef) });
+      } catch (error) {
+        postPrototypeEditorVoiceState({ requestId: data.requestId, targetOrigin: event.origin, success: false, error: error instanceof Error ? error.message : String(error) });
+      }
+      return;
+    }
+    if (event.source === window.parent && data.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_CREATE_COMMENT') {
+      const targetRef = String(data.targetRef || '');
+      try {
+        postPrototypeEditorVoiceState({ requestId: data.requestId, targetOrigin: event.origin, success: true, voiceCommentResult: await editorBridge.createVoiceComment(targetRef, String(data.content || ''), data.options ?? {}) });
+      } catch (error) {
+        postPrototypeEditorVoiceState({ requestId: data.requestId, targetOrigin: event.origin, success: false, error: error instanceof Error ? error.message : String(error) });
+      }
+      return;
+    }
+    if (event.source === window.parent && data.type === 'AXHUB_PROTOTYPE_EDITOR_VALIDATE_EDITING_TARGET') {
+      postPrototypeEditorVoiceState({
+        requestId: data.requestId,
+        targetOrigin: event.origin,
+        success: true,
+        editingTargetValid: editorBridge.validateExternalEditingTarget(
+          String(data.elementKey || ''),
+          data.targetRef ?? null,
+        ),
+      });
+      return;
+    }
+    if (event.source === window.parent && data.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_REFRESH_COMMENTS') {
+      const deletedCommentIds = Array.isArray(data.deletedCommentIds)
+        ? data.deletedCommentIds.filter((value: unknown): value is string => typeof value === 'string')
+        : [];
+      try {
+        await editorBridge.refreshPersistedComments(deletedCommentIds);
+        postPrototypeEditorVoiceState({ requestId: data.requestId, targetOrigin: event.origin, success: true });
+      } catch (error) {
+        postPrototypeEditorVoiceState({ requestId: data.requestId, targetOrigin: event.origin, success: false, error: error instanceof Error ? error.message : String(error) });
+      }
+      return;
+    }
+    if (event.source === window.parent && data.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_SUBSCRIBE_TARGETS') {
+      const subscriptionId = String(data.subscriptionId || '');
+      if (subscriptionId) {
+        parentVoiceTargetSubscriptions.get(subscriptionId)?.();
+        let subscribed = false;
+        const unsubscribe = editorBridge.subscribeVoiceTargets((voiceTargets) => {
+          if (subscribed && event.origin === trustedParentEditorOrigin) {
+            window.parent.postMessage({ type: 'AXHUB_PROTOTYPE_EDITOR_VOICE_TARGETS_CHANGED', subscriptionId, voiceTargets }, event.origin);
+          }
+        });
+        parentVoiceTargetSubscriptions.set(subscriptionId, unsubscribe);
+        postPrototypeEditorVoiceState({ requestId: data.requestId, subscriptionId, targetOrigin: event.origin, success: true, voiceTargets: editorBridge.getVoiceTargets() });
+        subscribed = true;
+      }
+      return;
+    }
+    if (event.source === window.parent && data.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_UNSUBSCRIBE_TARGETS') {
+      const subscriptionId = String(data.subscriptionId || '');
+      parentVoiceTargetSubscriptions.get(subscriptionId)?.();
+      parentVoiceTargetSubscriptions.delete(subscriptionId);
+      postPrototypeEditorVoiceState({ requestId: data.requestId, subscriptionId, targetOrigin: event.origin, success: true });
+      return;
     }
   });
 }
@@ -543,4 +895,7 @@ if (typeof window !== 'undefined') {
     editors: editorBridge,
   };
   installParentEditorBridge();
+  if (urlParams.get('mode') === 'edit') {
+    editorBridge.enable('webEditorV2', { toolbarMode: 'inline' });
+  }
 }

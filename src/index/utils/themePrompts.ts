@@ -70,7 +70,7 @@ const THEME_IMPORT_SOURCE_GUIDANCE: Record<ThemeImportSource, string[]> = {
 
 const THEME_CREATE_GUIDE_PATHS = [
     'AGENTS.md',
-    'rules/theme-guide.md',
+    '$build-design-system',
     'rules/resource-management-guide.md',
 ];
 

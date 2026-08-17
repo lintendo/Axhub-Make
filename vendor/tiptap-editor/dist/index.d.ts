@@ -15,6 +15,7 @@ interface SimpleEditorProps {
   compactToolbar?: boolean
   toolbarPreset?: "full" | "annotation"
   imageUpload?: UploadFunction
+  imageSrcResolver?: (src: string) => string
   onEditorReady?: (editor: unknown | null) => void
   onMarkdownChange?: (markdown: string) => void
   forceToolbarScrolled?: boolean

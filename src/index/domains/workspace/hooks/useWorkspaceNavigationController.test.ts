@@ -44,6 +44,23 @@ describe('useWorkspaceNavigationController source', () => {
     expect(loadProjectResourcesSource).not.toContain("fetch('/api/projects/active'");
   });
 
+  it('warns and synchronizes the URL when the requested project is unavailable', () => {
+    const source = readFileSync(resolve(__dirname, './useWorkspaceNavigationController.ts'), 'utf8');
+    const loadProjectsStart = source.indexOf('const loadProjects = useCallback');
+    const probeStatusStart = source.indexOf('const probeProjectRuntimeStatus = useCallback', loadProjectsStart);
+    const loadProjectsSource = source.slice(loadProjectsStart, probeStatusStart);
+
+    expect(source).toContain('function replaceBrowserProjectId(projectId: string | null): void {');
+    expect(source).toContain("url.searchParams.set('projectId', projectId);");
+    expect(source).toContain("window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);");
+    expect(loadProjectsSource).toContain('if (requestedProjectId && !requestedProjectExists) {');
+    expect(loadProjectsSource).toContain('messageApi.warning(payload.activeProjectId');
+    expect(loadProjectsSource).toContain("? '链接中的项目不存在或未注册，已切换到当前项目'");
+    expect(loadProjectsSource).toContain(": '链接中的项目不存在或未注册，请重新选择项目'");
+    expect(loadProjectsSource).toContain('replaceBrowserProjectId(payload.activeProjectId);');
+    expect(loadProjectsSource).toContain('initialProjectIdRef.current = null;');
+  });
+
   it('switches active projects through the project API before reloading resources', () => {
     const source = readFileSync(resolve(__dirname, './useWorkspaceNavigationController.ts'), 'utf8');
     const switchProjectStart = source.indexOf('const switchProject = useCallback');
@@ -363,11 +380,20 @@ describe('useWorkspaceNavigationController source', () => {
     const reloadSidebarAssetsSource = source.slice(reloadStart, reloadDocsStart);
     const reloadDocsItemsSource = source.slice(reloadDocsStart, reloadCanvasStart);
 
-    expect(source).toContain('function withActiveProjectParam(url: string, activeProjectId: string | null): string {');
+    expect(source).toContain("import { requireProjectScope, withProjectScope } from '../../../services/projectScope';");
+    expect(source).toContain('withProjectScope(url, requireProjectScope(activeProjectId))');
     expect(reloadSidebarAssetsSource).toContain("fetch(withActiveProjectParam('/api/docs', activeProjectId))");
     expect(reloadSidebarAssetsSource).toContain("fetch(withActiveProjectParam('/api/themes', activeProjectId))");
+    expect(reloadSidebarAssetsSource).toContain("sidebarApi.getResourceOrder('themes', requireProjectScope(activeProjectId))");
     expect(reloadDocsItemsSource).toContain("fetch(withActiveProjectParam('/api/docs', activeProjectId))");
     expect(reloadSidebarAssetsSource).toContain('}, [activeProjectId, loadProjectResources])');
     expect(reloadDocsItemsSource).toContain('}, [activeProjectId])');
+  });
+
+  it('passes the workspace active project into sidebar tree requests', () => {
+    const source = readFileSync(resolve(__dirname, './useWorkspaceNavigationController.ts'), 'utf8');
+
+    expect(source).toContain('sidebarApi.getSidebarTree(tab, requireProjectScope(activeProjectId))');
+    expect(source).not.toContain('getCurrentProjectIdFromUrl');
   });
 });

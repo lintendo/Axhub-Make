@@ -7,7 +7,47 @@ const appRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(appRoot, '../..');
 const themesRoot = path.join(appRoot, 'src/themes');
 const templateOnlyThemeIds = new Set([
+  '8returns',
+  'aevi-wellness',
+  'alison-roman',
+  'alpine-hearing-protection',
+  'altitude',
+  'amp',
+  'arte',
+  'artu',
+  'arva',
+  'ashton-bespoke',
+  'aspelin-reitan',
+  'assurestor',
+  'atelier-deux-ce',
+  'athletics',
+  'atlantic-vc',
+  'audyr',
+  'cards-against-humanity',
+  'clutch-security',
+  'dope-security',
+  'ease-health',
+  'getburnt',
   'google-for-education',
+  'healthy-together',
+  'krepling',
+  'leandra-isler',
+  'lithic',
+  'neverhack',
+  'nile-postgres',
+  'oak-me',
+  'on-energy',
+  'operate',
+  'pirsch-analytics',
+  'planhat',
+  'podscan-fm',
+  'privy',
+  'react-email',
+  'sapgoodenergy',
+  'school',
+  'seline-analytics',
+  'switch-lit',
+  't1-energy',
 ]);
 
 const localResourcePattern = /\.(?:avif|css|gif|html|jpe?g|json|otf|png|svg|ttf|webp|woff2?)(?:[?#].*)?$/iu;
@@ -126,6 +166,15 @@ describe('theme resource boundaries', () => {
     const themeIds = new Set(listThemeDirs().map((themeDir) => path.basename(themeDir)));
     for (const themeId of templateOnlyThemeIds) {
       expect(themeIds.has(themeId), `${themeId} should live in make-template, not client/src/themes`).toBe(false);
+    }
+  });
+
+  it('does not treat spec-only source directories as importable themes', () => {
+    for (const themeDir of listThemeDirs()) {
+      const hasSpecOnlySource = fs.existsSync(path.join(themeDir, 'DESIGN.md'))
+        && fs.existsSync(path.join(themeDir, 'SOURCE.md'))
+        && !fs.existsSync(path.join(themeDir, 'index.tsx'));
+      expect(hasSpecOnlySource, `${path.basename(themeDir)} is a spec-only directory and must not be bundled`).toBe(false);
     }
   });
 

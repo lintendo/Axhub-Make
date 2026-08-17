@@ -8,6 +8,7 @@ import {
     type AxhubPublishResponse,
     type AxhubStatusResponse,
 } from '../../services/api';
+import { requireProjectScope } from '../../services/projectScope';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -26,7 +27,7 @@ import {
 interface AxhubPublishDialogProps {
     open: boolean;
     targetPath: string;
-    projectId?: string | null;
+    projectId: string;
     onOpenChange: (open: boolean) => void;
     onPublished?: (result: AxhubPublishResponse) => void;
 }
@@ -119,7 +120,7 @@ export default function AxhubPublishDialog({
             if (nextStatus.connected && nextStatus.me?.isPlus === true) {
                 const [result, latest] = await Promise.all([
                     apiService.getAxhubHtmlProjects(),
-                    apiService.getCloudPublishingLatest(targetPath, projectId),
+                    apiService.getCloudPublishingLatest(targetPath, requireProjectScope(projectId)),
                 ]);
                 setProjects(result.projects || []);
                 const boundProjectId = String(latest.targets.axhub?.axhubProjectId || '');

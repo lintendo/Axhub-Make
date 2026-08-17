@@ -199,4 +199,4 @@ Run:
 pnpm admin:build
 ```
 
-Expected: both Vite admin builds complete successfully. Start `pnpm admin:dev`, then verify desktop and mobile start-guide states in a browser: configured input is editable; unconfigured input is locked with a working settings control; resource/design cards reveal copy on hover/focus and copying does not select a card.
+Expected: both Vite admin builds complete successfully. Start `pnpm server:dev -- --host 127.0.0.1 --no-open`, then verify desktop and mobile start-guide states in a browser: configured input is editable; unconfigured input is locked with a working settings control; resource/design cards reveal copy on hover/focus and copying does not select a card.

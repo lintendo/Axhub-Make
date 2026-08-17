@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import './canvas-generation-acp-scope.css';
 import {
   AssistantRuntimeProvider,
@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { getAcpProviderOption, resolveAcpPromptClientProvider, type AcpProviderKey } from '../../../common/acpModelConfig';
+import { ACP_PROVIDER_OPTIONS, resolveAcpPromptClientProvider, type AcpProviderKey } from '../../../common/acpModelConfig';
 import {
   Popover,
   PopoverContent,
@@ -74,7 +74,7 @@ type CanvasGenerationComposerPlacementMode = 'absolute' | 'fixed-bottom-center';
 
 export type CanvasAiScene = 'page' | 'design' | 'document';
 
-const FIXED_CANVAS_ACP_PROVIDER_OPTIONS = ['claude', 'codex', 'opencode'] as const satisfies readonly AcpProviderKey[];
+const CANVAS_ACP_PROVIDER_KEYS = ACP_PROVIDER_OPTIONS.map((option) => option.provider);
 
 export interface CanvasAcpSelectorDefaults {
   defaultProvider: AcpProviderKey;
@@ -82,24 +82,59 @@ export interface CanvasAcpSelectorDefaults {
   providerOptions: readonly AcpProviderKey[];
 }
 
+export interface CanvasAcpSelectorVisibility {
+  defaultAgentConfigured: boolean;
+  showSelectors: boolean;
+  showSettingsFallback: boolean;
+}
+
+export function resolveCanvasAcpSelectorVisibility({
+  enabled,
+  preferredPromptClient,
+  requireConfiguredDefaultAgent = false,
+  runtimeNeedsFallback,
+}: {
+  enabled?: boolean;
+  preferredPromptClient?: PromptClientPreference;
+  requireConfiguredDefaultAgent?: boolean;
+  runtimeNeedsFallback: boolean;
+}): CanvasAcpSelectorVisibility {
+  const defaultAgentConfigured = Boolean(resolveAcpPromptClientProvider(preferredPromptClient));
+  const defaultAgentAvailable = !requireConfiguredDefaultAgent || defaultAgentConfigured;
+  return {
+    defaultAgentConfigured,
+    showSelectors: Boolean(enabled) && defaultAgentAvailable && !runtimeNeedsFallback,
+    showSettingsFallback: Boolean(enabled) && (!defaultAgentAvailable || runtimeNeedsFallback),
+  };
+}
+
+export function resolveCanvasGenerationDisplayEditingDisabled({
+  disableEditingWithoutConfiguredAgent,
+  defaultAgentConfigured,
+}: {
+  disableEditingWithoutConfiguredAgent?: boolean;
+  defaultAgentConfigured: boolean;
+}): boolean {
+  return Boolean(disableEditingWithoutConfiguredAgent) && !defaultAgentConfigured;
+}
+
 export function resolveCanvasAcpSelectorDefaults(
   preferredPromptClient?: PromptClientPreference,
+  preferredModel?: string | null,
 ): CanvasAcpSelectorDefaults {
   const defaultProvider = resolveAcpPromptClientProvider(preferredPromptClient) || 'codex';
   return {
     defaultProvider,
-    defaultModel: getAcpProviderOption(defaultProvider)?.defaultAnnotationModel || null,
+    defaultModel: String(preferredModel || '').trim() || null,
     providerOptions: resolveCanvasAcpRuntimeProviderOptions(undefined, defaultProvider),
   };
 }
 
 export function resolveCanvasAcpRuntimeProviderOptions(
-  providerOptions?: readonly AcpProviderKey[] | null,
+  _providerOptions?: readonly AcpProviderKey[] | null,
   selectedProvider?: string | null,
 ): readonly AcpProviderKey[] {
-  const resolvedOptions = providerOptions?.length
-    ? [...providerOptions]
-    : [...FIXED_CANVAS_ACP_PROVIDER_OPTIONS];
+  const resolvedOptions = [...CANVAS_ACP_PROVIDER_KEYS];
   const currentProvider = resolveAcpPromptClientProvider(selectedProvider);
   return currentProvider && !resolvedOptions.some((provider) => provider === currentProvider)
     ? [...resolvedOptions, currentProvider]
@@ -156,6 +191,13 @@ export interface CanvasPromptOptimizationRequest {
   localContextRefs: CanvasLocalContextRef[];
 }
 
+export interface CanvasPromptCopyRequest {
+  prompt: string;
+  attachments: CanvasGenerationAttachmentPart[];
+  referenceImages: string[];
+  localContextRefs: CanvasLocalContextRef[];
+}
+
 type CanvasGenerationDisplaySubmitResult = boolean | void;
 type CanvasGenerationDisplayPostSelectorActions = React.ReactNode | ((props: { getPromptText: () => string }) => React.ReactNode);
 export type CanvasReferencePasteResult = string[] | Partial<CanvasReferenceContext> | null | undefined;
@@ -175,15 +217,60 @@ export interface CanvasProjectResourceItemSelection {
   item: ItemData;
 }
 
+export interface CanvasGenerationDisplayPromptTarget {
+  value: string;
+  focus: () => void;
+}
+
+export function applyCanvasGenerationDisplayPrompt({
+  target,
+  prompt,
+  disabled,
+  persist,
+}: {
+  target: CanvasGenerationDisplayPromptTarget | null;
+  prompt: string;
+  disabled: boolean;
+  persist: (prompt: string) => void;
+}): boolean {
+  const nextPrompt = prompt.trim();
+  if (disabled || !target || !nextPrompt) return false;
+  target.value = nextPrompt;
+  persist(nextPrompt);
+  target.focus();
+  return true;
+}
+
+export function shouldSubmitCanvasGenerationDisplayPrompt({
+  key,
+  shiftKey,
+  isComposing,
+}: {
+  key: string;
+  shiftKey: boolean;
+  isComposing: boolean;
+}): boolean {
+  return key === 'Enter' && !shiftKey && !isComposing;
+}
+
+type CanvasGenerationDisplayPromptCardsRenderer = (actions: {
+  disabled: boolean;
+  selectPrompt: (prompt: string) => void;
+}) => React.ReactNode;
+
 export interface CanvasGenerationDisplayComposerProps {
+  projectId: string;
   placeholder: string;
   ariaLabel: string;
   onSubmit?: (text: string, selection?: CanvasGenerationDisplaySubmitSelection) => CanvasGenerationDisplaySubmitResult | Promise<CanvasGenerationDisplaySubmitResult>;
   onOptimizePrompt?: (request: CanvasPromptOptimizationRequest) => Promise<string>;
+  onCopyPrompt?: (request: CanvasPromptCopyRequest) => Promise<string> | string;
   onOpenAISettings?: () => void;
+  renderPromptCards?: CanvasGenerationDisplayPromptCardsRenderer;
   canPasteReferenceImages?: boolean;
   className?: string;
   disabled?: boolean;
+  disableEditingWithoutConfiguredAgent?: boolean;
   draftStorageKey?: string | null;
   externalFileDropTargetRef?: React.RefObject<HTMLElement>;
   initialLocalContextRefs?: CanvasLocalContextRef[];
@@ -191,6 +278,7 @@ export interface CanvasGenerationDisplayComposerProps {
   leadingActions?: React.ReactNode;
   onPasteReferenceImages?: () => Promise<CanvasReferencePasteResult>;
   postSelectorActions?: CanvasGenerationDisplayPostSelectorActions;
+  preferredModel?: string | null;
   preferredPromptClient?: PromptClientPreference;
   projectResourceItems?: CanvasProjectResourceItems;
   projectResourceTrees?: CanvasProjectResourceTrees;
@@ -199,6 +287,7 @@ export interface CanvasGenerationDisplayComposerProps {
 }
 
 interface CanvasGenerationRuntimeComposerProps {
+  projectId: string;
   addAttachmentTooltip: string;
   allowAttachments: boolean;
   ariaLabel: string;
@@ -208,6 +297,7 @@ interface CanvasGenerationRuntimeComposerProps {
   initialReferenceImages?: string[];
   onPasteReferenceImages?: () => Promise<CanvasReferencePasteResult>;
   placeholder: string;
+  preferredModel?: string | null;
   preferredPromptClient?: PromptClientPreference;
   renderActions?: (props: { submitting: boolean }) => React.ReactNode;
   renderLeadingActions?: (props: { submitting: boolean }) => React.ReactNode;
@@ -868,9 +958,11 @@ function configureCanvasAcpRuntime(runtime: AssistantRuntimeState, workspacePath
 
 function useCanvasAcpRuntimeBridge({
   enabled,
+  projectId,
   workspacePath,
 }: {
   enabled?: boolean;
+  projectId: string;
   workspacePath?: string | null;
 }) {
   const [ready, setReadyState] = useState(false);
@@ -893,7 +985,7 @@ function useCanvasAcpRuntimeBridge({
 
     const promise = (async () => {
       try {
-        const runtime = await apiService.getAssistantRuntime({ autoStart });
+        const runtime = await apiService.getAssistantRuntime({ autoStart, projectId });
         const configured = configureCanvasAcpRuntime(runtime, workspacePath);
         setReady(configured);
         if (!configured && autoStart) {
@@ -914,7 +1006,7 @@ function useCanvasAcpRuntimeBridge({
     })();
     requestRef.current = { autoStart, promise };
     return promise;
-  }, [enabled, setReady, workspacePath]);
+  }, [enabled, projectId, setReady, workspacePath]);
 
   useEffect(() => {
     if (!enabled) {
@@ -1299,7 +1391,7 @@ function CanvasPromptOptimizeButton({
       title="优化提示词"
       disabled={disabled}
       aria-live="polite"
-      className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
       onClick={onClick}
     >
       {optimizing ? (
@@ -1309,6 +1401,103 @@ function CanvasPromptOptimizeButton({
       )}
       <span>{optimizing ? '正在优化提示词' : '优化提示词'}</span>
     </button>
+  );
+}
+
+function CanvasComposerSendButtonWithCopyMenu({
+  canCopy,
+  disabled,
+  onSubmit,
+  submitting,
+}: {
+  canCopy: boolean;
+  disabled: boolean;
+  onSubmit: () => void;
+  submitting: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const hoverTimerRef = useRef<number | null>(null);
+
+  const clearHoverTimer = useCallback(() => {
+    if (hoverTimerRef.current !== null) {
+      window.clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleOpen = useCallback(() => {
+    clearHoverTimer();
+    hoverTimerRef.current = window.setTimeout(() => {
+      setOpen(true);
+    }, 1000);
+  }, [clearHoverTimer]);
+
+  const closeTooltip = useCallback(() => {
+    clearHoverTimer();
+    setOpen(false);
+  }, [clearHoverTimer]);
+
+  useEffect(() => {
+    if (disabled) {
+      closeTooltip();
+    }
+  }, [closeTooltip, disabled]);
+
+  useEffect(() => () => clearHoverTimer(), [clearHoverTimer]);
+
+  return (
+    <TooltipProvider delayDuration={1000}>
+      <Tooltip open={open} onOpenChange={(nextOpen) => setOpen(disabled ? false : nextOpen)}>
+        <TooltipTrigger asChild>
+          <span
+            className="inline-flex"
+            onMouseEnter={scheduleOpen}
+            onMouseLeave={closeTooltip}
+            onFocus={scheduleOpen}
+            onBlur={closeTooltip}
+          >
+            <Button
+              type="button"
+              variant="default"
+              size="icon"
+              className={cn(
+                'aui-composer-send inline-flex size-8 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed',
+                disabled
+                  ? 'bg-slate-100 text-slate-400 opacity-60'
+                  : 'bg-slate-900 text-white hover:bg-slate-800',
+              )}
+              aria-label={submitting ? '发送中' : '发送'}
+              disabled={disabled}
+              onClick={onSubmit}
+            >
+              {submitting ? (
+                <Loader2 className="aui-composer-send-icon size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <ArrowUp className="aui-composer-send-icon size-4" />
+              )}
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="end" sideOffset={8} className="z-[1400] w-44 rounded-md p-2">
+          <div className="space-y-2 text-xs leading-4">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-background/90">发送</span>
+              <span className="rounded border border-white/20 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">
+                Enter
+              </span>
+            </div>
+            {canCopy ? (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-background/90">复制提示词</span>
+                <span className="rounded border border-white/20 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">
+                  Ctrl / ⌘ + C
+                </span>
+              </div>
+            ) : null}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -1407,7 +1596,8 @@ function CanvasComposerSubmitButton({
   );
 }
 
-interface CanvasGenerationDisplayComposerContentProps extends Omit<CanvasGenerationDisplayComposerProps, 'onSubmit' | 'onOptimizePrompt' | 'preferredPromptClient' | 'showSelectors' | 'workspacePath'> {
+interface CanvasGenerationDisplayComposerContentProps extends Omit<CanvasGenerationDisplayComposerProps, 'disableEditingWithoutConfiguredAgent' | 'onSubmit' | 'onOptimizePrompt' | 'preferredPromptClient' | 'showSelectors' | 'workspacePath'> {
+  editingDisabled?: boolean;
   onEnsureAcpRuntime?: (autoStart?: boolean) => Promise<boolean>;
   onOptimizePrompt?: (text: string, selection: Pick<CanvasGenerationDisplaySubmitSelection, 'attachments' | 'referenceImages' | 'localContextRefs'>) => Promise<string>;
   onSubmitText?: (text: string, selection: Pick<CanvasGenerationDisplaySubmitSelection, 'attachments' | 'referenceImages' | 'localContextRefs'>) => CanvasGenerationDisplaySubmitResult | Promise<CanvasGenerationDisplaySubmitResult>;
@@ -1421,6 +1611,7 @@ function CanvasGenerationDisplayComposerContent({
   canPasteReferenceImages,
   className,
   disabled = false,
+  editingDisabled = false,
   draftStorageKey,
   externalFileDropTargetRef,
   initialLocalContextRefs,
@@ -1428,9 +1619,11 @@ function CanvasGenerationDisplayComposerContent({
   onEnsureAcpRuntime,
   onOpenAISettings,
   onOptimizePrompt,
+  onCopyPrompt,
   onPasteReferenceImages,
   onSubmitText,
   placeholder,
+  renderPromptCards,
   leadingActions,
   postSelectorActions,
   projectResourceItems,
@@ -1452,8 +1645,13 @@ function CanvasGenerationDisplayComposerContent({
   const [localContextItems, setLocalContextItems] = useState<ContextItem[]>([]);
   const [projectResourceContextItems, setProjectResourceContextItems] = useState<ContextItem[]>([]);
   const [optimizingPrompt, setOptimizingPrompt] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [displayText, setDisplayText] = useState('');
   const visibleContextItems = [...localContextItems, ...projectResourceContextItems];
-  const controlsDisabled = disabled || optimizingPrompt;
+  const controlsDisabled = disabled || editingDisabled || optimizingPrompt || submitting;
+  const selectorControlsDisabled = disabled || optimizingPrompt || submitting;
+  const resolvedPlaceholder = editingDisabled ? '请使用本地 AI 应用，或前往 AI 设置完成配置' : placeholder;
+  const hasDisplayPromptText = displayText.trim().length > 0;
   const initialReferenceImagesKey = useMemo(
     () => JSON.stringify(initialReferenceImages ?? []),
     [initialReferenceImages],
@@ -1479,26 +1677,35 @@ function CanvasGenerationDisplayComposerContent({
     if (controlsDisabled) return;
     const text = inputRef.current?.value.trim() ?? '';
     if (!text) return;
-    const attachmentSelection = await resolveComposerAttachmentSubmitSelection(displayReferenceAttachments);
-    const submitResult = await onSubmitText?.(text, {
-      ...attachmentSelection,
-      localContextRefs: currentLocalContextRefsRef.current,
-    });
-    if (submitResult === false) {
+    setSubmitting(true);
+    try {
+      const attachmentSelection = await resolveComposerAttachmentSubmitSelection(displayReferenceAttachments);
+      const submitResult = await onSubmitText?.(text, {
+        ...attachmentSelection,
+        localContextRefs: currentLocalContextRefsRef.current,
+      });
+      if (submitResult === false) {
+        persistDisplayDraft(text);
+        return;
+      }
+      const storage = getCanvasGenerationComposerDraftStorage();
+      clearCanvasGenerationComposerDraft(storage, draftStorageKey);
+      if (inputRef.current) {
+        inputRef.current.value = '';
+      }
+      setDisplayText('');
+      await aui.composer().clearAttachments();
+      setProjectResourceSelectedKeys(new Set());
+      setProjectResourceContextItems([]);
+      currentLocalContextRefsRef.current = [];
+      currentLocalContextItemsRef.current = [];
+      syncDisplayContextItems([], []);
+    } catch (error) {
       persistDisplayDraft(text);
-      return;
+      toast.error(error instanceof Error ? error.message : '发送失败');
+    } finally {
+      setSubmitting(false);
     }
-    const storage = getCanvasGenerationComposerDraftStorage();
-    clearCanvasGenerationComposerDraft(storage, draftStorageKey);
-    if (inputRef.current) {
-      inputRef.current.value = '';
-    }
-    await aui.composer().clearAttachments();
-    setProjectResourceSelectedKeys(new Set());
-    setProjectResourceContextItems([]);
-    currentLocalContextRefsRef.current = [];
-    currentLocalContextItemsRef.current = [];
-    syncDisplayContextItems([], []);
   }, [aui, controlsDisabled, displayReferenceAttachments, draftStorageKey, onSubmitText, persistDisplayDraft, syncDisplayContextItems]);
   useEffect(() => {
     if (!draftStorageKey) return;
@@ -1515,15 +1722,24 @@ function CanvasGenerationDisplayComposerContent({
     });
     if (restoreText === null || !inputRef.current || restoreText === currentText) return;
     inputRef.current.value = restoreText;
+    setDisplayText(restoreText);
   }, [draftStorageKey]);
+  const selectDisplayPrompt = useCallback((prompt: string) => {
+    const applied = applyCanvasGenerationDisplayPrompt({
+      target: inputRef.current,
+      prompt,
+      disabled: controlsDisabled,
+      persist: persistDisplayDraft,
+    });
+    if (applied) {
+      setDisplayText(prompt.trim());
+    }
+  }, [controlsDisabled, persistDisplayDraft]);
   const handleInputChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    persistDisplayDraft(event.currentTarget.value);
+    const nextText = event.currentTarget.value;
+    setDisplayText(nextText);
+    persistDisplayDraft(nextText);
   }, [persistDisplayDraft]);
-  const handleInputKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
-    event.preventDefault();
-    void submitDisplayText();
-  }, [submitDisplayText]);
   useEffect(() => {
     if (!initialReferenceImages?.length) return;
     if (loadedInitialReferenceImagesKeyRef.current === initialReferenceImagesKey) return;
@@ -1621,6 +1837,7 @@ function CanvasGenerationDisplayComposerContent({
         inputRef.current.value = optimizedPrompt;
         inputRef.current.focus();
       }
+      setDisplayText(optimizedPrompt);
       persistDisplayDraft(optimizedPrompt);
     } catch (error) {
       if (error && typeof error === 'object' && 'action' in error && (error as { action?: unknown }).action === 'open-ai-settings') {
@@ -1632,6 +1849,48 @@ function CanvasGenerationDisplayComposerContent({
       setOptimizingPrompt(false);
     }
   }, [controlsDisabled, displayReferenceAttachments, onOpenAISettings, onOptimizePrompt, persistDisplayDraft, showModelSelectorFallback]);
+  const handleCopyPrompt = useCallback(async () => {
+    if (controlsDisabled || !onCopyPrompt || !hasDisplayPromptText) return;
+    const text = inputRef.current?.value.trim() ?? '';
+    if (!text) {
+      toast.error('请输入提示词');
+      return;
+    }
+    try {
+      const attachmentSelection = await resolveComposerAttachmentSubmitSelection(displayReferenceAttachments);
+      const copiedPrompt = await onCopyPrompt({
+        prompt: text,
+        ...attachmentSelection,
+        localContextRefs: currentLocalContextRefsRef.current,
+      });
+      const promptText = String(copiedPrompt || '').trim();
+      if (!promptText) {
+        throw new Error('提示词内容为空');
+      }
+      await navigator.clipboard.writeText(promptText);
+      toast.success('提示词已复制到剪贴板');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '复制提示词失败');
+    }
+  }, [controlsDisabled, displayReferenceAttachments, hasDisplayPromptText, onCopyPrompt]);
+  const handleInputKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'c') {
+      const selectionStart = event.currentTarget.selectionStart ?? 0;
+      const selectionEnd = event.currentTarget.selectionEnd ?? 0;
+      if (selectionStart === selectionEnd) {
+        event.preventDefault();
+        void handleCopyPrompt();
+      }
+      return;
+    }
+    if (!shouldSubmitCanvasGenerationDisplayPrompt({
+      key: event.key,
+      shiftKey: event.shiftKey,
+      isComposing: event.nativeEvent.isComposing,
+    })) return;
+    event.preventDefault();
+    void submitDisplayText();
+  }, [handleCopyPrompt, submitDisplayText]);
   const getDisplayPromptText = useCallback(() => inputRef.current?.value.trim() ?? '', []);
   const resolvedPostSelectorActions = typeof postSelectorActions === 'function'
     ? postSelectorActions({ getPromptText: getDisplayPromptText })
@@ -1683,27 +1942,28 @@ function CanvasGenerationDisplayComposerContent({
 
   return (
     <TooltipProvider>
-      <div className={cn('aui-root ax-acp-ui-scope ax-placeholder-display-composer mx-auto w-full max-w-[720px]', className)}>
-        <CanvasProjectResourcePickerDialog
-          open={projectResourceDialogOpen}
-          onOpenChange={(open) => setProjectResourceDialogOpen(controlsDisabled ? false : open)}
-          trees={projectResourceTrees}
-          items={projectResourceItems}
-          selectedKeys={projectResourceSelectedKeys}
-          selectionMode="context"
-          onApply={handleApplyProjectResources}
-        />
-        <div className="aui-composer-root relative flex w-full flex-col">
-          <div
-            data-slot="aui_composer-shell"
-            className={cn(
-              'flex min-h-[112px] w-full flex-col gap-2 rounded-2xl border border-border bg-background p-3 shadow-sm transition-colors focus-within:border-border-strong',
-              controlsDisabled ? 'opacity-60' : '',
-            )}
-          >
+      <>
+        <div className={cn('aui-root ax-acp-ui-scope ax-placeholder-display-composer mx-auto w-full max-w-[720px]', className)}>
+          <CanvasProjectResourcePickerDialog
+            open={projectResourceDialogOpen}
+            onOpenChange={(open) => setProjectResourceDialogOpen(controlsDisabled ? false : open)}
+            trees={projectResourceTrees}
+            items={projectResourceItems}
+            selectedKeys={projectResourceSelectedKeys}
+            selectionMode="context"
+            onApply={handleApplyProjectResources}
+          />
+          <div className="aui-composer-root relative flex w-full flex-col">
+            <div
+              data-slot="aui_composer-shell"
+              className={cn(
+                'flex min-h-[112px] w-full flex-col gap-2 rounded-2xl border border-border bg-background p-3 shadow-sm transition-colors focus-within:border-border-strong',
+                controlsDisabled ? 'opacity-60' : '',
+              )}
+            >
             <textarea
               ref={inputRef}
-              placeholder={placeholder}
+              placeholder={resolvedPlaceholder}
               className="aui-composer-input max-h-32 min-h-14 w-full resize-none bg-transparent px-1.75 py-1.5 text-[13px] outline-none placeholder:text-muted-foreground/80 disabled:cursor-not-allowed md:text-sm"
               rows={1}
               autoFocus
@@ -1714,11 +1974,14 @@ function CanvasGenerationDisplayComposerContent({
               onPaste={handleDisplayPaste}
             />
             <span className="sr-only" aria-live="polite">
-              {optimizingPrompt ? '正在优化提示词' : ''}
+              {submitting ? '正在发送' : optimizingPrompt ? '正在优化提示词' : ''}
             </span>
-            <div className={cn(controlsDisabled ? 'pointer-events-none opacity-60' : '')}>
+            <fieldset
+              disabled={controlsDisabled}
+              className={cn('m-0 min-w-0 border-0 p-0', controlsDisabled ? 'pointer-events-none opacity-60' : '')}
+            >
               <ComposerAttachments />
-            </div>
+            </fieldset>
             {visibleContextItems.length ? (
               <div className="flex flex-wrap gap-1.5 px-1">
                 {visibleContextItems.map((item) => (
@@ -1743,7 +2006,7 @@ function CanvasGenerationDisplayComposerContent({
             ) : null}
             <div className="aui-composer-action-wrapper relative flex items-center justify-between text-[13px] md:text-sm">
               <div className="flex min-w-0 items-center gap-1">
-                {disabled ? null : (
+                {disabled || editingDisabled ? null : (
                   <CanvasComposerAttachmentMenu
                     disabled={optimizingPrompt}
                     label="添加附件"
@@ -1751,16 +2014,17 @@ function CanvasGenerationDisplayComposerContent({
                   />
                 )}
                 {leadingActions ? (
-                  <div
+                  <fieldset
+                    disabled={controlsDisabled}
                     aria-disabled={controlsDisabled}
-                    className={cn('inline-flex min-w-0 items-center', controlsDisabled ? 'pointer-events-none opacity-60' : '')}
+                    className={cn('m-0 inline-flex min-w-0 items-center border-0 p-0', controlsDisabled ? 'pointer-events-none opacity-60' : '')}
                   >
                     {leadingActions}
-                  </div>
+                  </fieldset>
                 ) : null}
                 <div
-                  aria-disabled={controlsDisabled}
-                  className={cn('inline-flex min-w-0 items-center gap-1', controlsDisabled ? 'pointer-events-none opacity-60' : '')}
+                  aria-disabled={selectorControlsDisabled}
+                  className={cn('inline-flex min-w-0 items-center gap-1', selectorControlsDisabled ? 'pointer-events-none opacity-60' : '')}
                 >
                   {showSelectors ? <CanvasAcpComposerSelectors /> : null}
                   {showModelSelectorFallback ? (
@@ -1768,12 +2032,13 @@ function CanvasGenerationDisplayComposerContent({
                   ) : null}
                 </div>
                 {resolvedPostSelectorActions ? (
-                  <div
+                  <fieldset
+                    disabled={controlsDisabled}
                     aria-disabled={controlsDisabled}
-                    className={cn('inline-flex min-w-0 items-center', controlsDisabled ? 'pointer-events-none opacity-60' : '')}
+                    className={cn('m-0 inline-flex min-w-0 items-center border-0 p-0', controlsDisabled ? 'pointer-events-none opacity-60' : '')}
                   >
                     {resolvedPostSelectorActions}
-                  </div>
+                  </fieldset>
                 ) : null}
                 <CanvasPromptOptimizeButton
                   disabled={controlsDisabled}
@@ -1782,26 +2047,25 @@ function CanvasGenerationDisplayComposerContent({
                 />
               </div>
               <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  aria-label="发送"
-                  title="发送"
-                  disabled={controlsDisabled}
-                  className="aui-composer-send inline-flex size-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => { void submitDisplayText(); }}
-                >
-                  <ArrowUp className="aui-composer-send-icon size-4" />
-                </button>
+                <CanvasComposerSendButtonWithCopyMenu
+                  disabled={controlsDisabled || !hasDisplayPromptText}
+                  canCopy={Boolean(onCopyPrompt) && hasDisplayPromptText}
+                  onSubmit={() => { void submitDisplayText(); }}
+                  submitting={submitting}
+                />
               </div>
+            </div>
             </div>
           </div>
         </div>
-      </div>
+        {renderPromptCards?.({ disabled: controlsDisabled, selectPrompt: selectDisplayPrompt })}
+      </>
     </TooltipProvider>
   );
 }
 
 function CanvasGenerationDisplayComposerWithoutAcp({
+  disableEditingWithoutConfiguredAgent: _disableEditingWithoutConfiguredAgent,
   onOptimizePrompt,
   onSubmit,
   preferredPromptClient: _preferredPromptClient,
@@ -1904,13 +2168,27 @@ function CanvasGenerationDisplayComposerRuntime({
 }
 
 function CanvasGenerationDisplayComposerWithAcp({
+  disableEditingWithoutConfiguredAgent,
+  projectId,
   showSelectors,
   workspacePath,
+  preferredModel,
   preferredPromptClient,
   ...props
 }: CanvasGenerationDisplayComposerProps) {
-  const canvasAcpRuntime = useCanvasAcpRuntimeBridge({ enabled: showSelectors, workspacePath });
-  const acpSelectorDefaults = useMemo(() => resolveCanvasAcpSelectorDefaults(preferredPromptClient), [preferredPromptClient]);
+  const canvasAcpRuntime = useCanvasAcpRuntimeBridge({ enabled: showSelectors, projectId, workspacePath });
+  const selectorVisibility = resolveCanvasAcpSelectorVisibility({
+    enabled: showSelectors,
+    preferredPromptClient,
+    requireConfiguredDefaultAgent: disableEditingWithoutConfiguredAgent,
+    runtimeNeedsFallback: canvasAcpRuntime.needsFallback,
+  });
+  const canEnsureAcpRuntime = !disableEditingWithoutConfiguredAgent || selectorVisibility.defaultAgentConfigured;
+  const editingDisabled = resolveCanvasGenerationDisplayEditingDisabled({
+    disableEditingWithoutConfiguredAgent,
+    defaultAgentConfigured: selectorVisibility.defaultAgentConfigured,
+  });
+  const acpSelectorDefaults = useMemo(() => resolveCanvasAcpSelectorDefaults(preferredPromptClient, preferredModel), [preferredModel, preferredPromptClient]);
   const acpRuntimeKey = useMemo(() => [
     acpSelectorDefaults.defaultProvider,
     acpSelectorDefaults.defaultModel ?? 'default-model',
@@ -1929,9 +2207,11 @@ function CanvasGenerationDisplayComposerWithAcp({
     >
       <CanvasGenerationDisplayComposerRuntime
         {...props}
-        onEnsureAcpRuntime={canvasAcpRuntime.ensureRuntime}
-        showModelSelectorFallback={showSelectors && canvasAcpRuntime.needsFallback}
-        showSelectors={showSelectors && !canvasAcpRuntime.needsFallback}
+        editingDisabled={editingDisabled}
+        projectId={projectId}
+        onEnsureAcpRuntime={canEnsureAcpRuntime ? canvasAcpRuntime.ensureRuntime : undefined}
+        showModelSelectorFallback={selectorVisibility.showSettingsFallback}
+        showSelectors={selectorVisibility.showSelectors}
       />
     </AcpUiProvider>
   );
@@ -1959,34 +2239,73 @@ interface CanvasAcpSelectorSection {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-const CANVAS_ACP_PROVIDER_LABELS: Record<AcpProviderKey, string> = {
-  claude: 'Claude Code',
-  codex: 'Codex',
-  opencode: 'OpenCode',
-  cursor: 'Cursor',
-  qoder: 'Qoder',
-  codebuddy: 'CodeBuddy',
-  reasonix: 'Reasonix',
-  'grok-build': 'Grok Build',
-};
-
-const CANVAS_ACP_PROVIDER_ORDER = [
-  'claude',
-  'codex',
-  'opencode',
-  'cursor',
-  'qoder',
-  'codebuddy',
-  'reasonix',
-  'grok-build',
-] as const satisfies readonly AcpProviderKey[];
-
-const CANVAS_ACP_PROVIDER_OPTIONS = CANVAS_ACP_PROVIDER_ORDER.map((provider) => ({
-  value: provider,
-  label: CANVAS_ACP_PROVIDER_LABELS[provider],
+const CANVAS_ACP_PROVIDER_OPTIONS = ACP_PROVIDER_OPTIONS.map((option) => ({
+  value: option.provider,
+  label: option.label,
 }));
 
 const CANVAS_ACP_CONFIG_MENU_DESKTOP_QUERY = '(min-width: 640px)';
+
+interface CanvasAcpSubmenuAnchorRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+export interface CanvasAcpSubmenuViewportLayoutInput {
+  anchorRect: CanvasAcpSubmenuAnchorRect;
+  submenuWidth: number;
+  submenuContentHeight: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  gap?: number;
+  viewportInset?: number;
+  preferredMaxHeight?: number;
+}
+
+export interface CanvasAcpSubmenuViewportLayout {
+  left: number;
+  top: number;
+  maxHeight: number;
+  placement: 'left' | 'right';
+}
+
+function clampCanvasAcpSubmenuCoordinate(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+export function resolveCanvasAcpSubmenuViewportLayout({
+  anchorRect,
+  submenuWidth,
+  submenuContentHeight,
+  viewportWidth,
+  viewportHeight,
+  gap = 8,
+  viewportInset = 8,
+  preferredMaxHeight = 320,
+}: CanvasAcpSubmenuViewportLayoutInput): CanvasAcpSubmenuViewportLayout {
+  const viewportMaxHeight = Math.max(0, viewportHeight - viewportInset * 2);
+  const maxHeight = Math.min(submenuContentHeight, preferredMaxHeight, viewportMaxHeight);
+  const availableRight = viewportWidth - anchorRect.right - gap - viewportInset;
+  const availableLeft = anchorRect.left - gap - viewportInset;
+  const placement = submenuWidth <= availableRight || availableRight >= availableLeft ? 'right' : 'left';
+  const rawLeft = placement === 'right'
+    ? anchorRect.right + gap
+    : anchorRect.left - gap - submenuWidth;
+  const left = clampCanvasAcpSubmenuCoordinate(
+    rawLeft,
+    viewportInset,
+    Math.max(viewportInset, viewportWidth - viewportInset - submenuWidth),
+  );
+  const top = clampCanvasAcpSubmenuCoordinate(
+    anchorRect.top,
+    viewportInset,
+    Math.max(viewportInset, viewportHeight - viewportInset - maxHeight),
+  );
+
+  return { left, top, maxHeight, placement };
+}
 
 function useCanvasAcpMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(false);
@@ -2030,13 +2349,13 @@ function syncCanvasAcpCapabilitySnapshot(
   snapshot: AcpCapabilitySnapshot | null,
   actions: Pick<ReturnType<typeof useAcpUiRuntimeContext>, 'syncModel' | 'syncModeId' | 'syncThoughtLevel'>,
 ) {
-  if (snapshot?.capabilities.model?.currentValue) {
+  if (typeof snapshot?.capabilities.model?.currentValue === 'string') {
     actions.syncModel(snapshot.capabilities.model.currentValue);
   }
-  if (snapshot?.capabilities.mode?.currentValue) {
+  if (typeof snapshot?.capabilities.mode?.currentValue === 'string') {
     actions.syncModeId(snapshot.capabilities.mode.currentValue);
   }
-  if (snapshot?.capabilities.thought_level?.currentValue) {
+  if (typeof snapshot?.capabilities.thought_level?.currentValue === 'string') {
     actions.syncThoughtLevel(snapshot.capabilities.thought_level.currentValue);
   }
 }
@@ -2181,6 +2500,7 @@ function CanvasAcpConfigMenu({ sections }: { sections: readonly CanvasAcpSelecto
   const [desktopActiveKey, setDesktopActiveKey] = useState<CanvasAcpSelectorSection['key'] | null>(visibleSections[0]?.key ?? null);
   const [mobileExpandedKey, setMobileExpandedKey] = useState<CanvasAcpSelectorSection['key'] | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const rootMenuRef = useRef<HTMLDivElement | null>(null);
   const providerSection = visibleSections.find((section) => section.key === 'provider');
   const modelSection = visibleSections.find((section) => section.key === 'model');
   const desktopActiveSection = visibleSections.find((section) => section.key === desktopActiveKey) ?? visibleSections[0];
@@ -2262,6 +2582,7 @@ function CanvasAcpConfigMenu({ sections }: { sections: readonly CanvasAcpSelecto
       </button>
       {open ? (
         <div
+          ref={rootMenuRef}
           className="absolute bottom-full left-0 z-50 mb-2 w-[min(20rem,calc(100vw-2rem))] rounded-md border bg-popover p-1 text-popover-foreground shadow-md max-sm:w-[calc(100vw-5rem)]"
           role="menu"
           data-axhub-acp-config-root-menu
@@ -2311,7 +2632,11 @@ function CanvasAcpConfigMenu({ sections }: { sections: readonly CanvasAcpSelecto
               );
             })}
             {desktopActiveSection ? (
-              <CanvasAcpConfigSubmenu section={desktopActiveSection} variant="desktop" />
+              <CanvasAcpConfigSubmenu
+                section={desktopActiveSection}
+                variant="desktop"
+                desktopAnchorRef={rootMenuRef}
+              />
             ) : null}
           </div>
         </div>
@@ -2323,21 +2648,61 @@ function CanvasAcpConfigMenu({ sections }: { sections: readonly CanvasAcpSelecto
 function CanvasAcpConfigSubmenu({
   section,
   variant,
+  desktopAnchorRef,
 }: {
   section: CanvasAcpSelectorSection;
   variant: 'desktop' | 'mobile';
+  desktopAnchorRef?: React.RefObject<HTMLDivElement>;
 }) {
   const selectedValue = section.value || section.options[0]?.value || null;
+  const desktopSubmenuRef = useRef<HTMLDivElement | null>(null);
+  const [desktopLayout, setDesktopLayout] = useState<CanvasAcpSubmenuViewportLayout | null>(null);
+
+  useLayoutEffect(() => {
+    if (variant !== 'desktop' || typeof window === 'undefined') return;
+
+    const updateDesktopLayout = () => {
+      const anchorElement = desktopAnchorRef?.current;
+      const submenuElement = desktopSubmenuRef.current;
+      if (!anchorElement || !submenuElement) return;
+
+      setDesktopLayout(resolveCanvasAcpSubmenuViewportLayout({
+        anchorRect: anchorElement.getBoundingClientRect(),
+        submenuWidth: submenuElement.offsetWidth,
+        submenuContentHeight: submenuElement.scrollHeight,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+      }));
+    };
+
+    updateDesktopLayout();
+    window.addEventListener('resize', updateDesktopLayout);
+    return () => window.removeEventListener('resize', updateDesktopLayout);
+  }, [desktopAnchorRef, section, variant]);
+
+  const desktopStyle: React.CSSProperties | undefined = variant === 'desktop'
+    ? {
+        position: 'fixed',
+        left: desktopLayout?.left ?? 0,
+        top: desktopLayout?.top ?? 0,
+        maxHeight: desktopLayout?.maxHeight,
+        visibility: desktopLayout ? 'visible' : 'hidden',
+      }
+    : undefined;
+
   return (
     <div
+      ref={variant === 'desktop' ? desktopSubmenuRef : undefined}
       className={cn(
         'overflow-y-auto rounded-md bg-popover p-1 text-popover-foreground',
         variant === 'desktop'
-          ? 'absolute bottom-0 left-[calc(100%+0.5rem)] hidden max-h-80 w-[min(22rem,calc(100vw-2rem))] border shadow-md sm:block'
+          ? 'hidden max-h-80 w-[min(22rem,calc(100vw-2rem))] border shadow-md sm:block'
           : 'mt-1 max-h-56 w-full border-x-0 border-b-0 border-t sm:hidden',
       )}
+      style={desktopStyle}
       role="menu"
       data-axhub-acp-config-submenu={variant}
+      data-axhub-acp-config-submenu-placement={variant === 'desktop' ? desktopLayout?.placement : undefined}
     >
       {variant === 'desktop' ? (
         <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">{section.label}</div>
@@ -2394,7 +2759,7 @@ function CanvasAcpModelSelectorFallback({
       onClick={() => { void handleClick(); }}
     >
       <Settings2 className="size-3.5 shrink-0" />
-      <span className="truncate">请选择模型</span>
+      <span className="truncate">{onEnsureAcpRuntime ? '请选择模型' : '设置 AI Agent'}</span>
       <ChevronDown className="size-3 shrink-0" />
     </button>
   );
@@ -2658,13 +3023,15 @@ function CanvasGenerationRuntimeComposer({
 function CanvasGenerationRuntimeComposerWithAcp(
   {
     workspacePath,
+    projectId,
     showSelectors,
+    preferredModel,
     preferredPromptClient,
     ...props
   }: CanvasGenerationRuntimeComposerProps & Pick<CanvasGenerationComposerProps, 'onSubmitPrompt' | 'workspacePath'>,
 ) {
-  const canvasAcpRuntime = useCanvasAcpRuntimeBridge({ enabled: showSelectors, workspacePath });
-  const acpSelectorDefaults = useMemo(() => resolveCanvasAcpSelectorDefaults(preferredPromptClient), [preferredPromptClient]);
+  const canvasAcpRuntime = useCanvasAcpRuntimeBridge({ enabled: showSelectors, projectId, workspacePath });
+  const acpSelectorDefaults = useMemo(() => resolveCanvasAcpSelectorDefaults(preferredPromptClient, preferredModel), [preferredModel, preferredPromptClient]);
   const acpRuntimeKey = useMemo(() => [
     acpSelectorDefaults.defaultProvider,
     acpSelectorDefaults.defaultModel ?? 'default-model',
@@ -2683,6 +3050,7 @@ function CanvasGenerationRuntimeComposerWithAcp(
     >
       <CanvasGenerationRuntimeComposer
         {...props}
+        projectId={projectId}
         onEnsureAcpRuntime={canvasAcpRuntime.ensureRuntime}
         showModelSelectorFallback={showSelectors && canvasAcpRuntime.needsFallback}
         showSelectors={showSelectors && !canvasAcpRuntime.needsFallback}
@@ -2692,6 +3060,7 @@ function CanvasGenerationRuntimeComposerWithAcp(
 }
 
 export default function CanvasGenerationComposer({
+  projectId,
   addAttachmentTooltip,
   allowAttachments,
   ariaLabel,
@@ -2709,6 +3078,7 @@ export default function CanvasGenerationComposer({
   placement,
   placementMode = 'absolute',
   placeholder,
+  preferredModel,
   preferredPromptClient,
   renderActions,
   renderLeadingActions,
@@ -2752,6 +3122,7 @@ export default function CanvasGenerationComposer({
         </div>
       ) : null}
       <CanvasGenerationRuntimeComposerWithAcp
+        projectId={projectId}
         addAttachmentTooltip={addAttachmentTooltip}
         allowAttachments={allowAttachments}
         ariaLabel={ariaLabel}
@@ -2765,6 +3136,7 @@ export default function CanvasGenerationComposer({
         onPasteReferenceImages={onPasteReferenceImages}
         onSubmitPrompt={onSubmitPrompt}
         placeholder={placeholder}
+        preferredModel={preferredModel}
         preferredPromptClient={preferredPromptClient}
         renderActions={renderActions}
         renderLeadingActions={renderLeadingActions}

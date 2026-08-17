@@ -20,7 +20,8 @@ import {
 } from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import TemplateLibraryCard from './TemplateLibraryCard';
+import TemplateLibraryCard, { type TemplateLibraryCardItem } from './TemplateLibraryCard';
+import { requireProjectScope, withProjectScope } from '../../services/projectScope';
 
 type CreateDialogViewTab = 'upload' | 'onlineImport';
 
@@ -28,7 +29,7 @@ interface CreateDialogProps {
     visible: boolean;
     onClose: () => void;
     activeTab: 'prototypes';
-    activeProjectId?: string | null;
+    activeProjectId: string;
     initialTab?: CreateDialogTab;
     resourceWriteCapabilities: ResourceWriteCapabilities;
     preferredPromptClient: PromptClientPreference;
@@ -211,7 +212,7 @@ export default function CreateDialog({
             loading: true,
             error: '',
         }));
-        fetch('/api/template-library')
+        fetch(withProjectScope('/api/template-library', requireProjectScope(activeProjectId)))
             .then(async (response) => {
                 const result = await response.json();
                 if (!response.ok || result?.ok === false) {
@@ -239,7 +240,7 @@ export default function CreateDialog({
         return () => {
             cancelled = true;
         };
-    }, [activeKey, templateLibrary.loaded, visible]);
+    }, [activeKey, activeProjectId, templateLibrary.loaded, visible]);
 
     const handleUpload = async (files: File[]) => {
         if (files.length === 0) return;
@@ -253,9 +254,7 @@ export default function CreateDialog({
         formData.append('uploadType', uploadType);
         formData.append('targetType', activeTab);
         formData.append('uploadMode', uploadMode);
-        if (activeProjectId) {
-            formData.append('projectId', activeProjectId);
-        }
+        formData.append('projectId', requireProjectScope(activeProjectId).projectId);
         if (targetPrototypeName) {
             formData.append('targetPrototypeName', targetPrototypeName);
         }
@@ -290,7 +289,7 @@ export default function CreateDialog({
 
         setUploading(true);
         try {
-            const response = await fetch('/api/upload', {
+            const response = await fetch(withProjectScope('/api/upload', requireProjectScope(activeProjectId)), {
                 method: 'POST',
                 body: formData,
             });
@@ -336,7 +335,7 @@ export default function CreateDialog({
         }
         setTemplateImportingId(template.id);
         try {
-            const response = await fetch('/api/template-library/import', {
+            const response = await fetch(withProjectScope('/api/template-library/import', requireProjectScope(activeProjectId)), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ templateId: template.id, targetPrototypeName }),
@@ -355,7 +354,7 @@ export default function CreateDialog({
         }
     };
 
-    const handleTemplatePreviewCardClick = useCallback((template: TemplateLibraryItem) => {
+    const handleTemplatePreviewCardClick = useCallback((template: TemplateLibraryCardItem) => {
         const previewUrl = String(template.previewUrl || '').trim();
         if (!previewUrl) {
             toast.warning('该模板暂不支持在线预览');

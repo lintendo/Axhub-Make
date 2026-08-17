@@ -19,6 +19,7 @@
     "paths": {
       "@/*": ["src/*"],
       "@ant-design/cssinjs": ["./node_modules/@ant-design/cssinjs"],
+      "@axhub/agent-surface": ["./vendor/agent-surface/dist/index.d.ts"],
       "@axhub/excalidraw": ["./vendor/axhub-excalidraw/dist/types/excalidraw/index.d.ts"],
       "@axhub/excalidraw/*": ["./vendor/axhub-excalidraw/dist/types/excalidraw/*.d.ts"],
       "axhub-export-core": ["./vendor/axhub-export-core/dist/index.d.ts"],

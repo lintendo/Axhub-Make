@@ -12,14 +12,14 @@ description: Use when the user explicitly asks to write, draft, create, update, 
 优先看需求资料，不默认把工作流文档当成需求来源：
 
 1. 用户当前说明、附件、截图，以及用户提供的模板。
-2. `src/resources/` 中已有产品资料、PRD、模板、素材和长期文档。
+2. `src/resources/` 中已有产品资料、PRD、素材和长期文档；项目模板位于 `templates/`。
 3. 按 `rules/requirements-alignment-guide.md` 读取相关原型主规格。
 4. 相关原型页面、`annotation-source.json`、批注、状态定义和可见文案。
-5. 相关 `src/resources/**/*.excalidraw` 和同级 `<name>.assets/`，用于识别跨原型关系、流程草图和补充说明。
+5. 相关 `src/resources/**/*.excalidraw` 和 `src/resources/.assets/<resource-relative-path>/`，用于识别跨原型关系、流程草图和补充说明。
 
 ## 模板
 
-根据选定的模板入口文件编写 PRD，遵循其中的章节、字段和表达要求。未指定时使用统一内置模板 `src/resources/templates/prd-template.md`；允许用户或项目指定其他模板文件，已经明确时直接采用。
+根据选定的模板入口文件编写 PRD，遵循其中的章节、字段和表达要求。未指定时使用统一内置模板 `templates/prd.md`；允许用户或项目指定其他模板文件，已经明确时直接采用。
 
 PRD 只写产品决策、用户体验、范围、业务模型、规则和验收。不要堆易过期的代码片段或实现清单。
 

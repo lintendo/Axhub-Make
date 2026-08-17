@@ -12,6 +12,22 @@ function readSkillDescription(source: string): string {
 }
 
 describe('default client skills', () => {
+  it('bundles search-design-system in both client skill roots', () => {
+    const skillRoots = [
+      '.agents/skills/search-design-system',
+      '.claude/skills/search-design-system',
+    ];
+
+    for (const root of skillRoots) {
+      expect(readClientFile(`${root}/SKILL.md`)).toContain('name: search-design-system');
+      expect(existsSync(resolve(__dirname, '../../../client', `${root}/scripts/cli.mjs`))).toBe(true);
+      expect(existsSync(resolve(__dirname, '../../../client', `${root}/references/query-schema.md`))).toBe(true);
+    }
+
+    expect(existsSync(resolve(__dirname, '../../../client/.agents/skills/design-system-search'))).toBe(false);
+    expect(existsSync(resolve(__dirname, '../../../client/.claude/skills/design-system-search'))).toBe(false);
+  });
+
   it('keeps Drawio as a canvas workspace reference instead of a default project skill', () => {
     const skillRoots = [
       '.agents/skills/canvas-workspace',
@@ -68,16 +84,16 @@ describe('default client skills', () => {
       expect(source).toContain('原型页面：');
       expect(source).toContain('图片：');
       expect(source).toContain('流程图：');
-      expect(source).toContain('产物类型不清时先问一个问题');
+      expect(source).toContain('只有无法从现有上下文可靠判断时才询问必要问题');
       expect(source).toContain('src/resources/**/*.excalidraw');
-      expect(source).toContain('src/resources/**/<name>.assets/');
+      expect(source).toContain('src/resources/.assets/<resource-relative-path>/');
       expect(source).not.toContain('src/prototypes/<prototype-name>/canvas.excalidraw');
       expect(source).not.toContain('src/prototypes/<prototype-name>/canvas-assets/');
       expect(source).not.toContain('$flowchart');
     }
   });
 
-  it('routes canvas document text through Markdown resources before canvas placement', () => {
+  it('routes canvas document text through project documents before canvas placement', () => {
     const skillSources = [
       readClientFile('.agents/skills/canvas-workspace/SKILL.md'),
       readClientFile('.claude/skills/canvas-workspace/SKILL.md'),
@@ -85,9 +101,10 @@ describe('default client skills', () => {
 
     for (const source of skillSources) {
       expect(source).toContain('文档、说明、PRD、清单、列表、报告或其他文本内容');
-      expect(source).toContain('默认先生成 Markdown 文档到 `src/resources/`');
-      expect(source).toContain('再把该文档作为文档节点创建或更新到当前资源画布');
-      expect(source).toContain('不要把正文直接拆成大量画布文本框');
+      expect(source).toContain('项目内正式文档资源');
+      expect(source).toContain('使用 Markdown 或 HTML 等项目支持的文档格式');
+      expect(source).toContain('再以内嵌文档节点创建或更新到当前资源画布');
+      expect(source).toContain('不要把文档正文铺成普通画布文本');
     }
   });
 

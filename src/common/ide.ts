@@ -1,7 +1,7 @@
 export const MAIN_IDE_OPTIONS = [
     { value: 'cursor', label: 'Cursor' },
     { value: 'trae', label: 'TRAE' },
-    { value: 'vscode', label: 'vscode' },
+    { value: 'vscode', label: 'VS Code' },
     { value: 'trae_cn', label: 'TRAE CN' },
     { value: 'windsurf', label: 'Windsurf' },
     { value: 'qoder', label: 'Qoder' },
@@ -16,7 +16,7 @@ export const MAIN_IDE_VALUES = MAIN_IDE_OPTIONS.map((option) => option.value) as
 export const MAIN_IDE_APP_NAMES: Record<MainIDE, string> = {
     cursor: 'Cursor',
     trae: 'TRAE',
-    vscode: 'vscode',
+    vscode: 'VS Code',
     trae_cn: 'TRAE CN',
     windsurf: 'Windsurf',
     qoder: 'Qoder',

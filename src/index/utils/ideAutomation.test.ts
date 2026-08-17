@@ -43,7 +43,7 @@ describe('resolveOpenIDEErrorMessage', () => {
             true,
         );
 
-        expect(message).toBe('打开 Cursor 失败，请在 Cursor 中打开本项目，已继续后续操作');
+        expect(message).toBe('打开 Cursor 失败，请在 Cursor 中打开本项目，以继续后续操作');
     });
 
     it('maps server missing IDE errors to the same manual open message', () => {

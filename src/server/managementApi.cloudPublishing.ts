@@ -44,7 +44,7 @@ interface CloudPublishingHandlers {
     req: IncomingMessage,
     res: ServerResponse,
     options: ManagementApiOptions,
-    mode: 'active-fallback',
+    mode: 'explicit-required',
     body?: unknown,
   ) => CloudPublishingContext | null;
   resolveSourceFileFromMetadata: (context: CloudPublishingContext, targetPath: string) => string | null;
@@ -1424,7 +1424,7 @@ export function handleCloudPublishingApi(
   }
 
   if (pathname === '/api/cloud-publishing/config') {
-    const context = handlers.resolveProjectContext(req, res, options, 'active-fallback');
+    const context = handlers.resolveProjectContext(req, res, options, 'explicit-required');
     if (!context) return true;
     if (req.method === 'GET') {
       sendJson(res, toConfigResponse(getServerCloudPublishingConfig(context, options, handlers), context.project.root));
@@ -1445,7 +1445,7 @@ export function handleCloudPublishingApi(
   }
 
   if (pathname === '/api/cloud-publishing/latest') {
-    const context = handlers.resolveProjectContext(req, res, options, 'active-fallback');
+    const context = handlers.resolveProjectContext(req, res, options, 'explicit-required');
     if (!context) return true;
     if (req.method !== 'GET') {
       sendJson(res, { error: 'Method not allowed' }, { status: 405 });
@@ -1474,7 +1474,7 @@ export function handleCloudPublishingApi(
         sendJson(res, { error: 'Invalid cloud publishing target', code: 'INVALID_TARGET' }, { status: 400 });
         return;
       }
-      const context = handlers.resolveProjectContext(req, res, options, 'active-fallback', body);
+      const context = handlers.resolveProjectContext(req, res, options, 'explicit-required', body);
       if (!context) return;
       const metadata = context.metadata;
       const normalizedTargetPath = metadata

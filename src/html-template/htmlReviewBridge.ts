@@ -146,7 +146,7 @@ export function normalizeHtmlReviewDocumentPath(value: unknown): string {
   } else {
     raw = raw.replace(/^\.\//u, '');
   }
-  if (raw.startsWith('src/resources/')) {
+  if (/^(?:src\/(?:resources|prototypes|themes)\/|docs\/|templates\/)/u.test(raw)) {
     // Already project-relative.
   } else if (!raw.startsWith('/') && !/^[a-z]:\//iu.test(raw)) {
     raw = `src/resources/${raw}`;

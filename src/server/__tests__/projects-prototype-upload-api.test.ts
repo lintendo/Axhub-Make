@@ -13,6 +13,7 @@ import {
   createTempRoot,
   createZipFromDirectory,
   registerProject,
+  scopeProjectApiUrl,
   startTestServer,
   setActiveProject,
   writeProjectMetadata,
@@ -360,7 +361,7 @@ describe('make-server project prototype upload APIs', () => {
     try {
       await registerAndActivateProject(server.origin, projectRoot, 'prototype-upload-disabled', 'Prototype Upload Disabled');
 
-      const resources = await fetch(`${server.origin}/api/projects/prototype-upload-disabled/resources`)
+      const resources = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/projects/prototype-upload-disabled/resources`))
         .then((response) => response.json());
       expect(resources.capabilities.resourceWrites.prototypeUpload).toBe(false);
 
@@ -371,7 +372,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('folderName', 'demo');
       form.append('files', new File(['export default function Demo() { return null; }\n'], 'index.tsx'));
       form.append('relativePaths', 'demo/index.tsx');
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -423,7 +424,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('files', new File(['.demo { color: red; }\n'], 'style.css'));
       form.append('relativePaths', 'Marketing Demo/style.css');
 
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -503,7 +504,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('files', new File(['export default function Demo() { return null; }\n'], 'index.tsx'));
       form.append('relativePaths', 'Runtime Demo/index.tsx');
 
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -554,7 +555,7 @@ describe('make-server project prototype upload APIs', () => {
       await registerProject(server.origin, projectRoot, 'prototype-create-client', 'Prototype Create Client');
       await setActiveProject(server.origin, 'prototype-create-client');
 
-      const create = await fetch(`${server.origin}/api/prototypes/create-placeholder`, {
+      const create = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototypes/create-placeholder`), {
         method: 'POST',
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
@@ -626,7 +627,7 @@ describe('make-server project prototype upload APIs', () => {
       await registerProject(server.origin, projectRoot, 'standard-client-create', 'Standard Client Create');
       await setActiveProject(server.origin, 'standard-client-create');
 
-      const create = await fetch(`${server.origin}/api/prototypes/create-placeholder`, {
+      const create = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototypes/create-placeholder`), {
         method: 'POST',
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
@@ -675,10 +676,10 @@ describe('make-server project prototype upload APIs', () => {
       await registerProject(server.origin, projectRoot, 'prototype-start-generation-client', 'Prototype Start Generation Client');
       await setActiveProject(server.origin, 'prototype-start-generation-client');
 
-      await fetch(`${server.origin}/api/prototypes/create-placeholder`, { method: 'POST' })
+      await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototypes/create-placeholder`), { method: 'POST' })
         .then(async (response) => ({ status: response.status, body: await response.json() }));
 
-      const start = await fetch(`${server.origin}/api/prototypes/untitled/start-generation`, {
+      const start = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototypes/untitled/start-generation`), {
         method: 'POST',
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
@@ -712,7 +713,7 @@ describe('make-server project prototype upload APIs', () => {
       expect(prototype).not.toHaveProperty('placeholder');
       expect(prototype).not.toHaveProperty('placeholderGuide');
 
-      const resources = await fetch(`${server.origin}/api/projects/prototype-start-generation-client/resources`)
+      const resources = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/projects/prototype-start-generation-client/resources`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(resources.status).toBe(200);
@@ -765,7 +766,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('files', new File(['export default function Unsafe() { return null; }\n'], 'index.tsx'));
       form.append('relativePaths', '../outside/index.tsx');
 
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -813,7 +814,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('targetType', 'prototypes');
       form.append('uploadMode', 'zip');
       form.append('file', new File([fs.readFileSync(zipPath)], 'zip-demo.zip', { type: 'application/zip' }));
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -868,7 +869,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('targetType', 'prototypes');
       form.append('uploadMode', 'zip');
       form.append('file', new File([fs.readFileSync(zipPath)], 'legacy-chinese.zip', { type: 'application/zip' }));
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -915,7 +916,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('uploadMode', 'zip');
       form.append('targetPrototypeName', 'untitled');
       form.append('file', new File([fs.readFileSync(zipPath)], 'Sales Deck @2026!.zip', { type: 'application/zip' }));
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -986,7 +987,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('targetType', 'themes');
       form.append('uploadMode', 'zip');
       form.append('file', new File([fs.readFileSync(zipPath)], 'trae-design.zip', { type: 'application/zip' }));
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -1057,7 +1058,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('targetType', 'themes');
       form.append('uploadMode', 'zip');
       form.append('file', new File([fs.readFileSync(zipPath)], 'make-theme.zip', { type: 'application/zip' }));
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -1112,7 +1113,7 @@ describe('make-server project prototype upload APIs', () => {
     try {
       await registerAndActivateProject(server.origin, projectRoot, 'theme-upload-disabled', 'Theme Upload Disabled');
 
-      const resources = await fetch(`${server.origin}/api/projects/theme-upload-disabled/resources`)
+      const resources = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/projects/theme-upload-disabled/resources`))
         .then((response) => response.json());
       expect(resources.capabilities.resourceWrites.themeImport).toBe(false);
 
@@ -1121,7 +1122,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('targetType', 'themes');
       form.append('uploadMode', 'zip');
       form.append('file', new File(['zip-ish'], 'theme.zip', { type: 'application/zip' }));
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -1169,7 +1170,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('targetType', 'themes');
       form.append('uploadMode', 'zip');
       form.append('file', new File([fs.readFileSync(zipPath)], 'unsafe-theme.zip', { type: 'application/zip' }));
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -1212,7 +1213,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('files', new File(['png-one'], 'Home Screen.png', { type: 'image/png' }));
       form.append('files', new File(['png-two'], 'Home Screen.png', { type: 'image/png' }));
 
-      const upload = await fetch(`${server.origin}/api/upload-screenshots`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload-screenshots`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -1250,7 +1251,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('uploadMode', 'zip');
       form.append('file', new File([fs.readFileSync(zipPath)], 'figma-demo.zip', { type: 'application/zip' }));
 
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -1304,7 +1305,7 @@ describe('make-server project prototype upload APIs', () => {
       appendFolderFile(form, 'V0 Demo/app/page.tsx', 'export default function Page() { return <div>V0</div>; }\n');
       appendFolderFile(form, 'V0 Demo/package.json', JSON.stringify({ dependencies: { next: 'latest' } }));
 
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -1393,7 +1394,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('folderName', 'V0 Demo');
       appendFolderFile(form, 'V0 Demo/app/page.tsx', 'export default function Page() { return <div>V0</div>; }\n');
 
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -1456,7 +1457,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('targetPrototypeName', 'untitled');
       form.append('file', new File([fs.readFileSync(zipPath)], 'V0 Import @2026!.zip', { type: 'application/zip' }));
 
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -1510,7 +1511,7 @@ describe('make-server project prototype upload APIs', () => {
       appendFolderFile(form, 'AI Studio Demo/App.tsx', 'export default function App() { return <div>AI Studio</div>; }\n');
       appendFolderFile(form, 'AI Studio Demo/index.html', '<div id="root"></div>\n');
 
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -1554,7 +1555,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('uploadMode', 'zip');
       form.append('file', new File([fs.readFileSync(zipPath)], 'stitch-demo.zip', { type: 'application/zip' }));
 
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -1604,7 +1605,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('uploadMode', 'zip');
       form.append('file', new File([fs.readFileSync(zipPath)], 'axure-demo.zip', { type: 'application/zip' }));
 
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -1724,7 +1725,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('folderName', 'Figma Folder');
       appendFolderFile(form, 'Figma Folder/src/App.tsx', 'export default function App() { return null; }\n');
 
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -1754,7 +1755,7 @@ describe('make-server project prototype upload APIs', () => {
       form.append('folderName', 'V0 Demo');
       appendFolderFile(form, 'V0 Demo/app/page.tsx', 'export default function Page() { return <div>V0</div>; }\n');
 
-      const upload = await fetch(`${server.origin}/api/upload`, {
+      const upload = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/upload`), {
         method: 'POST',
         body: form,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));

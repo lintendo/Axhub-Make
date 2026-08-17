@@ -375,7 +375,7 @@ export async function runGiteeMirrorRelease({
       fetchImpl,
       token,
       logger,
-      options,
+      options: { ...options, replace: true },
       manifest,
       parsedMirror: parsedLatestMirror,
       assetPath: manifest.latestManifest.path,

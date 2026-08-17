@@ -74,6 +74,31 @@ describe('canvas direct run controller', () => {
     expect(controller.getActiveRunCount()).toBe(0);
   });
 
+  it('forwards lifecycle acceptance to callbacks supplied on the canvas request', async () => {
+    const onAccepted = vi.fn();
+    const controller = createCanvasDirectRunController({
+      maxActiveRuns: 1,
+      submit: async ({ onAccepted: accept }) => {
+        await accept?.({ provider: 'codex', threadId: 'canvas-thread', runId: 'canvas-run' });
+        return { ok: true, artifacts: [] };
+      },
+    });
+
+    const started = controller.start({
+      ...createRequest('继续当前画布'),
+      onAccepted,
+    });
+
+    expect(started.started).toBe(true);
+    if (!started.started) return;
+    await expect(started.promise).resolves.toMatchObject({ ok: true });
+    expect(onAccepted).toHaveBeenCalledWith({
+      provider: 'codex',
+      threadId: 'canvas-thread',
+      runId: 'canvas-run',
+    });
+  });
+
   it('maps streamed API artifacts into canvas generation artifacts and ignores the current canvas file', async () => {
     const submit = vi.fn(async () => ({
       output: 'done',

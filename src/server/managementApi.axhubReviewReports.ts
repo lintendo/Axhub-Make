@@ -28,7 +28,7 @@ interface AxhubReviewApiHandlers {
     req: IncomingMessage,
     res: ServerResponse,
     options: ManagementApiOptions,
-    mode: 'active-fallback',
+    mode: 'explicit-required',
     body?: unknown,
   ) => AxhubReviewProjectContext | null;
   createProjectContextFromBody: (
@@ -255,7 +255,7 @@ export function handleAxhubReviewReportsApi(
   }
 
   if (req.method === 'GET') {
-    const context = handlers.resolveProjectContext(req, res, options, 'active-fallback');
+    const context = handlers.resolveProjectContext(req, res, options, 'explicit-required');
     if (!context) return true;
     const prototypeId = String(url.searchParams.get('prototypeId') || '').trim();
     const prototypeDir = getPrototypeContext(res, context, prototypeId);

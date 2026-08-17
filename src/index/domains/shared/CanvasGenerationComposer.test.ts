@@ -83,6 +83,7 @@ async function loadMessageExtraction() {
   return {
     canvasGeneralFileAttachmentAdapter: mod.canvasGeneralFileAttachmentAdapter,
     canvasReferenceImageAttachmentAdapter: mod.canvasReferenceImageAttachmentAdapter,
+    applyCanvasGenerationDisplayPrompt: mod.applyCanvasGenerationDisplayPrompt,
     extractCanvasGenerationAttachmentPartsFromMessage: mod.extractCanvasGenerationAttachmentPartsFromMessage,
     extractCanvasGenerationPromptFromMessage: mod.extractCanvasGenerationPromptFromMessage,
     extractCanvasGenerationReferenceImagesFromMessage: mod.extractCanvasGenerationReferenceImagesFromMessage,
@@ -94,10 +95,91 @@ async function loadMessageExtraction() {
     removeCanvasLocalContextRefItem: mod.removeCanvasLocalContextRefItem,
     resolveCanvasAcpRuntimeProviderOptions: mod.resolveCanvasAcpRuntimeProviderOptions,
     resolveCanvasAcpSelectorDefaults: mod.resolveCanvasAcpSelectorDefaults,
+    shouldSubmitCanvasGenerationDisplayPrompt: mod.shouldSubmitCanvasGenerationDisplayPrompt,
   };
 }
 
 describe('CanvasGenerationComposer message extraction', () => {
+  it('submits display prompts on Enter but not while adding a line break or composing text', async () => {
+    const { shouldSubmitCanvasGenerationDisplayPrompt } = await loadMessageExtraction();
+
+    expect(shouldSubmitCanvasGenerationDisplayPrompt({
+      key: 'Enter',
+      shiftKey: false,
+      isComposing: false,
+    })).toBe(true);
+    expect(shouldSubmitCanvasGenerationDisplayPrompt({
+      key: 'Enter',
+      shiftKey: true,
+      isComposing: false,
+    })).toBe(false);
+    expect(shouldSubmitCanvasGenerationDisplayPrompt({
+      key: 'Enter',
+      shiftKey: false,
+      isComposing: true,
+    })).toBe(false);
+    expect(shouldSubmitCanvasGenerationDisplayPrompt({
+      key: 'a',
+      shiftKey: false,
+      isComposing: false,
+    })).toBe(false);
+  });
+
+  it('applies, persists, and focuses an editable display prompt', async () => {
+    const { applyCanvasGenerationDisplayPrompt } = await loadMessageExtraction();
+    const persist = vi.fn();
+    const focus = vi.fn();
+    const target = { value: 'existing draft', focus };
+
+    expect(applyCanvasGenerationDisplayPrompt({
+      target,
+      prompt: '  Generate a product requirements document.  ',
+      disabled: false,
+      persist,
+    })).toBe(true);
+    expect(target.value).toBe('Generate a product requirements document.');
+    expect(persist).toHaveBeenCalledOnce();
+    expect(persist).toHaveBeenCalledWith('Generate a product requirements document.');
+    expect(focus).toHaveBeenCalledOnce();
+  });
+
+  it('does not apply display prompts while controls are disabled or for blank input', async () => {
+    const { applyCanvasGenerationDisplayPrompt } = await loadMessageExtraction();
+    const persist = vi.fn();
+    const focus = vi.fn();
+    const target = { value: 'keep this draft', focus };
+
+    expect(applyCanvasGenerationDisplayPrompt({
+      target,
+      prompt: 'Deferred card prompt',
+      disabled: true,
+      persist,
+    })).toBe(false);
+    expect(applyCanvasGenerationDisplayPrompt({
+      target,
+      prompt: '   ',
+      disabled: false,
+      persist,
+    })).toBe(false);
+    expect(target.value).toBe('keep this draft');
+    expect(persist).not.toHaveBeenCalled();
+    expect(focus).not.toHaveBeenCalled();
+  });
+
+  it('applies repeated display prompt selections without retaining stale selection state', async () => {
+    const { applyCanvasGenerationDisplayPrompt } = await loadMessageExtraction();
+    const persist = vi.fn();
+    const target = { value: '', focus: vi.fn() };
+
+    applyCanvasGenerationDisplayPrompt({ target, prompt: 'First prompt', disabled: false, persist });
+    target.value = 'User edited prompt';
+    applyCanvasGenerationDisplayPrompt({ target, prompt: 'First prompt', disabled: false, persist });
+
+    expect(target.value).toBe('First prompt');
+    expect(persist).toHaveBeenCalledTimes(2);
+    expect(target.focus).toHaveBeenCalledTimes(2);
+  });
+
   it('extracts prompt text from text message parts', async () => {
     const { extractCanvasGenerationPromptFromMessage } = await loadMessageExtraction();
     const message = {
@@ -293,32 +375,91 @@ describe('CanvasGenerationComposer message extraction', () => {
     ]);
   });
 
-  it('limits ACP selector providers to Claude Code, Codex, OpenCode, plus the user default provider', async () => {
+  it('uses the complete ACP provider registry for selector defaults', async () => {
     const { resolveCanvasAcpSelectorDefaults } = await loadMessageExtraction();
 
-    expect(resolveCanvasAcpSelectorDefaults('acp:codex')).toEqual({
+    expect(resolveCanvasAcpSelectorDefaults('acp:codex', 'gpt-5.3-codex')).toEqual({
       defaultProvider: 'codex',
-      defaultModel: 'gpt-5.5',
-      providerOptions: ['claude', 'codex', 'opencode'],
+      defaultModel: 'gpt-5.3-codex',
+      providerOptions: ['claude', 'codex', 'opencode', 'cursor', 'qoder', 'codebuddy', 'reasonix', 'grok-build'],
     });
     expect(resolveCanvasAcpSelectorDefaults('acp:gemini')).toEqual({
       defaultProvider: 'codex',
-      defaultModel: 'gpt-5.5',
-      providerOptions: ['claude', 'codex', 'opencode'],
+      defaultModel: null,
+      providerOptions: ['claude', 'codex', 'opencode', 'cursor', 'qoder', 'codebuddy', 'reasonix', 'grok-build'],
     });
     expect(resolveCanvasAcpSelectorDefaults('acp:grok-build')).toEqual({
       defaultProvider: 'grok-build',
-      defaultModel: 'grok-build',
-      providerOptions: ['claude', 'codex', 'opencode', 'grok-build'],
+      defaultModel: null,
+      providerOptions: ['claude', 'codex', 'opencode', 'cursor', 'qoder', 'codebuddy', 'reasonix', 'grok-build'],
     });
   });
 
-  it('falls back to fixed ACP provider options when the runtime context omits providerOptions', async () => {
+  it('requires a configured default Agent only when the display composer opts in', async () => {
+    const mod = await import('./CanvasGenerationComposer');
+    const resolveVisibility = (mod as Record<string, unknown>).resolveCanvasAcpSelectorVisibility;
+
+    expect(resolveVisibility).toBeTypeOf('function');
+    if (typeof resolveVisibility !== 'function') return;
+
+    expect(resolveVisibility({
+      enabled: false,
+      preferredPromptClient: null,
+      runtimeNeedsFallback: false,
+    })).toEqual({ defaultAgentConfigured: false, showSelectors: false, showSettingsFallback: false });
+    expect(resolveVisibility({
+      enabled: true,
+      preferredPromptClient: null,
+      runtimeNeedsFallback: false,
+    })).toEqual({ defaultAgentConfigured: false, showSelectors: true, showSettingsFallback: false });
+    expect(resolveVisibility({
+      enabled: true,
+      preferredPromptClient: null,
+      runtimeNeedsFallback: false,
+      requireConfiguredDefaultAgent: true,
+    })).toEqual({ defaultAgentConfigured: false, showSelectors: false, showSettingsFallback: true });
+    expect(resolveVisibility({
+      enabled: true,
+      preferredPromptClient: 'acp:claude',
+      runtimeNeedsFallback: false,
+    })).toEqual({ defaultAgentConfigured: true, showSelectors: true, showSettingsFallback: false });
+    expect(resolveVisibility({
+      enabled: true,
+      preferredPromptClient: 'acp:claude',
+      runtimeNeedsFallback: true,
+    })).toEqual({ defaultAgentConfigured: true, showSelectors: false, showSettingsFallback: true });
+  });
+
+  it('locks display editing only when the caller requires a configured default Agent', async () => {
+    const mod = await import('./CanvasGenerationComposer');
+    const resolveEditingDisabled = (mod as Record<string, unknown>).resolveCanvasGenerationDisplayEditingDisabled;
+
+    expect(resolveEditingDisabled).toBeTypeOf('function');
+    if (typeof resolveEditingDisabled !== 'function') return;
+
+    expect(resolveEditingDisabled({
+      disableEditingWithoutConfiguredAgent: false,
+      defaultAgentConfigured: false,
+    })).toBe(false);
+    expect(resolveEditingDisabled({
+      disableEditingWithoutConfiguredAgent: true,
+      defaultAgentConfigured: false,
+    })).toBe(true);
+    expect(resolveEditingDisabled({
+      disableEditingWithoutConfiguredAgent: true,
+      defaultAgentConfigured: true,
+    })).toBe(false);
+  });
+
+  it('falls back to the complete ACP provider registry when the runtime context omits providerOptions', async () => {
     const { resolveCanvasAcpRuntimeProviderOptions } = await loadMessageExtraction();
 
-    expect(resolveCanvasAcpRuntimeProviderOptions(undefined, 'codex')).toEqual(['claude', 'codex', 'opencode']);
-    expect(resolveCanvasAcpRuntimeProviderOptions(undefined, 'gemini' as any)).toEqual(['claude', 'codex', 'opencode']);
-    expect(resolveCanvasAcpRuntimeProviderOptions(undefined, 'grok-build')).toEqual(['claude', 'codex', 'opencode', 'grok-build']);
+    expect(resolveCanvasAcpRuntimeProviderOptions(undefined, 'codex')).toEqual(['claude', 'codex', 'opencode', 'cursor', 'qoder', 'codebuddy', 'reasonix', 'grok-build']);
+    expect(resolveCanvasAcpRuntimeProviderOptions(undefined, 'gemini' as any)).toEqual(['claude', 'codex', 'opencode', 'cursor', 'qoder', 'codebuddy', 'reasonix', 'grok-build']);
+    expect(resolveCanvasAcpRuntimeProviderOptions(undefined, 'grok-build')).toEqual(['claude', 'codex', 'opencode', 'cursor', 'qoder', 'codebuddy', 'reasonix', 'grok-build']);
+    expect(resolveCanvasAcpRuntimeProviderOptions(['codex'], 'codex')).toEqual([
+      'claude', 'codex', 'opencode', 'cursor', 'qoder', 'codebuddy', 'reasonix', 'grok-build',
+    ]);
   });
 
   it('builds project resource context from selected files and folders without expanding folders', async () => {
@@ -682,5 +823,62 @@ describe('CanvasGenerationComposer message extraction', () => {
     expect(selections).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ node: expect.objectContaining({ kind: 'folder' }) }),
     ]));
+  });
+});
+
+describe('Canvas ACP config submenu viewport layout', () => {
+  it('shifts the submenu into the viewport before reducing its height', async () => {
+    const mod = await import('./CanvasGenerationComposer');
+    const resolveLayout = (mod as Record<string, unknown>).resolveCanvasAcpSubmenuViewportLayout;
+
+    expect(resolveLayout).toBeTypeOf('function');
+    if (typeof resolveLayout !== 'function') return;
+
+    expect(resolveLayout({
+      anchorRect: { left: 90, top: 70, right: 410, bottom: 510 },
+      submenuWidth: 352,
+      submenuContentHeight: 300,
+      viewportWidth: 900,
+      viewportHeight: 320,
+    })).toEqual({
+      left: 418,
+      top: 12,
+      maxHeight: 300,
+      placement: 'right',
+    });
+  });
+
+  it('flips the submenu left when the right side would overflow', async () => {
+    const { resolveCanvasAcpSubmenuViewportLayout } = await import('./CanvasGenerationComposer');
+
+    expect(resolveCanvasAcpSubmenuViewportLayout({
+      anchorRect: { left: 500, top: 100, right: 820, bottom: 480 },
+      submenuWidth: 300,
+      submenuContentHeight: 200,
+      viewportWidth: 900,
+      viewportHeight: 700,
+    })).toEqual({
+      left: 192,
+      top: 100,
+      maxHeight: 200,
+      placement: 'left',
+    });
+  });
+
+  it('reduces the submenu height only when the viewport is too short', async () => {
+    const { resolveCanvasAcpSubmenuViewportLayout } = await import('./CanvasGenerationComposer');
+
+    expect(resolveCanvasAcpSubmenuViewportLayout({
+      anchorRect: { left: 80, top: 40, right: 400, bottom: 220 },
+      submenuWidth: 300,
+      submenuContentHeight: 400,
+      viewportWidth: 900,
+      viewportHeight: 240,
+    })).toEqual({
+      left: 408,
+      top: 8,
+      maxHeight: 224,
+      placement: 'right',
+    });
   });
 });

@@ -27,6 +27,7 @@ import { getAiImageTaskStore, type AiImageTaskParams, type AiImageTaskRecord } f
 import type { CanvasLocalContextRef } from './canvasReferenceImages';
 import type { PromptClientPreference } from '../../types';
 import { pickCanvasAiScenePlaceholder } from '../ai-generation/canvasAiSceneRegistry';
+import { withProjectScope } from '../../services/projectScope';
 
 export interface AiImageComposerPlacement {
   left: number;
@@ -35,6 +36,7 @@ export interface AiImageComposerPlacement {
 }
 
 interface AiImageGenerationComposerProps {
+  projectId: string;
   canPasteReferenceImages?: boolean;
   conversationId?: string;
   assistantProjectPath?: string;
@@ -402,6 +404,7 @@ function AiImageComposerAction({
 }
 
 export default function AiImageGenerationComposer({
+  projectId,
   canPasteReferenceImages,
   conversationId,
   assistantProjectPath,
@@ -427,7 +430,7 @@ export default function AiImageGenerationComposer({
 
   useEffect(() => {
     let cancelled = false;
-    void fetch('/api/config').then((response) => response.ok ? response.json() : null).then((config: AiImageConfigResponse | null) => {
+    void fetch(withProjectScope('/api/config', { projectId })).then((response) => response.ok ? response.json() : null).then((config: AiImageConfigResponse | null) => {
       if (cancelled) return;
       setConfig(normalizeParams(config));
     }).catch(() => {
@@ -438,7 +441,7 @@ export default function AiImageGenerationComposer({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     onParamsChanged?.(params);
@@ -534,6 +537,7 @@ export default function AiImageGenerationComposer({
 
   return (
     <CanvasGenerationComposer
+      projectId={projectId}
       scene="page"
       dataAttribute="data-axhub-ai-image-composer"
       className="aui-root ax-ai-image-composer-host pointer-events-auto absolute z-[1200]"

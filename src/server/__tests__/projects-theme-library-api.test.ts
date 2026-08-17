@@ -1,11 +1,12 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { DESIGN_KNOWLEDGE_MANIFEST_URL } from '../designKnowledgeThemeCatalog.ts';
 import { getProjectMetadataPath } from '../projectCore/index.ts';
-
 import {
   cleanupProjectApiTestRoots,
   createTempRoot,
@@ -15,35 +16,10 @@ import {
   writeProjectMetadata,
 } from './projects-api.helpers';
 
-const TEMPLATE_REPO = 'lintendo/Make-Template';
-const DEFAULT_DESIGN_SYSTEM_INDEX = {
-  schemaVersion: 1,
-  designSystems: [
-    {
-      id: 'trae-design',
-      title: 'TRAE Design',
-      slug: 'trae-design',
-      sourcePath: 'design-systems/trae-design',
-      entryPath: 'design-systems/trae-design/index.tsx',
-      tokenPath: 'design-systems/trae-design/designToken.json',
-      stylePath: 'design-systems/trae-design/globals.css',
-      coverPath: 'design-systems/trae-design/assets/official-homepage.webp',
-      description: 'TRAE design system',
-    },
-  ],
-};
-const MIGRATED_GETDESIGN_TEMPLATE_SYSTEMS = [
-  'hp',
-  'bmw-m',
-  'vodafone',
-  'starbucks',
-  'mastercard',
-  'bugatti',
-  'the-verge',
-  'wired',
-  'playstation',
-  'meta',
-];
+const PUBLICATION_BASE = 'https://lintendo.github.io/Make-Template/knowledge/versions/api-test-v1';
+const DESKTOP_INDEX_URL = `${PUBLICATION_BASE}/indexes/desktop.json`;
+const MOBILE_INDEX_URL = `${PUBLICATION_BASE}/indexes/mobile.json`;
+const MOBILE_PACKAGE_URL = `${PUBLICATION_BASE}/packages/mobile-kit.tgz`;
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -51,26 +27,125 @@ afterEach(() => {
   cleanupProjectApiTestRoots();
 });
 
+function sha256(bytes: Uint8Array): string {
+  return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+function serialize(value: unknown): Buffer {
+  return Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
+}
+
+function createThemePackage(): Buffer {
+  const source = createTempRoot('axhub-theme-package-source-');
+  fs.writeFileSync(path.join(source, 'index.tsx'), 'export default function MobileKit() { return null; }\n');
+  fs.writeFileSync(path.join(source, 'theme.json'), '{"name":"Mobile Kit"}\n');
+  const archive = path.join(createTempRoot('axhub-theme-package-archive-'), 'mobile-kit.tgz');
+  execFileSync('tar', ['--format=ustar', '-czf', archive, '-C', source, 'index.tsx', 'theme.json']);
+  return fs.readFileSync(archive);
+}
+
+const THEME_PACKAGE_BYTES = createThemePackage();
+
+function createRecord(params: {
+  id: string;
+  platform: 'desktop' | 'mobile';
+  packageBytes?: Buffer;
+}) {
+  const publishable = Boolean(params.packageBytes);
+  return {
+    schemaVersion: 1,
+    id: params.id,
+    slug: params.id,
+    platforms: [params.platform],
+    searchable: true,
+    reviewStatus: publishable ? 'approved' : 'deferred',
+    publishable,
+    reasons: publishable ? [] : ['package-unauthorized'],
+    title: params.id === 'desktop-kit' ? 'Desktop Kit' : 'Mobile Kit',
+    tags: ['简洁', '消费品牌'],
+    annotation: { industries: ['ecommerce-retail'], productTypes: ['consumer-app'], styles: ['clean'] },
+    artifacts: {
+      designMdUrl: `${PUBLICATION_BASE}/designs/${params.id}/DESIGN.md`,
+      designMdHash: `sha256:${'1'.repeat(64)}`,
+      previewUrl: `${PUBLICATION_BASE}/previews/${params.id}/index.html`,
+      previewHash: `sha256:${'2'.repeat(64)}`,
+      previewImageUrl: `${PUBLICATION_BASE}/previews/${params.id}/assets/cover.webp`,
+      previewImageHash: `sha256:${'3'.repeat(64)}`,
+      ...(params.packageBytes ? { packageUrl: MOBILE_PACKAGE_URL, packageHash: sha256(params.packageBytes) } : {}),
+    },
+    text: 'large search text',
+    tokens: ['large', 'tokens'],
+  };
+}
+
+function mockKnowledgeResponses(options: { onPackageRequest?: () => Promise<void> } = {}) {
+  const packageBytes = THEME_PACKAGE_BYTES;
+  const desktop = {
+    schemaVersion: 1,
+    taxonomyVersion: '1.0.0',
+    searchContractVersion: '1.0.0',
+    tokenizationVersion: 'nfkc-intl-segmenter-v1',
+    platform: 'desktop',
+    records: [createRecord({ id: 'desktop-kit', platform: 'desktop' })],
+    postings: {},
+  };
+  const mobile = {
+    schemaVersion: 1,
+    taxonomyVersion: '1.0.0',
+    searchContractVersion: '1.0.0',
+    tokenizationVersion: 'nfkc-intl-segmenter-v1',
+    platform: 'mobile',
+    records: [createRecord({ id: 'mobile-kit', platform: 'mobile', packageBytes })],
+    postings: {},
+  };
+  const desktopBytes = serialize(desktop);
+  const mobileBytes = serialize(mobile);
+  const manifest = {
+    schemaVersion: 1,
+    taxonomyVersion: '1.0.0',
+    searchContractVersion: '1.0.0',
+    tokenizationVersion: 'nfkc-intl-segmenter-v1',
+    minReaderVersion: '1.0.0',
+    maxReaderVersionExclusive: '2.0.0',
+    sourceCommits: { runtime: 'a'.repeat(40), 'axhub-make': 'b'.repeat(40) },
+    records: [],
+    indexes: {
+      desktop: { url: DESKTOP_INDEX_URL, hash: sha256(desktopBytes), count: 1 },
+      mobile: { url: MOBILE_INDEX_URL, hash: sha256(mobileBytes), count: 1 },
+    },
+  };
+  const responses = new Map<string, Buffer>([
+    [DESIGN_KNOWLEDGE_MANIFEST_URL, serialize(manifest)],
+    [DESKTOP_INDEX_URL, desktopBytes],
+    [MOBILE_INDEX_URL, mobileBytes],
+    [MOBILE_PACKAGE_URL, packageBytes],
+  ]);
+  const originalFetch = globalThis.fetch;
+  const remoteRequests: string[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' || input instanceof URL ? String(input) : input.url;
+    if (url.startsWith('http://localhost:')) return originalFetch(input, init);
+    remoteRequests.push(url);
+    if (url === MOBILE_PACKAGE_URL) await options.onPackageRequest?.();
+    const body = responses.get(url);
+    return body
+      ? new Response(body as any, { status: 200 })
+      : new Response(`Unexpected URL: ${url}`, { status: 404 });
+  }));
+  return { remoteRequests };
+}
+
 function scopeProjectApiUrl(projectRoot: string, rawUrl: string): string {
-  const metadataPath = getProjectMetadataPath(projectRoot);
-  const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
-  const projectId = String(metadata?.project?.id || '').trim();
-  if (!projectId) throw new Error(`Missing project id in ${metadataPath}`);
+  const metadata = JSON.parse(fs.readFileSync(getProjectMetadataPath(projectRoot), 'utf8'));
   const url = new URL(rawUrl);
-  if (!url.searchParams.has('projectId')) url.searchParams.set('projectId', projectId);
+  url.searchParams.set('projectId', metadata.project.id);
   return url.toString();
 }
 
-function writeThemeImportEnabledProject(projectRoot: string, id = 'theme-library-client'): void {
+function writeThemeProject(projectRoot: string, id = 'theme-library-client'): void {
   writeProjectMetadata(projectRoot, {
     project: { id, name: id },
-    resources: {
-      prototypes: [],
-      docs: [],
-      themes: [],
-      data: [],
-      templates: [],
-    },
+    resources: { prototypes: [], docs: [], themes: [], data: [], templates: [] },
     navigation: { prototypes: [], docs: [] },
     orders: { themes: [], data: [], templates: [] },
     capabilities: {
@@ -79,505 +154,186 @@ function writeThemeImportEnabledProject(projectRoot: string, id = 'theme-library
       figmaExport: true,
       axureExport: true,
       multiDevicePreview: true,
-      resourceWrites: {
-        themeImport: true,
-      },
+      resourceWrites: { themeImport: true },
     },
-    resourceWriteTargets: {
-      themes: { path: 'content/themes' },
-    },
+    resourceWriteTargets: { themes: { path: 'content/themes' } },
   });
 }
 
-function readMetadata(projectRoot: string): any {
-  return JSON.parse(fs.readFileSync(getProjectMetadataPath(projectRoot), 'utf8'));
-}
-
-async function startThemeLibraryTestServer(projectRoot: string, projectId = String(readMetadata(projectRoot).project.id)) {
+async function startThemeServer(projectRoot: string) {
+  const projectId = JSON.parse(fs.readFileSync(getProjectMetadataPath(projectRoot), 'utf8')).project.id;
   const server = await startTestServer(projectRoot);
   await registerProject(server.origin, projectRoot, projectId);
   await setActiveProject(server.origin, projectId);
   return server;
 }
 
-function createTemplateTarball(files: Record<string, string>): string {
-  const archiveRoot = createTempRoot('axhub-make-theme-library-tar-root-');
-  const repoRoot = path.join(archiveRoot, 'lintendo-Make-Template-main');
-  for (const [relativePath, content] of Object.entries(files)) {
-    const filePath = path.join(repoRoot, relativePath);
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, content, 'utf8');
-  }
-  const tarPath = path.join(createTempRoot('axhub-make-theme-library-tar-file-'), 'make-template.tar.gz');
-  execFileSync('tar', ['-czf', tarPath, '-C', archiveRoot, path.basename(repoRoot)]);
-  return tarPath;
-}
-
-function mockGitHubResponses(params: {
-  index?: unknown;
-  branch?: string;
-  tarballPath?: string;
-  repoStatus?: number;
-  rawStatus?: number;
-  tarStatus?: number;
-} = {}): void {
-  const originalFetch = globalThis.fetch;
-  const branch = params.branch || 'main';
-  const index = params.index ?? DEFAULT_DESIGN_SYSTEM_INDEX;
-  const rawIndexResponse = () => new Response(JSON.stringify(index), {
-    status: params.rawStatus || 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
-  const tarResponse = () => new Response(params.tarballPath ? fs.readFileSync(params.tarballPath) : 'missing tarball', {
-    status: params.tarStatus || 200,
-    headers: { 'Content-Type': 'application/gzip' },
-  });
-  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' || input instanceof URL ? String(input) : input.url;
-    if (url.startsWith('http://localhost:')) {
-      return originalFetch(input, init);
-    }
-    if (url === `https://api.github.com/repos/${TEMPLATE_REPO}`) {
-      return new Response(JSON.stringify({ default_branch: branch }), {
-        status: params.repoStatus || 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-    if (url === `https://raw.githubusercontent.com/${TEMPLATE_REPO}/${branch}/design-systems.json`) {
-      return rawIndexResponse();
-    }
-    if (url === `https://raw.githubusercontent.com/${TEMPLATE_REPO}/HEAD/design-systems.json`) {
-      return rawIndexResponse();
-    }
-    if (url === `https://codeload.github.com/${TEMPLATE_REPO}/tar.gz/${branch}`) {
-      return tarResponse();
-    }
-    if (url === `https://codeload.github.com/${TEMPLATE_REPO}/tar.gz/HEAD`) {
-      return tarResponse();
-    }
-    return new Response(`Unexpected URL: ${url}`, { status: 404 });
-  }));
-}
-
-function withoutLocalThemeLibrary<T>(run: () => Promise<T>): Promise<T> {
-  const realExistsSync = fs.existsSync;
-  const existsSyncSpy = vi.spyOn(fs, 'existsSync').mockImplementation((target) => {
-    if (String(target).endsWith(path.join('apps', 'make-template', 'design-systems.json'))) {
-      return false;
-    }
-    return realExistsSync(target);
-  });
-
-  return run().finally(() => {
-    existsSyncSpy.mockRestore();
-  });
-}
-
 async function fetchJson(url: string, init?: RequestInit) {
   const response = await fetch(url, init);
-  return {
-    status: response.status,
-    body: await response.json(),
-  };
+  return { status: response.status, body: await response.json() as any };
 }
 
-describe('make-server project theme library APIs', () => {
-  it('lists remote design systems from mocked GitHub responses', async () => {
+describe('make-server Design Knowledge theme library APIs', () => {
+  it('lists the selected platform without reading the legacy local theme index', async () => {
     const projectRoot = createTempRoot();
-    writeThemeImportEnabledProject(projectRoot);
-    mockGitHubResponses();
-    const server = await startThemeLibraryTestServer(projectRoot);
+    writeThemeProject(projectRoot);
+    const { remoteRequests } = mockKnowledgeResponses();
+    const server = await startThemeServer(projectRoot);
+    try {
+      const url = scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library?platform=mobile`);
+      const listed = await fetchJson(url);
 
-    await withoutLocalThemeLibrary(async () => {
-      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library`));
-
-      expect(listed.status).toBe(200);
-      expect(listed.body).toMatchObject({
-        schemaVersion: 1,
-        source: {
-          repo: TEMPLATE_REPO,
-          branch: 'main',
-        },
+      expect(listed).toMatchObject({
+        status: 200,
+        body: { schemaVersion: 1, platform: 'mobile', total: 1, stale: false },
       });
-      expect(listed.body.designSystems).toHaveLength(1);
-      expect(listed.body.designSystems[0]).toMatchObject({
-        id: 'trae-design',
-        title: 'TRAE Design',
-        slug: 'trae-design',
-        coverUrl: `https://raw.githubusercontent.com/${TEMPLATE_REPO}/main/design-systems/trae-design/assets/official-homepage.webp`,
-        sourceUrl: `https://github.com/${TEMPLATE_REPO}/tree/main/design-systems/trae-design`,
+      expect(listed.body.designSystems).toEqual([expect.objectContaining({
+        id: 'mobile-kit',
+        platform: 'mobile',
         canDirectImport: true,
-      });
-      expect(listed.body.designSystems[0]).not.toHaveProperty('directImportDisabledReason');
-    }).finally(async () => {
-      await server.close();
-    });
-  });
-
-  it('returns remote errors when no local make-template design system index exists', async () => {
-    const projectRoot = createTempRoot();
-    writeThemeImportEnabledProject(projectRoot);
-    mockGitHubResponses({ rawStatus: 404 });
-    const server = await startThemeLibraryTestServer(projectRoot);
-
-    await withoutLocalThemeLibrary(async () => {
-      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library`));
-
-      expect(listed.status).toBe(502);
-      expect(listed.body).toMatchObject({
-        code: 'THEME_LIBRARY_REMOTE_UNAVAILABLE',
-      });
-    }).finally(async () => {
-      await server.close();
-    });
-  });
-
-  it('loads local make-template design systems when available', async () => {
-    const projectRoot = createTempRoot();
-    writeThemeImportEnabledProject(projectRoot);
-    const server = await startThemeLibraryTestServer(projectRoot);
-
-    try {
-      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library`));
-
-      expect(listed.status).toBe(200);
-      expect(listed.body).toMatchObject({
-        schemaVersion: 1,
-        source: {
-          repo: TEMPLATE_REPO,
-          branch: 'local',
-        },
-      });
-      expect(listed.body.designSystems).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          id: 'hp',
-          title: 'HP Design System',
-          slug: 'hp',
-          entryPath: 'design-systems/hp/index.tsx',
-          tokenPath: 'design-systems/hp/designToken.json',
-          coverPath: 'design-systems/hp/assets/official-homepage.webp',
-          coverUrl: `https://raw.githubusercontent.com/${TEMPLATE_REPO}/HEAD/design-systems/hp/assets/official-homepage.webp`,
-          sourceUrl: `https://github.com/${TEMPLATE_REPO}/tree/HEAD/design-systems/hp`,
-          canDirectImport: true,
-        }),
-      ]));
+      })]);
+      expect(remoteRequests).not.toEqual(expect.arrayContaining([expect.stringContaining('design-systems.json')]));
+      expect(JSON.stringify(listed.body)).not.toContain('packageUrl');
     } finally {
       await server.close();
     }
   });
 
-  it('exposes migrated getdesign.md themes from local make-template design systems', async () => {
+  it('rejects invalid platforms before loading the remote catalog', async () => {
     const projectRoot = createTempRoot();
-    writeThemeImportEnabledProject(projectRoot);
-    const server = await startThemeLibraryTestServer(projectRoot);
-
+    writeThemeProject(projectRoot);
+    const { remoteRequests } = mockKnowledgeResponses();
+    const server = await startThemeServer(projectRoot);
     try {
-      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library`));
-
-      expect(listed.status).toBe(200);
-      expect(listed.body.source).toMatchObject({ branch: 'local' });
-      for (const slug of MIGRATED_GETDESIGN_TEMPLATE_SYSTEMS) {
-        expect(listed.body.designSystems).toEqual(expect.arrayContaining([
-          expect.objectContaining({
-            id: slug,
-            slug,
-            sourcePath: `design-systems/${slug}`,
-            entryPath: `design-systems/${slug}/index.tsx`,
-            tokenPath: `design-systems/${slug}/designToken.json`,
-            stylePath: `design-systems/${slug}/globals.css`,
-            coverPath: slug === 'mastercard'
-              ? 'design-systems/mastercard/assets/mastercard-design-system-cover.webp'
-              : `design-systems/${slug}/assets/official-homepage.webp`,
-            canDirectImport: true,
-          }),
-        ]));
-      }
-    } finally {
-      await server.close();
-    }
-  });
-
-  it('prefers local make-template design systems without waiting for the remote index', async () => {
-    const projectRoot = createTempRoot();
-    writeThemeImportEnabledProject(projectRoot);
-    const server = await startThemeLibraryTestServer(projectRoot);
-    const originalFetch = globalThis.fetch;
-    const remoteRequests: string[] = [];
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const url = typeof input === 'string' || input instanceof URL ? String(input) : input.url;
-      if (url.startsWith('http://localhost:')) {
-        return originalFetch(input);
-      }
-      remoteRequests.push(url);
-      throw new Error(`Remote theme library should not be requested when local make-template exists: ${url}`);
-    }));
-
-    try {
-      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library`));
-
-      expect(listed.status).toBe(200);
-      expect(listed.body).toMatchObject({
-        schemaVersion: 1,
-        source: {
-          repo: TEMPLATE_REPO,
-          branch: 'local',
-        },
-      });
-      expect(listed.body.designSystems).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          id: 'hp',
-          title: 'HP Design System',
-          slug: 'hp',
-          canDirectImport: true,
-        }),
-      ]));
+      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library?platform=tablet`));
+      expect(listed).toMatchObject({ status: 400, body: { code: 'THEME_LIBRARY_PLATFORM_INVALID' } });
       expect(remoteRequests).toEqual([]);
     } finally {
       await server.close();
     }
   });
 
-  it('returns a structured error for invalid design system schema and unsafe paths', async () => {
+  it('rejects imports for catalog records without an authorized package', async () => {
     const projectRoot = createTempRoot();
-    writeThemeImportEnabledProject(projectRoot);
-    mockGitHubResponses({
-      index: {
-        schemaVersion: 1,
-        designSystems: [
-          {
-            id: 'unsafe',
-            title: 'Unsafe',
-            slug: 'unsafe',
-            sourcePath: '../outside',
-            entryPath: 'design-systems/unsafe/index.tsx',
-            tokenPath: 'design-systems/unsafe/designToken.json',
-            stylePath: 'design-systems/unsafe/globals.css',
-            coverPath: 'design-systems/unsafe/assets/official-homepage.webp',
-            description: 'Unsafe path',
-          },
-        ],
-      },
-    });
-    const server = await startThemeLibraryTestServer(projectRoot);
-
-    await withoutLocalThemeLibrary(async () => {
-      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library`));
-
-      expect(listed.status).toBe(502);
-      expect(listed.body).toMatchObject({
-        code: 'THEME_LIBRARY_SCHEMA_INVALID',
-      });
-      expect(listed.body.error).toContain('sourcePath');
-    }).finally(async () => {
-      await server.close();
-    });
-  });
-
-  it('imports a design system into the declared themes target', async () => {
-    const projectRoot = createTempRoot();
-    writeThemeImportEnabledProject(projectRoot, 'theme-import-client');
-    const tarballPath = createTemplateTarball({
-      'design-systems/trae-design/index.tsx': 'export default function TraeDesign() { return null; }\n',
-      'design-systems/trae-design/designToken.json': JSON.stringify({ name: 'TRAE Design' }, null, 2),
-      'design-systems/trae-design/globals.css': ':root { --primary: #32f08c; }\n',
-    });
-    mockGitHubResponses({ tarballPath });
-    const server = await startThemeLibraryTestServer(projectRoot);
-
-    await withoutLocalThemeLibrary(async () => {
-      const imported = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library/import`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ designSystemId: 'trae-design' }),
-      });
-
-      expect(imported).toMatchObject({
-        status: 200,
-        body: {
-          success: true,
-          projectId: 'theme-import-client',
-          designSystemId: 'trae-design',
-          folderName: 'trae-design',
-          path: 'themes/trae-design',
-          filePath: 'content/themes/trae-design/index.tsx',
-          absoluteFilePath: path.join(projectRoot, 'content/themes/trae-design/index.tsx'),
-          clientUrl: `${server.origin}/themes/trae-design`,
-        },
-      });
-      expect(fs.readFileSync(path.join(projectRoot, 'content/themes/trae-design/index.tsx'), 'utf8'))
-        .toContain('TraeDesign');
-      expect(fs.readFileSync(path.join(projectRoot, 'content/themes/trae-design/globals.css'), 'utf8'))
-        .toBe(':root { --primary: #32f08c; }\n');
-
-      const metadata = readMetadata(projectRoot);
-      expect(metadata.resources.themes).toEqual([
-        expect.objectContaining({
-          id: 'trae-design',
-          name: 'trae-design',
-          title: 'TRAE Design',
-          path: 'content/themes/trae-design',
-          sourcePath: 'content/themes/trae-design',
-          filePath: 'content/themes/trae-design/index.tsx',
-          absoluteFilePath: path.join(projectRoot, 'content/themes/trae-design/index.tsx'),
-          clientUrl: `${server.origin}/themes/trae-design`,
-        }),
-      ]);
-      expect(metadata.orders.themes).toEqual(['trae-design']);
-    }).finally(async () => {
-      await server.close();
-    });
-  });
-
-  it('imports a migrated local make-template design system into the declared themes target', async () => {
-    const projectRoot = createTempRoot();
-    writeThemeImportEnabledProject(projectRoot, 'theme-local-import-client');
-    const server = await startThemeLibraryTestServer(projectRoot);
-
+    writeThemeProject(projectRoot);
+    mockKnowledgeResponses();
+    const server = await startThemeServer(projectRoot);
     try {
       const imported = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library/import`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ designSystemId: 'hp' }),
+        body: JSON.stringify({ themeId: 'desktop-kit', platform: 'desktop' }),
       });
-
-      expect(imported).toMatchObject({
-        status: 200,
-        body: {
-          success: true,
-          projectId: 'theme-local-import-client',
-          designSystemId: 'hp',
-          folderName: 'hp',
-          path: 'themes/hp',
-          filePath: 'content/themes/hp/index.tsx',
-          absoluteFilePath: path.join(projectRoot, 'content/themes/hp/index.tsx'),
-          clientUrl: `${server.origin}/themes/hp`,
-        },
-      });
-      expect(fs.readFileSync(path.join(projectRoot, 'content/themes/hp/index.tsx'), 'utf8'))
-        .toContain('Self-contained design system preview');
-      expect(fs.existsSync(path.join(projectRoot, 'content/themes/hp/designToken.json'))).toBe(true);
-      expect(fs.existsSync(path.join(projectRoot, 'content/themes/hp/globals.css'))).toBe(true);
-      expect(fs.existsSync(path.join(projectRoot, 'content/themes/hp/assets/official-homepage.webp'))).toBe(true);
-
-      const metadata = readMetadata(projectRoot);
-      expect(metadata.resources.themes).toEqual([
-        expect.objectContaining({
-          id: 'hp',
-          name: 'hp',
-          title: 'HP Design System',
-          path: 'content/themes/hp',
-          sourcePath: 'content/themes/hp',
-          filePath: 'content/themes/hp/index.tsx',
-          absoluteFilePath: path.join(projectRoot, 'content/themes/hp/index.tsx'),
-          clientUrl: `${server.origin}/themes/hp`,
-        }),
-      ]);
-      expect(metadata.orders.themes).toEqual(['hp']);
+      expect(imported).toMatchObject({ status: 409, body: { code: 'THEME_LIBRARY_NOT_IMPORTABLE' } });
+      expect(fs.existsSync(path.join(projectRoot, 'content/themes/desktop-kit'))).toBe(false);
     } finally {
       await server.close();
     }
   });
 
-  it('imports a mobile local make-template design system into the declared themes target', async () => {
+  it('imports a verified package selected only by theme id and platform', async () => {
     const projectRoot = createTempRoot();
-    writeThemeImportEnabledProject(projectRoot, 'theme-mobile-local-import-client');
-    const server = await startThemeLibraryTestServer(projectRoot);
-
+    writeThemeProject(projectRoot, 'theme-package-client');
+    const { remoteRequests } = mockKnowledgeResponses();
+    const server = await startThemeServer(projectRoot);
     try {
-      const listed = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library`));
-      expect(listed.status).toBe(200);
-      expect(listed.body.designSystems).toHaveLength(61);
-      expect(listed.body.designSystems).toEqual(expect.arrayContaining([
-        expect.objectContaining({ id: 'snapchat-mobile', slug: 'snapchat-mobile', canDirectImport: true }),
-      ]));
-
       const imported = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library/import`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ designSystemId: 'snapchat-mobile' }),
+        body: JSON.stringify({
+          themeId: 'mobile-kit',
+          platform: 'mobile',
+          packageUrl: 'https://attacker.example/evil.tgz',
+        }),
       });
-
       expect(imported).toMatchObject({
         status: 200,
         body: {
           success: true,
-          projectId: 'theme-mobile-local-import-client',
-          designSystemId: 'snapchat-mobile',
-          folderName: 'snapchat-mobile',
-          path: 'themes/snapchat-mobile',
-          filePath: 'content/themes/snapchat-mobile/index.tsx',
+          projectId: 'theme-package-client',
+          themeId: 'mobile-kit',
+          folderName: 'mobile-kit',
+          filePath: 'content/themes/mobile-kit/index.tsx',
         },
       });
-      for (const file of ['index.tsx', 'designToken.json', 'globals.css', 'DESIGN.md', 'SOURCE.md', 'assets/cover.svg']) {
-        expect(fs.existsSync(path.join(projectRoot, 'content/themes/snapchat-mobile', file))).toBe(true);
-      }
+      expect(fs.readFileSync(path.join(projectRoot, 'content/themes/mobile-kit/index.tsx'), 'utf8')).toContain('MobileKit');
+      expect(remoteRequests).toContain(MOBILE_PACKAGE_URL);
+      expect(remoteRequests).not.toContain('https://attacker.example/evil.tgz');
     } finally {
       await server.close();
     }
   });
 
-  it('rejects direct import when the target theme folder already exists', async () => {
+  it('keeps the import lock owned while later concurrent requests are rejected', async () => {
     const projectRoot = createTempRoot();
-    writeThemeImportEnabledProject(projectRoot, 'theme-existing-target-client');
-    const existingIndexPath = path.join(projectRoot, 'content/themes/trae-design/index.tsx');
-    fs.mkdirSync(path.dirname(existingIndexPath), { recursive: true });
-    fs.writeFileSync(existingIndexPath, 'existing\n', 'utf8');
-    const tarballPath = createTemplateTarball({
-      'design-systems/trae-design/index.tsx': 'export default function TraeDesign() { return null; }\n',
-      'design-systems/trae-design/designToken.json': JSON.stringify({ name: 'TRAE Design' }, null, 2),
+    writeThemeProject(projectRoot, 'theme-concurrent-client');
+    let notifyPackageStarted!: () => void;
+    let notifySecondPackageStarted!: () => void;
+    let releasePackage!: () => void;
+    const packageStarted = new Promise<void>((resolve) => {
+      notifyPackageStarted = resolve;
     });
-    mockGitHubResponses({ tarballPath });
-    const server = await startThemeLibraryTestServer(projectRoot);
-
-    await withoutLocalThemeLibrary(async () => {
-      const imported = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library/import`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ designSystemId: 'trae-design' }),
-      });
-
-      expect(imported.status).toBe(409);
-      expect(imported.body).toMatchObject({
-        code: 'THEME_LIBRARY_TARGET_EXISTS',
-        folderName: 'trae-design',
-      });
-      expect(fs.readFileSync(existingIndexPath, 'utf8')).toBe('existing\n');
-    }).finally(async () => {
-      await server.close();
+    const secondPackageStarted = new Promise<void>((resolve) => {
+      notifySecondPackageStarted = resolve;
     });
-  });
-
-  it('rejects direct import when theme import capability or target is missing', async () => {
-    const projectRoot = createTempRoot();
-    writeProjectMetadata(projectRoot, {
-      project: { id: 'theme-no-target-client', name: 'Theme No Target Client' },
-      capabilities: {
-        quickEdit: true,
-        quickEditMode: 'clientRuntime',
-        figmaExport: true,
-        axureExport: true,
-        multiDevicePreview: true,
-        resourceWrites: {
-          themeImport: true,
-        },
+    const packageGate = new Promise<void>((resolve) => {
+      releasePackage = resolve;
+    });
+    let packageRequestCount = 0;
+    const { remoteRequests } = mockKnowledgeResponses({
+      onPackageRequest: async () => {
+        packageRequestCount += 1;
+        if (packageRequestCount === 1) notifyPackageStarted();
+        if (packageRequestCount === 2) notifySecondPackageStarted();
+        await packageGate;
       },
     });
-    mockGitHubResponses();
-    const server = await startThemeLibraryTestServer(projectRoot);
+    const server = await startThemeServer(projectRoot);
+    try {
+      const url = scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library/import`);
+      const request = () => fetchJson(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ themeId: 'mobile-kit', platform: 'mobile' }),
+      });
+      const first = request();
+      await packageStarted;
+      const second = await request();
+      const third = request();
+      const thirdWhileLocked = await Promise.race([
+        third.then((result) => ({ type: 'response' as const, result })),
+        secondPackageStarted.then(() => ({ type: 'second-package' as const })),
+        new Promise<{ type: 'timeout' }>((resolve) => setTimeout(() => resolve({ type: 'timeout' }), 2_000)),
+      ]);
+      releasePackage();
+      const results = [await first, second, await third];
 
+      expect(thirdWhileLocked).toMatchObject({
+        type: 'response',
+        result: { status: 409, body: { code: 'THEME_LIBRARY_IMPORT_IN_PROGRESS' } },
+      });
+      expect(results.map((result) => result.status).sort()).toEqual([200, 409, 409]);
+      expect(results.filter((result) => result.status === 409).map((result) => result.body.code))
+        .toEqual(['THEME_LIBRARY_IMPORT_IN_PROGRESS', 'THEME_LIBRARY_IMPORT_IN_PROGRESS']);
+      expect(remoteRequests.filter((url) => url === MOBILE_PACKAGE_URL)).toHaveLength(1);
+      expect(fs.readFileSync(path.join(projectRoot, 'content/themes/mobile-kit/index.tsx'), 'utf8')).toContain('MobileKit');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('does not accept the legacy designSystemId import contract', async () => {
+    const projectRoot = createTempRoot();
+    writeThemeProject(projectRoot);
+    mockKnowledgeResponses();
+    const server = await startThemeServer(projectRoot);
     try {
       const imported = await fetchJson(scopeProjectApiUrl(projectRoot, `${server.origin}/api/theme-library/import`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ designSystemId: 'trae-design' }),
+        body: JSON.stringify({ designSystemId: 'desktop-kit' }),
       });
-
-      expect(imported.status).toBe(424);
-      expect(imported.body).toMatchObject({
-        code: 'THEME_LIBRARY_IMPORT_ADAPTER_REQUIRED',
-        adapterRequired: true,
-        projectId: 'theme-no-target-client',
-      });
+      expect(imported).toMatchObject({ status: 400, body: { code: 'THEME_LIBRARY_THEME_ID_REQUIRED' } });
     } finally {
       await server.close();
     }

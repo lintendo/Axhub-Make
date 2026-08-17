@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
     buildAssistantAutoOpenPanelModeStorageKey,
     buildAssistantAutoOpenDismissedStorageKey,
+    getCommentaryVoiceVisible,
     getAssistantAutoOpenDismissed,
     getAssistantAutoOpenPanelMode,
     formatThrownError,
@@ -16,11 +17,74 @@ import {
     resolveDocRenameBaseName,
     replaceSidebarItemTitle,
     resolveMobileItemOpenUrl,
+    resolveAssistantPanelOpenTarget,
+    shouldSuppressAssistantAutoOpenForProjectChange,
     setAssistantAutoOpenDismissed,
     setAssistantAutoOpenPanelMode,
+    setCommentaryVoiceVisible,
 } from './index-page.helpers';
 
 describe('index page helpers', () => {
+    it('restores and persists the Commentary voice launcher visibility in local storage', () => {
+        const values = new Map<string, string>([
+            ['axhub-make:commentary-voice-visible', '1'],
+        ]);
+        const storage = {
+            getItem: (key: string) => values.get(key) ?? null,
+            setItem: (key: string, value: string) => {
+                values.set(key, value);
+            },
+        };
+        expect(getCommentaryVoiceVisible(storage)).toBe(true);
+
+        setCommentaryVoiceVisible(false, storage);
+        expect(values.get('axhub-make:commentary-voice-visible')).toBe('0');
+        expect(getCommentaryVoiceVisible(storage)).toBe(false);
+
+        setCommentaryVoiceVisible(true, storage);
+        expect(values.get('axhub-make:commentary-voice-visible')).toBe('1');
+    });
+
+    it('keeps the Commentary voice launcher hidden when local storage is missing or unavailable', () => {
+        const unavailableStorage = {
+            getItem: () => {
+                throw new Error('storage unavailable');
+            },
+            setItem: () => {
+                throw new Error('storage unavailable');
+            },
+        };
+        expect(getCommentaryVoiceVisible(null)).toBe(false);
+        expect(getCommentaryVoiceVisible(unavailableStorage)).toBe(false);
+        expect(() => setCommentaryVoiceVisible(true, unavailableStorage)).not.toThrow();
+    });
+
+    it('uses persistent local storage rather than browser-tab session storage by default', () => {
+        const localValues = new Map<string, string>();
+        const sessionValues = new Map<string, string>();
+        const createStorage = (values: Map<string, string>) => ({
+            getItem: (key: string) => values.get(key) ?? null,
+            setItem: (key: string, value: string) => {
+                values.set(key, value);
+            },
+        });
+
+        vi.stubGlobal('window', {
+            localStorage: createStorage(localValues),
+            sessionStorage: createStorage(sessionValues),
+        });
+
+        try {
+            setCommentaryVoiceVisible(true);
+
+            expect(localValues.get('axhub-make:commentary-voice-visible')).toBe('1');
+            expect(sessionValues.size).toBe(0);
+            expect(getCommentaryVoiceVisible()).toBe(true);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
     it('formats non-Error thrown values with useful diagnostic details', () => {
         expect(formatThrownError({ error: 'Session annotation-1 failed', status: 500 })).toBe('Session annotation-1 failed；status=500');
         expect(formatThrownError({ detail: { message: 'provider unavailable' } })).toBe('provider unavailable');
@@ -60,7 +124,14 @@ describe('index page helpers', () => {
         }
     });
 
-    it('keeps assistant auto-open enabled by default and stores real closes project-wide', () => {
+    it('suppresses assistant auto-open only when switching between loaded projects', () => {
+        expect(shouldSuppressAssistantAutoOpenForProjectChange('', 'project-a', false)).toBe(false);
+        expect(shouldSuppressAssistantAutoOpenForProjectChange('project-a', 'project-a', false)).toBe(false);
+        expect(shouldSuppressAssistantAutoOpenForProjectChange('project-a', 'project-b', true)).toBe(false);
+        expect(shouldSuppressAssistantAutoOpenForProjectChange('project-a', 'project-b', false)).toBe(true);
+    });
+
+    it('keeps assistant auto-open closed by default until this browser tab opens it', () => {
         const storage = new Map<string, string>();
         const fakeStorage = {
             getItem: (key: string) => storage.get(key) ?? null,
@@ -72,19 +143,29 @@ describe('index page helpers', () => {
         const otherPrototypeKey = buildAssistantAutoOpenDismissedStorageKey('make-project', 'src/prototypes/other/index.tsx');
         const otherProjectKey = buildAssistantAutoOpenDismissedStorageKey('other-project', 'src/prototypes/beginner-guide/index.tsx');
 
-        expect(getAssistantAutoOpenDismissed(guideKey, fakeStorage)).toBe(false);
-        expect(getAssistantAutoOpenDismissed(otherProjectKey, fakeStorage)).toBe(false);
+        expect(getAssistantAutoOpenDismissed(guideKey, fakeStorage)).toBe(true);
+        expect(getAssistantAutoOpenDismissed(otherProjectKey, fakeStorage)).toBe(true);
 
         setAssistantAutoOpenDismissed(guideKey, false, fakeStorage);
 
         expect(getAssistantAutoOpenDismissed(guideKey, fakeStorage)).toBe(false);
         expect(getAssistantAutoOpenDismissed(otherPrototypeKey, fakeStorage)).toBe(false);
-        expect(getAssistantAutoOpenDismissed(otherProjectKey, fakeStorage)).toBe(false);
+        expect(getAssistantAutoOpenDismissed(otherProjectKey, fakeStorage)).toBe(true);
 
         setAssistantAutoOpenDismissed(guideKey, true, fakeStorage);
 
         expect(getAssistantAutoOpenDismissed(guideKey, fakeStorage)).toBe(true);
         expect(getAssistantAutoOpenDismissed(otherPrototypeKey, fakeStorage)).toBe(true);
+    });
+
+    it('opens the assistant in a new window on compact viewports', () => {
+        expect(resolveAssistantPanelOpenTarget(768)).toBe('window');
+        expect(resolveAssistantPanelOpenTarget(767)).toBe('window');
+    });
+
+    it('keeps the assistant embedded above the compact viewport threshold', () => {
+        expect(resolveAssistantPanelOpenTarget(769)).toBe('iframe');
+        expect(resolveAssistantPanelOpenTarget(1280)).toBe('iframe');
     });
 
     it('stores the last assistant panel mode project-wide for auto restore', () => {
@@ -136,7 +217,7 @@ describe('index page helpers', () => {
         const metadataOnlyTemplate = normalizeTemplateItem({
             name: 'prd-template.md',
             displayName: 'PRD Template',
-        });
+        }, 'client-project');
         expect(metadataOnlyTemplate.filePath).toBeUndefined();
         expect(metadataOnlyTemplate.absoluteFilePath).toBeUndefined();
 
@@ -145,7 +226,7 @@ describe('index page helpers', () => {
             displayName: 'PRD Template',
             path: 'content/templates/prd-template.md',
             absoluteFilePath: '/workspace/content/templates/prd-template.md',
-        });
+        }, 'client-project');
         expect(sourceBackedTemplate.filePath).toBe('content/templates/prd-template.md');
         expect(sourceBackedTemplate.absoluteFilePath).toBe('/workspace/content/templates/prd-template.md');
     });
@@ -156,29 +237,29 @@ describe('index page helpers', () => {
             displayName: 'Guide',
             path: 'content/docs/guide.md',
             absoluteFilePath: '/workspace/content/docs/guide.md',
-        });
+        }, 'client-project');
         const template = normalizeTemplateItem({
             name: 'prd-template.md',
             displayName: 'PRD Template',
             path: 'content/templates/prd-template.md',
             absoluteFilePath: '/workspace/content/templates/prd-template.md',
-        });
+        }, 'client-project');
 
-        expect(doc.specUrl).toBe('/api/markdown-file?path=%2Fworkspace%2Fcontent%2Fdocs%2Fguide.md');
-        expect(doc.previewUrl).toBe('/spec-template.html?url=%2Fapi%2Fmarkdown-file%3Fpath%3D%252Fworkspace%252Fcontent%252Fdocs%252Fguide.md');
-        expect(template.specUrl).toBe('/api/markdown-file?path=%2Fworkspace%2Fcontent%2Ftemplates%2Fprd-template.md');
-        expect(template.previewUrl).toBe('/spec-template.html?url=%2Fapi%2Fmarkdown-file%3Fpath%3D%252Fworkspace%252Fcontent%252Ftemplates%252Fprd-template.md');
+        expect(doc.specUrl).toBe('/api/docs/content%2Fdocs%2Fguide.md?projectId=client-project');
+        expect(doc.previewUrl).toBe('/spec-template.html?url=%2Fapi%2Fdocs%2Fcontent%252Fdocs%252Fguide.md%3FprojectId%3Dclient-project');
+        expect(template.specUrl).toBe('/api/markdown-file?path=%2Fworkspace%2Fcontent%2Ftemplates%2Fprd-template.md&projectId=client-project');
+        expect(template.previewUrl).toBe('/spec-template.html?url=%2Fapi%2Fmarkdown-file%3Fpath%3D%252Fworkspace%252Fcontent%252Ftemplates%252Fprd-template.md%26projectId%3Dclient-project');
     });
 
     it('builds rendered markdown previews for metadata-only templates', () => {
         const template = normalizeTemplateItem({
             name: 'write-prd.md',
             displayName: 'Write PRD',
-        });
+        }, 'client-project');
 
         expect(template.name).toBe('write-prd.md');
-        expect(template.specUrl).toBe('/api/docs/templates/write-prd.md');
-        expect(template.previewUrl).toBe('/spec-template.html?url=%2Fapi%2Fdocs%2Ftemplates%2Fwrite-prd.md');
+        expect(template.specUrl).toBe('/api/docs/templates/write-prd.md?projectId=client-project');
+        expect(template.previewUrl).toBe('/spec-template.html?url=%2Fapi%2Fdocs%2Ftemplates%2Fwrite-prd.md%3FprojectId%3Dclient-project');
         expect(template.filePath).toBeUndefined();
         expect(template.absoluteFilePath).toBeUndefined();
     });
@@ -194,7 +275,7 @@ describe('index page helpers', () => {
         const template = normalizeTemplateItem({
             name: 'templates/prd-template.md',
             displayName: 'templates/prd-template',
-        });
+        }, 'client-project');
 
         expect(template.displayName).toBe('prd-template');
     });
@@ -203,14 +284,14 @@ describe('index page helpers', () => {
         const image = normalizeDocItem({
             name: 'assets/logo.png',
             displayName: 'assets/logo',
-            path: 'content/docs/assets/logo.png',
+            path: 'assets/logo.png',
             absoluteFilePath: '/workspace/content/docs/assets/logo.png',
-        });
+        }, 'client-project');
 
         expect(image.name).toBe('assets/logo.png');
         expect(image.displayName).toBe('logo');
-        expect(image.specUrl).toBe('/api/markdown-file?path=%2Fworkspace%2Fcontent%2Fdocs%2Fassets%2Flogo.png');
-        expect(image.previewUrl).toBe('/api/markdown-file?path=%2Fworkspace%2Fcontent%2Fdocs%2Fassets%2Flogo.png');
+        expect(image.specUrl).toBe('/api/docs/assets%2Flogo.png?projectId=client-project');
+        expect(image.previewUrl).toBe('/api/docs/assets%2Flogo.png?projectId=client-project');
     });
 
     it('uses project-scoped docs file URLs for pasted image resources from the docs list', () => {

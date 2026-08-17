@@ -22,7 +22,7 @@ function parseArgs(argv) {
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.manifest) {
-    console.error('Usage: node scripts/audit-assets.mjs --manifest src/prototypes/<slug>/assets/asset-manifest.json');
+    console.error('Usage: node scripts/audit-assets.mjs --manifest .local/screenshot-to-prototype/<slug>/candidate-manifest.json');
     process.exit(1);
   }
 

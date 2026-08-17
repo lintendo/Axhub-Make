@@ -209,6 +209,7 @@ export function resolvePrototypeAutoSelectionDecision({
 }
 
 interface UseIndexPageSelectionSyncParams {
+    projectId: string | null;
     loading: boolean;
     data: DataType;
     docsItems: ItemData[];
@@ -244,6 +245,7 @@ interface UseIndexPageSelectionSyncParams {
 }
 
 export function useIndexPageSelectionSync({
+    projectId,
     loading,
     data,
     docsItems,
@@ -449,7 +451,7 @@ export function useIndexPageSelectionSync({
             const resolvedDeepLink = resolveIndexDeepLinkSelection(initialResourceDeepLink, {
                 prototypes: data.prototypes,
                 docs: docsItems,
-                templates: templateAssets.map((template) => normalizeTemplateItem(template)),
+                templates: templateAssets.map((template) => normalizeTemplateItem(template, projectId)),
                 themes,
             });
             if (resolvedDeepLink?.kind === 'template') {
@@ -481,7 +483,7 @@ export function useIndexPageSelectionSync({
             const resolvedDeepLink = resolveIndexDeepLinkSelection(initialResourceDeepLink, {
                 prototypes: data.prototypes,
                 docs: docsItems,
-                templates: templateAssets.map((template) => normalizeTemplateItem(template)),
+                templates: templateAssets.map((template) => normalizeTemplateItem(template, projectId)),
                 themes,
             });
             if (resolvedDeepLink?.kind === 'theme') {
@@ -512,6 +514,7 @@ export function useIndexPageSelectionSync({
             }
         }
     }, [
+        projectId,
         data.prototypes,
         docsItems,
         initialResourceDeepLink,

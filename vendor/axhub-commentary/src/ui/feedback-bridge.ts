@@ -4,9 +4,11 @@ export interface WebEditorFeedbackBridge {
     content?: string;
     okText: string;
     cancelText?: string;
+    secondaryText?: string;
     okType?: 'primary' | 'default';
     getContainer: () => HTMLElement;
     onOk: () => void;
+    onSecondary?: () => void;
     onCancel: () => void;
   }) => void;
   alert: (options: {

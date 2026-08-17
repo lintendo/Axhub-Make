@@ -99,7 +99,7 @@ Expected: both Vite admin builds complete successfully with exit code 0.
 Start the admin UI:
 
 ```bash
-pnpm admin:dev --host 127.0.0.1
+pnpm server:dev -- --host 127.0.0.1 --no-open
 ```
 
 Use a prototype that supports annotation and verify this sequence:

@@ -1,0 +1,326 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 13,
+  "pageId": "mzc71b",
+  "pageName": "疫苗接种",
+  "sitemapPath": "首页 / 疫苗接种",
+  "requestedPath": "疫苗接种.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.59.01/%E7%96%AB%E8%8B%97%E6%8E%A5%E7%A7%8D.html",
+  "dataUrl": "http://127.0.0.1:32768/20.59.01/files/%E7%96%AB%E8%8B%97%E6%8E%A5%E7%A7%8D/data.js",
+  "generationDate": "2026-08-14T12:59:01.702Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 接种列表\n- paragraph: 卡介苗\n- paragraph: 预防结合病\n- paragraph: 第一次\n- paragraph: + 标记接种\n- paragraph: 1月龄\n- paragraph: 卡介苗\n- paragraph: 预防结合病\n- paragraph: 第一次\n- paragraph: + 标记接种\n- paragraph: 卡介苗\n- paragraph: 预防结合病\n- paragraph: 第一次\n- paragraph: + 标记接种\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":\n- paragraph: 卡介苗\n- paragraph: 预防结合病\n- paragraph: 第一次\n- paragraph: + 标记接种\n- paragraph: 5月龄\n- paragraph: 卡介苗\n- paragraph: 预防结合病\n- paragraph: 第一次\n- paragraph: + 标记接种\n- paragraph: 卡介苗\n- paragraph: 预防结合病\n- paragraph: 第一次\n- paragraph: + 标记接种\n- paragraph: 卡介苗\n- paragraph: 预防结合病\n- paragraph: 第一次\n- paragraph: + 标记接种\n- paragraph: 11月龄",
+  "screenshot": "013-vaccination-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "导航",
+    "数据",
+    "按钮",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [],
+  "panels": [
+    {
+      "scope": "page:疫苗接种 / Group / 按钮",
+      "label": "按钮",
+      "visible": true,
+      "states": [
+        "State1",
+        "State2"
+      ]
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 按钮",
+      "label": "按钮",
+      "visible": true,
+      "states": [
+        "State1",
+        "State2"
+      ]
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 按钮",
+      "label": "按钮",
+      "visible": true,
+      "states": [
+        "State1",
+        "State2"
+      ]
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 按钮",
+      "label": "按钮",
+      "visible": true,
+      "states": [
+        "State1",
+        "State2"
+      ]
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 按钮",
+      "label": "按钮",
+      "visible": true,
+      "states": [
+        "State1",
+        "State2"
+      ]
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 按钮",
+      "label": "按钮",
+      "visible": true,
+      "states": [
+        "State1",
+        "State2"
+      ]
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 按钮",
+      "label": "按钮",
+      "visible": true,
+      "states": [
+        "State1",
+        "State2"
+      ]
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:疫苗接种 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 数据",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 接种详情 in Current window",
+      "target": "接种详情.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 按钮",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set 按钮 to&nbsp; to Next wrap ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 数据",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 接种详情 in Current window",
+      "target": "接种详情.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 按钮",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set 按钮 to&nbsp; to Next wrap ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 数据",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 接种详情 in Current window",
+      "target": "接种详情.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 按钮",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set 按钮 to&nbsp; to Next wrap ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 数据",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 接种详情 in Current window",
+      "target": "接种详情.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 按钮",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set 按钮 to&nbsp; to Next wrap ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 数据",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 接种详情 in Current window",
+      "target": "接种详情.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 按钮",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set 按钮 to&nbsp; to Next wrap ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 数据",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 接种详情 in Current window",
+      "target": "接种详情.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 按钮",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set 按钮 to&nbsp; to Next wrap ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 数据",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 接种详情 in Current window",
+      "target": "接种详情.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:疫苗接种 / Group / 按钮",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "setPanelState",
+      "description": "Set 按钮 to&nbsp; to Next wrap ",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

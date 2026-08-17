@@ -1,0 +1,181 @@
+{
+  "sourceId": "src-001",
+  "pageIndex": 15,
+  "pageId": "ljc520",
+  "pageName": "宝宝日记",
+  "sitemapPath": "首页 / 宝宝日记",
+  "requestedPath": "宝宝日记.html",
+  "resolvedUrl": "http://127.0.0.1:32768/20.59.02/%E5%AE%9D%E5%AE%9D%E6%97%A5%E8%AE%B0.html",
+  "dataUrl": "http://127.0.0.1:32768/20.59.02/files/%E5%AE%9D%E5%AE%9D%E6%97%A5%E8%AE%B0/data.js",
+  "generationDate": "2026-08-14T12:59:02.509Z",
+  "defaultAdaptiveView": {
+    "name": "",
+    "cursor": 1,
+    "size": {
+      "width": 420,
+      "height": 0
+    }
+  },
+  "adaptiveViews": [],
+  "visibleSnapshot": "- paragraph: 宝宝日记\n- paragraph: 今天\n- paragraph: 第 210 天\n- paragraph: 今天是初一，带宝贝看电影《小猪佩奇过大年》，之后去迪卡侬，本来是要去给她买轮滑鞋的，但她过去尝试打球，踢球，之后去打乒乓，打羽毛球，我们都试了，我感觉费了好大劲教她，她都学不会。最后我们决定一\n- paragraph: 全文\n- paragraph: 3小时前\n- paragraph: 昨天\n- paragraph: 第 209 天\n- paragraph: 08：59\n- paragraph: 身高 55 cm\n- paragraph: 体重 15 kg\n- paragraph: 头围 30 cm\n- paragraph: 2019/05/12\n- paragraph: 第 152 天\n- paragraph: 13:15\n- paragraph: 宝宝第一次走路\n- paragraph: 宝宝终于迈出第一步啦！开心！！！\n- paragraph: 数据加载中\n- paragraph: 已陪伴宝宝 210 天\n- generic \"咨询作者\":\n- generic \"咨询作者\":\n- generic \"作品主页\":",
+  "screenshot": "015-baby-diary-default-desktop.png",
+  "notes": {},
+  "labels": [
+    "导航",
+    "宝宝信息",
+    "背景",
+    "home",
+    "qq卡片"
+  ],
+  "fields": [],
+  "panels": [
+    {
+      "scope": "page:宝宝日记 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel",
+      "label": "",
+      "visible": true,
+      "states": [
+        "State1"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "scope": "page:宝宝日记 / 导航 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open Back in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "page:宝宝日记 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 发布日记 in Current window",
+      "target": "发布日记.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:宝宝日记 / Shape",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 搜索 in Current window",
+      "target": "搜索.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:宝宝日记 / Dynamic panel / state:State1 / 宝宝信息 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 日记详情 in Current window",
+      "target": "日记详情.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:宝宝日记 / Dynamic panel / state:State1 / 宝宝信息 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 身高记录 in Current window",
+      "target": "身高记录.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "page:宝宝日记 / Dynamic panel / state:State1 / 宝宝信息 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open 日记详情 in Current window",
+      "target": "日记详情.html",
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://wpa.qq.com/msgrd?v=3&uin=3318424510&site=qq&menu=yes in Current window",
+      "target": null,
+      "linkType": "current"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "fadeWidget",
+      "description": "Show qq卡片slide left none 300ms Treat as flyout",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Click or tap",
+      "case": "",
+      "condition": "",
+      "action": "linkWindow",
+      "description": "Open http://daisyaxure.com/index.html in New window/tab",
+      "target": null,
+      "linkType": "new"
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse enter",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"true\"",
+      "target": null,
+      "linkType": null
+    },
+    {
+      "scope": "master:右侧操作 / Dynamic panel / state:State1 / Group / Group",
+      "event": "Mouse exit",
+      "case": "",
+      "condition": "",
+      "action": "setFunction",
+      "description": "Set is selected of This equal to \"false\"",
+      "target": null,
+      "linkType": null
+    }
+  ]
+}

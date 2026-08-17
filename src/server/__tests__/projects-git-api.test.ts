@@ -8,6 +8,7 @@ import {
   createTempRoot,
   initGitRepo,
   registerProject,
+  scopeProjectApiUrl,
   startTestServer,
   writeProjectMetadata,
 } from './projects-api.helpers';
@@ -50,7 +51,7 @@ describe('make-server project git APIs', () => {
 
     try {
       await registerProject(server.origin, projectRoot, 'non-git', 'Non Git');
-      const status = await fetch(`${server.origin}/api/git/status`);
+      const status = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/status`));
       const statusBody = await status.json();
       expect(status.status).toBe(200);
       expect(statusBody).toMatchObject({
@@ -59,7 +60,7 @@ describe('make-server project git APIs', () => {
         projectId: 'non-git',
       });
 
-      const history = await fetch(`${server.origin}/api/git/history?path=${encodeURIComponent('../outside')}`);
+      const history = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/history?path=${encodeURIComponent('../outside')}`));
       const historyBody = await history.json();
       expect(history.status).toBe(403);
       expect(historyBody).toMatchObject({
@@ -85,7 +86,7 @@ describe('make-server project git APIs', () => {
 
     try {
       await registerProject(server.origin, projectRoot, 'git-client', 'Git Client');
-      const status = await fetch(`${server.origin}/api/git/status`).then((response) => response.json());
+      const status = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/status`)).then((response) => response.json());
       expect(status).toMatchObject({
         available: true,
         isGitRepo: true,
@@ -93,7 +94,7 @@ describe('make-server project git APIs', () => {
         projectId: 'git-client',
       });
 
-      const history = await fetch(`${server.origin}/api/git/history?path=${encodeURIComponent('prototypes/home')}`)
+      const history = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/history?path=${encodeURIComponent('prototypes/home')}`))
         .then((response) => response.json());
       expect(history).toMatchObject({
         historyReady: true,
@@ -108,12 +109,12 @@ describe('make-server project git APIs', () => {
       const versionEntryUrl = `${server.origin}/api/git/version-file/${historyVersionId}/prototypes/home/index.tsx?projectId=git-client`;
       expect((await fetch(versionEntryUrl)).status).toBe(404);
 
-      const diff = await fetch(`${server.origin}/api/git/diff?path=${encodeURIComponent('prototypes/home')}`)
+      const diff = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/diff?path=${encodeURIComponent('prototypes/home')}`))
         .then((response) => response.json());
       expect(diff.diff).toContain('changed');
       expect(diff.projectId).toBe('git-client');
 
-      const version = await fetch(`${server.origin}/api/git/build-version`, {
+      const version = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/build-version`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: 'prototypes/home', commitHash: history.commits[0].hash }),
@@ -133,7 +134,7 @@ describe('make-server project git APIs', () => {
       expect(version.body.prototypeUrl).not.toContain('/index.tsx');
       expect((await fetch(versionEntryUrl)).status).toBe(200);
 
-      const missingMessage = await fetch(`${server.origin}/api/git/commit`, {
+      const missingMessage = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/commit`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: 'prototypes/home' }),
@@ -143,7 +144,7 @@ describe('make-server project git APIs', () => {
         body: { error: 'Missing message parameter' },
       });
 
-      const committed = await fetch(`${server.origin}/api/git/commit`, {
+      const committed = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/commit`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: 'prototypes/home', message: 'update home prototype' }),
@@ -158,7 +159,7 @@ describe('make-server project git APIs', () => {
 
       const updatedContent = 'export default function Home() { return "after commit"; }\n';
       fs.writeFileSync(path.join(prototypeDir, 'index.tsx'), updatedContent, 'utf8');
-      const missingCommitHash = await fetch(`${server.origin}/api/git/restore`, {
+      const missingCommitHash = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/restore`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: 'prototypes/home' }),
@@ -168,7 +169,7 @@ describe('make-server project git APIs', () => {
         body: { error: 'Missing commitHash parameter' },
       });
 
-      const restore = await fetch(`${server.origin}/api/git/restore`, {
+      const restore = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/restore`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: 'prototypes/home', commitHash: history.commits[0].hash }),
@@ -204,7 +205,7 @@ describe('make-server project git APIs', () => {
 
     try {
       await registerProject(server.origin, projectRoot, 'git-history-prototype-presence', 'Git History Prototype Presence');
-      const history = await fetch(`${server.origin}/api/git/history?path=${encodeURIComponent('prototypes/home')}`)
+      const history = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/history?path=${encodeURIComponent('prototypes/home')}`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(history.status).toBe(200);
@@ -251,7 +252,7 @@ describe('make-server project git APIs', () => {
 
     try {
       await registerProject(server.origin, projectRoot, 'metadata-git-client', 'Metadata Git Client');
-      const prototypeDiff = await fetch(`${server.origin}/api/git/diff?path=${encodeURIComponent('prototypes/home')}`)
+      const prototypeDiff = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/diff?path=${encodeURIComponent('prototypes/home')}`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(prototypeDiff.status).toBe(200);
       expect(prototypeDiff.body.diff).toContain('metadata path');
@@ -259,7 +260,7 @@ describe('make-server project git APIs', () => {
         expect.objectContaining({ file: 'custom/screens/home/index.tsx' }),
       ]);
 
-      const docDiff = await fetch(`${server.origin}/api/git/diff?path=${encodeURIComponent('src/resources/spec.md')}`)
+      const docDiff = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/diff?path=${encodeURIComponent('src/resources/spec.md')}`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(docDiff.status).toBe(200);
       expect(docDiff.body.diff).toContain('Spec v2');
@@ -303,9 +304,9 @@ describe('make-server project git APIs', () => {
 
     try {
       await registerProject(server.origin, projectRoot, 'git-version-preview-deps', 'Git Version Preview Deps');
-      const history = await fetch(`${server.origin}/api/git/history?path=${encodeURIComponent('prototypes/home')}`)
+      const history = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/history?path=${encodeURIComponent('prototypes/home')}`))
         .then((response) => response.json());
-      const version = await fetch(`${server.origin}/api/git/build-version`, {
+      const version = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/build-version`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: 'prototypes/home', commitHash: history.commits[0].hash }),
@@ -346,9 +347,9 @@ describe('make-server project git APIs', () => {
 
     try {
       await registerProject(server.origin, projectRoot, 'git-version-preview-unicode', 'Git Version Preview Unicode');
-      const history = await fetch(`${server.origin}/api/git/history?path=${encodeURIComponent('prototypes/未命名')}`)
+      const history = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/history?path=${encodeURIComponent('prototypes/未命名')}`))
         .then((response) => response.json());
-      const version = await fetch(`${server.origin}/api/git/build-version`, {
+      const version = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/build-version`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: 'prototypes/未命名', commitHash: history.commits[0].hash }),
@@ -362,7 +363,7 @@ describe('make-server project git APIs', () => {
       });
       expect(version.body.prototypeUrl).toBe(`/prototypes/${encodeURIComponent('未命名')}?projectId=git-version-preview-unicode&gitVersion=${version.body.versionId}&gitPath=src%2Fprototypes%2F%E6%9C%AA%E5%91%BD%E5%90%8D`);
       expect(fs.existsSync(path.join(projectRoot, '.git-versions', version.body.versionId, 'src', 'prototypes', '未命名', 'index.tsx'))).toBe(true);
-      const versionEntry = await fetch(`${server.origin}/api/git/version-file/${version.body.versionId}/prototypes/${encodeURIComponent('未命名')}/index.tsx?projectId=git-version-preview-unicode`);
+      const versionEntry = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/version-file/${version.body.versionId}/prototypes/${encodeURIComponent('未命名')}/index.tsx?projectId=git-version-preview-unicode`));
       expect(versionEntry.status).toBe(200);
     } finally {
       await server.close();
@@ -415,7 +416,7 @@ describe('make-server project git APIs', () => {
 
     try {
       await registerProject(server.origin, projectRoot, 'git-version-preview-error', 'Git Version Preview Error');
-      const response = await fetch(`${server.origin}/api/git/build-version`, {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/build-version`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: 'prototypes/home', commitHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }),
@@ -430,7 +431,7 @@ describe('make-server project git APIs', () => {
     }
   }, GIT_INTEGRATION_TIMEOUT_MS);
 
-  it('reports workspace git status with user-friendly change groups and prompt fallbacks', async () => {
+  it('reports workspace git status with user-friendly change groups', async () => {
     const projectRoot = createTempRoot('axhub-workspace-git-status-');
     const prototypeDir = path.join(projectRoot, 'src', 'prototypes', 'home');
     const themeDir = path.join(projectRoot, 'design-systems', 'brand');
@@ -486,7 +487,7 @@ describe('make-server project git APIs', () => {
 
     try {
       await registerProject(server.origin, projectRoot, 'workspace-git-client', 'Workspace Git Client');
-      const status = await fetch(`${server.origin}/api/git/workspace/status`)
+      const status = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/status`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(status.status).toBe(200);
@@ -532,17 +533,13 @@ describe('make-server project git APIs', () => {
         expect.objectContaining({ name: 'canvas.excalidraw' }),
       ]));
 
-      const prompt = await fetch(`${server.origin}/api/git/workspace/prompt`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scene: 'branch-management' }),
-      }).then(async (response) => ({ status: response.status, body: await response.json() }));
-
-      expect(prompt.status).toBe(200);
-      expect(prompt.body.prompt).toContain('当前分支');
-      expect(prompt.body.prompt).not.toContain('工作线');
-      expect(prompt.body.prompt).toContain('序号或名称');
-      expect(prompt.body.prompt).toContain('切换、合并或删除');
+      const missingBranch = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/status?branch=missing`))
+        .then(async (response) => ({ status: response.status, body: await response.json() }));
+      expect(missingBranch).toMatchObject({
+        status: 404,
+        body: { code: 'BRANCH_NOT_FOUND' },
+      });
+      expect(missingBranch.body).not.toHaveProperty('prompt');
     } finally {
       await server.close();
     }
@@ -581,7 +578,7 @@ describe('make-server project git APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'workspace-version-details', 'Workspace Version Details');
 
-      const currentStatus = await fetch(`${server.origin}/api/git/workspace/status`)
+      const currentStatus = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/status`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(currentStatus.status).toBe(200);
       expect(currentStatus.body).toMatchObject({
@@ -606,9 +603,10 @@ describe('make-server project git APIs', () => {
         }),
       ]);
 
-      const historicalStatus = await fetch(`${server.origin}/api/git/workspace/status?gitVersion=${currentStatus.body.currentCommit.shortHash}`)
+      const historicalStatus = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/status?gitVersion=${currentStatus.body.currentCommit.shortHash}&branch=missing`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(historicalStatus.status).toBe(200);
+      expect(historicalStatus.body).not.toHaveProperty('branchView');
       expect(historicalStatus.body).toMatchObject({
         isHistoricalVersion: true,
         hasChanges: true,
@@ -658,7 +656,7 @@ describe('make-server project git APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'workspace-detect-origin', 'Workspace Detect Origin');
 
-      const status = await fetch(`${server.origin}/api/git/workspace/status`)
+      const status = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/status`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(status.status).toBe(200);
@@ -712,7 +710,7 @@ describe('make-server project git APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'workspace-scoped-status', 'Workspace Scoped Status');
 
-      const status = await fetch(`${server.origin}/api/git/workspace/status?path=${encodeURIComponent('prototypes/home')}`)
+      const status = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/status?path=${encodeURIComponent('prototypes/home')}`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(status.status).toBe(200);
@@ -777,16 +775,16 @@ describe('make-server project git APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'workspace-scoped-commit', 'Workspace Scoped Commit');
 
-      const committed = await fetch(`${server.origin}/api/git/workspace/commit`, {
+      const committed = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/commit`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: 'prototypes/home', message: '更新首页原型' }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(committed.status).toBe(200);
-      const homeStatus = await fetch(`${server.origin}/api/git/workspace/status?path=${encodeURIComponent('prototypes/home')}`)
+      const homeStatus = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/status?path=${encodeURIComponent('prototypes/home')}`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
-      const aboutStatus = await fetch(`${server.origin}/api/git/workspace/status?path=${encodeURIComponent('prototypes/about')}`)
+      const aboutStatus = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/status?path=${encodeURIComponent('prototypes/about')}`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(homeStatus.body).toMatchObject({
         hasChanges: false,
@@ -844,12 +842,15 @@ describe('make-server project git APIs', () => {
       if (args.join(' ') === 'branch --format=%(refname:short)') return { stdout: 'feature', stderr: '' };
       if (args.join(' ') === 'branch -r --format=%(refname:short)') return { stdout: 'origin/main\norigin/feature', stderr: '' };
       if (args.join(' ') === 'rev-parse --verify origin/main') return { stdout: 'origin/main', stderr: '' };
+      if (args.join(' ') === 'rev-parse --verify origin/feature') return { stdout: 'origin/feature', stderr: '' };
       if (args.join(' ') === 'diff --name-status HEAD..origin/main') {
         return { stdout: 'M\tsrc/prototypes/home/index.tsx\nA\tclient/src/prototypes/home/canvas.excalidraw', stderr: '' };
       }
       if (args.join(' ') === 'diff --name-status origin/main..HEAD') {
         return { stdout: 'M\tskills/writer/SKILL.md\nM\tpackage.json', stderr: '' };
       }
+      if (args.join(' ') === 'diff --name-status feature..origin/feature') return { stdout: '', stderr: '' };
+      if (args.join(' ') === 'diff --name-status origin/feature..feature') return { stdout: '', stderr: '' };
       if (args[0] === 'log' && args[1] === '-1' && args[2]?.startsWith('--pretty=format:')) {
         const ref = args[3] || '';
         if (ref === 'HEAD') {
@@ -883,7 +884,7 @@ describe('make-server project git APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'workspace-remote-comparison', 'Workspace Remote Comparison');
 
-      const status = await fetch(`${server.origin}/api/git/workspace/status`)
+      const status = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/status`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(status.status).toBe(200);
@@ -949,6 +950,113 @@ describe('make-server project git APIs', () => {
     }
   }, GIT_INTEGRATION_TIMEOUT_MS);
 
+  it('uses explicit refs for branch views and never executes branch mutations', async () => {
+    const projectRoot = createTempRoot('axhub-workspace-git-explicit-branch-view-');
+    writeProjectMetadata(projectRoot, {
+      project: { id: 'workspace-explicit-branch-view', name: 'Workspace Explicit Branch View' },
+    });
+    fs.writeFileSync(path.join(projectRoot, 'README.md'), '# Main\n', 'utf8');
+    await initGitRepo(projectRoot);
+
+    const { execFile } = await import('node:child_process');
+    const run = (command: string, args: string[], cwd: string) => new Promise<{ stdout: string; stderr: string }>(
+      (resolve, reject) => {
+        execFile(command, args, { cwd }, (error, stdout, stderr) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve({ stdout: String(stdout), stderr: String(stderr) });
+        });
+      },
+    );
+    const runGit = async (args: string[]) => (await run('git', args, projectRoot)).stdout.trim();
+
+    const workspaceBranch = await runGit(['branch', '--show-current']);
+    const workspaceHead = await runGit(['rev-parse', 'HEAD']);
+    await runGit(['switch', '-c', 'feature']);
+    fs.writeFileSync(path.join(projectRoot, 'README.md'), '# Feature\n', 'utf8');
+    await commitAll(projectRoot, 'feature version');
+    const featureHead = await runGit(['rev-parse', 'HEAD']);
+    await runGit(['switch', workspaceBranch]);
+    await runGit(['update-ref', `refs/remotes/origin/${workspaceBranch}`, workspaceHead]);
+    await runGit(['update-ref', 'refs/remotes/origin/feature', featureHead]);
+    fs.writeFileSync(path.join(projectRoot, 'scratch.txt'), 'dirty\n', 'utf8');
+    fs.mkdirSync(path.join(projectRoot, '.axhub', 'make'), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, '.axhub', 'make', 'axhub.config.json'), JSON.stringify({
+      versionCollaboration: {
+        remote: {
+          url: 'https://example.com/team/branch-view.git',
+          defaultBranch: workspaceBranch,
+        },
+      },
+    }), 'utf8');
+
+    const commandExecutor = vi.fn((command: string, args: string[], options: { cwd: string }) => (
+      run(command, args, options.cwd).then((result) => ({
+        stdout: result.stdout.trimEnd(),
+        stderr: result.stderr.trimEnd(),
+      }))
+    ));
+    const server = await startTestServer(
+      projectRoot,
+      createTempRoot('axhub-workspace-git-explicit-branch-view-home-'),
+      { gitWorkspaceCommandExecutor: commandExecutor },
+    );
+
+    try {
+      await registerProject(
+        server.origin,
+        projectRoot,
+        'workspace-explicit-branch-view',
+        'Workspace Explicit Branch View',
+      );
+      const status = await fetch(
+        scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/status?branch=feature&remoteBranch=feature`),
+      ).then(async (response) => ({ status: response.status, body: await response.json() }));
+
+      expect(status.status).toBe(200);
+      expect(status.body).toMatchObject({
+        currentBranch: workspaceBranch,
+        hasChanges: true,
+        branchView: {
+          branch: 'feature',
+          remoteBranch: 'feature',
+          commit: { hash: featureHead },
+        },
+      });
+      expect(commandExecutor).toHaveBeenCalledWith(
+        'git',
+        ['diff', '--name-status', 'feature..origin/feature'],
+        { cwd: projectRoot },
+      );
+      expect(commandExecutor).toHaveBeenCalledWith(
+        'git',
+        ['diff', '--name-status', 'origin/feature..feature'],
+        { cwd: projectRoot },
+      );
+
+      const forbidden = new Set(['switch', 'checkout', 'merge', 'rebase', 'reset', 'stash']);
+      for (const [, args] of commandExecutor.mock.calls) {
+        expect(forbidden.has(args[0])).toBe(false);
+        expect(args.slice(0, 2)).not.toEqual(['branch', '-f']);
+      }
+
+      commandExecutor.mockClear();
+      const missingRemote = await fetch(
+        scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/status?branch=feature&remoteBranch=missing`),
+      ).then(async (response) => ({ status: response.status, body: await response.json() }));
+      expect(missingRemote.status).toBe(200);
+      expect(missingRemote.body.branchView.remoteComparison).toMatchObject({
+        available: false,
+        reason: 'remote-branch-missing',
+      });
+      expect(commandExecutor.mock.calls.some(([, args]) => args.some((arg) => arg.includes('origin/missing')))).toBe(false);
+    } finally {
+      await server.close();
+    }
+  }, GIT_INTEGRATION_TIMEOUT_MS);
+
   it('filters online differences to a prototype path when requested', async () => {
     const projectRoot = createTempRoot('axhub-workspace-git-scoped-remote-comparison-');
     writeProjectMetadata(projectRoot, {
@@ -997,12 +1105,15 @@ describe('make-server project git APIs', () => {
       if (args.join(' ') === 'branch --format=%(refname:short)') return { stdout: 'feature', stderr: '' };
       if (args.join(' ') === 'branch -r --format=%(refname:short)') return { stdout: 'origin/main\norigin/feature', stderr: '' };
       if (args.join(' ') === 'rev-parse --verify origin/main') return { stdout: 'origin/main', stderr: '' };
+      if (args.join(' ') === 'rev-parse --verify origin/feature') return { stdout: 'origin/feature', stderr: '' };
       if (args.join(' ') === 'diff --name-status HEAD..origin/main') {
         return { stdout: 'M\tsrc/prototypes/home/index.tsx\nM\tsrc/prototypes/about/index.tsx', stderr: '' };
       }
       if (args.join(' ') === 'diff --name-status origin/main..HEAD') {
         return { stdout: 'M\tsrc/prototypes/home/style.css\nM\tsrc/prototypes/about/style.css', stderr: '' };
       }
+      if (args.join(' ') === 'diff --name-status feature..origin/feature') return { stdout: '', stderr: '' };
+      if (args.join(' ') === 'diff --name-status origin/feature..feature') return { stdout: '', stderr: '' };
       if (args[0] === 'log') {
         return { stdout: '1111111111111111111111111111111111111111|Test User|test@example.com|1700000000|initial', stderr: '' };
       }
@@ -1015,7 +1126,7 @@ describe('make-server project git APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'workspace-scoped-remote-comparison', 'Workspace Scoped Remote Comparison');
 
-      const status = await fetch(`${server.origin}/api/git/workspace/status?path=${encodeURIComponent('prototypes/home')}`)
+      const status = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/status?path=${encodeURIComponent('prototypes/home')}`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(status.status).toBe(200);
@@ -1086,7 +1197,7 @@ describe('make-server project git APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'workspace-missing-remote-branch', 'Workspace Missing Remote Branch');
 
-      const status = await fetch(`${server.origin}/api/git/workspace/status`)
+      const status = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/status`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(status.status).toBe(200);
@@ -1124,7 +1235,7 @@ describe('make-server project git APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'workspace-actions', 'Workspace Actions');
 
-      const init = await fetch(`${server.origin}/api/git/workspace/init`, {
+      const init = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/init`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -1133,7 +1244,7 @@ describe('make-server project git APIs', () => {
       expect(init.body).toMatchObject({ success: true, initialized: true });
 
       fs.writeFileSync(path.join(projectRoot, 'src', 'prototypes', 'home', 'index.tsx'), 'export default function Home() { return "v2"; }\n', 'utf8');
-      const committed = await fetch(`${server.origin}/api/git/workspace/commit`, {
+      const committed = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/commit`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: '更新首页原型' }),
@@ -1141,7 +1252,7 @@ describe('make-server project git APIs', () => {
       expect(committed.status).toBe(200);
       expect(committed.body).toMatchObject({ success: true });
 
-      const remote = await fetch(`${server.origin}/api/git/workspace/remote`, {
+      const remote = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/remote`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: 'https://example.com/team/workspace-actions.git', defaultBranch: 'main' }),
@@ -1163,7 +1274,7 @@ describe('make-server project git APIs', () => {
       });
 
       fs.writeFileSync(path.join(projectRoot, 'scratch.txt'), 'dirty\n', 'utf8');
-      const syncDown = await fetch(`${server.origin}/api/git/workspace/sync-down`, {
+      const syncDown = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/sync-down`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -1179,45 +1290,60 @@ describe('make-server project git APIs', () => {
     }
   }, GIT_INTEGRATION_TIMEOUT_MS);
 
-  it('switches existing workspace branches without exposing merge operations', async () => {
-    const projectRoot = createTempRoot('axhub-workspace-git-branch-switch-');
+  it('reads another branch without switching HEAD or rejecting a dirty worktree', async () => {
+    const projectRoot = createTempRoot('axhub-workspace-git-branch-view-');
     writeProjectMetadata(projectRoot, {
-      project: { id: 'workspace-branch-switch', name: 'Workspace Branch Switch' },
+      project: { id: 'workspace-branch-view', name: 'Workspace Branch View' },
     });
-    fs.writeFileSync(path.join(projectRoot, 'README.md'), '# Branch\n', 'utf8');
+    fs.writeFileSync(path.join(projectRoot, 'README.md'), '# Main\n', 'utf8');
     await initGitRepo(projectRoot);
-    const commandExecutor = vi.fn(async (command: string, args: string[], options: { cwd: string }) => {
-      if (command !== 'git') throw new Error(command);
-      if (args.join(' ') === '--version') return { stdout: 'git version 2.44.0', stderr: '' };
-      if (args.join(' ') === 'rev-parse --is-inside-work-tree') return { stdout: 'true', stderr: '' };
-      if (args.join(' ') === 'rev-parse --verify HEAD') return { stdout: 'HEAD', stderr: '' };
-      if (args.join(' ') === 'branch --show-current') return { stdout: 'main', stderr: '' };
-      if (args.join(' ') === 'branch --format=%(refname:short)') return { stdout: 'main\nfeature', stderr: '' };
-      if (args.join(' ') === 'branch -r --format=%(refname:short)') return { stdout: '', stderr: '' };
-      if (args.join(' ') === 'status --porcelain -uall') return { stdout: '', stderr: '' };
-      if (args.join(' ') === 'switch feature') return { stdout: 'Switched to branch feature', stderr: '' };
-      throw new Error(`${command} ${args.join(' ')} in ${options.cwd}`);
+
+    const { execFile } = await import('node:child_process');
+    const runGit = (args: string[]) => new Promise<string>((resolve, reject) => {
+      execFile('git', args, { cwd: projectRoot }, (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(String(stderr || stdout || error.message)));
+          return;
+        }
+        resolve(String(stdout).trim());
+      });
     });
-    const server = await startTestServer(projectRoot, createTempRoot('axhub-workspace-git-branch-switch-home-'), {
-      gitWorkspaceCommandExecutor: commandExecutor,
-    });
+
+    const workspaceBranch = await runGit(['branch', '--show-current']);
+    await runGit(['switch', '-c', 'feature']);
+    fs.writeFileSync(path.join(projectRoot, 'README.md'), '# Feature\n', 'utf8');
+    await commitAll(projectRoot, 'feature version');
+    const featureHead = await runGit(['rev-parse', 'HEAD']);
+    await runGit(['switch', workspaceBranch]);
+    fs.writeFileSync(path.join(projectRoot, 'scratch.txt'), 'dirty\n', 'utf8');
+
+    const server = await startTestServer(projectRoot);
 
     try {
-      await registerProject(server.origin, projectRoot, 'workspace-branch-switch', 'Workspace Branch Switch');
+      await registerProject(server.origin, projectRoot, 'workspace-branch-view', 'Workspace Branch View');
 
-      const switched = await fetch(`${server.origin}/api/git/workspace/branch`, {
+      const status = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/status?branch=feature`))
+        .then(async (response) => ({ status: response.status, body: await response.json() }));
+
+      expect(status.status).toBe(200);
+      expect(status.body).toMatchObject({
+        currentBranch: workspaceBranch,
+        hasChanges: true,
+        branchView: {
+          branch: 'feature',
+          commit: { hash: featureHead, message: 'feature version' },
+          recentCommits: expect.arrayContaining([expect.objectContaining({ hash: featureHead })]),
+        },
+      });
+      expect(await runGit(['branch', '--show-current'])).toBe(workspaceBranch);
+      expect(await runGit(['status', '--porcelain'])).toContain('scratch.txt');
+
+      const removedSwitchRoute = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/branch`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ branch: 'feature' }),
-      }).then(async (response) => ({ status: response.status, body: await response.json() }));
-
-      expect(switched.status).toBe(200);
-      expect(switched.body).toMatchObject({
-        success: true,
-        currentBranch: 'feature',
       });
-      expect(commandExecutor).toHaveBeenCalledWith('git', ['switch', 'feature'], { cwd: projectRoot });
-      expect(commandExecutor).not.toHaveBeenCalledWith('git', expect.arrayContaining(['merge']), expect.anything());
+      expect(removedSwitchRoute.status).toBe(404);
     } finally {
       await server.close();
     }
@@ -1255,7 +1381,7 @@ describe('make-server project git APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'workspace-create-remote', 'Workspace Create Remote');
 
-      const created = await fetch(`${server.origin}/api/git/workspace/create-remote-repository`, {
+      const created = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/create-remote-repository`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: 'https://github.com/acme/workspace-create-remote.git', visibility: 'private' }),
@@ -1271,7 +1397,7 @@ describe('make-server project git APIs', () => {
         args: ['repo', 'create', 'acme/workspace-create-remote', '--private', '--source=.', '--remote=origin', '--confirm'],
       });
 
-      const createdByName = await fetch(`${server.origin}/api/git/workspace/create-remote-repository`, {
+      const createdByName = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/create-remote-repository`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repositoryName: 'workspace-create-remote-name', visibility: 'public' }),
@@ -1286,7 +1412,7 @@ describe('make-server project git APIs', () => {
         args: ['repo', 'create', 'workspace-create-remote-name', '--public', '--source=.', '--remote=origin', '--confirm'],
       });
 
-      const fallback = await fetch(`${server.origin}/api/git/workspace/create-remote-repository`, {
+      const fallback = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/create-remote-repository`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: 'ssh://git.example.internal/team/workspace-create-remote.git' }),
@@ -1336,7 +1462,7 @@ describe('make-server project git APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'workspace-persist-created-remote', 'Workspace Persist Created Remote');
 
-      const created = await fetch(`${server.origin}/api/git/workspace/create-remote-repository`, {
+      const created = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/git/workspace/create-remote-repository`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repositoryName: 'acme/workspace-created', visibility: 'private' }),

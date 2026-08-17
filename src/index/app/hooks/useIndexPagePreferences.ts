@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { apiService } from '../../services/index.api';
+import { requireProjectScope } from '../../services/projectScope';
 import { normalizePromptClientPreference } from '@/common/promptExecution';
 import type { PromptClientPreference } from '../../types';
 import type { IDEAvailabilityMap, MainIDEPreference } from '../../../common/ide';
@@ -35,14 +36,18 @@ export interface UseIndexPagePreferencesParams {
 }
 
 export interface UseIndexPagePreferencesResult {
-    preferredPromptClient: PromptClientPreference;
+    conversationPromptClient: PromptClientPreference;
+    conversationModel: string | null;
     preferredIDE: MainIDEPreference;
     ideAvailability: IDEAvailabilityMap;
     agentAvailability: RuntimeAgentAvailability;
     assistantImageGenerationConfig: AssistantImageGenerationConfig | null;
     annotationPromptClient: PromptClientPreference;
     annotationModel: string | null;
+    canvasPromptClient: PromptClientPreference;
+    canvasModel: string | null;
     agentRunConcurrency: number;
+    autoClearCompletedComments: boolean;
     initialPreferencesLoaded: boolean;
     setPreferredIDE: (ide: MainIDEPreference) => void;
     handleSettingsSaved: () => void;
@@ -56,14 +61,18 @@ export function useIndexPagePreferences({
     onExcalidrawPropertyPanelModeLoaded,
     onExcalidrawPropertyPanelPositionLoaded,
 }: UseIndexPagePreferencesParams): UseIndexPagePreferencesResult {
-    const [preferredPromptClient, setPreferredPromptClient] = useState<PromptClientPreference>(null);
+    const [conversationPromptClient, setConversationPromptClient] = useState<PromptClientPreference>(null);
+    const [conversationModel, setConversationModel] = useState<string | null>(null);
     const [preferredIDE, setPreferredIDE] = useState<MainIDEPreference>(null);
     const [ideAvailability, setIDEAvailability] = useState<IDEAvailabilityMap>({});
     const [agentAvailability, setAgentAvailability] = useState<RuntimeAgentAvailability>(EMPTY_AGENT_AVAILABILITY);
     const [assistantImageGenerationConfig, setAssistantImageGenerationConfig] = useState<AssistantImageGenerationConfig | null>(null);
     const [annotationPromptClient, setAnnotationPromptClient] = useState<PromptClientPreference>(null);
     const [annotationModel, setAnnotationModel] = useState<string | null>(null);
+    const [canvasPromptClient, setCanvasPromptClient] = useState<PromptClientPreference>(null);
+    const [canvasModel, setCanvasModel] = useState<string | null>(null);
     const [agentRunConcurrency, setAgentRunConcurrency] = useState(5);
+    const [autoClearCompletedComments, setAutoClearCompletedComments] = useState(true);
     const [initialPreferencesLoaded, setInitialPreferencesLoaded] = useState(false);
 
     useEffect(() => {
@@ -71,17 +80,25 @@ export function useIndexPagePreferences({
             setInitialPreferencesLoaded(false);
             return undefined;
         }
+        if (!activeProjectId?.trim()) {
+            setInitialPreferencesLoaded(false);
+            return undefined;
+        }
 
         let canceled = false;
-        apiService.getBootstrapConfig({ projectId: activeProjectId })
+        apiService.getBootstrapConfig(requireProjectScope(activeProjectId))
             .then((config) => {
                 if (canceled) return;
-                setPreferredPromptClient(normalizePromptClientPreference(config?.automation?.defaultPromptClient));
+                setConversationPromptClient(normalizePromptClientPreference(config?.automation?.conversationPromptClient));
+                setConversationModel(config?.automation?.conversationModel || null);
                 setPreferredIDE(config?.automation?.defaultIDE || null);
                 setAssistantImageGenerationConfig(config?.ai?.imageGeneration || null);
                 setAnnotationPromptClient(normalizePromptClientPreference(config?.automation?.annotationPromptClient));
                 setAnnotationModel(config?.automation?.annotationModel || null);
+                setCanvasPromptClient(normalizePromptClientPreference(config?.automation?.canvasPromptClient));
+                setCanvasModel(config?.automation?.canvasModel || null);
                 setAgentRunConcurrency(sanitizeAgentRunConcurrency(config?.automation?.agentRunConcurrency));
+                setAutoClearCompletedComments(config?.automation?.autoClearCompletedComments !== false);
                 setInitialPreferencesLoaded(true);
                 setDefaultThemeName((config as any)?.projectDefaults?.defaultTheme || null);
                 onExcalidrawPropertyPanelModeLoaded?.(persistExcalidrawPropertyPanelModePreference(
@@ -93,12 +110,16 @@ export function useIndexPagePreferences({
             })
             .catch(() => {
                 if (!canceled) {
-                    setPreferredPromptClient(null);
+                    setConversationPromptClient(null);
+                    setConversationModel(null);
                     setPreferredIDE(null);
                     setAssistantImageGenerationConfig(null);
                     setAnnotationPromptClient(null);
                     setAnnotationModel(null);
+                    setCanvasPromptClient(null);
+                    setCanvasModel(null);
                     setAgentRunConcurrency(5);
+                    setAutoClearCompletedComments(true);
                     setInitialPreferencesLoaded(true);
                     setIDEAvailability({});
                     setAgentAvailability(EMPTY_AGENT_AVAILABILITY);
@@ -115,15 +136,22 @@ export function useIndexPagePreferences({
         if (!enabled) {
             return;
         }
+        if (!activeProjectId?.trim()) {
+            return;
+        }
 
-        apiService.getConfig({ projectId: activeProjectId })
+        apiService.getConfig(requireProjectScope(activeProjectId))
             .then((config) => {
-                setPreferredPromptClient(normalizePromptClientPreference(config?.automation?.defaultPromptClient));
+                setConversationPromptClient(normalizePromptClientPreference(config?.automation?.conversationPromptClient));
+                setConversationModel(config?.automation?.conversationModel || null);
                 setPreferredIDE(config?.automation?.defaultIDE || null);
                 setAssistantImageGenerationConfig(config?.ai?.imageGeneration || null);
                 setAnnotationPromptClient(normalizePromptClientPreference(config?.automation?.annotationPromptClient));
                 setAnnotationModel(config?.automation?.annotationModel || null);
+                setCanvasPromptClient(normalizePromptClientPreference(config?.automation?.canvasPromptClient));
+                setCanvasModel(config?.automation?.canvasModel || null);
                 setAgentRunConcurrency(sanitizeAgentRunConcurrency(config?.automation?.agentRunConcurrency));
+                setAutoClearCompletedComments(config?.automation?.autoClearCompletedComments !== false);
                 setIDEAvailability(config?.ideAvailability || {});
                 setAgentAvailability(config?.agentAvailability || EMPTY_AGENT_AVAILABILITY);
                 setDefaultThemeName((config as any)?.projectDefaults?.defaultTheme || null);
@@ -136,12 +164,16 @@ export function useIndexPagePreferences({
                 void Promise.resolve(onProjectConfigSaved?.()).catch(() => undefined);
             })
             .catch(() => {
-                setPreferredPromptClient(null);
+                setConversationPromptClient(null);
+                setConversationModel(null);
                 setPreferredIDE(null);
                 setAssistantImageGenerationConfig(null);
                 setAnnotationPromptClient(null);
                 setAnnotationModel(null);
+                setCanvasPromptClient(null);
+                setCanvasModel(null);
                 setAgentRunConcurrency(5);
+                setAutoClearCompletedComments(true);
                 setIDEAvailability({});
                 setAgentAvailability(EMPTY_AGENT_AVAILABILITY);
                 setDefaultThemeName(null);
@@ -149,14 +181,18 @@ export function useIndexPagePreferences({
     }, [activeProjectId, enabled, onExcalidrawPropertyPanelModeLoaded, onExcalidrawPropertyPanelPositionLoaded, onProjectConfigSaved, setDefaultThemeName]);
 
     return {
-        preferredPromptClient,
+        conversationPromptClient,
+        conversationModel,
         preferredIDE,
         ideAvailability,
         agentAvailability,
         assistantImageGenerationConfig,
         annotationPromptClient,
         annotationModel,
+        canvasPromptClient,
+        canvasModel,
         agentRunConcurrency,
+        autoClearCompletedComments,
         initialPreferencesLoaded,
         setPreferredIDE,
         handleSettingsSaved,

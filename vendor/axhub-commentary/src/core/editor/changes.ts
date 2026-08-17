@@ -1,14 +1,19 @@
-import type { ElementLocator, WebEditorElementKey } from '../../web-editor-types';
+import type {
+  ElementLocator,
+  PrototypeEditCommentStatus,
+  WebEditorElementKey,
+} from '../../web-editor-types';
 import { aggregateTransactionsByElement } from '../transaction-aggregator';
 import { createElementLocator, locateElement } from '../locator';
 import { generateFullElementLabel, generateStableElementKey } from '../element-key';
 import type { EditorChangesService, ExternalEditingElementTarget } from './contracts';
-import type {
-  EditChangeKind,
-  EditorRuntimeState,
-  ElementEditMeta,
-  MarkerAnchor,
-  PromptImageAttachment,
+import {
+  ensureElementEditCommentId,
+  type EditChangeKind,
+  type EditorRuntimeState,
+  type ElementEditMeta,
+  type MarkerAnchor,
+  type PromptImageAttachment,
 } from './state';
 import {
   createMarkerAnchor,
@@ -32,7 +37,19 @@ import {
   resolveAnnotationElementIdentity,
 } from './annotation-target';
 
-type ChangeMarkerTaskState = 'editing' | 'error';
+type ChangeMarkerTaskState = PrototypeEditCommentStatus;
+
+const CHANGE_MARKER_TASK_LABELS: Record<ChangeMarkerTaskState, string> = {
+  idle: '待处理',
+  editing: '进行中',
+  completed: '已完成',
+  error: '处理失败',
+};
+
+const CHANGE_MARKER_TASK_GLYPHS = {
+  completed: '✓',
+  error: '!',
+} as const;
 
 export function filterVisibleChangeMarkerMetas(
   metas: readonly ElementEditMeta[],
@@ -46,6 +63,10 @@ export function createChangesService(options: {
   state: EditorRuntimeState;
   scheduleCacheWrite: () => void;
   persistMarkerVisibility: (visible: boolean) => void;
+  getCommentTaskState?: (
+    elementKey: WebEditorElementKey,
+  ) => PrototypeEditCommentStatus | null;
+  onCommentEdited?: (elementKey: WebEditorElementKey) => void;
   onSelectMarkedElement?: (element: Element, anchor: MarkerAnchor) => void;
   onStatusChange?: () => void;
 }): EditorChangesService {
@@ -262,6 +283,7 @@ export function createChangesService(options: {
     }
 
     const created: ElementEditMeta = {
+      commentId: null,
       elementKey,
       locator,
       label,
@@ -469,12 +491,13 @@ export function createChangesService(options: {
   function buildMarkerDetailLines(meta: ElementEditMeta): string[] {
     const lines: string[] = [];
     const note = normalizeNote(meta.note).trim();
+    const userImageCount = meta.images.filter((image) => image.source !== 'target-screenshot').length;
     if (note) {
       lines.push(note);
     } else if ((meta.skillIds?.length ?? 0) > 0) {
       lines.push('已选择 AI 技能');
-    } else if (meta.images.length > 0) {
-      lines.push(`已附加 ${meta.images.length} 张参考图片`);
+    } else if (userImageCount > 0) {
+      lines.push(`已附加 ${userImageCount} 张参考图片`);
     } else if (meta.changeKinds.length > 0) {
       lines.push(`已修改：${meta.changeKinds.join(' / ')}`);
     } else {
@@ -505,10 +528,12 @@ export function createChangesService(options: {
       state.externalEditingTaskByElementKey.get(elementKey)
       ?? state.agentTaskByElementKey.get(elementKey)
       ?? null;
-    if (!task || task.dismissed) return null;
-    if (task.status === 'pending' || task.status === 'created') return 'editing';
-    if (task.status === 'error') return 'error';
-    return null;
+    if (task && !task.dismissed) {
+      if (task.status === 'pending' || task.status === 'created') return 'editing';
+      if (task.status === 'completed') return 'completed';
+      if (task.status === 'error') return 'error';
+    }
+    return options.getCommentTaskState?.(elementKey) ?? null;
   }
 
   function pruneIdleMeta(elementKey: WebEditorElementKey): void {
@@ -563,9 +588,12 @@ export function createChangesService(options: {
       return;
     }
 
-    const nodes = visibleMetas.map((meta, index) => {
+    const resolvedMetas = visibleMetas.flatMap((meta) => {
       const anchor = resolveLiveAnchor(meta.locator, meta.anchor);
-      if (!anchor) return null;
+      return anchor ? [{ meta, anchor }] : [];
+    });
+
+    const nodes = resolvedMetas.map(({ meta, anchor }, index) => {
       const position = getViewportMarkerPosition(anchor);
       const annotationNodeId = extractAnnotationPanelNodeId(meta.locator);
       const detailLines = buildMarkerDetailLines(meta);
@@ -584,7 +612,7 @@ export function createChangesService(options: {
       marker.tabIndex = 0;
       marker.setAttribute(
         'aria-label',
-        `定位到 ${meta.label}${taskState === 'editing' ? '，修改中' : taskState === 'error' ? '，修改失败' : ''}`,
+        `定位到 ${meta.label}${taskState ? `，${CHANGE_MARKER_TASK_LABELS[taskState]}` : ''}`,
       );
       if (taskState) {
         marker.setAttribute('data-task-state', taskState);
@@ -597,6 +625,17 @@ export function createChangesService(options: {
       markerBody.className = 'we-change-marker__body';
       markerBody.textContent = markerText;
 
+      const taskGlyph = taskState === 'completed' || taskState === 'error'
+        ? CHANGE_MARKER_TASK_GLYPHS[taskState]
+        : null;
+      const taskStatus = taskGlyph ? document.createElement('span') : null;
+      if (taskStatus && taskState) {
+        taskStatus.className = 'we-change-marker__task-status';
+        taskStatus.textContent = taskGlyph;
+        taskStatus.setAttribute('aria-hidden', 'true');
+        taskStatus.title = CHANGE_MARKER_TASK_LABELS[taskState];
+      }
+
       const tooltip = document.createElement('div');
       tooltip.className = 'we-change-marker__tooltip';
 
@@ -606,7 +645,10 @@ export function createChangesService(options: {
 
       const details = document.createElement('div');
       details.className = 'we-change-marker__details';
-      for (const line of detailLines) {
+      for (const line of [
+        ...(taskState ? [`状态：${CHANGE_MARKER_TASK_LABELS[taskState]}`] : []),
+        ...detailLines,
+      ]) {
         const detail = document.createElement('span');
         detail.className = 'we-change-marker__note';
         detail.textContent = line;
@@ -634,9 +676,9 @@ export function createChangesService(options: {
       });
 
       tooltip.append(label, details);
-      marker.append(markerBody, tooltip);
+      marker.append(markerBody, ...(taskStatus ? [taskStatus] : []), tooltip);
       return marker;
-    }).filter((node): node is HTMLDivElement => node !== null);
+    });
 
     layer.hidden = nodes.length === 0;
     layer.replaceChildren(...nodes);
@@ -647,6 +689,16 @@ export function createChangesService(options: {
     state.propertyPanel?.refresh();
     renderChangeMarkers();
     options.onStatusChange?.();
+  }
+
+  function notifyCommentEdited(meta: ElementEditMeta): void {
+    const hasPersistentContent = Boolean(
+      normalizeNote(meta.note).trim()
+      || meta.images.length > 0
+      || hasRecordedTweak(meta),
+    );
+    if (!meta.commentId || !hasPersistentContent) return;
+    options.onCommentEdited?.(meta.elementKey);
   }
 
   function syncEditMetaWithTransactions(): void {
@@ -679,6 +731,9 @@ export function createChangesService(options: {
       if (summary.netEffect.styleChanges) nextKinds.push('style');
       if (summary.netEffect.classChanges) nextKinds.push('class');
       meta.changeKinds = nextKinds;
+      if (nextKinds.length > 0) {
+        ensureElementEditCommentId(meta);
+      }
       meta.styleSummaryLines = buildStyleSummaryLines(
         summary.netEffect.styleChanges?.before,
         summary.netEffect.styleChanges?.after,
@@ -831,12 +886,21 @@ export function createChangesService(options: {
   function setNoteForElement(
     element: Element | null,
     note: string,
-    options: { skillIds?: readonly string[] } = {},
-  ): void {
+    options: {
+      skillIds?: readonly string[];
+      voiceCreateOperationId?: string;
+      voiceTargetRef?: string;
+      voiceTarget?: import('../../web-editor-types').CommentaryPageElementSummary;
+      anchorPlacement?: 'target';
+    } = {},
+  ): string | null {
     const meta = getMetaForElement(element);
-    if (!meta) return;
+    if (!meta) return null;
     meta.note = normalizeNote(note);
-    if (options.skillIds) {
+    const hasNote = Boolean(meta.note.trim());
+    if (!hasNote) {
+      delete meta.skillIds;
+    } else if (options.skillIds) {
       const nextSkillIds = normalizePromptCardSkillIds(options.skillIds);
       if (nextSkillIds.length > 0) {
         meta.skillIds = nextSkillIds;
@@ -848,12 +912,21 @@ export function createChangesService(options: {
     if (pendingAnchor) {
       meta.anchor = pendingAnchor;
       state.pendingMarkerAnchors.delete(meta.elementKey);
-    } else if (!meta.anchor && normalizeNote(meta.note).trim()) {
+    } else if (!meta.anchor && hasNote) {
       const fallbackElement = element && element.isConnected ? element : locateElement(meta.locator);
       meta.anchor = fallbackElement ? buildFallbackAnchor(fallbackElement) : null;
     }
 
-    if (normalizeNote(meta.note).trim() || (meta.skillIds?.length ?? 0) > 0) {
+    const commentId = hasNote ? ensureElementEditCommentId(meta) : null;
+    if (hasNote) {
+      const voiceCreateOperationId = String(options.voiceCreateOperationId || '').trim();
+      if (voiceCreateOperationId) {
+        meta.voiceCreateOperationId = voiceCreateOperationId;
+        meta.voiceElementKey = meta.elementKey;
+        meta.voiceTargetRef = String(options.voiceTargetRef || '').trim() || undefined;
+        meta.voiceTarget = options.voiceTarget;
+        meta.anchorPlacement = options.anchorPlacement;
+      }
       if (meta.dirtySince === null) {
         meta.dirtySince = Date.now();
       }
@@ -869,7 +942,9 @@ export function createChangesService(options: {
     }
 
     pruneIdleMeta(meta.elementKey);
+    notifyCommentEdited(meta);
     notifyEditMetaChanged();
+    return commentId;
   }
 
   function getImagesForElement(element: Element | null): PromptImageAttachment[] {
@@ -894,6 +969,7 @@ export function createChangesService(options: {
     }
 
     if (meta.images.length > 0) {
+      ensureElementEditCommentId(meta);
       if (meta.dirtySince === null) {
         meta.dirtySince = Date.now();
       }
@@ -909,6 +985,7 @@ export function createChangesService(options: {
     }
 
     pruneIdleMeta(meta.elementKey);
+    notifyCommentEdited(meta);
     notifyEditMetaChanged();
   }
 
@@ -933,6 +1010,7 @@ export function createChangesService(options: {
 
     meta.tweakSummaryLines = summaryLines;
     if (summaryLines.length > 0) {
+      ensureElementEditCommentId(meta);
       meta.tweakBaselineValues = baselineValues;
       meta.tweakCurrentValues = currentValues;
       meta.changeKinds = ['tweak', ...meta.changeKinds.filter((kind) => kind !== 'tweak')];
@@ -962,6 +1040,7 @@ export function createChangesService(options: {
     }
 
     pruneIdleMeta(meta.elementKey);
+    notifyCommentEdited(meta);
     notifyEditMetaChanged();
   }
 
@@ -979,6 +1058,7 @@ export function createChangesService(options: {
     }
 
     pruneIdleMeta(meta.elementKey);
+    notifyCommentEdited(meta);
     options.scheduleCacheWrite();
     renderChangeMarkers();
   }

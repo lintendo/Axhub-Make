@@ -1,0 +1,45 @@
+{
+  "index": 48,
+  "label": "云文档",
+  "requestedUrl": "https://xl3n1thocz.feishu.cn/admin/data-analysis/application/space",
+  "url": "https://xl3n1thocz.feishu.cn/admin/data-analysis/application/space",
+  "title": "云文档 - 飞书管理后台",
+  "text": "企业管理\n产品设置\n搜索功能导航、组织数据、角色详情等\n企业概览\n组织架构\n成员与部门\n角色管理\n单位管理\n用户组管理\n字段配置\n人事企业版配置\n对外协作\n关联组织\n会议室\n会议室管理\n设备与运维\n工作台\n应用审核\n应用管理\n工作台设置\n定制工作台\n增值版本\nAPI 用量情况\n基础 API 调用次数\n费用中心\n我的产品\n权益数据\n订单列表\n发票管理\n账户管理\nAI 使用管理\n用量概览\n用量详情\n用量日志\n限额管理\n存储空间\n容量概览\n存储清理\n上限管理\n安全\n策略中心\n策略管理\n安全中心\n安全概览\n成员异常\n文档异常\n成员权限\n账号安全\n终端安全\n网络安全\n链接安全\n数据分类\n数据保护\n部署与加密\n合规\n日志审计\n权限审计\n数据保险箱\n内容合规\n隐私设置\n数据报表\n数据概览\n成员活跃数据\n功能使用情况\n消息\n云文档\n日历\n邮箱\n任务\n视频会议\n服务台\n知识库\n增值版本\n应用使用数据\n增值版本\n企业文化\n品牌配置\n功能配置\n企业设置\n企业信息\n管理员权限\n组织架构数据同步\n数据迁移\n风险控制\n版本升级提醒\n收起导航\n数据报表\n功能使用情况\n云文档\n云文档\n截止到 2026年08月13日 的最新数据\nAxhub\n全部产品版本\n导出\n云文档活跃人数\n创建文件人数\n创建文件数量\n人均创建文件数量",
+  "buttons": [
+    "导出"
+  ],
+  "inputs": [
+    {
+      "tag": "input",
+      "type": "text",
+      "placeholder": "",
+      "aria": ""
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "placeholder": "开始日期",
+      "aria": ""
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "placeholder": "结束日期",
+      "aria": ""
+    },
+    {
+      "tag": "input",
+      "type": "search",
+      "placeholder": "",
+      "aria": ""
+    },
+    {
+      "tag": "input",
+      "type": "search",
+      "placeholder": "",
+      "aria": ""
+    }
+  ],
+  "headings": [],
+  "screenshot": "048-data-analysis-application-space-default-desktop.png"
+}

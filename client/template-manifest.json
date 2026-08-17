@@ -16,23 +16,36 @@
       "tsconfig.base.json",
       "tsconfig.json",
       "tsconfig.typecheck.json",
-      "vite.config.ts"
+      "vite.config.ts",
+      "templates/prd.md",
+      "templates/prototype-spec.md",
+      "templates/prototype-spec.html",
+      "templates/prototype-review.md",
+      "templates/ui-review.md",
+      "scripts/build-all.js",
+      "scripts/canvas-fig-sync.mjs",
+      "scripts/capture-theme-homepage.mjs",
+      "scripts/capture-theme-source.mjs",
+      "scripts/check-app-ready.mjs",
+      "scripts/chrome-export-converter.mjs",
+      "scripts/scan-entries.js",
+      "scripts/sync-project-metadata.d.ts",
+      "scripts/sync-project-metadata.mjs",
+      "scripts/sync-project-metadata.mjs.d.ts",
+      "scripts/sync-vendor-if-present.mjs"
     ],
     "directories": [
       ".agents/skills",
       ".claude/skills",
       "rules",
-      "scripts",
+      "design-knowledge",
+      "scripts/templates",
+      "scripts/utils",
       "src/common",
       "src/preview-templates",
       "vite-plugins"
     ],
     "fileRules": [
-      {
-        "action": "exclude",
-        "pattern": "^scripts/subset-beginner-guide-fonts\\.mjs$",
-        "description": "发布包只保留已裁剪字体，不携带字体裁剪开发工具。"
-      },
       {
         "action": "exclude",
         "pattern": "^\\.(?:agents|claude)/skills/prototype-comments(?:/|$)",
@@ -42,6 +55,16 @@
         "action": "exclude",
         "pattern": "^\\.(?:agents|claude)/skills/triple-ampersand-operator(?:/|$)",
         "description": "测试用 triple-ampersand-operator 不进入发布模板。"
+      },
+      {
+        "action": "exclude",
+        "pattern": "^\\.(?:agents|claude)/skills/generate-data-cockpit-prototype(?:/|$)",
+        "description": "未完善的数据大屏技能暂不进入发布模板。"
+      },
+      {
+        "action": "exclude",
+        "pattern": "^design-knowledge/(?:.+\\.(?:tgz|zip)|\\.local(?:/|$))$",
+        "description": "Design Knowledge 发布包只允许索引和 DESIGN.md，不携带归档或本地输入。"
       }
     ]
   },
@@ -107,35 +130,17 @@
         "action": "exclude",
         "pattern": "^(?:trae|whop)$",
         "description": "排除仅用于本地调试、不属于正式主题库的主题。"
+      },
+      {
+        "action": "exclude",
+        "pattern": "^.+$",
+        "description": "客户端模板不再内置本地主题，主题由在线设计系统按主源、备用源顺序提供。"
       }
     ]
   },
   "resources": {
     "files": [
-      "src/resources/.gitkeep",
-      "src/resources/README.md",
-      "src/resources/data-visualization-style-reference/assets/01-cinematic-fui.png",
-      "src/resources/data-visualization-style-reference/assets/02-holographic-lattice.png",
-      "src/resources/data-visualization-style-reference/assets/03-enterprise-blue-ioc.png",
-      "src/resources/data-visualization-style-reference/assets/04-photoreal-digital-twin.png",
-      "src/resources/data-visualization-style-reference/assets/05-bright-natural-gis.png",
-      "src/resources/data-visualization-style-reference/assets/06-new-chinese-oriental.png",
-      "src/resources/data-visualization-style-reference/assets/07-minimal-glass-saas.png",
-      "src/resources/data-visualization-style-reference/assets/08-data-decision-bi.png",
-      "src/resources/data-visualization-style-reference/assets/4k/01-cinematic-fui-4k.webp",
-      "src/resources/data-visualization-style-reference/assets/4k/02-holographic-lattice-4k.webp",
-      "src/resources/data-visualization-style-reference/assets/4k/03-enterprise-blue-ioc-4k.webp",
-      "src/resources/data-visualization-style-reference/assets/4k/04-photoreal-digital-twin-4k.webp",
-      "src/resources/data-visualization-style-reference/assets/4k/05-bright-natural-gis-4k.webp",
-      "src/resources/data-visualization-style-reference/assets/4k/06-new-chinese-oriental-4k.webp",
-      "src/resources/data-visualization-style-reference/assets/4k/07-minimal-glass-saas-4k.webp",
-      "src/resources/data-visualization-style-reference/assets/4k/08-data-decision-bi-4k.webp",
-      "src/resources/data-visualization-style-reference/visualization-style-prompts.md",
-      "src/resources/templates/prd-template.md",
-      "src/resources/templates/prototype-review-report-template.md",
-      "src/resources/templates/ui-review-report-template.md",
-      "src/resources/templates/规格文档 HTML 模板.html",
-      "src/resources/templates/规格文档 Markdown 模板.md"
+      "src/resources/.gitkeep"
     ]
   }
 }

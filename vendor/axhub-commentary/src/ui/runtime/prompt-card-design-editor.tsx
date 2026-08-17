@@ -1,5 +1,6 @@
 import React from 'react';
-import { Empty, Segmented } from 'antd';
+import { DeleteOutlined } from '@ant-design/icons';
+import { Empty, Popconfirm, Segmented } from 'antd';
 import type { TransactionManager } from '../../core/transaction-manager';
 import type { DesignTokensService } from '../../core/design-tokens';
 import {
@@ -15,13 +16,10 @@ import {
   type StyleSnapshot,
 } from '../property-panel/react-design-panel';
 import { PromptCardScrollArea } from './prompt-card-scroll-area';
-import { EDITOR_CHROME } from './theme';
+import { resolveRuntimePopupContainer } from './popup-container';
+import { IconActionButton } from './action-buttons';
 
-type PromptCardDesignGroupId =
-  | 'layout'
-  | 'colors'
-  | 'typography'
-  | 'border';
+type PromptCardDesignGroupId = 'layout' | 'colors' | 'typography' | 'border';
 
 export interface PromptCardDesignEditorProps {
   target: Element | null;
@@ -30,6 +28,7 @@ export interface PromptCardDesignEditorProps {
   disabled?: boolean;
   refreshKey: number;
   onRefreshRequest?: () => void;
+  onDeleteElement?: (element: Element) => boolean | Promise<boolean>;
   defaultGroupId?: PromptCardDesignGroupId;
 }
 
@@ -100,16 +99,14 @@ const GROUPS: DesignGroupDefinition[] = [
 
 const tabStripStyle: React.CSSProperties = {
   display: 'flex',
-  justifyContent: 'flex-start',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
   padding: '0 0 6px',
 };
 
 const editorShellStyle: React.CSSProperties = {
-  marginTop: 2,
-  padding: '8px 8px 6px',
-  borderRadius: 16,
-  background: `color-mix(in srgb, ${EDITOR_CHROME.surfaceMuted} 72%, ${EDITOR_CHROME.surface} 28%)`,
-  border: `1px solid ${EDITOR_CHROME.border}`,
+  padding: '0 8px 6px',
 };
 
 const contentStyle: React.CSSProperties = {
@@ -117,9 +114,7 @@ const contentStyle: React.CSSProperties = {
   minHeight: 0,
 };
 
-export function PromptCardDesignEditor(
-  props: PromptCardDesignEditorProps,
-): React.ReactElement {
+export function PromptCardDesignEditor(props: PromptCardDesignEditorProps): React.ReactElement {
   const {
     target,
     transactionManager,
@@ -127,11 +122,14 @@ export function PromptCardDesignEditor(
     disabled,
     refreshKey,
     onRefreshRequest,
+    onDeleteElement,
     defaultGroupId = 'colors',
   } = props;
-  const [activeGroupId, setActiveGroupId] =
-    React.useState<PromptCardDesignGroupId>(defaultGroupId);
-  const snapshot = React.useMemo(() => (target ? createStyleSnapshot(target) : null), [target, refreshKey]);
+  const [activeGroupId, setActiveGroupId] = React.useState<PromptCardDesignGroupId>(defaultGroupId);
+  const snapshot = React.useMemo(
+    () => (target ? createStyleSnapshot(target) : null),
+    [target, refreshKey],
+  );
 
   React.useEffect(() => {
     setActiveGroupId((current) => {
@@ -176,6 +174,25 @@ export function PromptCardDesignEditor(
           }))}
           onChange={(value) => setActiveGroupId(String(value) as PromptCardDesignGroupId)}
         />
+        <Popconfirm
+          title="删除当前元素"
+          description="删除后会在父级创建批注；撤销或清空该批注可恢复元素。"
+          okText="删除"
+          cancelText="取消"
+          okButtonProps={{ danger: true }}
+          disabled={disabled || !onDeleteElement}
+          getPopupContainer={resolveRuntimePopupContainer}
+          onConfirm={() => onDeleteElement?.(target)}
+        >
+          <span style={{ display: 'inline-flex' }}>
+            <IconActionButton
+              title="删除当前元素（Delete / Backspace）"
+              icon={<DeleteOutlined />}
+              tone="dark"
+              disabled={disabled || !onDeleteElement}
+            />
+          </span>
+        </Popconfirm>
       </div>
       <PromptCardScrollArea style={contentStyle}>
         <ActiveGroupPanel {...sectionProps} />

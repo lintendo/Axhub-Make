@@ -37,6 +37,7 @@ import {
 } from './http.ts';
 import { handleAiArtifactHistoryApi } from './managementApi.aiArtifactHistory.ts';
 import { handleAiRunsApi } from './managementApi.aiRuns.ts';
+import { handleAcpRuntimeEventsApi } from './managementApi.acpRuntimeEvents.ts';
 import { handleAxhubApi } from './managementApi.axhub.ts';
 import { handleAssistantPromptIde } from './managementApi.assistantIde.ts';
 import { handleBridgeAndImageProxy } from './managementApi.bridge.ts';
@@ -46,6 +47,7 @@ import { handleCloudPublishingApi, type CommandExecutor } from './managementApi.
 import { handleConfigApi, readMakeServerVersion } from './managementApi.config.ts';
 import { handleProjectDataAndThemeApi } from './managementApi.dataTheme.ts';
 import { handleProjectDocsApi } from './managementApi.docs.ts';
+import { handleDocumentTemplatesApi } from './managementApi.documentTemplates.ts';
 import { handleEntriesCompatibilityApi } from './managementApi.entries.ts';
 import { handleSourceBackedExports, handleUnavailableManagement } from './managementApi.exports.ts';
 import { handleFileOperationsApi } from './managementApi.fileOperations.ts';
@@ -57,6 +59,7 @@ import { handleAxhubReviewReportsApi } from './managementApi.axhubReviewReports.
 import { handleReviewReportsApi } from './managementApi.reviewReports.ts';
 import { handlePrototypeAnnotationApi } from './managementApi.prototypeAnnotation.ts';
 import { handlePrototypeCommentsApi } from './managementApi.prototypeComments.ts';
+import { handleDocumentCommentsApi } from './managementApi.documentComments.ts';
 import { handlePrototypeSpecApi } from './managementApi.prototypeSpec.ts';
 import {
   handleCreatePlaceholderPrototype,
@@ -391,7 +394,7 @@ function getRequestProjectContext(
   options: ManagementApiOptions,
   body?: unknown,
 ): ProjectRequestContext | null {
-  return resolveProjectContext(req, res, options, 'active-fallback', body);
+  return resolveProjectContext(req, res, options, 'explicit-required', body);
 }
 
 function createProjectContextFromBody(
@@ -400,7 +403,7 @@ function createProjectContextFromBody(
   options: ManagementApiOptions,
   body: unknown,
 ): ProjectRequestContext | null {
-  return resolveProjectContext(req, res, options, 'active-fallback', body);
+  return resolveProjectContext(req, res, options, 'explicit-required', body);
 }
 
 function createProjectContextFromMultipartParts(
@@ -410,7 +413,7 @@ function createProjectContextFromMultipartParts(
   parts: MultipartPart[],
 ): ProjectRequestContext | null {
   const projectId = getMultipartTextField(parts, 'projectId');
-  return resolveProjectContext(req, res, options, 'active-fallback', projectId ? { projectId } : undefined);
+  return resolveProjectContext(req, res, options, 'explicit-required', projectId ? { projectId } : undefined);
 }
 
 function getRequestProjectId(url: URL, body?: unknown): string {
@@ -431,7 +434,7 @@ function resolveProjectContext(
   req: IncomingMessage,
   res: ServerResponse,
   options: ManagementApiOptions,
-  mode: 'active-fallback' | 'explicit-required',
+  _mode: 'explicit-required',
   body?: unknown,
 ): ProjectRequestContext | null {
   try {
@@ -447,14 +450,18 @@ function resolveProjectContext(
   const url = getRequestUrl(req);
   const registry = getProjectRegistryForRequest(options);
   const requestedProjectId = getRequestProjectId(url, body);
-  const project = requestedProjectId
-    ? registry.getProject(requestedProjectId)
-    : mode === 'active-fallback'
-      ? registry.getActiveProject()
-      : null;
+  if (!requestedProjectId) {
+    sendJson(res, {
+      ok: false,
+      code: 'PROJECT_ID_REQUIRED',
+      error: 'Project-scoped API requires projectId',
+    }, { status: 400 });
+    return null;
+  }
+  const project = registry.getProject(requestedProjectId);
   let startupContext: ProjectRequestContext | null = null;
   try {
-    startupContext = !project && mode === 'active-fallback' && !fs.existsSync(registry.getRegistryPath())
+    startupContext = !project
       ? createStartupProjectContext(options, requestedProjectId)
       : null;
   } catch (error: any) {
@@ -1053,7 +1060,7 @@ function createUnavailableProjectResourcesPayload(
 
 function resolveUnavailableStartupProject(
   options: ManagementApiOptions,
-  projectId?: string,
+  projectId: string,
 ): { project: RegisteredProject; error: ProjectMetadataAvailabilityError } | null {
   try {
     ensureDefaultRegisteredProject(options);
@@ -1062,7 +1069,7 @@ function resolveUnavailableStartupProject(
   }
 
   const registry = getProjectRegistryForRequest(options);
-  const project = projectId ? registry.getProject(projectId) : registry.getActiveProject();
+  const project = registry.getProject(projectId);
   if (!project) {
     return null;
   }
@@ -1116,7 +1123,11 @@ function handleUnavailableProjectStartupApi(
     return false;
   }
 
-  const startupProject = resolveUnavailableStartupProject(options, getRequestProjectId(url));
+  const requestedProjectId = getRequestProjectId(url);
+  if (!requestedProjectId) {
+    return false;
+  }
+  const startupProject = resolveUnavailableStartupProject(options, requestedProjectId);
   if (!startupProject) {
     return false;
   }
@@ -1267,7 +1278,7 @@ export async function handleManagementApi(req: IncomingMessage, res: ServerRespo
   }
 
   if (handleLegacyDocsApi(req, res, options, null, pathname, url, {
-    getActiveProjectContext,
+    resolveProjectContext,
   })) {
     return true;
   }
@@ -1392,26 +1403,39 @@ export async function handleManagementApi(req: IncomingMessage, res: ServerRespo
     createProjectRelativePath,
   })) return true;
 
-  const requestContext = getRequestProjectContext(req, res, options);
+  if (handlePrototypeUploadApi(req, res, options, pathname, {
+    readMultipartParts,
+    createProjectContextFromMultipartParts,
+    getDeclaredResourceWriteDir,
+    hasResourceWriteCapability,
+    sendDisabledCapability,
+  })) return true;
+
+  let bodyForProjectContext: unknown;
+  const contentType = String(req.headers['content-type'] || '').toLowerCase();
+  if (!getRequestProjectId(url) && contentType.includes('application/json')) {
+    try {
+      bodyForProjectContext = await readJsonBody(req);
+    } catch (error: any) {
+      sendJson(res, { error: error?.message || 'Invalid JSON body' }, { status: 400 });
+      return true;
+    }
+  }
+  const requestContext = getRequestProjectContext(req, res, options, bodyForProjectContext);
   if (!requestContext) {
     return true;
   }
   const activeProjectRoot = requestContext.project.root;
-  const activeProjectContextForBridge = getActiveProjectContext(options);
-  if (activeProjectContextForBridge) {
-    getCanvasBridgeHub().configureProjectRoot(activeProjectContextForBridge.project.root);
-  }
+  getCanvasBridgeHub().configureProjectRoot(requestContext.project.root);
 
   if (await handleHtmlResourceEditingApi(req, res, activeProjectRoot, pathname)) return true;
   if (await handleHtmlReviewArtifactsApi(req, res, activeProjectRoot, pathname)) return true;
 
-  if (handleLegacyDocsApi(req, res, options, activeProjectRoot, pathname, url, {
-    getActiveProjectContext,
+  if (handleLegacyDocsApi(req, res, options, requestContext, pathname, url, {
+    resolveProjectContext,
   })) return true;
 
-  if (handleEntriesCompatibilityApi(req, res, options, pathname, {
-    getActiveProjectContext,
-  })) return true;
+  if (handleEntriesCompatibilityApi(req, res, options, requestContext, pathname)) return true;
 
   if (handleCodeReviewApi(req, res, requestContext, pathname, {
     resolveSourceFileFromMetadata,
@@ -1432,6 +1456,15 @@ export async function handleManagementApi(req: IncomingMessage, res: ServerRespo
     getServerConfigStoreForRequest,
   })) return true;
 
+  if (handleAcpRuntimeEventsApi(
+    req,
+    res,
+    options,
+    requestContext,
+    pathname,
+    getServerConfigStoreForRequest,
+  )) return true;
+
   if (handleAiArtifactHistoryApi(req, res, requestContext, pathname)) return true;
 
   if (handleCloudPublishingApi(req, res, options, pathname, {
@@ -1451,6 +1484,7 @@ export async function handleManagementApi(req: IncomingMessage, res: ServerRespo
     sendResourceWriteAdapterRequired,
     createProjectRelativePath,
   })) return true;
+  if (handleDocumentTemplatesApi(req, res, requestContext, pathname)) return true;
   if (handleProjectDataAndThemeApi(req, res, requestContext, options, pathname, {
     createProjectContextFromBody,
     getDeclaredResourceWriteDir,
@@ -1496,13 +1530,6 @@ export async function handleManagementApi(req: IncomingMessage, res: ServerRespo
     );
     return true;
   }
-  if (handlePrototypeUploadApi(req, res, options, pathname, {
-    readMultipartParts,
-    createProjectContextFromMultipartParts,
-    getDeclaredResourceWriteDir,
-    hasResourceWriteCapability,
-    sendDisabledCapability,
-  })) return true;
   if (handleTemplateLibraryApi(req, res, options, pathname, {
     createProjectContextFromBody,
     getDeclaredResourceWriteDir: getDeclaredResourceWriteDir as any,
@@ -1515,9 +1542,13 @@ export async function handleManagementApi(req: IncomingMessage, res: ServerRespo
     hasResourceWriteCapability: hasResourceWriteCapability as any,
     sendDisabledCapability,
   })) return true;
-  if (handleCanvasApi(req, res, activeProjectRoot, pathname, { metadata: requestContext.metadata })) return true;
+  if (handleCanvasApi(req, res, activeProjectRoot, pathname, {
+    metadata: requestContext.metadata,
+    projectId: requestContext.project.id,
+  })) return true;
   if (handlePrototypeAnnotationApi(req, res, requestContext, url)) return true;
   if (handlePrototypeCommentsApi(req, res, requestContext, url)) return true;
+  if (handleDocumentCommentsApi(req, res, requestContext, url)) return true;
   if (handleMediaApi(req, res, activeProjectRoot, { mediaRoot: getDeclaredResourceWriteDir(requestContext, 'media') || undefined })) return true;
   if (handleWorkspaceApi(req, res, options, requestContext, pathname, url, {
     toProjectIdentity,

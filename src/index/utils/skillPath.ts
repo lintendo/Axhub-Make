@@ -68,8 +68,8 @@ export function selfCheckSkillPathNormalization(): boolean {
         ['/skills/local-axure-workflow/SKILL.md', '/skills/local-axure-workflow/SKILL.md'],
         ['skills\\local-axure-workflow\\SKILL.md', '/skills/local-axure-workflow/SKILL.md'],
         ['/skills//nested///guide.md', '/skills/nested/guide.md'],
-        ['.agents/skills/prototype-comments/SKILL.md', '.agents/skills/prototype-comments/SKILL.md'],
-        ['.claude\\skills\\prototype-comments\\SKILL.md', '.claude/skills/prototype-comments/SKILL.md'],
+        ['.agents/skills/handle-comments/SKILL.md', '.agents/skills/handle-comments/SKILL.md'],
+        ['.claude\\skills\\handle-comments\\SKILL.md', '.claude/skills/handle-comments/SKILL.md'],
     ];
 
     for (const [input, expected] of validCases) {
@@ -102,10 +102,10 @@ export function selfCheckSkillPathNormalization(): boolean {
     if (
         normalizeSkillSource([
             '.agents/skills/explore-options/SKILL.md',
-            '.claude\\skills\\prototype-comments\\SKILL.md',
+            '.claude\\skills\\handle-comments\\SKILL.md',
         ].join('\n')) !== [
             '.agents/skills/explore-options/SKILL.md',
-            '.claude/skills/prototype-comments/SKILL.md',
+            '.claude/skills/handle-comments/SKILL.md',
         ].join('\n')
     ) {
         return false;

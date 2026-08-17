@@ -18,13 +18,15 @@ describe('Grok Build ACP provider configuration', () => {
     expect(toAcpProvider('acp:grok-build')).toBe('grok-build');
   });
 
-  it('exposes the Grok Build model and npm fallback metadata', () => {
-    expect(getAcpProviderOption('grok-build')).toEqual({
+  it('exposes provider launch metadata without owning a default model', () => {
+    const option = getAcpProviderOption('grok-build');
+
+    expect(option).toEqual({
       provider: 'grok-build',
       client: 'acp:grok-build',
       label: 'Grok Build',
-      defaultAnnotationModel: 'grok-build',
       supportsNpxFallback: true,
     });
+    expect(option).not.toHaveProperty('defaultAnnotationModel');
   });
 });

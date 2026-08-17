@@ -7,7 +7,7 @@ export interface ExportModalPreferences {
     version: 1;
     activeTabKey?: ExportModalTabKey;
     selectedExportType?: ExportConfigType;
-    imageConfig?: Pick<ImageConfig, 'width' | 'height' | 'includeConfig' | 'contentType' | 'isFullScreen'>;
+    imageConfig?: Pick<ImageConfig, 'width' | 'height' | 'includeConfig' | 'includeImageAssets' | 'contentType' | 'isFullScreen'>;
     axureCopyOptions?: AxureCopyOptions;
 }
 
@@ -43,6 +43,9 @@ function sanitizeImageConfig(value: unknown): ExportModalPreferences['imageConfi
         || value.includeConfig === 'code'
         ? value.includeConfig
         : undefined;
+    const includeImageAssets = typeof value.includeImageAssets === 'boolean'
+        ? value.includeImageAssets
+        : undefined;
     const contentType = value.contentType === 'title' || value.contentType === 'screenshot'
         ? value.contentType
         : undefined;
@@ -53,6 +56,7 @@ function sanitizeImageConfig(value: unknown): ExportModalPreferences['imageConfi
         width === undefined
         && height === undefined
         && includeConfig === undefined
+        && includeImageAssets === undefined
         && contentType === undefined
         && isFullScreen === undefined
     ) {
@@ -63,6 +67,7 @@ function sanitizeImageConfig(value: unknown): ExportModalPreferences['imageConfi
         width: width ?? 500,
         height: height ?? 300,
         includeConfig: includeConfig ?? 'code',
+        includeImageAssets: includeImageAssets ?? true,
         contentType: contentType ?? 'title',
         isFullScreen: isFullScreen ?? true,
     };

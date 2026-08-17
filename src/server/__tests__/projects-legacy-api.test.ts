@@ -13,6 +13,7 @@ import {
   cleanupProjectApiTestRoots,
   createTempRoot,
   registerProject,
+  scopeProjectApiUrl,
   setActiveProject,
   startTestServer,
   writeJson,
@@ -42,7 +43,46 @@ describe('make-server project legacy compatibility APIs', () => {
     expect(handleLegacyDocsApi).toBeTypeOf('function');
   });
 
-  it('routes legacy compatibility APIs through the active project context', async () => {
+  it('rejects project-scoped query, JSON, multipart, legacy, and early-domain requests without projectId', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot, {
+      project: { id: 'explicit-project', name: 'Explicit Project' },
+    });
+    const server = await startTestServer(projectRoot);
+
+    try {
+      await registerProject(server.origin, projectRoot, 'explicit-project', 'Explicit Project');
+      const formData = new FormData();
+      formData.append('file', new Blob(['# Missing Scope\n'], { type: 'text/markdown' }), 'missing-scope.md');
+      const responses = await Promise.all([
+        fetch(`${server.origin}/api/config`),
+        fetch(`${server.origin}/api/workspace/project`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: 'Wrong Project' }),
+        }),
+        fetch(`${server.origin}/api/docs/upload`, {
+          method: 'POST',
+          body: formData,
+        }),
+        fetch(`${server.origin}/api/entries.json`),
+        fetch(`${server.origin}/api/git/status`),
+      ]);
+
+      for (const response of responses) {
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({
+          ok: false,
+          code: 'PROJECT_ID_REQUIRED',
+          error: 'Project-scoped API requires projectId',
+        });
+      }
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('routes legacy compatibility APIs through the explicit project context', async () => {
     const firstRoot = createTempRoot();
     const secondRoot = createTempRoot();
     writeProjectMetadata(firstRoot, {
@@ -75,18 +115,18 @@ describe('make-server project legacy compatibility APIs', () => {
       await registerProject(server.origin, secondRoot, 'second-client', 'Second Client');
       await setActiveProject(server.origin, 'second-client');
 
-      const config = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const config = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(config.projectPath).toBe(secondRoot);
       expect(config.projectInfo.name).toBe('Second Client');
 
-      const docs = await fetch(`${server.origin}/api/docs`).then((response) => response.json());
+      const docs = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/docs`)).then((response) => response.json());
       expect(docs.map((doc: any) => doc.name)).toEqual(['second.md']);
 
-      const markdown = await fetch(`${server.origin}/api/markdown-file?path=${encodeURIComponent('src/resources/second.md')}`)
+      const markdown = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/markdown-file?path=${encodeURIComponent('src/resources/second.md')}`))
         .then((response) => response.text());
       expect(markdown).toBe('# Second\n');
 
-      const markdownMeta = await fetch(`${server.origin}/api/markdown-file-meta?path=${encodeURIComponent('src/resources/second.md')}`)
+      const markdownMeta = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/markdown-file-meta?path=${encodeURIComponent('src/resources/second.md')}`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(markdownMeta).toMatchObject({
         status: 200,
@@ -97,7 +137,7 @@ describe('make-server project legacy compatibility APIs', () => {
         },
       });
 
-      const saveMarkdown = await fetch(`${server.origin}/api/markdown-file?path=${encodeURIComponent('src/resources/second.md')}`, {
+      const saveMarkdown = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/markdown-file?path=${encodeURIComponent('src/resources/second.md')}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: '# Updated Second\n' }),
@@ -105,13 +145,13 @@ describe('make-server project legacy compatibility APIs', () => {
       expect(saveMarkdown.status).toBe(200);
       expect(fs.readFileSync(path.join(secondRoot, 'src', 'resources', 'second.md'), 'utf8')).toBe('# Updated Second\n');
 
-      const forbidden = await fetch(`${server.origin}/api/markdown-file?path=${encodeURIComponent(path.join(firstRoot, 'src/resources/first.md'))}`);
+      const forbidden = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/markdown-file?path=${encodeURIComponent(path.join(firstRoot, 'src/resources/first.md'))}`));
       expect(forbidden.status).toBe(403);
 
-      const forbiddenMeta = await fetch(`${server.origin}/api/markdown-file-meta?path=${encodeURIComponent(path.join(firstRoot, 'src/resources/first.md'))}`);
+      const forbiddenMeta = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/markdown-file-meta?path=${encodeURIComponent(path.join(firstRoot, 'src/resources/first.md'))}`));
       expect(forbiddenMeta.status).toBe(403);
 
-      const navigation = await fetch(`${server.origin}/api/workspace/navigation?tab=prototypes`)
+      const navigation = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/workspace/navigation?tab=prototypes`))
         .then((response) => response.json());
       const itemKeys = JSON.stringify(navigation.tree);
       expect(itemKeys).toContain('prototypes/second-only');
@@ -223,7 +263,7 @@ describe('make-server project legacy compatibility APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'legacy-docs-list', 'Legacy Docs List');
 
-      const docs = await fetch(`${server.origin}/api/docs`).then((response) => response.json());
+      const docs = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs`)).then((response) => response.json());
       expect(docs.map((doc: any) => doc.name)).toEqual(['visible.json']);
     } finally {
       await server.close();
@@ -247,7 +287,7 @@ describe('make-server project legacy compatibility APIs', () => {
       await registerProject(server.origin, projectRoot, 'legacy-drawio-preview', 'Legacy Drawio Preview');
 
       const response = await fetch(
-        `${server.origin}/api/markdown-file?path=${encodeURIComponent('src/resources/order-status-flow.drawio')}`,
+        scopeProjectApiUrl(projectRoot, `${server.origin}/api/markdown-file?path=${encodeURIComponent('src/resources/order-status-flow.drawio')}`),
         {
           headers: {
             accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -264,7 +304,7 @@ describe('make-server project legacy compatibility APIs', () => {
       expect(html).toContain('用系统应用打开');
       expect(html).not.toContain('<mxfile');
 
-      const rawResponse = await fetch(`${server.origin}/api/markdown-file?path=${encodeURIComponent('src/resources/order-status-flow.drawio')}&download=1`, {
+      const rawResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/markdown-file?path=${encodeURIComponent('src/resources/order-status-flow.drawio')}&download=1`), {
         headers: {
           accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
@@ -296,7 +336,7 @@ describe('make-server project legacy compatibility APIs', () => {
       await registerProject(server.origin, projectRoot, 'legacy-html-preview', 'Legacy HTML Preview');
 
       const response = await fetch(
-        `${server.origin}/api/markdown-file?path=${encodeURIComponent('src/resources/visual-prd.html')}`,
+        scopeProjectApiUrl(projectRoot, `${server.origin}/api/markdown-file?path=${encodeURIComponent('src/resources/visual-prd.html')}`),
         {
           headers: {
             accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -332,7 +372,7 @@ describe('make-server project legacy compatibility APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'legacy-spec-doc', 'Legacy Spec Doc');
 
-      const saveDoc = await fetch(`${server.origin}/api/spec-doc/save`, {
+      const saveDoc = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/spec-doc/save`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -352,7 +392,7 @@ describe('make-server project legacy compatibility APIs', () => {
       const formData = new FormData();
       formData.append('docUrl', '/docs/guide.md');
       formData.append('file', new File(['png'], 'hero.png', { type: 'image/png' }));
-      const uploadImage = await fetch(`${server.origin}/api/spec-doc/upload-image`, {
+      const uploadImage = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/spec-doc/upload-image`), {
         method: 'POST',
         body: formData,
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
@@ -366,7 +406,7 @@ describe('make-server project legacy compatibility APIs', () => {
       });
       expect(fs.readFileSync(path.join(docsDir, 'assets', 'hero.png'), 'utf8')).toBe('png');
 
-      const prototypeSpecSave = await fetch(`${server.origin}/api/spec-doc/save`, {
+      const prototypeSpecSave = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/spec-doc/save`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -377,12 +417,12 @@ describe('make-server project legacy compatibility APIs', () => {
       expect(prototypeSpecSave.status).toBe(400);
       expect(fs.existsSync(path.join(projectRoot, 'src', 'prototypes', 'home', 'spec.md'))).toBe(false);
 
-      const asset = await fetch(`${server.origin}/api/markdown-file-asset?path=${encodeURIComponent('src/resources/guide.md')}&asset=${encodeURIComponent('images/logo.svg')}`);
+      const asset = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/markdown-file-asset?path=${encodeURIComponent('src/resources/guide.md')}&asset=${encodeURIComponent('images/logo.svg')}`));
       expect(asset.status).toBe(200);
       expect(asset.headers.get('content-type')).toBe('image/svg+xml');
       await expect(asset.text()).resolves.toBe('<svg />');
 
-      const forbiddenAsset = await fetch(`${server.origin}/api/markdown-file-asset?path=${encodeURIComponent('src/resources/guide.md')}&asset=${encodeURIComponent('../secret.svg')}`);
+      const forbiddenAsset = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/markdown-file-asset?path=${encodeURIComponent('src/resources/guide.md')}&asset=${encodeURIComponent('../secret.svg')}`));
       expect(forbiddenAsset.status).toBe(403);
     } finally {
       await server.close();
@@ -399,7 +439,7 @@ describe('make-server project legacy compatibility APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'delete-root-client', 'Delete Root Client');
 
-      const deleted = await fetch(`${server.origin}/api/delete`, {
+      const deleted = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/delete`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: '.' }),
@@ -470,7 +510,7 @@ describe('make-server project legacy compatibility APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'src-prefixed-zip', 'Src Prefixed Zip');
 
-      const zipProbe = await fetch(`${server.origin}/api/zip?path=${encodeURIComponent('src/prototypes/bi-marketing-dashboard')}&probe=1`)
+      const zipProbe = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/zip?path=${encodeURIComponent('src/prototypes/bi-marketing-dashboard')}&probe=1`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(zipProbe).toMatchObject({
@@ -499,7 +539,7 @@ describe('make-server project legacy compatibility APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'legacy-zip-download', 'Legacy Zip Download');
 
-      const response = await fetch(`${server.origin}/api/zip?path=${encodeURIComponent('src/prototypes/zip-preview')}&download=1`);
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/zip?path=${encodeURIComponent('src/prototypes/zip-preview')}&download=1`));
       const body = new Uint8Array(await response.arrayBuffer());
       const entries = unzipSync(body);
 
@@ -537,7 +577,7 @@ describe('make-server project legacy compatibility APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'theme-directory-export', 'Theme Directory Export');
 
-      const zipProbe = await fetch(`${server.origin}/api/zip?path=${encodeURIComponent('src/themes/brand-design')}&probe=1`)
+      const zipProbe = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/zip?path=${encodeURIComponent('src/themes/brand-design')}&probe=1`))
         .then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(zipProbe).toMatchObject({
@@ -579,7 +619,7 @@ describe('make-server project legacy compatibility APIs', () => {
     try {
       await registerProject(server.origin, projectRoot, 'metadata-only', 'Metadata Only');
 
-      const source = await fetch(`${server.origin}/api/source?path=${encodeURIComponent('prototypes/preview')}`);
+      const source = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/source?path=${encodeURIComponent('prototypes/preview')}`));
       const sourceBody = await source.json();
       expect(source.status).toBe(424);
       expect(sourceBody).toMatchObject({
@@ -587,7 +627,7 @@ describe('make-server project legacy compatibility APIs', () => {
         projectId: 'metadata-only',
       });
 
-      const exportBundle = await fetch(`${server.origin}/api/export-index-bundle?path=${encodeURIComponent('prototypes/preview')}`);
+      const exportBundle = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/export-index-bundle?path=${encodeURIComponent('prototypes/preview')}`));
       const exportBundleBody = await exportBundle.json();
       expect(exportBundle.status).toBe(424);
       expect(exportBundleBody).toMatchObject({
@@ -595,7 +635,7 @@ describe('make-server project legacy compatibility APIs', () => {
         adapterRequired: true,
       });
 
-      const exportHtml = await fetch(`${server.origin}/api/export-html?path=${encodeURIComponent('prototypes/preview')}`);
+      const exportHtml = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/export-html?path=${encodeURIComponent('prototypes/preview')}`));
       const exportHtmlBody = await exportHtml.json();
       expect(exportHtml.status).toBe(424);
       expect(exportHtmlBody).toMatchObject({
@@ -603,7 +643,7 @@ describe('make-server project legacy compatibility APIs', () => {
         adapterRequired: true,
       });
 
-      const promptExecute = await fetch(`${server.origin}/api/prompt/execute`, {
+      const promptExecute = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prompt/execute`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: 'hello' }),
@@ -670,14 +710,14 @@ describe('make-server project legacy compatibility APIs', () => {
 
       fs.mkdirSync(path.join(firstRoot, 'dist'), { recursive: true });
       fs.writeFileSync(path.join(firstRoot, 'dist', 'first.txt'), 'first\n', 'utf8');
-      const dist = await fetch(`${server.origin}/api/download-dist`);
+      const dist = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/download-dist`));
       const distBody = await dist.json().catch(() => ({}));
       expect(dist.status).toBe(404);
       expect(distBody.error).toBe('Dist directory not found');
 
       fs.mkdirSync(path.join(firstRoot, 'src', 'prototypes', 'home'), { recursive: true });
       fs.writeFileSync(path.join(firstRoot, 'src', 'prototypes', 'home', 'index.tsx'), 'first\n', 'utf8');
-      const source = await fetch(`${server.origin}/api/source?path=${encodeURIComponent('prototypes/home')}`);
+      const source = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/source?path=${encodeURIComponent('prototypes/home')}`));
       const sourceBody = await source.json();
       expect(source.status).toBe(424);
       expect(sourceBody.projectId).toBe('second-client');

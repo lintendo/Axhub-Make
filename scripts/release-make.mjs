@@ -41,7 +41,6 @@ const makeClientTemplateLatestManifestName = 'axhub-make-client-template.latest.
 const makeClientTemplateLatestManifestGiteeTagName = 'make-client-template-latest';
 const makeClientTemplatePackageManager = 'pnpm@10.20.0';
 const makeClientTemplateRequiredExactDependencies = new Set([
-  '@axhub/annotation',
   'lucide-react',
 ]);
 const makeClientTemplateExactDevDependencies = new Map([
@@ -655,6 +654,73 @@ function walkTemplateSourceFiles(rootDir, currentDir = rootDir, relativeDir = ''
   return files;
 }
 
+function validateDesignKnowledgeSnapshot(sourceClientDir) {
+  const snapshotRoot = path.join(sourceClientDir, 'design-knowledge');
+  const manifestPath = path.join(snapshotRoot, 'manifest.json');
+  if (!fs.existsSync(manifestPath) || fs.lstatSync(manifestPath).isSymbolicLink()) {
+    throw new Error(`Design Knowledge snapshot manifest is missing: ${manifestPath}`);
+  }
+  let manifest;
+  try {
+    manifest = readJson(manifestPath);
+  } catch (error) {
+    throw new Error(`Design Knowledge snapshot manifest is invalid: ${error.message}`);
+  }
+  if (manifest?.schemaVersion !== 1 || typeof manifest.snapshotVersion !== 'string') {
+    throw new Error('Design Knowledge snapshot manifest has an unsupported schema');
+  }
+  const snapshotFiles = [];
+  for (const platform of ['desktop', 'mobile']) {
+    const descriptor = manifest.indexes?.[platform];
+    if (!descriptor || !Number.isInteger(descriptor.count) || !/^sha256:[a-f0-9]{64}$/u.test(descriptor.hash)) {
+      throw new Error(`Design Knowledge snapshot index descriptor is invalid: ${platform}`);
+    }
+    const indexPath = path.resolve(snapshotRoot, descriptor.path);
+    if (!isInsideDirectory(snapshotRoot, indexPath) || !fs.existsSync(indexPath) || fs.lstatSync(indexPath).isSymbolicLink()) {
+      throw new Error(`Design Knowledge snapshot index path is invalid: ${platform}`);
+    }
+    const indexBytes = fs.readFileSync(indexPath);
+    if (`sha256:${crypto.createHash('sha256').update(indexBytes).digest('hex')}` !== descriptor.hash) {
+      throw new Error(`Design Knowledge snapshot index hash mismatch: ${platform}`);
+    }
+    let index;
+    try { index = JSON.parse(indexBytes.toString('utf8')); } catch (error) { throw new Error(`Design Knowledge snapshot index is invalid: ${platform}`); }
+    if (index.platform !== platform || !Array.isArray(index.records) || index.records.length !== descriptor.count) {
+      throw new Error(`Design Knowledge snapshot index count/platform mismatch: ${platform}`);
+    }
+    snapshotFiles.push(indexPath);
+    for (const record of index.records) {
+      const artifact = record?.artifacts;
+      if (!record?.publishable || record.reviewStatus !== 'approved' || !artifact || !/^sha256:[a-f0-9]{64}$/u.test(artifact.designMdHash)) {
+        throw new Error(`Design Knowledge snapshot record is invalid: ${record?.id || '(unknown)'}`);
+      }
+      const designPath = path.resolve(snapshotRoot, artifact.designMdPath);
+      if (!isInsideDirectory(snapshotRoot, designPath) || !fs.existsSync(designPath) || fs.lstatSync(designPath).isSymbolicLink()) {
+        throw new Error(`Design Knowledge DESIGN.md path is invalid: ${record.id}`);
+      }
+      const designBytes = fs.readFileSync(designPath);
+      if (`sha256:${crypto.createHash('sha256').update(designBytes).digest('hex')}` !== artifact.designMdHash) {
+        throw new Error(`Design Knowledge DESIGN.md hash mismatch: ${record.id}`);
+      }
+      snapshotFiles.push(designPath);
+    }
+  }
+  if (manifest.designMd?.count !== new Set(snapshotFiles.filter((filePath) => filePath.includes(`${path.sep}design-md${path.sep}`))).size) {
+    throw new Error('Design Knowledge snapshot DESIGN.md count mismatch');
+  }
+  for (const filePath of walkFiles(snapshotRoot)) {
+    const relative = path.relative(snapshotRoot, filePath).split(path.sep).join('/');
+    if (/(?:\.tgz|\.zip)$/u.test(relative) || relative.startsWith('.local/')) {
+      throw new Error(`Design Knowledge snapshot contains a forbidden release file: ${relative}`);
+    }
+  }
+}
+
+function isInsideDirectory(root, candidate) {
+  const relative = path.relative(path.resolve(root), path.resolve(candidate));
+  return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+}
+
 function addTemplateSourceFile(entries, sourceClientDir, relativeSourcePath, relativeOutputPath = relativeSourcePath) {
   const sourcePath = path.join(sourceClientDir, ...relativeSourcePath.split('/'));
   if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
@@ -1091,6 +1157,10 @@ export function createMakeClientTemplateZip({
   if (!fs.existsSync(path.join(sourceClientDir, 'package.json'))) {
     throw new Error(`Make client template source is missing package.json: ${sourceClientDir}`);
   }
+  const contentManifest = loadMakeClientTemplateContentManifest(sourceClientDir);
+  if (contentManifest.runtime.directories.includes('design-knowledge')) {
+    validateDesignKnowledgeSnapshot(sourceClientDir);
+  }
   fs.mkdirSync(outputDir, { recursive: true });
   const zipPath = path.join(outputDir, makeClientTemplateZipName);
   fs.rmSync(zipPath, { force: true });
@@ -1333,9 +1403,12 @@ export function createCliEntrypointSource(cliImportPath, options = {}) {
   const importStatement = options.dynamicImport
     ? `const { handleCliError, runCli } = await import(${JSON.stringify(cliImportPath)});`
     : `import { handleCliError, runCli } from ${JSON.stringify(cliImportPath)};`;
+  const runExpression = options.selfContainedExecutable
+    ? 'runCli(process.argv.slice(2), { selfContainedExecutable: true })'
+    : 'runCli()';
   return `${options.disableAutoRun ? "process.env.AXHUB_MAKE_DISABLE_AUTO_RUN = '1';\n" : ''}${importStatement}
 
-runCli()
+${runExpression}
   .then((exitCode) => {
     process.exitCode = exitCode;
   })
@@ -1399,6 +1472,7 @@ function createBunEntrypoint() {
   fs.writeFileSync(entryPath, createCliEntrypointSource(cliPath, {
     disableAutoRun: true,
     dynamicImport: true,
+    selfContainedExecutable: true,
   }), 'utf8');
   return entryPath;
 }
@@ -1697,18 +1771,31 @@ function getCurrentTargetId() {
   return null;
 }
 
-function npmBinPath(tempInstallDir) {
-  const binName = process.platform === 'win32' ? 'axhub-make.cmd' : 'axhub-make';
-  return path.join(tempInstallDir, 'node_modules/.bin', binName);
-}
-
 function installedBinPath(tempInstallDir, binName) {
   const commandName = process.platform === 'win32' ? `${binName}.cmd` : binName;
   return path.join(tempInstallDir, 'node_modules/.bin', commandName);
 }
 
+export function createInstalledNpmBinCommand(tempInstallDir, binName, options = {}) {
+  const platform = options.platform || process.platform;
+  if (platform === 'win32') {
+    const binTarget = requiredNpmBin[binName];
+    if (!binTarget) {
+      throw new Error(`Unknown npm bin: ${binName}`);
+    }
+    return {
+      command: options.nodeExecutable || process.execPath,
+      args: [path.join(tempInstallDir, 'node_modules', '@axhub', 'make', binTarget)],
+    };
+  }
+  return {
+    command: installedBinPath(tempInstallDir, binName),
+    args: [],
+  };
+}
+
 export function createNpmExecSmokeArgs(tarballPath) {
-  return ['exec', '--yes', tarballPath, '--', '--help'];
+  return ['exec', '--yes', `--package=${tarballPath}`, '--', 'make', '--help'];
 }
 
 function findFreePort() {
@@ -1734,7 +1821,7 @@ async function waitForHttpOk(url, child, label) {
   const deadline = Date.now() + 20_000;
   let lastError = null;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) {
+    if (child && child.exitCode !== null) {
       throw new Error(`${label} exited before becoming ready with code ${child.exitCode}`);
     }
     try {
@@ -1751,24 +1838,51 @@ async function waitForHttpOk(url, child, label) {
   throw new Error(`${label} did not become ready: ${lastError?.message || 'timeout'}`);
 }
 
+export function createServerProbeLaunchOptions(params) {
+  return {
+    args: [
+      '--host',
+      '127.0.0.1',
+      '--port',
+      String(params.port),
+      '--admin-root',
+      params.adminRoot,
+    ],
+    env: {
+      AXHUB_MAKE_CANVAS_FIG_SYNC: params.canvasFigSyncPath,
+      ...(params.env || {}),
+      AXHUB_MAKE_HOME_DIR: params.makeHomeDir,
+    },
+  };
+}
+
+export function createBackgroundServerProbeArgs(foregroundArgs) {
+  return [...foregroundArgs, '--background', '--no-open', '--json'];
+}
+
+function readCliJsonResult(result, label) {
+  const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+  const lastLine = output.split(/\r?\n/u).filter(Boolean).at(-1) || '';
+  try {
+    return JSON.parse(lastLine);
+  } catch {
+    throw new Error(`${label} did not return a JSON result: ${output || '(no output)'}`);
+  }
+}
+
 async function startAndProbeServer(params) {
   const port = await findFreePort();
-  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-make-release-project-'));
-  const args = [
-    projectRoot,
-    '--host',
-    '127.0.0.1',
-    '--port',
-    String(port),
-    '--admin-root',
-    params.adminRoot,
-  ];
-  const child = spawn(params.command, args, {
+  const makeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-make-release-home-'));
+  const launch = createServerProbeLaunchOptions({
+    ...params,
+    port,
+    makeHomeDir,
+  });
+  const child = spawn(params.command, [...(params.commandArgs || []), ...launch.args], {
     cwd: params.cwd || repoRoot,
     env: {
       ...process.env,
-      AXHUB_MAKE_CANVAS_FIG_SYNC: params.canvasFigSyncPath,
-      ...(params.env || {}),
+      ...launch.env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -1800,11 +1914,50 @@ async function startAndProbeServer(params) {
       child.once('exit', resolve);
       setTimeout(resolve, 1000);
     });
-    fs.rmSync(projectRoot, { recursive: true, force: true });
+    fs.rmSync(makeHomeDir, { recursive: true, force: true });
   }
 
   if (output.trim()) {
     console.log(output.trim().split('\n').slice(0, 4).join('\n'));
+  }
+}
+
+async function startAndProbeBackgroundServer(params) {
+  const port = await findFreePort();
+  const makeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-make-release-background-home-'));
+  const launch = createServerProbeLaunchOptions({
+    ...params,
+    port,
+    makeHomeDir,
+  });
+  const commandArgs = params.commandArgs || [];
+  const runOptions = {
+    cwd: params.cwd || repoRoot,
+    env: launch.env,
+    capture: true,
+  };
+
+  try {
+    const startResult = run(
+      params.command,
+      [...commandArgs, ...createBackgroundServerProbeArgs(launch.args)],
+      runOptions,
+    );
+    const started = readCliJsonResult(startResult, `${params.label} background start`);
+    if (!started.ok || !['make-started', 'make-running'].includes(started.code)) {
+      throw new Error(`${params.label} background start failed: ${JSON.stringify(started)}`);
+    }
+    await waitForHttpOk(`http://127.0.0.1:${port}/api/health`, null, params.label);
+  } finally {
+    try {
+      const stopResult = run(params.command, [...commandArgs, 'stop', '--json'], runOptions);
+      const stopped = readCliJsonResult(stopResult, `${params.label} background stop`);
+      if (!stopped.ok || stopped.code !== 'make-stopped') {
+        throw new Error(`${params.label} background stop failed: ${JSON.stringify(stopped)}`);
+      }
+    } finally {
+      fs.rmSync(makeHomeDir, { recursive: true, force: true });
+    }
   }
 }
 
@@ -1818,14 +1971,16 @@ async function testPreparedArtifacts() {
     run('npm', ['init', '-y'], { cwd: tempInstallDir, capture: true });
     run('npm', ['install', manifest.npmTarballPath, '--ignore-scripts'], { cwd: tempInstallDir });
 
-    const installedBin = npmBinPath(tempInstallDir);
     for (const binName of Object.keys(requiredNpmBin)) {
-      run(installedBinPath(tempInstallDir, binName), ['--help'], { cwd: tempInstallDir, capture: true });
+      const installedBin = createInstalledNpmBinCommand(tempInstallDir, binName, { platform: process.platform });
+      run(installedBin.command, [...installedBin.args, '--help'], { cwd: tempInstallDir, capture: true });
     }
     run('npm', createNpmExecSmokeArgs(manifest.npmTarballPath), { cwd: tempInstallDir, capture: true });
+    const installedBin = createInstalledNpmBinCommand(tempInstallDir, 'axhub-make', { platform: process.platform });
     await startAndProbeServer({
       label: 'installed npm CLI',
-      command: installedBin,
+      command: installedBin.command,
+      commandArgs: installedBin.args,
       cwd: tempInstallDir,
       adminRoot: manifest.adminDir,
       canvasFigSyncPath: path.join(npmPackageScriptsDir, 'canvas-fig-sync.mjs'),
@@ -1839,6 +1994,13 @@ async function testPreparedArtifacts() {
   if (currentAsset) {
     logStep(`Testing current-platform Bun executable (${currentTargetId})`);
     await startAndProbeServer({
+      label: `${currentTargetId} Bun executable`,
+      command: currentAsset.executablePath,
+      cwd: currentAsset.bundleDir,
+      adminRoot: path.join(currentAsset.bundleDir, 'admin'),
+      canvasFigSyncPath: path.join(currentAsset.bundleDir, 'scripts/canvas-fig-sync.mjs'),
+    });
+    await startAndProbeBackgroundServer({
       label: `${currentTargetId} Bun executable`,
       command: currentAsset.executablePath,
       cwd: currentAsset.bundleDir,

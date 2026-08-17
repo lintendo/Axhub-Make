@@ -2,6 +2,9 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "@axhub/agent-surface": [
+        "./vendor/agent-surface/dist/index.d.ts"
+      ],
       "@axhub/excalidraw": [
         "./vendor/axhub-excalidraw/dist/types/excalidraw/index.d.ts"
       ],

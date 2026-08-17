@@ -35,9 +35,9 @@ var init_define_import_meta_env = __esm({
   }
 });
 
-// ../../../excalidraw-upstream/node_modules/lodash.throttle/index.js
+// ../../node_modules/lodash.throttle/index.js
 var require_lodash = __commonJS({
-  "../../../excalidraw-upstream/node_modules/lodash.throttle/index.js"(exports, module) {
+  "../../node_modules/lodash.throttle/index.js"(exports, module) {
     init_define_import_meta_env();
     var FUNC_ERROR_TEXT = "Expected a function";
     var NAN = 0 / 0;
@@ -204,28 +204,28 @@ import { pointsEqual as pointsEqual7 } from "@excalidraw/math";
 // src/bounds.ts
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/rough.js
+// ../../node_modules/roughjs/bin/rough.js
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/canvas.js
+// ../../node_modules/roughjs/bin/canvas.js
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/generator.js
+// ../../node_modules/roughjs/bin/generator.js
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/renderer.js
+// ../../node_modules/roughjs/bin/renderer.js
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/fillers/filler.js
+// ../../node_modules/roughjs/bin/fillers/filler.js
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/fillers/hachure-filler.js
+// ../../node_modules/roughjs/bin/fillers/hachure-filler.js
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/fillers/scan-line-hachure.js
+// ../../node_modules/roughjs/bin/fillers/scan-line-hachure.js
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/hachure-fill/bin/hachure.js
+// ../../node_modules/hachure-fill/bin/hachure.js
 init_define_import_meta_env();
 function rotatePoints(points, center, degrees) {
   if (points && points.length) {
@@ -371,7 +371,7 @@ function straightHachureLines(polygons, gap, hachureStepOffset) {
   return lines;
 }
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/fillers/scan-line-hachure.js
+// ../../node_modules/roughjs/bin/fillers/scan-line-hachure.js
 function polygonHachureLines(polygonList, o) {
   var _a;
   const angle = o.hachureAngle + 90;
@@ -389,7 +389,7 @@ function polygonHachureLines(polygonList, o) {
   return hachureLines(polygonList, gap, angle, skipOffset || 1);
 }
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/fillers/hachure-filler.js
+// ../../node_modules/roughjs/bin/fillers/hachure-filler.js
 var HachureFiller = class {
   constructor(helper2) {
     this.helper = helper2;
@@ -411,10 +411,10 @@ var HachureFiller = class {
   }
 };
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/fillers/zigzag-filler.js
+// ../../node_modules/roughjs/bin/fillers/zigzag-filler.js
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/geometry.js
+// ../../node_modules/roughjs/bin/geometry.js
 init_define_import_meta_env();
 function lineLength(line2) {
   const p1 = line2[0];
@@ -422,7 +422,7 @@ function lineLength(line2) {
   return Math.sqrt(Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2));
 }
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/fillers/zigzag-filler.js
+// ../../node_modules/roughjs/bin/fillers/zigzag-filler.js
 var ZigZagFiller = class extends HachureFiller {
   fillPolygons(polygonList, o) {
     let gap = o.hachureGap;
@@ -452,7 +452,7 @@ var ZigZagFiller = class extends HachureFiller {
   }
 };
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/fillers/hatch-filler.js
+// ../../node_modules/roughjs/bin/fillers/hatch-filler.js
 init_define_import_meta_env();
 var HatchFiller = class extends HachureFiller {
   fillPolygons(polygonList, o) {
@@ -464,7 +464,7 @@ var HatchFiller = class extends HachureFiller {
   }
 };
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/fillers/dot-filler.js
+// ../../node_modules/roughjs/bin/fillers/dot-filler.js
 init_define_import_meta_env();
 var DotFiller = class {
   constructor(helper2) {
@@ -506,7 +506,7 @@ var DotFiller = class {
   }
 };
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/fillers/dashed-filler.js
+// ../../node_modules/roughjs/bin/fillers/dashed-filler.js
 init_define_import_meta_env();
 var DashedFiller = class {
   constructor(helper2) {
@@ -543,7 +543,7 @@ var DashedFiller = class {
   }
 };
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/fillers/zigzag-line-filler.js
+// ../../node_modules/roughjs/bin/fillers/zigzag-line-filler.js
 init_define_import_meta_env();
 var ZigZagLineFiller = class {
   constructor(helper2) {
@@ -582,7 +582,7 @@ var ZigZagLineFiller = class {
   }
 };
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/fillers/filler.js
+// ../../node_modules/roughjs/bin/fillers/filler.js
 var fillers = {};
 function getFiller(o, helper2) {
   let fillerName = o.fillStyle || "hachure";
@@ -625,7 +625,7 @@ function getFiller(o, helper2) {
   return fillers[fillerName];
 }
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/math.js
+// ../../node_modules/roughjs/bin/math.js
 init_define_import_meta_env();
 function randomSeed() {
   return Math.floor(Math.random() * 2 ** 31);
@@ -643,10 +643,10 @@ var Random = class {
   }
 };
 
-// ../../../excalidraw-upstream/node_modules/path-data-parser/lib/index.js
+// ../../node_modules/path-data-parser/lib/index.js
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/path-data-parser/lib/parser.js
+// ../../node_modules/path-data-parser/lib/parser.js
 init_define_import_meta_env();
 var COMMAND = 0;
 var NUMBER = 1;
@@ -725,7 +725,7 @@ function parsePath(d) {
   return segments;
 }
 
-// ../../../excalidraw-upstream/node_modules/path-data-parser/lib/absolutize.js
+// ../../node_modules/path-data-parser/lib/absolutize.js
 init_define_import_meta_env();
 function absolutize(segments) {
   let cx = 0, cy = 0;
@@ -837,7 +837,7 @@ function absolutize(segments) {
   return out;
 }
 
-// ../../../excalidraw-upstream/node_modules/path-data-parser/lib/normalize.js
+// ../../node_modules/path-data-parser/lib/normalize.js
 init_define_import_meta_env();
 function normalize(segments) {
   const out = [];
@@ -1052,7 +1052,7 @@ function arcToCubicCurves(x1, y1, x2, y2, r1, r2, angle, largeArcFlag, sweepFlag
   }
 }
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/renderer.js
+// ../../node_modules/roughjs/bin/renderer.js
 var helper = {
   randOffset,
   randOffsetWithRange,
@@ -1511,7 +1511,7 @@ function _bezierTo(x1, y1, x2, y2, x, y, current, o) {
   return ops;
 }
 
-// ../../../excalidraw-upstream/node_modules/points-on-curve/lib/curve-to-bezier.js
+// ../../node_modules/points-on-curve/lib/curve-to-bezier.js
 init_define_import_meta_env();
 function clone(p) {
   return [...p];
@@ -1548,7 +1548,7 @@ function curveToBezier(pointsIn, curveTightness = 0) {
   return out;
 }
 
-// ../../../excalidraw-upstream/node_modules/points-on-curve/lib/index.js
+// ../../node_modules/points-on-curve/lib/index.js
 init_define_import_meta_env();
 function distance(p1, p2) {
   return Math.sqrt(distanceSq(p1, p2));
@@ -1662,7 +1662,7 @@ function pointsOnBezierCurves(points, tolerance = 0.15, distance3) {
   return newPoints;
 }
 
-// ../../../excalidraw-upstream/node_modules/points-on-path/lib/index.js
+// ../../node_modules/points-on-path/lib/index.js
 init_define_import_meta_env();
 function pointsOnPath(path, tolerance, distance3) {
   const segments = parsePath(path);
@@ -1724,7 +1724,7 @@ function pointsOnPath(path, tolerance, distance3) {
   return out;
 }
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/generator.js
+// ../../node_modules/roughjs/bin/generator.js
 var NOS = "none";
 var RoughGenerator = class {
   constructor(config) {
@@ -1986,7 +1986,7 @@ var RoughGenerator = class {
   }
 };
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/canvas.js
+// ../../node_modules/roughjs/bin/canvas.js
 var RoughCanvas = class {
   constructor(canvas, config) {
     this.canvas = canvas;
@@ -2119,14 +2119,14 @@ var RoughCanvas = class {
   }
 };
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/svg.js
+// ../../node_modules/roughjs/bin/svg.js
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/core.js
+// ../../node_modules/roughjs/bin/core.js
 init_define_import_meta_env();
 var SVGNS = "http://www.w3.org/2000/svg";
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/svg.js
+// ../../node_modules/roughjs/bin/svg.js
 var RoughSVG = class {
   constructor(svg, config) {
     this.svg = svg;
@@ -2242,7 +2242,7 @@ var RoughSVG = class {
   }
 };
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/rough.js
+// ../../node_modules/roughjs/bin/rough.js
 var rough_default = {
   canvas(canvas, config) {
     return new RoughCanvas(canvas, config);
@@ -2448,7 +2448,7 @@ var getClosedCurveShape = (element, roughShape, startingPoint = pointFrom(0, 0),
 // src/shape.ts
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/perfect-freehand/dist/esm/index.js
+// ../../node_modules/perfect-freehand/dist/esm/index.js
 init_define_import_meta_env();
 function $(e, t, u, x = (h) => h) {
   return e * x(0.5 - t * (0.5 - u));

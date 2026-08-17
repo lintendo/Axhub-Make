@@ -4,12 +4,29 @@ import type {
     CommentaryDebugState,
     CommentaryHostToolbarAction,
     CommentaryHostToolbarState,
+    CommentaryModifiedElementSummary,
+    CommentaryPageElementActivationResult,
+    CommentaryPageElementSearchQuery,
+    CommentaryPageElementSearchResult,
+    CommentaryPageElementStructureQuery,
+    CommentaryPageElementStructureResult,
+    CommentaryVoiceCommentOptions,
+    CommentaryVoiceCommentResult,
+    CommentaryVoiceTargets,
+    CommentaryVoiceTargetsListener,
 } from '@/common/web-editor-types';
 import type { AxureCopyOptions, ImageConfig } from '../../types';
 import type { ExportIndexBundle } from '../../services/api';
 import type { PreviewConfig } from '../../domains/device/preview-layout';
 import { getExplicitLocalPath, stripIndexFilePath } from '../../utils/localPath';
 import { appendEditorLaunchOptionsToUrl, type BuildEditorUrlOptions } from '../../utils/url';
+import type {
+    QuickEditSaveAction,
+    QuickEditSaveCommitResult,
+    QuickEditSaveDraft,
+    QuickEditSavePreflight,
+} from '@/common/quickEditSave';
+export type { QuickEditSaveAction } from '@/common/quickEditSave';
 
 export const DEVICE_SIZES = {
     desktop: { id: 'desktop', width: 1440, height: 900 },
@@ -24,6 +41,48 @@ export type PrototypePanePrompt = {
     promptText: string | null | undefined;
 };
 export type QuickEditRuntimeStatus = 'idle' | 'pending' | 'ready' | 'missing' | 'error';
+
+export function hasPrototypeDecisionData(
+    state: Pick<CommentaryHostToolbarState, 'propertyPanelVisible'> | null | undefined,
+    decisionDataCount = 0,
+): boolean {
+    return Boolean(state?.propertyPanelVisible) || Number(decisionDataCount || 0) > 0;
+}
+
+const MOBILE_ANNOTATION_MAX_WIDTH = 768;
+
+export function resolvePrototypeEditorMobileMode(
+    resourceType: 'prototype' | 'theme',
+    pane: PreviewPane,
+    previewConfig: PreviewConfig,
+): boolean {
+    if (resourceType !== 'prototype') {
+        return false;
+    }
+    if (pane === 'secondary') {
+        return true;
+    }
+    if (previewConfig.previewMode !== 'single') {
+        return false;
+    }
+    if (previewConfig.singlePreset === 'mobile') {
+        return true;
+    }
+    return previewConfig.singlePreset === 'custom'
+        && Number.isFinite(previewConfig.customWidth)
+        && (previewConfig.customWidth as number) <= MOBILE_ANNOTATION_MAX_WIDTH;
+}
+
+export function isQuickEditRuntimeReadyForIframe(
+    status: QuickEditRuntimeStatus,
+    readyIframe: HTMLIFrameElement | null | undefined,
+    currentIframe: HTMLIFrameElement | null | undefined,
+): boolean {
+    return status === 'ready'
+        && Boolean(currentIframe)
+        && readyIframe === currentIframe;
+}
+
 export type QuickEditMessageType =
     | 'axhub.quickEdit.runtimeReady'
     | 'axhub.quickEdit.patch'
@@ -33,7 +92,44 @@ export type QuickEditMessageType =
     | 'axhub.quickEdit.export.copyToFigmaResult'
     | 'axhub.quickEdit.export.captureScreenshotResult'
     | 'axhub.quickEdit.export.axureJsonResult';
-export type QuickEditSaveAction = 'save-text' | 'save-style' | 'clear-style';
+
+export function createPreviewRefreshRestoreSnapshot<T extends Record<string, unknown>>(params: {
+    prototypeEditorActive: boolean;
+    documentEditorActive: boolean;
+    prototypeEditorLaunchOptions: T;
+    selectionModeActive: boolean;
+    documentQuickEditMode: 'comment' | 'edit';
+    standalonePanelOpen: boolean;
+}) {
+    return {
+        prototypeEditor: params.prototypeEditorActive
+            ? {
+                ...params.prototypeEditorLaunchOptions,
+                selectionModeActive: params.selectionModeActive,
+            }
+            : null,
+        documentQuickEditMode: params.documentEditorActive
+            ? params.documentQuickEditMode
+            : null,
+        standalonePanelOpen: params.standalonePanelOpen,
+    };
+}
+
+export function resolveDocumentRefreshRestoreStatus(
+    pendingMode: 'comment' | 'edit' | null,
+    status: { enabled: boolean },
+): { acceptStatus: boolean; restoreMode: 'comment' | 'edit' | null } {
+    if (pendingMode && !status.enabled) {
+        return {
+            acceptStatus: false,
+            restoreMode: pendingMode,
+        };
+    }
+    return {
+        acceptStatus: true,
+        restoreMode: null,
+    };
+}
 
 export function createPrototypeSpecMarkdownStatusGate() {
     let phase: 'idle' | 'waiting' | 'starting' | 'active' = 'idle';
@@ -145,6 +241,32 @@ export function resolveCurrentPreviewScreenshotSize(
     return fallback;
 }
 
+export function resolveExportScreenshotViewportSize(options: {
+    currentPreviewSize: { width: number; height: number };
+    configuredSize: { width: number; height: number };
+    userSetDimensions: boolean;
+    explicitWidth?: number;
+    explicitHeight?: number;
+}): { width: number; height: number; shouldSyncConfig: boolean } {
+    const explicitWidth = Number.isFinite(options.explicitWidth) ? options.explicitWidth : undefined;
+    const explicitHeight = Number.isFinite(options.explicitHeight) ? options.explicitHeight : undefined;
+    const useConfiguredSize = options.userSetDimensions
+        || explicitWidth !== undefined
+        || explicitHeight !== undefined;
+    if (useConfiguredSize) {
+        return {
+            width: explicitWidth ?? options.configuredSize.width,
+            height: explicitHeight ?? options.configuredSize.height,
+            shouldSyncConfig: false,
+        };
+    }
+    return {
+        ...options.currentPreviewSize,
+        shouldSyncConfig: options.configuredSize.width !== options.currentPreviewSize.width
+            || options.configuredSize.height !== options.currentPreviewSize.height,
+    };
+}
+
 export const DEFAULT_AXURE_COPY_OPTIONS: AxureCopyOptions = {
     preserveHierarchy: false,
     preserveSvgIcons: true,
@@ -154,6 +276,7 @@ export const DEFAULT_EXPORT_IMAGE_CONFIG: ImageConfig = {
     width: 500,
     height: 300,
     includeConfig: 'code',
+    includeImageAssets: true,
     contentType: 'title',
     isFullScreen: true,
     rawScreenshotUrl: '',
@@ -169,6 +292,27 @@ export type HostToolbarEditorsApi = {
     getCopyPromptText?: () => string;
     getElementPromptText?: (elementKey: string) => string;
     getEditedSnapshot?: () => CommentaryEditedSnapshot;
+    getDebugState?: () => CommentaryDebugState | null;
+    /** Safe selected-first / hovered Commentary target for the voice surface. */
+    getVoiceTarget?: () => unknown;
+    getVoiceTargets?: () => CommentaryVoiceTargets;
+    subscribeVoiceTargets?: (listener: CommentaryVoiceTargetsListener) => () => void;
+    findVoiceElements?: (query: CommentaryPageElementSearchQuery) => CommentaryPageElementSearchResult;
+    getVoiceElementStructure?: (
+        query: CommentaryPageElementStructureQuery,
+    ) => CommentaryPageElementStructureResult;
+    activateVoiceElement?: (targetRef: string) => Promise<CommentaryPageElementActivationResult>;
+    createVoiceComment?: (
+      targetRef: string,
+      content: string,
+      options: CommentaryVoiceCommentOptions,
+    ) => Promise<CommentaryVoiceCommentResult>;
+    validateExternalEditingTarget?: (
+        elementKey: string,
+        targetRef?: CommentaryExternalEditingTargetRef | null,
+    ) => boolean | Promise<boolean>;
+    /** Reload persisted annotations after a host-side voice write. */
+    refreshPersistedComments?: (deletedCommentIds?: readonly string[]) => void | Promise<void>;
     setNodeEditingState?: (
         elementKey: string,
         nextState: 'editing' | 'idle' | 'completed' | 'error',
@@ -186,6 +330,7 @@ export type HostToolbarEditorsApi = {
 };
 
 export type DocumentEditorApi = HostToolbarEditorsApi & {
+    setContext?: (context: { projectId: string; documentPath: string; makeServerOrigin?: string }) => void;
     enableDocumentEditor?: (options?: {
         toolbarMode?: 'inline' | 'host';
         quickEditMode?: 'comment' | 'edit';
@@ -196,13 +341,15 @@ export type DocumentEditorApi = HostToolbarEditorsApi & {
 };
 
 export type PrototypeEditorContext = {
-    projectId?: string;
-    resourceId?: string;
-    resourceType: 'prototype' | 'theme';
-    pane: PreviewPane;
-    pageId?: string;
-    commentPageScope?: string;
-    mobileMode: boolean;
+  projectId?: string;
+  resourceId?: string;
+  documentPath?: string;
+  makeServerOrigin?: string;
+  resourceType: 'prototype' | 'theme';
+  pane: PreviewPane;
+  pageId?: string;
+  commentPageScope?: string;
+  mobileMode: boolean;
 };
 
 export type PrototypeEditorApi = HostToolbarEditorsApi & {
@@ -211,6 +358,7 @@ export type PrototypeEditorApi = HostToolbarEditorsApi & {
         initialDarkMode?: boolean;
         assistantPanelOpen?: boolean;
         commentPageScope?: string;
+        makeServerOrigin?: string;
         annotationApiBaseUrl?: string;
         annotationProjectId?: string;
     }) => void | Promise<void>;
@@ -219,11 +367,15 @@ export type PrototypeEditorApi = HostToolbarEditorsApi & {
     saveWebEditorTextChanges?: () => void | Promise<void>;
     saveWebEditorStyleChanges?: () => void | Promise<void>;
     clearWebEditorForcedStyles?: () => void | Promise<void>;
+    prepareQuickEditSave?: (action: QuickEditSaveAction) => Promise<QuickEditSaveDraft | null>;
+    preflightQuickEditSave?: (draft: QuickEditSaveDraft) => Promise<QuickEditSavePreflight>;
+    commitQuickEditSave?: (draft: QuickEditSaveDraft) => Promise<QuickEditSaveCommitResult>;
     enablePanelOnly?: (options?: {
         toolbarMode?: 'inline' | 'host';
         initialDarkMode?: boolean;
         assistantPanelOpen?: boolean;
         commentPageScope?: string;
+        makeServerOrigin?: string;
         annotationApiBaseUrl?: string;
         annotationProjectId?: string;
     }) => void | Promise<void>;
@@ -233,6 +385,7 @@ export type PrototypeEditorApi = HostToolbarEditorsApi & {
 export type PrototypeEditorBridgeStateMessage = {
     type: 'AXHUB_PROTOTYPE_EDITOR_STATE';
     requestId?: string;
+    subscriptionId?: string;
     success?: boolean;
     handled?: boolean;
     active?: boolean;
@@ -241,18 +394,105 @@ export type PrototypeEditorBridgeStateMessage = {
     hostToolbarState?: CommentaryHostToolbarState | null;
     debugState?: CommentaryDebugState | null;
     promptText?: string;
+    voiceTargets?: CommentaryVoiceTargets;
+    voiceSearchResult?: CommentaryPageElementSearchResult;
+    voiceStructureResult?: CommentaryPageElementStructureResult;
+    voiceActivationResult?: CommentaryPageElementActivationResult;
+    voiceCommentResult?: CommentaryVoiceCommentResult;
+    editingTargetValid?: boolean;
+    modifiedElements?: CommentaryModifiedElementSummary[];
     decisionDataCount?: number;
+    saveDraft?: QuickEditSaveDraft | null;
+    savePreflight?: QuickEditSavePreflight | null;
+    saveCommitResult?: QuickEditSaveCommitResult | null;
 };
+
+export function createPrototypeEditorVoiceBridgeResponse(payload: {
+    requestId?: unknown;
+    subscriptionId?: string;
+    success: boolean;
+    error?: string;
+    voiceTargets?: CommentaryVoiceTargets;
+    voiceSearchResult?: CommentaryPageElementSearchResult;
+    voiceStructureResult?: CommentaryPageElementStructureResult;
+    voiceActivationResult?: CommentaryPageElementActivationResult;
+    voiceCommentResult?: CommentaryVoiceCommentResult;
+    editingTargetValid?: boolean;
+}): PrototypeEditorBridgeStateMessage {
+    return {
+        type: 'AXHUB_PROTOTYPE_EDITOR_STATE',
+        requestId: typeof payload.requestId === 'string' ? payload.requestId : undefined,
+        success: payload.success,
+        ...(payload.subscriptionId ? { subscriptionId: payload.subscriptionId } : {}),
+        ...(payload.error ? { error: payload.error } : {}),
+        ...(payload.voiceTargets ? { voiceTargets: payload.voiceTargets } : {}),
+        ...(payload.voiceSearchResult ? { voiceSearchResult: payload.voiceSearchResult } : {}),
+        ...(payload.voiceStructureResult ? { voiceStructureResult: payload.voiceStructureResult } : {}),
+        ...(payload.voiceActivationResult ? { voiceActivationResult: payload.voiceActivationResult } : {}),
+        ...(payload.voiceCommentResult ? { voiceCommentResult: payload.voiceCommentResult } : {}),
+        ...(typeof payload.editingTargetValid === 'boolean' ? { editingTargetValid: payload.editingTargetValid } : {}),
+    };
+}
+
+export function resolveAnnotationActionEditingTargets(
+    action: CommentaryHostToolbarAction | null | undefined,
+    modifiedElements: readonly CommentaryModifiedElementSummary[] = [],
+): Array<{
+    commentId?: string;
+    elementKey: string;
+    targetRef: { locator: ElementLocator | null; label: string };
+}> {
+    if (action?.type === 'send-to-agent') {
+        const elementKey = String(action.elementKey || '').trim();
+        if (elementKey) {
+            const commentId = String(action.commentId || '').trim()
+                || String(modifiedElements.find((item) => (
+                    String(item?.elementKey || '').trim() === elementKey
+                ))?.commentId || '').trim();
+            return [{
+                ...(commentId
+                    ? { commentId }
+                    : {}),
+                elementKey,
+                targetRef: {
+                    locator: action.locator ?? null,
+                    label: String(action.label || '').trim() || elementKey,
+                },
+            }];
+        }
+        const commentId = String(action.commentId || '').trim();
+        if (commentId) {
+            modifiedElements = modifiedElements.filter((item) => (
+                String(item?.commentId || '').trim() === commentId
+            ));
+        }
+    }
+
+    const targets = new Map<string, {
+        commentId?: string;
+        elementKey: string;
+        targetRef: { locator: ElementLocator | null; label: string };
+    }>();
+    for (const item of modifiedElements) {
+        const elementKey = String(item?.elementKey || '').trim();
+        if (!elementKey || targets.has(elementKey)) continue;
+        targets.set(elementKey, {
+            ...(String(item?.commentId || '').trim()
+                ? { commentId: String(item.commentId).trim() }
+                : {}),
+            elementKey,
+            targetRef: {
+                locator: item?.locator ?? null,
+                label: String(item?.label || '').trim() || elementKey,
+            },
+        });
+    }
+    return Array.from(targets.values());
+}
 
 export type PrototypeEditorSaveActionMessage = {
     type: 'AXHUB_PROTOTYPE_EDITOR_SAVE_ACTION';
     action: QuickEditSaveAction;
-};
-
-export type PrototypeEditorBridgePendingRequest = {
-    iframe: HTMLIFrameElement;
-    resolve: (message: PrototypeEditorBridgeStateMessage | null) => void;
-    timeoutId: number;
 };
 
 const HOST_TOOLBAR_STATE_SETTLE_TIMEOUT_MS = 1500;
@@ -329,6 +569,8 @@ export function resolveHostToolbarStateForDisplay(
             visible: true,
             darkMode: resolvedDarkMode,
             disablePageAnimations: nextState.disablePageAnimations,
+            captureTargetScreenshotAvailable: nextState.captureTargetScreenshotAvailable,
+            captureTargetScreenshot: nextState.captureTargetScreenshot,
             pageZoomEnabled: nextState.pageZoomEnabled,
             propertyPanelOpen: nextState.propertyPanelOpen,
             modifiedCount: nextState.modifiedCount,
@@ -532,6 +774,8 @@ export function createDefaultHostToolbarState(): CommentaryHostToolbarState {
         aiExecutionProviderOptions: [],
         darkMode: false,
         disablePageAnimations: false,
+        captureTargetScreenshotAvailable: false,
+        captureTargetScreenshot: false,
         pageZoomEnabled: false,
         copySkillInstallPromptDisabled: false,
         selectionModeActive: true,

@@ -220,7 +220,7 @@ export default function InvoiceRateLimitA() {
                 <section className="invoice-lab-hero">
                     <div className="invoice-lab-hero-copy">
                         <p className="invoice-lab-kicker">REPRODUCTION PROTOTYPE · INVOICE RATE LIMIT A</p>
-                        <h1>当 effect 遇上<br /><em>无限重启。</em></h1>
+                        <h1>无限重启循环</h1>
                         <p className="invoice-lab-lede">一个最小化的 16 文件上传模拟，用可观测指标复现 callback 依赖链带来的生命周期抖动，并验证可取消的修复方案。</p>
                     </div>
                     <div className="invoice-lab-hero-aside">

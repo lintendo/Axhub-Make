@@ -12,11 +12,11 @@ describe('normalizeSkillPath', () => {
       '/skills/stitch-skills/design-md/SKILL.md'
     );
     expect(normalizeSkillPath(' /skills/foo/./bar.md ')).toBe('/skills/foo/bar.md');
-    expect(normalizeSkillPath('.agents/skills/prototype-comments/SKILL.md')).toBe(
-      '.agents/skills/prototype-comments/SKILL.md',
+    expect(normalizeSkillPath('.agents/skills/handle-comments/SKILL.md')).toBe(
+      '.agents/skills/handle-comments/SKILL.md',
     );
-    expect(normalizeSkillPath('.claude\\skills\\prototype-comments\\SKILL.md')).toBe(
-      '.claude/skills/prototype-comments/SKILL.md',
+    expect(normalizeSkillPath('.claude\\skills\\handle-comments\\SKILL.md')).toBe(
+      '.claude/skills/handle-comments/SKILL.md',
     );
   });
 
@@ -48,13 +48,13 @@ describe('normalizeSkillSource', () => {
         .agents/skills/explore-options/SKILL.md
         .claude\\skills\\explore-options\\SKILL.md
         https://example.com/skills/remote.md
-        .agents/skills/prototype-comments/SKILL.md
+        .agents/skills/handle-comments/SKILL.md
       `),
     ).toBe(
       [
         '.agents/skills/explore-options/SKILL.md',
         '.claude/skills/explore-options/SKILL.md',
-        '.agents/skills/prototype-comments/SKILL.md',
+        '.agents/skills/handle-comments/SKILL.md',
       ].join('\n'),
     );
   });
