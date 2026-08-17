@@ -13,6 +13,13 @@ process.env.AXHUB_MAKE_RELEASE_SKIP_MAIN = '1';
 const releaseMake = await import('./release-make.mjs');
 
 const tempRoots = [];
+const fixedClientTemplateFiles = [
+  'templates/prd.md',
+  'templates/prototype-spec.md',
+  'templates/prototype-spec.html',
+  'templates/prototype-review.md',
+  'templates/ui-review.md',
+];
 
 function createTempRoot(prefix) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -605,10 +612,27 @@ describe('release make artifact helpers', () => {
     );
   });
 
-  it('keeps the approved annotation range while pinning exact client dependencies and pnpm', () => {
+  it('keeps the 0.1.20 client template identity, release notes, and pinned dependencies', () => {
     const clientPackageJson = JSON.parse(fs.readFileSync(path.resolve('client/package.json'), 'utf8'));
+    const runtimeConstants = fs.readFileSync(path.resolve('src/common/makeClientTemplate.ts'), 'utf8');
+    const releaseNotes = fs.readFileSync(path.resolve('client/RELEASE_NOTES.md'), 'utf8');
+    const serializedDefaultReleaseNotes = runtimeConstants.match(
+      /^export const DEFAULT_MAKE_CLIENT_TEMPLATE_RELEASE_NOTES = (?<notes>"(?:[^"\\]|\\.)*");$/mu,
+    )?.groups?.notes;
 
-    assert.equal(clientPackageJson.version, '0.1.18');
+    assert.equal(clientPackageJson.version, '0.1.20');
+    assert.match(
+      runtimeConstants,
+      /export const DEFAULT_MAKE_CLIENT_TEMPLATE_VERSION = '0\.1\.20';/u,
+    );
+    assert.match(releaseNotes, /^# Axhub Make Client 0\.1\.20$/mu);
+    assert.match(releaseNotes, /5 个.*固定模板/u);
+    assert.match(releaseNotes, /本地 Design Knowledge 检索/u);
+    assert.match(releaseNotes, /223 份.*DESIGN\.md/u);
+    assert.match(releaseNotes, /哈希验证.*主源.*Gitee.*固定回退/u);
+    assert.match(releaseNotes, /ZIP.*不包含.*本地主题源码/u);
+    assert.ok(serializedDefaultReleaseNotes, 'runtime default release notes must use a serialized string');
+    assert.equal(JSON.parse(serializedDefaultReleaseNotes), releaseNotes.trim());
     assert.equal(clientPackageJson.packageManager, 'pnpm@10.20.0');
     assert.equal(clientPackageJson.dependencies['@axhub/annotation'], '^1.0.18');
     assert.equal(clientPackageJson.dependencies['lucide-react'], '0.562.0');
@@ -1019,6 +1043,7 @@ describe('release make artifact helpers', () => {
           'scripts/build-all.js',
           'scripts/capture-theme-homepage.mjs',
           'scripts/capture-theme-source.mjs',
+          ...fixedClientTemplateFiles,
         ],
         directories: ['.agents/skills', '.claude/skills', 'design-knowledge', 'scripts/utils'],
         fileRules: [{
@@ -1102,6 +1127,9 @@ describe('release make artifact helpers', () => {
     writeFile(path.join(clientRoot, 'scripts/build-all.js'), 'export {};\n');
     writeFile(path.join(clientRoot, 'scripts/capture-theme-homepage.mjs'), 'export {};\n');
     writeFile(path.join(clientRoot, 'scripts/capture-theme-source.mjs'), 'export {};\n');
+    for (const relativePath of fixedClientTemplateFiles) {
+      writeFile(path.join(clientRoot, relativePath), `# ${path.basename(relativePath)}\n`);
+    }
     writeFile(path.join(clientRoot, 'scripts/utils/runtime.mjs'), 'export {};\n');
     writeFile(path.join(clientRoot, 'scripts/collect-mobile-theme-screenshots.mjs'), 'export {};\n');
     writeFile(path.join(clientRoot, 'scripts/capture-theme-homepage.test.mjs'), 'export {};\n');
@@ -1228,6 +1256,10 @@ describe('release make artifact helpers', () => {
     assert(entries.includes('scripts/build-all.js'));
     assert(entries.includes('scripts/capture-theme-homepage.mjs'));
     assert(entries.includes('scripts/capture-theme-source.mjs'));
+    for (const relativePath of fixedClientTemplateFiles) {
+      assert(entries.includes(relativePath));
+    }
+    assert(!entries.some((entry) => entry.startsWith('src/resources/templates/')));
     assert(entries.includes('scripts/utils/runtime.mjs'));
     assert(!entries.includes('scripts/collect-mobile-theme-screenshots.mjs'));
     assert(!entries.includes('scripts/subset-beginner-guide-fonts.mjs'));
@@ -1291,6 +1323,31 @@ describe('release make artifact helpers', () => {
     assert(!entries.some((entry) => entry.startsWith('.axhub/sessions/')));
     assert(!entries.some((entry) => entry.startsWith('src/resources/prd/')));
     assert(!entries.includes('src/prototypes/beginner-guide/.spec/reviews/config.json'));
+  });
+
+  it('rejects non-regular fixed template runtime entries', () => {
+    for (const entryType of ['directory', 'symlink']) {
+      const sourceRoot = createTempRoot(`axhub-release-template-${entryType}-source-`);
+      const outputRoot = createTempRoot(`axhub-release-template-${entryType}-output-`);
+      const clientRoot = path.join(sourceRoot, 'client');
+      writeFile(path.join(clientRoot, 'package.json'), '{"name":"@axhub/make-client"}\n');
+      writeMinimalTemplateAssembly(clientRoot, ['package.json', 'templates/prd.md']);
+      fs.mkdirSync(path.join(clientRoot, 'templates'), { recursive: true });
+      if (entryType === 'directory') {
+        fs.mkdirSync(path.join(clientRoot, 'templates/prd.md'));
+      } else {
+        writeFile(path.join(clientRoot, 'shared-prd.md'), '# Shared PRD\n');
+        fs.symlinkSync('../shared-prd.md', path.join(clientRoot, 'templates/prd.md'), 'file');
+      }
+
+      assert.throws(
+        () => releaseMake.createMakeClientTemplateZip({
+          sourceClientDir: clientRoot,
+          outputDir: outputRoot,
+        }),
+        /runtime entry must be a regular file: templates\/prd\.md/u,
+      );
+    }
   });
 
   it('rejects make client template zips with local machine paths', async () => {

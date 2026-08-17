@@ -767,8 +767,12 @@ function isInsideDirectory(root, candidate) {
 
 function addTemplateSourceFile(entries, sourceClientDir, relativeSourcePath, relativeOutputPath = relativeSourcePath) {
   const sourcePath = path.join(sourceClientDir, ...relativeSourcePath.split('/'));
-  if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
+  if (!fs.existsSync(sourcePath)) {
     throw new Error(`Make client template source file is missing: ${relativeSourcePath}`);
+  }
+  const sourceStats = fs.lstatSync(sourcePath);
+  if (!sourceStats.isFile() || sourceStats.isSymbolicLink()) {
+    throw new Error(`Make client template runtime entry must be a regular file: ${relativeSourcePath}`);
   }
   const outputPath = relativeOutputPath.split(path.sep).join('/');
   if (shouldSkipTemplateSafetyEntry(path.posix.basename(outputPath), outputPath)) {
