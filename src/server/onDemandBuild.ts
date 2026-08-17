@@ -12,6 +12,7 @@
  * without requiring a prior `pnpm build` step.
  */
 
+import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
@@ -205,11 +206,12 @@ function loadVendorAliases(projectRoot: string): Array<{ packageName: string; ru
 
 async function importPackageFromProject<T = any>(projectRoot: string, packageName: string): Promise<T> {
   let entryPath: string;
-  try {
+  const projectPackageRoot = path.join(projectRoot, 'node_modules', ...packageName.split('/'));
+  if (fs.existsSync(projectPackageRoot)) {
     entryPath = requireFromCurrentModule.resolve(packageName, {
       paths: [projectRoot],
     });
-  } catch {
+  } else {
     entryPath = requireFromCurrentModule.resolve(packageName);
   }
   return import(pathToFileURL(entryPath).href) as Promise<T>;
@@ -236,6 +238,25 @@ function isAnnotationRuntimeModule(moduleId: string): boolean {
   return normalized.includes('/node_modules/@axhub/annotation/')
     || normalized.includes('/packages/axhub-annotation/src/')
     || normalized.includes('/packages/axhub-annotation/dist/');
+}
+
+function createEntryStylePlugin(entryFilePath: string) {
+  const resolvedEntryPath = path.resolve(entryFilePath);
+  const normalizedEntryPath = fs.realpathSync.native(resolvedEntryPath);
+  const stylePath = path.join(path.dirname(resolvedEntryPath), 'style.css');
+
+  return {
+    name: 'axhub-make-entry-style',
+    enforce: 'pre' as const,
+    load(id: string) {
+      const resolvedId = path.resolve(id.split('?', 1)[0]);
+      const normalizedId = fs.existsSync(resolvedId) ? fs.realpathSync.native(resolvedId) : resolvedId;
+      if (normalizedId !== normalizedEntryPath || !fs.existsSync(stylePath)) {
+        return null;
+      }
+      return `import './style.css';\n${fs.readFileSync(resolvedEntryPath, 'utf8')}`;
+    },
+  };
 }
 
 /**
@@ -265,6 +286,7 @@ export async function buildOnDemand(
     logLevel: 'silent',
     root: projectRoot,
     plugins: [
+      createEntryStylePlugin(entryFilePath),
       tailwindcss(),
       createAnnotationSourceMarkdownPlugin(projectRoot, { mode: 'build' }),
       react({
