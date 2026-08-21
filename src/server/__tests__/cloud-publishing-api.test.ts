@@ -534,6 +534,64 @@ describe('cloud publishing API', () => {
     ]));
   });
 
+  it('excludes nested build and dependency directories from includeSource packages', async () => {
+    const projectRoot = createTempRoot();
+    writeProject(projectRoot);
+    const prototypeRoot = path.join(projectRoot, 'src/prototypes/home');
+    writeFile(path.join(prototypeRoot, 'vue-app/package.json'), '{"name":"demo-vue-app","private":true}\n');
+    writeFile(path.join(prototypeRoot, 'vue-app/pnpm-lock.yaml'), 'lockfileVersion: 9.0\n');
+    writeFile(path.join(prototypeRoot, 'vue-app/.npmrc'), 'registry=https://registry.npmjs.org/\n');
+    writeFile(path.join(prototypeRoot, 'vue-app/src/App.vue'), '<template><div>app</div></template>\n');
+    writeFile(path.join(prototypeRoot, 'vue-app/src/main.ts'), 'export {}\n');
+    writeFile(path.join(prototypeRoot, 'vue-app/node_modules/vue/package.json'), '{"name":"vue"}\n');
+    writeFile(path.join(prototypeRoot, 'vue-app/dist/embed/app.js'), 'console.log("dist")\n');
+    writeFile(path.join(prototypeRoot, 'vue-app/.vite/deps/vue.js'), 'export {}\n');
+    writeFile(path.join(prototypeRoot, 'vue-app/coverage/lcov.info'), 'TN:\n');
+    writeFile(path.join(prototypeRoot, 'Home.spec.tsx'), 'test("home", () => {});\n');
+    writeFile(path.join(prototypeRoot, '.spec/generation-artifacts.json'), '{}\n');
+    vi.mocked(buildOnDemand).mockResolvedValueOnce({
+      jsCode: 'var UserComponent = function Home(){};',
+      cssText: '.home{color:red;}',
+      metadata: { usesAnnotationRuntime: true },
+    });
+
+    const files = await buildExportHtmlStaticFiles({
+      projectRoot,
+      sourceFile: path.join(prototypeRoot, 'index.tsx'),
+      entryName: 'home',
+      displayName: 'Home',
+      group: 'prototypes',
+      includeSource: true,
+    });
+
+    const sourcePaths = files
+      .map((file) => file.path)
+      .filter((filePath) => filePath.startsWith('source/'))
+      .sort();
+
+    expect(sourcePaths).toEqual(expect.arrayContaining([
+      'source/manifest.json',
+      'source/index.tsx',
+      'source/vue-app/package.json',
+      'source/vue-app/pnpm-lock.yaml',
+      'source/vue-app/.npmrc',
+      'source/vue-app/src/App.vue',
+      'source/vue-app/src/main.ts',
+    ]));
+    expect(sourcePaths).not.toEqual(expect.arrayContaining([
+      'source/vue-app/node_modules/vue/package.json',
+      'source/vue-app/dist/embed/app.js',
+      'source/vue-app/.vite/deps/vue.js',
+      'source/vue-app/coverage/lcov.info',
+      'source/Home.spec.tsx',
+      'source/.spec/generation-artifacts.json',
+    ]));
+    expect(sourcePaths.some((filePath) => filePath.includes('/node_modules/'))).toBe(false);
+    expect(sourcePaths.some((filePath) => /(?:^|\/)dist(?:\/|$)/u.test(filePath))).toBe(false);
+    expect(sourcePaths.some((filePath) => filePath.includes('/.vite/'))).toBe(false);
+    expect(sourcePaths.some((filePath) => filePath.includes('/coverage/'))).toBe(false);
+  });
+
   it('does not inject annotation source references for non-annotation pages', async () => {
     const projectRoot = createTempRoot();
     writeProject(projectRoot);

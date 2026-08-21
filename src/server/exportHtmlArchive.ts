@@ -425,6 +425,14 @@ function cryptoHash(buffer: Buffer): string {
   return Math.abs(hash >>> 0).toString(16).padStart(8, '0');
 }
 
+const SOURCE_EXCLUDED_DIR_NAMES = new Set([
+  '.spec',
+  'node_modules',
+  'dist',
+  '.vite',
+  'coverage',
+]);
+
 function listFilesRecursive(rootDir: string, baseDir = rootDir): string[] {
   if (!fs.existsSync(rootDir) || !fs.statSync(rootDir).isDirectory()) {
     return [];
@@ -433,6 +441,9 @@ function listFilesRecursive(rootDir: string, baseDir = rootDir): string[] {
   for (const entry of fs.readdirSync(rootDir, { withFileTypes: true })) {
     const fullPath = path.join(rootDir, entry.name);
     if (entry.isDirectory()) {
+      if (SOURCE_EXCLUDED_DIR_NAMES.has(entry.name.toLowerCase())) {
+        continue;
+      }
       files.push(...listFilesRecursive(fullPath, baseDir));
       continue;
     }
@@ -442,10 +453,6 @@ function listFilesRecursive(rootDir: string, baseDir = rootDir): string[] {
   }
   return files.sort((a, b) => a.localeCompare(b));
 }
-
-const SOURCE_EXCLUDED_DIR_NAMES = new Set([
-  '.spec',
-]);
 
 const SOURCE_EXCLUDED_FILE_NAMES = new Set([
   'manifest.json',
