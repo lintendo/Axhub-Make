@@ -1,6 +1,12 @@
 {
   "packages": [
     {
+      "packageName": "@axhub/agent-surface",
+      "outputDirRelative": "vendor/agent-surface",
+      "runtimeEntryRelative": "vendor/agent-surface/dist/index.js",
+      "typesEntryRelative": "vendor/agent-surface/dist/index.d.ts"
+    },
+    {
       "packageName": "@axhub/excalidraw",
       "outputDirRelative": "vendor/axhub-excalidraw",
       "runtimeEntryRelative": "vendor/axhub-excalidraw/dist/prod/index.js",

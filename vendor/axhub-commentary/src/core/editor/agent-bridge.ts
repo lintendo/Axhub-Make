@@ -1543,28 +1543,53 @@ export function createAgentBridgeService(options: {
     return `prototype-comment-assets/${id}.${inferPromptImageExtension(image.mimeType, image.name)}`;
   }
 
-  function appendPromptImageAssetPathsToMessage(message: string, assetPaths: readonly string[]): string {
-    const paths = collectUniqueStrings(...assetPaths);
-    const missingPaths = paths.filter((assetPath) => !message.includes(assetPath));
-    if (missingPaths.length === 0) return message;
+  function appendPromptImageAssetPathsToMessage(
+    message: string,
+    images: readonly { assetPath?: string; source?: PromptImageAttachment['source'] }[],
+  ): string {
+    const userPaths = collectUniqueStrings(
+      ...images
+        .filter((image) => image.source !== 'target-screenshot')
+        .map((image) => normalizeString(image.assetPath)),
+    ).filter((assetPath) => !message.includes(assetPath));
+    const targetPath = [...images]
+      .reverse()
+      .find((image) => image.source === 'target-screenshot')?.assetPath;
+    const missingTargetPath = targetPath && !message.includes(targetPath) ? targetPath : '';
+    if (userPaths.length === 0 && !missingTargetPath) return message;
 
     return [
       message,
       '',
-      '本地图片素材:',
-      ...missingPaths.map((assetPath) => `- ${assetPath}`),
+      ...(userPaths.length > 0
+        ? ['本地图片素材:', ...userPaths.map((assetPath) => `- ${assetPath}`)]
+        : []),
+      ...(missingTargetPath
+        ? [`目标截图（用于精确定位当前批注元素）：${missingTargetPath}`]
+        : []),
     ].join('\n');
   }
 
   function collectPromptImagesForElements(elements: readonly Element[]) {
     return elements.flatMap((element) =>
-      options.changes.getImagesForElement(element).slice(0, 3).map((image, index) => ({
-        name: image.name,
-        data: image.data,
-        mimeType: image.mimeType,
-        size: image.size,
-        assetPath: inferPromptImageAssetPath(image, index),
-      })),
+      (() => {
+        const images = options.changes.getImagesForElement(element);
+        const userImages = images
+          .filter((image) => image.source !== 'target-screenshot')
+          .slice(0, 3);
+        const targetScreenshot = [...images]
+          .reverse()
+          .find((image) => image.source === 'target-screenshot');
+        return [...userImages, ...(targetScreenshot ? [targetScreenshot] : [])]
+          .map((image, index) => ({
+            name: image.name,
+            data: image.data,
+            mimeType: image.mimeType,
+            size: image.size,
+            ...(image.source === 'target-screenshot' ? { source: image.source } : {}),
+            assetPath: inferPromptImageAssetPath(image, index),
+          }));
+      })(),
     );
   }
 
@@ -1615,6 +1640,7 @@ export function createAgentBridgeService(options: {
     const selected = state.selectedElement;
     if (selected && selected !== taskRoot && isWithinTaskSubtree(selected, taskRoot)) {
       state.selectedElement = taskRoot;
+      state.initialSelectionElement = taskRoot;
       state.positionTracker?.setSelectionElement(taskRoot);
       state.breadcrumbs?.setTarget(taskRoot);
       state.propertyPanel?.setTarget(taskRoot);
@@ -3791,12 +3817,9 @@ export function createAgentBridgeService(options: {
     const { element, prompt, scopeKey, reusableConversation, effectiveProvider } = params;
     const meta = resolveElementTaskMeta(element);
     const promptImages = collectPromptImagesForElements([element]);
-    const promptImageAssetPaths = promptImages
-      .map((image) => normalizeString(image.assetPath))
-      .filter(Boolean);
     const messageWithImageAssets = appendPromptImageAssetPathsToMessage(
       prompt,
-      promptImageAssetPaths,
+      promptImages,
     );
     const sessionIdToReuse = reusableConversation?.sessionId ?? null;
     const startedAt = params.startedAt ?? Date.now();

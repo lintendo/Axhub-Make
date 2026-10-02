@@ -224,7 +224,8 @@ describe('useIndexPageResourceActions source', () => {
     expect(source).not.toContain('const handleGenerateThemeFromPrototype = useCallback');
     expect(source).not.toContain('generateCreateThemePrompt(');
     expect(source).not.toContain('setSelectedThemeReferencePages');
-    expect(source).toContain("setInitialThemeDialogTab('import')");
+    expect(source).not.toContain('initialThemeDialogTab');
+    expect(source).not.toContain('setInitialThemeDialogTab');
     expect(source).toContain("setThemeCreateDialogVisible(true)");
   });
 
@@ -272,6 +273,10 @@ describe('useIndexPageResourceActions source', () => {
     expect(source).toContain("setViewMode('canvas');");
     expect(source).toContain('setSelectedDoc(selectedCanvasDoc);');
     expect(source).toContain('const handleCreateDrawioResourceFile = useCallback(async (targetFolder?: string | null) => {');
+    expect(source).toContain("const handleCreateDocument = useCallback(async (targetFolder?: string | null) => {");
+    expect(source).toContain("buildUniqueResourceFileName(docsItems, targetFolder, '新文档.md')");
+    expect(source).toContain("body: JSON.stringify(buildResourceBody({ content: '# 新文档\\n' }))");
+    expect(source).toContain("await loadSidebarTree('docs', { force: true, items: nextDocs });");
     expect(source).toContain("const createdName = buildUniqueResourceFileName(docsItems, targetFolder, 'untitled.drawio');");
     expect(source).toContain("body: JSON.stringify(buildResourceBody({ content: EMPTY_DRAWIO_RESOURCE_CONTENT }))");
     expect(source).toContain('await openDrawioResourceEditor({');
@@ -283,6 +288,7 @@ describe('useIndexPageResourceActions source', () => {
     expect(source).toContain('setSelectedDoc(createdDoc);');
     expect(source).toContain('handleCreateResourceCanvasFile,');
     expect(source).toContain('handleCreateDrawioResourceFile,');
+    expect(source).toContain('handleCreateDocument,');
     expect(source).not.toContain("fetch('/api/canvas/create'");
     expect(source).not.toContain('handleRenameCanvasItem');
     expect(source).not.toContain('handleDuplicateCanvasItem');
@@ -299,6 +305,29 @@ describe('useIndexPageResourceActions source', () => {
     expect(handlerSource).toMatch(/const latestItems = tab === 'docs'\s+\? await reloadDocsItems\(\)\s+: getSidebarTabItems\(tab\);/);
     expect(handlerSource.indexOf('await sidebarApi.saveSidebarTree(tab, normalizedTree, requireProjectScope(activeProjectId))'))
       .toBeLessThan(handlerSource.indexOf('await reloadDocsItems()'));
+  });
+
+  it('prepares and selects the canonical image AI resource folder', () => {
+    const source = readResourceRootSource();
+    const handlerStart = source.indexOf('const prepareImageAiResourceFolder = useCallback');
+    const handlerEnd = source.indexOf('const handleSidebarTreeChange', handlerStart);
+    const handlerSource = source.slice(handlerStart, handlerEnd);
+
+    expect(handlerStart).toBeGreaterThanOrEqual(0);
+    expect(handlerSource).toContain('sidebarApi.ensureSidebarFolder(folderPath, requireProjectScope(activeProjectId))');
+    expect(handlerSource).toContain("sanitizeSidebarTree('docs', Array.isArray(response.tree) ? response.tree : [], items)");
+    expect(handlerSource).toContain("setSidebarTrees((previous: Record<SidebarTreeTab, SidebarTreeNode[]>) => ({ ...previous, docs: nextTree }))");
+    expect(handlerSource).toContain("handleSelectResourceFolder(response.folder, 'docs');");
+    expect(handlerSource).toContain("folder: toSelectedResourceFolder(response.folder, 'docs'),");
+    expect(handlerSource).toContain('absolutePath: response.absolutePath,');
+    expect(handlerSource).toContain("messageApi.error(error?.message || '准备图片保存文件夹失败');");
+    expect(source).toContain('prepareImageAiResourceFolder,');
+  });
+
+  it('exposes the existing docs refresh callback for host-side image save events', () => {
+    const source = readResourceRootSource();
+    expect(source).toContain('const refreshDocsResources = useCallback(async () => {');
+    expect(source).toContain('refreshDocsResources,');
   });
 
   it('selects the uploaded document resource after paste upload refreshes docs metadata', () => {

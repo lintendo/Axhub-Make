@@ -1,0 +1,4 @@
+interface:
+  display_name: "原型标注"
+  short_description: "用原型替代 PRD 交付时，接入页面目录、组件说明和状态说明"
+  default_prompt: "使用 $prototype-annotation 为这个原型接入或维护标注能力。"

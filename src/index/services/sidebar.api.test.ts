@@ -63,6 +63,36 @@ describe('sidebarApi', () => {
     });
   });
 
+  it('ensures a named resource folder in the explicitly scoped project', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        tab: 'docs',
+        version: 1,
+        tree: [],
+        folder: {
+          id: 'folder-docs-brand-images',
+          kind: 'folder',
+          title: 'images',
+          path: 'brand/images',
+          folderPath: 'brand/images',
+          children: [],
+        },
+        absolutePath: '/workspace/src/resources/brand/images',
+        created: true,
+      }),
+    } as Response);
+
+    await sidebarApi.ensureSidebarFolder('brand/images', scope);
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/workspace/navigation/folders?tab=docs&projectId=project-b', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderPath: 'brand/images' }),
+    });
+  });
+
   it('rejects workspace requests without an explicit project scope', async () => {
     await expect(sidebarApi.getSidebarTree('themes', undefined as any)).rejects.toThrow('请先选择项目');
   });

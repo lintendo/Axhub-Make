@@ -328,6 +328,66 @@ describe('HTML resource editing API', () => {
     }
   });
 
+  it('persists text edits to the fixed HTML template path', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot, { project: { id: 'html-template-edit', name: 'HTML Template Edit' } });
+    const filePath = path.join(projectRoot, 'templates/prototype-spec.html');
+    const source = '<html><body><p>模板原文</p></body></html>';
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, source, 'utf8');
+    const server = await startTestServer(projectRoot);
+
+    try {
+      await registerProject(server.origin, projectRoot, 'html-template-edit', 'HTML Template Edit');
+      await setActiveProject(server.origin, 'html-template-edit');
+      const indexed = indexHtmlEditableText(source);
+      const response = await fetch(`${server.origin}/api/html-review/text-edits?projectId=html-template-edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: 'templates/prototype-spec.html',
+          revision: indexed.revision,
+          edits: [{ key: indexed.targets[0].key, before: '模板原文', after: '模板新文' }],
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(fs.readFileSync(filePath, 'utf8')).toContain('<p>模板新文</p>');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('persists text edits to a safe HTML document at any project-relative path', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot, { project: { id: 'html-project-doc-edit', name: 'HTML Project Doc Edit' } });
+    const filePath = path.join(projectRoot, 'src/prototypes/demo/.spec/spec.html');
+    const source = '<html><body><p>任意路径原文</p></body></html>';
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, source, 'utf8');
+    const server = await startTestServer(projectRoot);
+
+    try {
+      await registerProject(server.origin, projectRoot, 'html-project-doc-edit', 'HTML Project Doc Edit');
+      await setActiveProject(server.origin, 'html-project-doc-edit');
+      const indexed = indexHtmlEditableText(source);
+      const response = await fetch(`${server.origin}/api/html-review/text-edits?projectId=html-project-doc-edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: 'src/prototypes/demo/.spec/spec.html',
+          revision: indexed.revision,
+          edits: [{ key: indexed.targets[0].key, before: '任意路径原文', after: '任意路径新文' }],
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(fs.readFileSync(filePath, 'utf8')).toContain('<p>任意路径新文</p>');
+    } finally {
+      await server.close();
+    }
+  });
+
   it('rejects stale or invalid requests without modifying the document', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot, { project: { id: 'html-edit-conflict', name: 'HTML Edit Conflict' } });

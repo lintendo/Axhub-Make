@@ -762,11 +762,8 @@ describe('make-server project APIs', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ root: otherProjectRoot }),
       });
-      expect(duplicate.status).toBe(200);
-      expect(await duplicate.json()).toMatchObject({
-        success: true,
-        project: { id: 'client-b', root: otherProjectRoot },
-      });
+      expect(duplicate.status).toBe(409);
+      expect(await duplicate.json()).toMatchObject({ code: 'MAKE_PROJECT_PATH_CONFLICT' });
 
       const missingActive = await fetch(`${server.origin}/api/projects/active`, {
         method: 'PUT',
@@ -949,6 +946,68 @@ describe('make-server project APIs', () => {
     }
   });
 
+  it('serves project-internal HTML documents through the existing editable preview host', async () => {
+    const projectRoot = createTempRoot();
+    writeMakeClientMarkerForProject(projectRoot, 'client-a', 'Client A');
+    writeMakeClientPackageForProject(projectRoot);
+    const relativeDocPath = 'templates/nested/prototype-spec.html';
+    const internalDocPath = path.join(projectRoot, relativeDocPath);
+    const internalAssetPath = path.join(projectRoot, 'templates', 'assets', 'preview.png');
+    fs.mkdirSync(path.dirname(internalDocPath), { recursive: true });
+    fs.mkdirSync(path.dirname(internalAssetPath), { recursive: true });
+    fs.writeFileSync(internalDocPath, '<!doctype html><html><body><p>Template</p><img src="../assets/preview.png?v=1#cover"><img src="bad%ZZ.png"></body></html>\n', 'utf8');
+    fs.writeFileSync(internalAssetPath, 'preview-image', 'utf8');
+    writeProjectMetadata(projectRoot, { project: { id: 'client-a', name: 'Client A' } });
+    const server = await startTestServer(projectRoot);
+
+    try {
+      await registerExistingMakeProject(server.origin, projectRoot);
+      const response = await fetch(
+        `${server.origin}/api/projects/client-a/document-content?path=${encodeURIComponent(relativeDocPath)}`,
+        { headers: { Accept: 'text/html' } },
+      );
+
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain('<p data-axhub-text-key=');
+      expect(html).toContain('/assets/html-template-bootstrap.js');
+      expect(html).toContain('asset=..%2Fassets%2Fpreview.png');
+      expect(html).toContain('#cover');
+      expect(html).toContain('src="bad%ZZ.png"');
+      const assetUrl = html.match(/src="([^"]*document-asset[^"]*)"/u)?.[1]?.replace(/&amp;/gu, '&') || '';
+      const assetResponse = await fetch(new URL(assetUrl, server.origin));
+      expect(assetResponse.status).toBe(200);
+      expect(await assetResponse.text()).toBe('preview-image');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('serves project-internal HTML documents from prototype .spec paths', async () => {
+    const projectRoot = createTempRoot();
+    writeMakeClientMarkerForProject(projectRoot, 'client-a', 'Client A');
+    writeMakeClientPackageForProject(projectRoot);
+    const relativeDocPath = 'src/prototypes/demo/.spec/spec.html';
+    const internalDocPath = path.join(projectRoot, relativeDocPath);
+    fs.mkdirSync(path.dirname(internalDocPath), { recursive: true });
+    fs.writeFileSync(internalDocPath, '<!doctype html><html><body><p>Prototype spec</p></body></html>\n', 'utf8');
+    writeProjectMetadata(projectRoot, { project: { id: 'client-a', name: 'Client A' } });
+    const server = await startTestServer(projectRoot);
+
+    try {
+      await registerExistingMakeProject(server.origin, projectRoot);
+      const response = await fetch(
+        `${server.origin}/api/projects/client-a/document-content?path=${encodeURIComponent(relativeDocPath)}`,
+        { headers: { Accept: 'text/html' } },
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toContain('<p data-axhub-text-key=');
+    } finally {
+      await server.close();
+    }
+  });
+
   it('serves relative assets for project-internal markdown documents', async () => {
     const projectRoot = createTempRoot();
     writeMakeClientMarkerForProject(projectRoot, 'client-a', 'Client A');
@@ -1025,6 +1084,38 @@ describe('make-server project APIs', () => {
         code: 'DOCUMENT_PATH_FORBIDDEN',
         projectId: 'client-a',
       });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('rejects project HTML document and asset paths that escape through symlinks', async () => {
+    const projectRoot = createTempRoot();
+    const externalRoot = createTempRoot();
+    writeMakeClientMarkerForProject(projectRoot, 'client-a', 'Client A');
+    writeMakeClientPackageForProject(projectRoot);
+    writeProjectMetadata(projectRoot, {
+      project: { id: 'client-a', name: 'Client A' },
+    });
+    fs.mkdirSync(path.join(projectRoot, 'templates'), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, 'templates', 'safe.html'), '<html><body><img src="linked/outside.png"></body></html>', 'utf8');
+    fs.writeFileSync(path.join(externalRoot, 'outside.html'), '<html><body>outside</body></html>', 'utf8');
+    fs.writeFileSync(path.join(externalRoot, 'outside.png'), 'outside-image', 'utf8');
+    fs.symlinkSync(externalRoot, path.join(projectRoot, 'templates', 'linked'), 'dir');
+    const server = await startTestServer(projectRoot);
+
+    try {
+      await registerExistingMakeProject(server.origin, projectRoot);
+      const documentResponse = await fetch(
+        `${server.origin}/api/projects/client-a/document-content?path=${encodeURIComponent('templates/linked/outside.html')}`,
+        { headers: { Accept: 'text/html' } },
+      );
+      const assetResponse = await fetch(
+        `${server.origin}/api/projects/client-a/document-asset?path=${encodeURIComponent('templates/safe.html')}&asset=${encodeURIComponent('linked/outside.png')}`,
+      );
+
+      expect(documentResponse.status).toBe(403);
+      expect(assetResponse.status).toBe(403);
     } finally {
       await server.close();
     }

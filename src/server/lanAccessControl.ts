@@ -14,6 +14,10 @@ export const LAN_ACCESS_SHARE_TOKEN_TTL_MS = 10 * 60 * 1000;
 
 const SCRYPT_KEY_LENGTH = 64;
 const TOKEN_VERSION = 1;
+const LAN_ACCESS_PUBLIC_RUNTIME_PATHS = new Set([
+  '/assets/dev-template-bootstrap.js',
+  '/runtime/quick-edit.js',
+]);
 
 export interface LanAccessPasswordRecord {
   algorithm: 'scrypt';
@@ -46,6 +50,11 @@ export interface LanAccessStatus {
 export interface LanAccessControlApiOptions {
   getConfig: () => MakeServerConfig;
   saveConfig: (config: Partial<MakeServerConfig>) => MakeServerConfig;
+}
+
+export interface LanAccessGateOptions {
+  getConfig: () => MakeServerConfig;
+  isPublicPublishedRequest?: (req: IncomingMessage) => boolean;
 }
 
 export interface LanAccessGateDecision {
@@ -365,7 +374,10 @@ function sendLanAuthRequired(req: IncomingMessage, res: ServerResponse, pathname
 
 function isLanAccessAllowedPath(pathname: string, method = 'GET'): boolean {
   const normalizedMethod = method.toUpperCase();
-  return pathname === '/api/health'
+  const isPublicRuntimeAsset = (normalizedMethod === 'GET' || normalizedMethod === 'HEAD')
+    && LAN_ACCESS_PUBLIC_RUNTIME_PATHS.has(pathname);
+  return isPublicRuntimeAsset
+    || pathname === '/api/health'
     || pathname.startsWith('/api/access/')
     || (
       pathname === '/api/review-reports/submit'
@@ -380,10 +392,12 @@ function isLanAccessAllowedPath(pathname: string, method = 'GET'): boolean {
 export function handleLanAccessGate(
   req: IncomingMessage,
   res: ServerResponse,
-  options: { getConfig: () => MakeServerConfig },
+  options: LanAccessGateOptions,
 ): boolean {
   const pathname = getRequestUrl(req).pathname;
-  if (isLanAccessAllowedPath(pathname, req.method) || isLanAccessRequestLocal(req)) {
+  if (isLanAccessAllowedPath(pathname, req.method)
+    || isLanAccessRequestLocal(req)
+    || options.isPublicPublishedRequest?.(req) === true) {
     return false;
   }
   const config = options.getConfig();
@@ -421,10 +435,12 @@ export function handleLanAccessGate(
 
 export function getLanAccessGateDecision(
   req: IncomingMessage,
-  options: { getConfig: () => MakeServerConfig },
+  options: LanAccessGateOptions,
 ): LanAccessGateDecision {
   const pathname = getRequestUrl(req).pathname;
-  if (isLanAccessAllowedPath(pathname, req.method) || isLanAccessRequestLocal(req)) {
+  if (isLanAccessAllowedPath(pathname, req.method)
+    || isLanAccessRequestLocal(req)
+    || options.isPublicPublishedRequest?.(req) === true) {
     return { allowed: true, status: 401, code: 'LAN_AUTH_REQUIRED' };
   }
   const config = options.getConfig();

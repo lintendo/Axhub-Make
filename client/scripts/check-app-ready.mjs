@@ -33,7 +33,12 @@
  *   checks?: [{ name: "lint|typecheck|build", status: "...", message: "...", errors: [...] }]
  *   homeUrl?: "http://localhost:51720"
  *   targetUrl?: "http://localhost:51720/prototypes/ref-app-home"
- *   targetPath?: "http://localhost:51720/prototypes/ref-app-home/index.html"
+ *   targetPath?: "http://localhost:51720/prototypes/ref-app-home"
+ *   runtimeHomeUrl?: "http://localhost:51720"
+ *   runtimeTargetUrl?: "http://localhost:51720/prototypes/ref-app-home"
+ *   serverOrigin?: "http://localhost:53817"
+ *   serverHomeUrl?: "http://localhost:53817/?projectId=make-project"
+ *   serverUrl?: "http://localhost:53817/?projectId=make-project&p=ref-app-home"
  * }
  * =====================================================
  */
@@ -49,6 +54,8 @@ import { decodeOutput, getPreferredNpmCommand, getPreferredNpxCommand } from './
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const APP_ROOT = path.resolve(__dirname, '..')
+const MAKE_SERVER_STATUS_PATH = '/__axhub/make-server/status'
+const isCli = process.argv[1] && path.resolve(process.argv[1]) === __filename
 
 /* ================= 配置 ================= */
 // 解析命令行参数
@@ -145,7 +152,7 @@ function getServerInfo() {
  * 生成服务器首页 URL
  * 使用 localhost 而不是 0.0.0.0，因为浏览器无法访问 0.0.0.0
  */
-function getHomeUrl(serverInfo) {
+export function getHomeUrl(serverInfo) {
   // 如果 host 是 0.0.0.0，使用 localhost 替代
   const host = serverInfo.host === '0.0.0.0' ? 'localhost' : serverInfo.host
   return `http://${host}:${serverInfo.port}`
@@ -155,20 +162,83 @@ function getHomeUrl(serverInfo) {
  * 获取可访问的 host
  * 将 0.0.0.0 转换为 localhost，因为浏览器无法直接访问 0.0.0.0
  */
-function getAccessibleHost(serverInfo) {
+export function getAccessibleHost(serverInfo) {
   return serverInfo.host === '0.0.0.0' ? 'localhost' : serverInfo.host
 }
 
-function getTargetUrl(serverInfo, targetPath) {
+export function getTargetUrl(serverInfo, targetPath) {
   const host = getAccessibleHost(serverInfo)
   return `http://${host}:${serverInfo.port}${targetPath}`
 }
 
-function getEntryHtmlPath(targetPath) {
-  const normalized = targetPath.startsWith('/') ? targetPath : `/${targetPath}`
-  if (normalized.endsWith('.html')) return normalized
-  if (normalized.endsWith('/')) return `${normalized}index.html`
-  return `${normalized}/index.html`
+export function getPreviewRoutePath(targetPath) {
+  const normalized = String(targetPath || '/').trim()
+  if (!normalized) return '/'
+  return normalized.startsWith('/') ? normalized : `/${normalized}`
+}
+
+function getAdminResourceFromRoute(pagePath) {
+  const parts = getPreviewRoutePath(pagePath).split('/').filter(Boolean)
+  const [type, ...resourceParts] = parts
+  const resourceId = resourceParts.join('/')
+  if (!resourceId) return null
+  if (type === 'prototypes') return { queryKey: 'p', resourceId }
+  if (type === 'themes') return { queryKey: 'theme', resourceId }
+  return null
+}
+
+export function buildAdminDeepLinkUrl({
+  adminOrigin,
+  adminUrl,
+  projectId,
+  pagePath,
+}) {
+  const origin = String(adminOrigin || '').trim().replace(/\/+$/u, '')
+  if (!origin) return null
+
+  let url
+  try {
+    url = new URL(String(adminUrl || '/'), origin)
+  } catch {
+    url = new URL('/', origin)
+  }
+
+  const normalizedProjectId = String(projectId || '').trim()
+  if (normalizedProjectId) {
+    url.searchParams.set('projectId', normalizedProjectId)
+  }
+
+  const resource = getAdminResourceFromRoute(pagePath)
+  if (resource) {
+    url.searchParams.set(resource.queryKey, resource.resourceId)
+  }
+  return url.toString()
+}
+
+function normalizeMakeServerStatus(payload) {
+  if (!payload || typeof payload !== 'object') return null
+  const adminOrigin = typeof payload.adminOrigin === 'string'
+    ? payload.adminOrigin.trim().replace(/\/+$/u, '')
+    : ''
+  if (!adminOrigin) return null
+
+  return {
+    adminOrigin,
+    adminUrl: typeof payload.adminUrl === 'string' ? payload.adminUrl.trim() : '',
+    projectId: typeof payload.projectId === 'string' ? payload.projectId.trim() : '',
+  }
+}
+
+async function getMakeServerStatus(runtimeHomeUrl) {
+  try {
+    const response = await fetch(new URL(MAKE_SERVER_STATUS_PATH, runtimeHomeUrl), {
+      headers: { accept: 'application/json' },
+    })
+    if (!response.ok) return null
+    return normalizeMakeServerStatus(await response.json())
+  } catch {
+    return null
+  }
 }
 
 /* ================= 全局状态 ================= */
@@ -320,23 +390,52 @@ async function waitForStable(pageUrl) {
 /**
  * 为结果添加服务器首页信息
  */
-function addUrls(result, serverInfo) {
+export function addUrls(result, serverInfo, makeServerStatus = null, pagePath = CONFIG.pagePath) {
   if (!serverInfo) {
     return {
       ...result,
       homeUrl: null,
       targetUrl: null,
-      targetPath: null
+      targetPath: null,
+      runtimeHomeUrl: null,
+      runtimeTargetUrl: null,
+      serverOrigin: null,
+      serverHomeUrl: null,
+      serverUrl: null,
     }
   }
 
-  const entryHtmlPath = getEntryHtmlPath(CONFIG.pagePath)
+  const previewRoutePath = getPreviewRoutePath(pagePath)
+  const runtimeHomeUrl = getHomeUrl(serverInfo)
+  const runtimeTargetUrl = getTargetUrl(serverInfo, previewRoutePath)
+  const serverOrigin = makeServerStatus?.adminOrigin || null
+  const serverHomeUrl = serverOrigin
+    ? buildAdminDeepLinkUrl({
+      adminOrigin: serverOrigin,
+      adminUrl: makeServerStatus?.adminUrl,
+      projectId: makeServerStatus?.projectId,
+      pagePath: '/',
+    })
+    : null
+  const serverUrl = serverOrigin
+    ? buildAdminDeepLinkUrl({
+      adminOrigin: serverOrigin,
+      adminUrl: makeServerStatus?.adminUrl,
+      projectId: makeServerStatus?.projectId,
+      pagePath: previewRoutePath,
+    })
+    : null
 
   return {
     ...result,
-    homeUrl: getHomeUrl(serverInfo),
-    targetUrl: getTargetUrl(serverInfo, CONFIG.pagePath),
-    targetPath: getTargetUrl(serverInfo, entryHtmlPath)
+    homeUrl: runtimeHomeUrl,
+    targetUrl: runtimeTargetUrl,
+    targetPath: runtimeTargetUrl,
+    runtimeHomeUrl,
+    runtimeTargetUrl,
+    serverOrigin,
+    serverHomeUrl,
+    serverUrl,
   }
 }
 
@@ -751,7 +850,10 @@ async function main() {
 }
 
 async function continueWithServerInfo(serverInfo, pageUrl, viteProcess) {
+  let makeServerStatus = null
   try {
+    makeServerStatus = await getMakeServerStatus(getHomeUrl(serverInfo))
+
     // 步骤 1: 执行 lint 检查
     const lintResult = await runLintCheck()
     if (lintResult.status === 'FAILED') {
@@ -764,7 +866,7 @@ async function continueWithServerInfo(serverInfo, pageUrl, viteProcess) {
         logs,
         lintCheck: lintResult,
         checks: buildChecksSummary({ lintResult })
-      }, serverInfo), 1)
+      }, serverInfo, makeServerStatus), 1)
     }
 
     // 步骤 2: 执行 typecheck 检查
@@ -780,7 +882,7 @@ async function continueWithServerInfo(serverInfo, pageUrl, viteProcess) {
         lintCheck: lintResult,
         typeCheck: typeCheckResult,
         checks: buildChecksSummary({ lintResult, typeCheckResult })
-      }, serverInfo), 1)
+      }, serverInfo, makeServerStatus), 1)
     }
 
     // 步骤 3: 执行构建校验（除非指定 --skip-build）
@@ -803,7 +905,7 @@ async function continueWithServerInfo(serverInfo, pageUrl, viteProcess) {
           lintCheck: lintResult,
           typeCheck: typeCheckResult,
           checks: buildChecksSummary({ lintResult, typeCheckResult, buildResult })
-        }, serverInfo), 1)
+        }, serverInfo, makeServerStatus), 1)
       }
     } else {
       logs.push('Build check skipped (--skip-build flag)')
@@ -844,11 +946,12 @@ async function continueWithServerInfo(serverInfo, pageUrl, viteProcess) {
         lintCheck: lintResult,
         typeCheck: typeCheckResult,
         checks: buildChecksSummary({ lintResult, typeCheckResult, buildResult })
-      }, serverInfo), 1)
+      }, serverInfo, makeServerStatus), 1)
     }
 
     // 等待稳定状态
     const result = await waitForStable(pageUrl)
+    makeServerStatus = await getMakeServerStatus(getHomeUrl(serverInfo)) || makeServerStatus
 
     // 清理进程
     if (viteChild) viteChild.kill()
@@ -862,7 +965,7 @@ async function continueWithServerInfo(serverInfo, pageUrl, viteProcess) {
       checks: buildChecksSummary({ lintResult, typeCheckResult, buildResult })
     }
 
-    jsonExit(addUrls(finalResult, serverInfo), result.status === 'READY' ? 0 : 1)
+    jsonExit(addUrls(finalResult, serverInfo, makeServerStatus), result.status === 'READY' ? 0 : 1)
   } catch (err) {
     jsonExit(addUrls({
       status: 'ERROR',
@@ -871,8 +974,10 @@ async function continueWithServerInfo(serverInfo, pageUrl, viteProcess) {
       url: CONFIG.pagePath,
       errors: [String(err)],
       logs
-    }, serverInfo), 1)
+    }, serverInfo, makeServerStatus), 1)
   }
 }
 
-main()
+if (isCli) {
+  main()
+}

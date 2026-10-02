@@ -12,57 +12,50 @@ describe('documentTemplatesApi', () => {
     vi.unstubAllGlobals();
   });
 
-  it('normalizes markdown and HTML files from the templates directory listing', () => {
-    expect(normalizeDocumentTemplateList([
-      { name: 'write-prd.md', displayName: 'Write PRD', description: 'PRD 模板' },
-      { name: 'visual-report.html', displayName: 'Visual Report', description: 'HTML 模板' },
-      { name: 'flow.drawio', displayName: 'Flow' },
-      { name: 'nested/spec.MD', displayName: 'Spec' },
-      { name: '.hidden.md', displayName: 'Hidden' },
-      { name: 'README.md', displayName: 'Readme' },
-    ])).toEqual([
+  it('normalizes only existing entries from the fixed template response', () => {
+    expect(normalizeDocumentTemplateList({ templates: [
+      { id: 'prd', path: 'templates/prd.md', displayName: 'PRD 模板', description: 'PRD 模板', exists: true },
+      { id: 'prototype-spec-html', path: 'templates/prototype-spec.html', displayName: 'HTML 规格文档模板', description: 'HTML 模板', exists: true },
+      { id: 'ui-review', path: 'templates/ui-review.md', displayName: 'UI 评审报告模板', exists: false },
+      { id: 'custom', path: 'templates/custom.md', displayName: 'Custom', exists: true },
+    ] })).toEqual([
       {
-        name: 'write-prd.md',
-        displayName: 'Write PRD',
+        name: 'templates/prd.md',
+        displayName: 'PRD 模板',
         description: 'PRD 模板',
       },
       {
-        name: 'visual-report.html',
-        displayName: 'Visual Report',
+        name: 'templates/prototype-spec.html',
+        displayName: 'HTML 规格文档模板',
         description: 'HTML 模板',
-      },
-      {
-        name: 'nested/spec.MD',
-        displayName: 'Spec',
-        description: '',
       },
     ]);
   });
 
   it('filters templates by output compatibility', () => {
-    const templates = normalizeDocumentTemplateList([
-      { name: 'write-prd.md', displayName: 'Write PRD' },
-      { name: 'visual-report.html', displayName: 'Visual Report' },
-    ]);
+    const templates = normalizeDocumentTemplateList({ templates: [
+      { id: 'prd', path: 'templates/prd.md', displayName: 'PRD 模板', exists: true },
+      { id: 'prototype-spec-html', path: 'templates/prototype-spec.html', displayName: 'HTML 规格文档模板', exists: true },
+    ] });
 
     expect(filterCompatibleDocumentTemplates(templates, 'html').map((template) => template.name)).toEqual([
-      'write-prd.md',
-      'visual-report.html',
+      'templates/prd.md',
+      'templates/prototype-spec.html',
     ]);
     expect(filterCompatibleDocumentTemplates(templates, 'md').map((template) => template.name)).toEqual([
-      'write-prd.md',
+      'templates/prd.md',
     ]);
     expect(filterCompatibleDocumentTemplates(templates, 'mermaid')).toEqual([]);
     expect(filterCompatibleDocumentTemplates(templates, 'drawio')).toEqual([]);
   });
 
-  it('reads document template list and content from /api/docs/templates', async () => {
+  it('reads the fixed template list and content from /api/document-templates', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(new Response(JSON.stringify([
-        { name: 'write-prd.md', displayName: 'Write PRD' },
-        { name: 'visual-report.html', displayName: 'Visual Report' },
-        { name: 'flow.drawio', displayName: 'Flow' },
-      ]), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ templates: [
+        { id: 'prd', path: 'templates/prd.md', displayName: 'PRD 模板', exists: true },
+        { id: 'prototype-spec-html', path: 'templates/prototype-spec.html', displayName: 'HTML 规格文档模板', exists: true },
+        { id: 'ui-review', path: 'templates/ui-review.md', displayName: 'UI 评审报告模板', exists: false },
+      ] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       .mockResolvedValueOnce(new Response('# Write PRD\n\n## 背景\n', {
         status: 200,
         headers: { 'Content-Type': 'text/markdown' },
@@ -70,12 +63,12 @@ describe('documentTemplatesApi', () => {
 
     const scope = { projectId: 'client-project' };
     await expect(documentTemplatesApi.list(scope)).resolves.toEqual([
-      { name: 'write-prd.md', displayName: 'Write PRD', description: '' },
-      { name: 'visual-report.html', displayName: 'Visual Report', description: '' },
+      { name: 'templates/prd.md', displayName: 'PRD 模板', description: '' },
+      { name: 'templates/prototype-spec.html', displayName: 'HTML 规格文档模板', description: '' },
     ]);
-    await expect(documentTemplatesApi.read('write-prd.md', scope)).resolves.toBe('# Write PRD\n\n## 背景\n');
+    await expect(documentTemplatesApi.read('prd', scope)).resolves.toBe('# Write PRD\n\n## 背景\n');
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/docs/templates?projectId=client-project');
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/docs/templates/write-prd.md?projectId=client-project');
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/document-templates?projectId=client-project');
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/document-templates/prd?projectId=client-project');
   });
 });

@@ -103,6 +103,27 @@
     display: none !important;
 }
 
+.ax-presentation-toolbar {
+    container-type: inline-size;
+    container-name: presentation-toolbar;
+}
+
+@container presentation-toolbar (max-width: 1100px) {
+    .ax-presentation-toolbar .ax-presentation-toolbar-compact-button {
+        height: 1.75rem;
+        width: 1.75rem;
+        min-width: 1.75rem;
+        gap: 0;
+        padding: 0;
+        font-size: 0;
+    }
+
+    .ax-presentation-toolbar .ax-presentation-toolbar-label,
+    .ax-presentation-toolbar .ax-presentation-toolbar-chevron {
+        display: none !important;
+    }
+}
+
 .ax-sidebar-shell {
     position: relative;
     flex: 0 0 240px;
@@ -129,8 +150,29 @@
     background: hsl(var(--background));
 }
 
-.ax-presentation-toolbar {
+.ax-start-guide {
     container-type: inline-size;
+}
+
+.ax-start-guide-title {
+    font-size: 28px;
+}
+
+.ax-start-prompt-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+    gap: 16px;
+    margin-top: 32px;
+}
+
+@container (min-width: 768px) {
+    .ax-start-guide-title {
+        font-size: 34px;
+    }
+
+    .ax-start-prompt-grid {
+        margin-top: 64px;
+    }
 }
 
 .ax-sidebar-compact-fallback-trigger {
@@ -139,12 +181,6 @@
     top: 6px;
     left: 8px;
     display: flex;
-}
-
-@container (max-width: 600px) {
-    .ax-toolbar-adaptive-action {
-        display: none !important;
-    }
 }
 
 .ax-sidebar-shell.is-collapsed .ax-sidebar-content {

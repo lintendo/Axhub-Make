@@ -1,7 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { getConfigPath, getGlobalServerConfigPath } from './paths.ts';
+import {
+  GLOBAL_SERVER_SECRETS_FILE_NAME,
+  getConfigPath,
+  getGlobalServerConfigPath,
+} from './paths.ts';
+import {
+  createServerSecretsStore,
+  type MakeServerSecrets,
+} from './server-secrets.ts';
 
 export type ServerPromptClientPreference =
   | 'acp:codex'
@@ -13,7 +21,7 @@ export type ServerPromptClientPreference =
   | 'acp:reasonix'
   | 'acp:grok-build'
   | 'manual';
-export type ServerDefaultPromptClientPreference = ServerPromptClientPreference | null;
+export type ServerAiPromptClientPreference = ServerPromptClientPreference | null;
 export type ServerAnnotationPromptClientPreference = Exclude<ServerPromptClientPreference, 'manual'> | null;
 export type ServerAcpExecutionMode = 'prompt' | 'exec';
 export type ServerAcpPermissionMode = 'approve-all';
@@ -57,6 +65,29 @@ export interface AiImageGenerationConfig {
   apiKey: string | null;
   model: string;
   lastTest?: AiImageGenerationLastTest;
+}
+
+export interface AiDoubaoConfig {
+  appId: string;
+  accessKey: string;
+  speaker: string;
+}
+
+export interface AiProcessingConfig {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}
+
+export type AiVisionFamily = '' | 'qwen3' | 'doubao-seed';
+export type AiVisionResponseFormat = 'auto' | 'none';
+
+export interface AiVisionConfig {
+  endpoint: string;
+  apiKey: string;
+  model: string;
+  family: AiVisionFamily;
+  responseFormat: AiVisionResponseFormat;
 }
 
 export interface LanAccessPasswordConfig {
@@ -114,8 +145,11 @@ export interface ServerCloudPublishingConfig {
 
 export interface MakeServerConfig {
   automation: {
-    defaultPromptClient: ServerDefaultPromptClientPreference;
+    conversationPromptClient: ServerAiPromptClientPreference;
+    conversationModel: string | null;
     defaultIDE: ServerIDEPreference;
+    injectLocalAiEntry: boolean;
+    launchLocalAiApp: boolean;
     acp: {
       mode: ServerAcpExecutionMode;
       permission: ServerAcpPermissionMode;
@@ -123,7 +157,10 @@ export interface MakeServerConfig {
     };
     annotationPromptClient: ServerAnnotationPromptClientPreference;
     annotationModel: string | null;
+    canvasPromptClient: ServerAiPromptClientPreference;
+    canvasModel: string | null;
     agentRunConcurrency: number;
+    autoClearCompletedComments: boolean;
   };
   assistant: {
     webBaseUrl: string | null;
@@ -131,6 +168,9 @@ export interface MakeServerConfig {
   };
   ai: {
     imageGeneration: AiImageGenerationConfig;
+    doubao: AiDoubaoConfig;
+    processing: AiProcessingConfig;
+    vision: AiVisionConfig;
   };
   uiPreferences: {
     excalidrawPropertyPanelMode: ExcalidrawPropertyPanelModePreference;
@@ -146,6 +186,7 @@ export interface MakeServerConfig {
 export interface ServerConfigStoreOptions {
   homeDir?: string;
   configPath?: string;
+  secretsPath?: string;
 }
 
 export interface ServerConfigGetOptions {
@@ -203,8 +244,11 @@ const DEFAULT_CLOUD_PUBLISHING_CONFIG: ServerCloudPublishingConfig = {
 
 const DEFAULT_SERVER_CONFIG: MakeServerConfig = {
   automation: {
-    defaultPromptClient: null,
+    conversationPromptClient: null,
+    conversationModel: null,
     defaultIDE: 'none',
+    injectLocalAiEntry: true,
+    launchLocalAiApp: true,
     acp: {
       mode: 'prompt',
       permission: 'approve-all',
@@ -212,7 +256,10 @@ const DEFAULT_SERVER_CONFIG: MakeServerConfig = {
     },
     annotationPromptClient: null,
     annotationModel: null,
+    canvasPromptClient: null,
+    canvasModel: null,
     agentRunConcurrency: DEFAULT_AGENT_RUN_CONCURRENCY,
+    autoClearCompletedComments: true,
   },
   assistant: {
     webBaseUrl: null,
@@ -223,6 +270,23 @@ const DEFAULT_SERVER_CONFIG: MakeServerConfig = {
       baseUrl: 'https://api.openai.com/v1',
       apiKey: null,
       model: 'gpt-image-2',
+    },
+    doubao: {
+      appId: '',
+      accessKey: '',
+      speaker: '',
+    },
+    processing: {
+      baseUrl: 'https://api.openai.com/v1',
+      apiKey: '',
+      model: 'gpt-4.1-mini',
+    },
+    vision: {
+      endpoint: '',
+      apiKey: '',
+      model: '',
+      family: '',
+      responseFormat: 'auto',
     },
   },
   uiPreferences: {
@@ -549,10 +613,62 @@ function normalizeAiImageGenerationConfig(
   return config;
 }
 
+function normalizeAiDoubaoConfig(
+  input: unknown,
+  fallback: AiDoubaoConfig,
+): AiDoubaoConfig {
+  const data = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+  return {
+    appId: hasOwn(data, 'appId') ? normalizeTrimmedString(data.appId) : fallback.appId,
+    accessKey: hasOwn(data, 'accessKey')
+      ? normalizeTrimmedString(data.accessKey)
+      : fallback.accessKey,
+    speaker: hasOwn(data, 'speaker') ? normalizeTrimmedString(data.speaker) : fallback.speaker,
+  };
+}
+
+function normalizeAiProcessingConfig(
+  input: unknown,
+  fallback: AiProcessingConfig,
+): AiProcessingConfig {
+  const data = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+  return {
+    baseUrl: hasOwn(data, 'baseUrl')
+      ? normalizeBaseUrl(data.baseUrl, fallback.baseUrl)
+      : fallback.baseUrl,
+    apiKey: hasOwn(data, 'apiKey') ? normalizeTrimmedString(data.apiKey) : fallback.apiKey,
+    model: hasOwn(data, 'model')
+      ? normalizeOptionalString(data.model, fallback.model)
+      : fallback.model,
+  };
+}
+
+function normalizeAiVisionConfig(
+  input: unknown,
+  fallback: AiVisionConfig,
+): AiVisionConfig {
+  const data = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+  const family = normalizeTrimmedString(data.family);
+  const responseFormat = normalizeTrimmedString(data.responseFormat);
+  return {
+    endpoint: hasOwn(data, 'endpoint')
+      ? normalizeTrimmedString(data.endpoint)
+      : fallback.endpoint,
+    apiKey: hasOwn(data, 'apiKey') ? normalizeTrimmedString(data.apiKey) : fallback.apiKey,
+    model: hasOwn(data, 'model') ? normalizeTrimmedString(data.model) : fallback.model,
+    family: hasOwn(data, 'family') && ['', 'qwen3', 'doubao-seed'].includes(family)
+      ? family as AiVisionFamily
+      : fallback.family,
+    responseFormat: hasOwn(data, 'responseFormat') && ['auto', 'none'].includes(responseFormat)
+      ? responseFormat as AiVisionResponseFormat
+      : fallback.responseFormat,
+  };
+}
+
 function normalizePromptClient(
   value: unknown,
-  fallback: ServerDefaultPromptClientPreference,
-): ServerDefaultPromptClientPreference {
+  fallback: ServerAiPromptClientPreference,
+): ServerAiPromptClientPreference {
   if (value === null) {
     return null;
   }
@@ -612,14 +728,24 @@ function normalizeAcpExecutionConfig(
   };
 }
 
-function normalizeToolOpenStateEntry(value: unknown, fallback: ToolOpenStateEntry = {}): ToolOpenStateEntry {
+function normalizeToolOpenStateEntry(
+  key: string,
+  value: unknown,
+  fallback: ToolOpenStateEntry = {},
+): ToolOpenStateEntry {
   const data = value && typeof value === 'object' ? value as Record<string, unknown> : {};
-  const executablePath = hasOwn(data, 'executablePath')
-    ? normalizeTrimmedString(data.executablePath)
-    : fallback.executablePath || '';
-  const commandPath = hasOwn(data, 'commandPath')
-    ? normalizeTrimmedString(data.commandPath)
-    : fallback.commandPath || '';
+  const usesExecutablePath = key.startsWith('ide:') || key.startsWith('local-app:');
+  const usesCommandPath = key.startsWith('cli:') || key.startsWith('web:');
+  const executablePath = usesExecutablePath
+    ? hasOwn(data, 'executablePath')
+      ? normalizeTrimmedString(data.executablePath)
+      : fallback.executablePath || ''
+    : '';
+  const commandPath = usesCommandPath
+    ? hasOwn(data, 'commandPath')
+      ? normalizeTrimmedString(data.commandPath)
+      : fallback.commandPath || ''
+    : '';
   const appPathName = hasOwn(data, 'appPathName')
     ? normalizeTrimmedString(data.appPathName)
     : fallback.appPathName || '';
@@ -641,7 +767,7 @@ function normalizeToolOpenState(value: unknown, fallback: ToolOpenState = {}): T
   const current = Object.fromEntries(
     Object.entries(fallback)
       .filter(([key]) => TOOL_OPEN_KEY_PATTERN.test(key))
-      .map(([key, entry]) => [key, normalizeToolOpenStateEntry(entry)]),
+      .map(([key, entry]) => [key, normalizeToolOpenStateEntry(key, entry)]),
   );
   const data = value && typeof value === 'object' ? value as Record<string, unknown> : {};
   const next: ToolOpenState = { ...current };
@@ -654,7 +780,7 @@ function normalizeToolOpenState(value: unknown, fallback: ToolOpenState = {}): T
       delete next[key];
       continue;
     }
-    const entry = normalizeToolOpenStateEntry(rawEntry, next[key]);
+    const entry = normalizeToolOpenStateEntry(key, rawEntry, next[key]);
     if (Object.keys(entry).length > 0) {
       next[key] = entry;
     } else {
@@ -759,30 +885,69 @@ function normalizeConfig(input: unknown, fallback: MakeServerConfig = DEFAULT_SE
   const accessControl = data.accessControl && typeof data.accessControl === 'object'
     ? data.accessControl as Record<string, unknown>
     : {};
+  const legacyPromptClient = hasOwn(automation, 'defaultPromptClient')
+    ? normalizePromptClient(automation.defaultPromptClient, null)
+    : null;
+  const legacyAnnotationPromptClient = legacyPromptClient === 'manual'
+    ? null
+    : legacyPromptClient;
+  const annotationPromptClientFallback = hasOwn(automation, 'defaultPromptClient')
+    ? legacyAnnotationPromptClient
+    : fallback.automation.annotationPromptClient;
+  const conversationPromptClient = hasOwn(automation, 'conversationPromptClient')
+    ? normalizePromptClient(
+      automation.conversationPromptClient,
+      fallback.automation.conversationPromptClient,
+    )
+    : legacyPromptClient || fallback.automation.conversationPromptClient;
+  const annotationPromptClient = hasOwn(automation, 'annotationPromptClient')
+    ? normalizeAnnotationPromptClient(
+      automation.annotationPromptClient,
+      annotationPromptClientFallback,
+    )
+    : annotationPromptClientFallback;
+  const canvasPromptClient = hasOwn(automation, 'canvasPromptClient')
+    ? normalizePromptClient(automation.canvasPromptClient, fallback.automation.canvasPromptClient)
+    : legacyPromptClient || fallback.automation.canvasPromptClient;
 
   return {
     automation: {
-      defaultPromptClient: hasOwn(automation, 'defaultPromptClient')
-        ? normalizePromptClient(automation.defaultPromptClient, fallback.automation.defaultPromptClient)
-        : fallback.automation.defaultPromptClient,
+      conversationPromptClient,
+      conversationModel: hasOwn(automation, 'conversationModel')
+        ? normalizeNullableString(automation.conversationModel)
+        : fallback.automation.conversationModel,
       defaultIDE: hasOwn(automation, 'defaultIDE')
         ? normalizeIDE(automation.defaultIDE, fallback.automation.defaultIDE)
         : fallback.automation.defaultIDE,
+      injectLocalAiEntry: hasOwn(automation, 'injectLocalAiEntry')
+        && typeof automation.injectLocalAiEntry === 'boolean'
+        ? automation.injectLocalAiEntry
+        : fallback.automation.injectLocalAiEntry,
+      launchLocalAiApp: hasOwn(automation, 'launchLocalAiApp')
+        && typeof automation.launchLocalAiApp === 'boolean'
+        ? automation.launchLocalAiApp
+        : fallback.automation.launchLocalAiApp,
       acp: hasOwn(automation, 'acp') || hasOwn(automation, 'acpx')
         ? normalizeAcpExecutionConfig(
           hasOwn(automation, 'acp') ? automation.acp : automation.acpx,
           fallback.automation.acp,
         )
         : fallback.automation.acp,
-      annotationPromptClient: hasOwn(automation, 'annotationPromptClient')
-        ? normalizeAnnotationPromptClient(automation.annotationPromptClient, fallback.automation.annotationPromptClient)
-        : fallback.automation.annotationPromptClient,
+      annotationPromptClient,
       annotationModel: hasOwn(automation, 'annotationModel')
         ? normalizeNullableString(automation.annotationModel)
         : fallback.automation.annotationModel,
+      canvasPromptClient,
+      canvasModel: hasOwn(automation, 'canvasModel')
+        ? normalizeNullableString(automation.canvasModel)
+        : fallback.automation.canvasModel,
       agentRunConcurrency: hasOwn(automation, 'agentRunConcurrency')
         ? sanitizeAgentRunConcurrency(automation.agentRunConcurrency, fallback.automation.agentRunConcurrency)
         : fallback.automation.agentRunConcurrency,
+      autoClearCompletedComments: hasOwn(automation, 'autoClearCompletedComments')
+        && typeof automation.autoClearCompletedComments === 'boolean'
+        ? automation.autoClearCompletedComments
+        : fallback.automation.autoClearCompletedComments,
     },
     assistant: {
       webBaseUrl: hasOwn(assistant, 'webBaseUrl')
@@ -796,6 +961,15 @@ function normalizeConfig(input: unknown, fallback: MakeServerConfig = DEFAULT_SE
       imageGeneration: hasOwn(ai, 'imageGeneration')
         ? normalizeAiImageGenerationConfig(ai.imageGeneration, fallback.ai.imageGeneration)
         : fallback.ai.imageGeneration,
+      doubao: hasOwn(ai, 'doubao')
+        ? normalizeAiDoubaoConfig(ai.doubao, fallback.ai.doubao)
+        : fallback.ai.doubao,
+      processing: hasOwn(ai, 'processing')
+        ? normalizeAiProcessingConfig(ai.processing, fallback.ai.processing)
+        : fallback.ai.processing,
+      vision: hasOwn(ai, 'vision')
+        ? normalizeAiVisionConfig(ai.vision, fallback.ai.vision)
+        : fallback.ai.vision,
     },
     uiPreferences: {
       excalidrawPropertyPanelMode: hasOwn(uiPreferences, 'excalidrawPropertyPanelMode')
@@ -841,9 +1015,9 @@ function getLegacyProjectConfig(projectRoot?: string | null): MakeServerConfig {
   const legacyConfig = readJsonFile(getConfigPath(projectRoot));
   if (legacyConfig && typeof legacyConfig === 'object' && !Array.isArray(legacyConfig)) {
     const { cloudPublishing: _ignoredCloudPublishing, ...serverConfigFallback } = legacyConfig as Record<string, unknown>;
-    return normalizeConfig(serverConfigFallback);
+    return normalizeConfig(stripManagedSecrets(serverConfigFallback));
   }
-  return normalizeConfig(legacyConfig);
+  return normalizeConfig(stripManagedSecrets(legacyConfig));
 }
 
 function writeJsonAtomic(filePath: string, value: unknown): void {
@@ -859,39 +1033,264 @@ function writeJsonAtomic(filePath: string, value: unknown): void {
   }
 }
 
-function serializeServerConfigForStorage(config: MakeServerConfig): Record<string, unknown> {
-  const serialized: Record<string, unknown> = { ...config };
-  const lanPassword = config.accessControl.lanPassword;
-  if (!lanPassword.passwordHash && !lanPassword.salt && !lanPassword.secret && !lanPassword.updatedAt) {
-    delete serialized.accessControl;
+function stripManagedSecrets(input: unknown): unknown {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
+  const source = input as Record<string, unknown>;
+  const sanitized: Record<string, unknown> = { ...source };
+
+  if (source.ai && typeof source.ai === 'object' && !Array.isArray(source.ai)) {
+    const ai = { ...source.ai as Record<string, unknown> };
+    for (const [sectionName, secretName] of [
+      ['imageGeneration', 'apiKey'],
+      ['doubao', 'accessKey'],
+      ['processing', 'apiKey'],
+      ['vision', 'apiKey'],
+    ] as const) {
+      const section = ai[sectionName];
+      if (section && typeof section === 'object' && !Array.isArray(section)) {
+        const publicSection = { ...section as Record<string, unknown> };
+        delete publicSection[secretName];
+        ai[sectionName] = publicSection;
+      }
+    }
+    sanitized.ai = ai;
   }
-  if (
-    JSON.stringify(normalizeServerCloudPublishingConfig(config.cloudPublishing))
-    === JSON.stringify(DEFAULT_CLOUD_PUBLISHING_CONFIG)
-  ) {
-    delete serialized.cloudPublishing;
+
+  if (source.cloudPublishing && typeof source.cloudPublishing === 'object' && !Array.isArray(source.cloudPublishing)) {
+    const cloudPublishing = { ...source.cloudPublishing as Record<string, unknown> };
+    for (const [sectionName, secretNames] of [
+      ['vercel', ['token']],
+      ['cloudflarePages', ['apiToken']],
+      ['s3', ['accessKeyId', 'secretAccessKey']],
+    ] as const) {
+      const section = cloudPublishing[sectionName];
+      if (section && typeof section === 'object' && !Array.isArray(section)) {
+        const publicSection = { ...section as Record<string, unknown> };
+        for (const secretName of secretNames) delete publicSection[secretName];
+        cloudPublishing[sectionName] = publicSection;
+      }
+    }
+    sanitized.cloudPublishing = cloudPublishing;
+  }
+
+  delete sanitized.accessControl;
+  return sanitized;
+}
+
+function applyServerSecrets(
+  publicConfig: MakeServerConfig,
+  secrets: MakeServerSecrets,
+): MakeServerConfig {
+  return normalizeConfig({
+    ...publicConfig,
+    ai: {
+      ...publicConfig.ai,
+      imageGeneration: {
+        ...publicConfig.ai.imageGeneration,
+        apiKey: secrets.ai.imageGeneration.apiKey || null,
+      },
+      doubao: {
+        ...publicConfig.ai.doubao,
+        accessKey: secrets.ai.doubao.accessKey,
+      },
+      processing: {
+        ...publicConfig.ai.processing,
+        apiKey: secrets.ai.processing.apiKey,
+      },
+      vision: {
+        ...publicConfig.ai.vision,
+        apiKey: secrets.ai.vision.apiKey,
+      },
+    },
+    cloudPublishing: {
+      ...publicConfig.cloudPublishing,
+      vercel: {
+        ...publicConfig.cloudPublishing.vercel,
+        token: secrets.cloudPublishing.vercel.token,
+      },
+      cloudflarePages: {
+        ...publicConfig.cloudPublishing.cloudflarePages,
+        apiToken: secrets.cloudPublishing.cloudflarePages.apiToken,
+      },
+      s3: {
+        ...publicConfig.cloudPublishing.s3,
+        accessKeyId: secrets.cloudPublishing.s3.accessKeyId,
+        secretAccessKey: secrets.cloudPublishing.s3.secretAccessKey,
+      },
+    },
+    accessControl: {
+      lanPassword: {
+        algorithm: 'scrypt',
+        passwordHash: secrets.accessControl.lanPassword.passwordHash || null,
+        salt: secrets.accessControl.lanPassword.salt || null,
+        secret: secrets.accessControl.lanPassword.secret,
+        updatedAt: secrets.accessControl.lanPassword.updatedAt || null,
+      },
+    },
+  });
+}
+
+function extractServerSecrets(config: MakeServerConfig): MakeServerSecrets {
+  return {
+    version: 1,
+    ai: {
+      imageGeneration: { apiKey: config.ai.imageGeneration.apiKey || '' },
+      doubao: { accessKey: config.ai.doubao.accessKey },
+      processing: { apiKey: config.ai.processing.apiKey },
+      vision: { apiKey: config.ai.vision.apiKey },
+    },
+    cloudPublishing: {
+      vercel: { token: config.cloudPublishing.vercel?.token || '' },
+      cloudflarePages: { apiToken: config.cloudPublishing.cloudflarePages?.apiToken || '' },
+      s3: {
+        accessKeyId: config.cloudPublishing.s3?.accessKeyId || '',
+        secretAccessKey: config.cloudPublishing.s3?.secretAccessKey || '',
+      },
+    },
+    accessControl: {
+      lanPassword: {
+        passwordHash: config.accessControl.lanPassword.passwordHash || '',
+        salt: config.accessControl.lanPassword.salt || '',
+        secret: config.accessControl.lanPassword.secret,
+        updatedAt: config.accessControl.lanPassword.updatedAt || '',
+      },
+    },
+  };
+}
+
+function serializePublicCloudPublishingConfig(
+  config: ServerCloudPublishingConfig,
+): ServerCloudPublishingConfig {
+  return {
+    vercel: {
+      projectName: config.vercel?.projectName || '',
+      teamId: config.vercel?.teamId || '',
+    },
+    cloudflarePages: {
+      accountId: config.cloudflarePages?.accountId || '',
+      projectName: config.cloudflarePages?.projectName || '',
+      productionBranch: config.cloudflarePages?.productionBranch || 'main',
+    },
+    s3: {
+      region: config.s3?.region || '',
+      bucket: config.s3?.bucket || '',
+      prefix: config.s3?.prefix || '',
+      baseUrl: config.s3?.baseUrl || '',
+      endpoint: config.s3?.endpoint || '',
+    },
+    githubPages: { ...config.githubPages },
+    publishSettings: config.publishSettings
+      ? {
+          includeSource: config.publishSettings.includeSource,
+          visibleTargets: [...config.publishSettings.visibleTargets],
+        }
+      : undefined,
+  };
+}
+
+function serializeServerConfigForStorage(config: MakeServerConfig): Record<string, unknown> {
+  const cloudPublishing = serializePublicCloudPublishingConfig(config.cloudPublishing);
+  const defaultCloudPublishing = serializePublicCloudPublishingConfig(DEFAULT_CLOUD_PUBLISHING_CONFIG);
+  const serialized: Record<string, unknown> = {
+    automation: config.automation,
+    assistant: config.assistant,
+    ai: {
+      imageGeneration: {
+        baseUrl: config.ai.imageGeneration.baseUrl,
+        model: config.ai.imageGeneration.model,
+        ...(config.ai.imageGeneration.lastTest
+          ? { lastTest: config.ai.imageGeneration.lastTest }
+          : {}),
+      },
+      doubao: {
+        appId: config.ai.doubao.appId,
+        speaker: config.ai.doubao.speaker,
+      },
+      processing: {
+        baseUrl: config.ai.processing.baseUrl,
+        model: config.ai.processing.model,
+      },
+      vision: {
+        endpoint: config.ai.vision.endpoint,
+        model: config.ai.vision.model,
+        family: config.ai.vision.family,
+        responseFormat: config.ai.vision.responseFormat,
+      },
+    },
+    uiPreferences: config.uiPreferences,
+    toolOpenState: config.toolOpenState,
+  };
+  if (JSON.stringify(cloudPublishing) !== JSON.stringify(defaultCloudPublishing)) {
+    serialized.cloudPublishing = cloudPublishing;
   }
   return serialized;
 }
 
+export function toPublicServerConfig(config: MakeServerConfig) {
+  return {
+    automation: config.automation,
+    assistant: config.assistant,
+    ai: {
+      imageGeneration: {
+        baseUrl: config.ai.imageGeneration.baseUrl,
+        model: config.ai.imageGeneration.model,
+        hasApiKey: Boolean(config.ai.imageGeneration.apiKey),
+        ...(config.ai.imageGeneration.lastTest
+          ? { lastTest: config.ai.imageGeneration.lastTest }
+          : {}),
+      },
+      doubao: {
+        appId: config.ai.doubao.appId,
+        speaker: config.ai.doubao.speaker,
+        hasAccessKey: Boolean(config.ai.doubao.accessKey),
+      },
+      processing: {
+        baseUrl: config.ai.processing.baseUrl,
+        model: config.ai.processing.model,
+        hasApiKey: Boolean(config.ai.processing.apiKey),
+      },
+      vision: {
+        endpoint: config.ai.vision.endpoint,
+        model: config.ai.vision.model,
+        family: config.ai.vision.family,
+        responseFormat: config.ai.vision.responseFormat,
+        hasApiKey: Boolean(config.ai.vision.apiKey),
+      },
+    },
+    uiPreferences: config.uiPreferences,
+    toolOpenState: config.toolOpenState,
+  };
+}
+
 export function createServerConfigStore(options: ServerConfigStoreOptions = {}) {
   const configPath = options.configPath ? path.resolve(options.configPath) : getGlobalServerConfigPath(options.homeDir);
+  const secretsPath = options.secretsPath
+    || (options.configPath ? path.join(path.dirname(configPath), GLOBAL_SERVER_SECRETS_FILE_NAME) : undefined);
+  const secretsStore = createServerSecretsStore({
+    homeDir: options.homeDir,
+    ...(secretsPath ? { secretsPath } : {}),
+  });
+
+  const readEffectiveConfig = (getOptions: ServerConfigGetOptions = {}): MakeServerConfig => {
+    const publicConfig = fs.existsSync(configPath)
+      ? normalizeConfig(stripManagedSecrets(readJsonFile(configPath)))
+      : getLegacyProjectConfig(getOptions.activeProjectRoot);
+    return applyServerSecrets(publicConfig, secretsStore.getSecrets());
+  };
 
   return {
     getConfigPath() {
       return configPath;
     },
     getConfig(getOptions: ServerConfigGetOptions = {}): MakeServerConfig {
-      if (fs.existsSync(configPath)) {
-        return normalizeConfig(readJsonFile(configPath));
-      }
-      return getLegacyProjectConfig(getOptions.activeProjectRoot);
+      return readEffectiveConfig(getOptions);
     },
     saveConfig(input: DeepPartial<MakeServerConfig>): MakeServerConfig {
       const current = fs.existsSync(configPath)
-        ? normalizeConfig(readJsonFile(configPath))
-        : DEFAULT_SERVER_CONFIG;
+        ? readEffectiveConfig()
+        : applyServerSecrets(DEFAULT_SERVER_CONFIG, secretsStore.getSecrets());
       const saved = normalizeConfig(input, current);
+      secretsStore.replaceSecrets(extractServerSecrets(saved));
       writeJsonAtomic(configPath, serializeServerConfigForStorage(saved));
       return saved;
     },

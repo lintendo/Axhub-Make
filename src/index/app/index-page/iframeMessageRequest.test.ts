@@ -154,6 +154,22 @@ describe('postIframeMessageRequest', () => {
     expect(targetWindow.postMessage).toHaveBeenCalledTimes(5);
   });
 
+  it('supports a single dispatch for mutating requests that must not be replayed', async () => {
+    vi.useFakeTimers();
+    const { messageHost, targetWindow, requestId, request } = createRequest({ retryDelaysMs: [0] });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(targetWindow.postMessage).toHaveBeenCalledTimes(1);
+    messageHost.dispatch({
+      source: targetWindow,
+      origin: 'http://127.0.0.1:41873',
+      data: { type: 'AXHUB_PROTOTYPE_EDITOR_STATE', requestId, success: true },
+    });
+    await expect(request).resolves.toMatchObject({ requestId, success: true });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(targetWindow.postMessage).toHaveBeenCalledTimes(1);
+  });
+
   it('resolves null and clears the listener when its iframe session becomes stale', async () => {
     vi.useFakeTimers();
     let current = true;

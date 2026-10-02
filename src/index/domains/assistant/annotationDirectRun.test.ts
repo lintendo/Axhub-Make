@@ -103,6 +103,29 @@ describe('annotation direct API run threads', () => {
     });
   });
 
+  it('keeps a unique run id while reusing an explicitly supplied canvas session', () => {
+    const target = {
+      projectScope: 'project-a',
+      currentFilePath: 'src/resources/flows/home.excalidraw',
+      prototypePath: '',
+      conversationStorePath: '/workspace/project/.spec/acp/conversations.json',
+    };
+
+    const prepared = prepareAnnotationDirectRunThread({
+      target,
+      threadId: 'canvas-thread-1',
+      conversationId: 'canvas-conversation-1',
+      createRunId: () => 'canvas-run-2',
+    });
+
+    expect(prepared).toEqual({
+      runId: 'canvas-run-2',
+      threadId: 'canvas-thread-1',
+      conversationId: 'canvas-conversation-1',
+      target,
+    });
+  });
+
   it('submits three separate prompts into three independent conversations', async () => {
     const context = {
       currentFile: {
@@ -183,6 +206,38 @@ describe('annotation direct API run threads', () => {
     });
     expect(params.contextBundle.items).toEqual(expect.any(Array));
     expect(params.contextBundle).not.toHaveProperty('selectedElements');
+  });
+
+  it('forwards the viewport screenshot and explicit session ids to the direct AI run', async () => {
+    await submitAnnotationPromptViaApi({
+      context: {
+        currentFile: {
+          path: 'src/resources/flows/home.excalidraw',
+          displayName: 'Home Canvas',
+        },
+        selectedElements: [],
+        extensions: {},
+      } as any,
+      prompt: '根据当前画布继续。',
+      projectPath: '/workspace/project',
+      projectScope: 'project-a',
+      projectId: 'project-a',
+      provider: 'codex',
+      preferredPromptClient: 'acp:codex',
+      threadId: 'canvas-thread-1',
+      conversationId: 'canvas-conversation-1',
+      referenceImages: ['data:image/png;base64,viewport'],
+      permissionMode: 'bypassPermissions',
+      createRunId: () => 'canvas-run-1',
+    });
+
+    expect(vi.mocked(runAiStream).mock.calls[0]?.[0]).toMatchObject({
+      runId: 'canvas-run-1',
+      threadId: 'canvas-thread-1',
+      conversationId: 'canvas-conversation-1',
+      referenceImages: ['data:image/png;base64,viewport'],
+      permissionMode: 'bypassPermissions',
+    });
   });
 
   it('submits image generation settings for direct runs without preview or canvas MCP servers', async () => {

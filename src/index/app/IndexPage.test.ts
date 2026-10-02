@@ -3,6 +3,86 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('IndexPage source', () => {
+  it('mounts the Commentary voice entry through existing preview callbacks only', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+    const voiceSource = source.slice(
+      source.indexOf('const commentaryVoiceCommentAdapter = useMemo'),
+      source.indexOf('const prototypeSpecNavigation = usePrototypeSpecNavigationGuard'),
+    );
+
+		expect(voiceSource).toContain('toAcpVoiceHostTools');
+    expect(voiceSource).toContain('preview.runAnnotationAcpChatPrompt');
+    expect(voiceSource).toContain('preview.abortAnnotationDirectRun');
+    expect(voiceSource).toContain('mcpServers: buildCommentaryVoiceMcpServersForDirectRun()');
+    expect(voiceSource).toContain('commentaryVoiceToolRegistrationsRef');
+    expect(source).toContain("registration.confirmation !== 'none'");
+    expect(voiceSource).toContain('createMakeVoiceToolRegistry');
+    expect(voiceSource).toContain('createMakeVoiceCommentOperations');
+    expect(voiceSource).toContain('pageScope: buildInternalPrototypeCommentPageScope(targetPath, selectedPrototypePageId) || undefined');
+    expect(voiceSource).toContain('getVoiceTargets: preview.getCommentaryVoiceTargets');
+    expect(voiceSource).toContain('findVoiceElements: preview.findCommentaryVoiceElements');
+    expect(voiceSource).toContain('getVoiceElementStructure: preview.getCommentaryVoiceElementStructure');
+    expect(voiceSource).toContain('activateVoiceElement: preview.activateCommentaryVoiceElement');
+    expect(voiceSource).toContain('createVoiceComment: preview.createCommentaryVoiceComment');
+    expect(voiceSource).toContain('tasks: commentaryVoiceExecutionDependencies');
+    expect(voiceSource).toContain('comments: commentaryVoiceCommentOperations');
+    expect(source).not.toContain('onSubmitCommentExecution: handleSubmitCommentExecution');
+    expect(voiceSource).toContain('resolve: async ({ commentId, signal }');
+    expect(voiceSource).toContain('preview.resolveCommentaryExecutionContext(commentId)');
+    expect(voiceSource).toContain('if (!await preview.refreshCommentaryVoicePersistedComments())');
+    expect(voiceSource).toContain("ensureDefaultAiConfigured(preferences.annotationPromptClient, '批注 AI')");
+    expect(voiceSource.indexOf("ensureDefaultAiConfigured(preferences.annotationPromptClient, '批注 AI')"))
+      .toBeLessThan(voiceSource.indexOf('preview.runAnnotationAcpChatPrompt'));
+    expect(voiceSource).toContain('requestCurrentScreenshot(input.scope, { preserveLayout: true })');
+    expect(voiceSource).not.toContain('screenshotUrl: capture.dataUrl');
+    expect(voiceSource).toContain('returnExecutionHandle: true');
+    expect(voiceSource).toContain('notifyCommentaryVoiceOnCompletion: true');
+    expect(voiceSource).toContain('preserveOnAutoClear: true');
+    expect(voiceSource).toContain('const promptText = String(executionContext?.promptText');
+    expect(voiceSource).not.toContain('prompt: stringValue(comment.comment');
+    expect(voiceSource).toContain('findByOperationId');
+    expect(voiceSource).toContain('preview.getAnnotationDirectRunOperation');
+    expect(voiceSource).toContain('<MakeCommentaryVoiceEntry');
+    expect(voiceSource).toContain('checkMakeVoiceConfiguration');
+    expect(voiceSource).toContain('checkMakeVoiceConfigurationAfterRuntimeReady');
+    expect(voiceSource).toContain('assistantController.connectAssistantRuntimeSilently');
+    expect(voiceSource).toContain('checkVoiceConfiguration={commentaryVoiceConfigurationCheck}');
+    expect(voiceSource).toContain('ref={commentaryVoiceAssistantRef}');
+    expect(voiceSource).toContain("openSettingsDialog('ai', { voiceSection: 'voice-doubao' })");
+    expect(voiceSource).not.toContain('handleOpenAcpWebAgent');
+    expect(voiceSource).toContain("contentMode === 'preview'");
+    expect(voiceSource).toContain("preview.editorStatus.mode === 'quickEdit'");
+    expect(voiceSource).not.toMatch(/streamAcpChat|\/api\/chat|createAcpSession|task-service/u);
+		expect(voiceSource).not.toMatch(/createMakeVoiceConversationBridge|createMakeVoiceSpeechAdapter/u);
+  });
+
+  it('keeps live comments out of the automatic turn context', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+    const voiceSource = source.slice(
+      source.indexOf('const commentaryVoiceCommentAdapter = useMemo'),
+      source.indexOf('const prototypeSpecNavigation = usePrototypeSpecNavigationGuard'),
+    );
+
+    expect(voiceSource).toContain('instructions: MAKE_COMMENTARY_VOICE_INSTRUCTIONS');
+    expect(voiceSource).toContain('activeTargets');
+    expect(voiceSource).not.toContain('recentComments');
+    expect(voiceSource).not.toContain('commentTotal');
+    expect(voiceSource).not.toContain('commentaryVoiceCommentOperations.list({');
+    expect(voiceSource).toContain('buildMakeVoiceTurnContext');
+    expect(source).toContain('executeMakeVoiceTool');
+    expect(voiceSource).toContain('buildSafeVoicePrototypeResourcePath(selectedItem)');
+    expect(voiceSource).not.toContain('resourcePath: selectedItem ? getSelectedResourceTargetPath(selectedItem)');
+    expect(voiceSource).not.toContain('创建成功后询问用户是否立即执行');
+    expect(voiceSource).not.toContain('Use the existing Axhub Make Commentary workflow.');
+  });
+
+  it('disables completed-comment auto cleanup while the voice assistant is visible', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+    expect(source).toContain(
+      'autoClearCompletedComments: preferences.autoClearCompletedComments && !showCommentaryVoice',
+    );
+  });
+
   it('passes the active markdown resource and content mode into the assistant controller', () => {
     const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
     const baseContentModeIndex = source.indexOf('const baseContentMode = useMemo');
@@ -76,7 +156,7 @@ describe('IndexPage source', () => {
     expect(assistantControllerCall).toContain('assistantImageGenerationConfig: preferences.assistantImageGenerationConfig,');
   });
 
-  it('passes image generation settings into annotation direct API runs without canvas MCP servers', () => {
+  it('passes image generation settings and caller-provided MCP servers into annotation direct API runs', () => {
     const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
     const directRunSource = source.slice(
       source.indexOf('const handleRunAnnotationAssistantPromptViaApi = useCallback'),
@@ -85,7 +165,8 @@ describe('IndexPage source', () => {
 
     expect(directRunSource).toContain('builtinToolSettings: preferences.assistantImageGenerationConfig');
     expect(directRunSource).toContain('? { imageGeneration: preferences.assistantImageGenerationConfig }');
-    expect(directRunSource).not.toContain('mcpServers');
+    expect(directRunSource).toContain('mcpServers?: unknown[];');
+    expect(directRunSource).toContain('mcpServers: request.mcpServers,');
   });
 
   it('passes abort signals into annotation direct API runs', () => {
@@ -97,6 +178,19 @@ describe('IndexPage source', () => {
 
     expect(directRunSource).toContain('signal?: AbortSignal;');
     expect(directRunSource).toContain('signal: request.signal,');
+  });
+
+  it('treats an unconfigured annotation AI as a feedback-handled preflight result', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+    const directRunSource = source.slice(
+      source.indexOf('const handleRunAnnotationAssistantPromptViaApi = useCallback'),
+      source.indexOf('const buildPromptActionAssistantContext = useCallback'),
+    );
+
+    expect(source).toContain('createAnnotationDirectRunPreflightResult');
+    expect(directRunSource).toContain(
+      "if (!ensureDefaultAiConfigured(preferences.annotationPromptClient, '批注 AI')) return createAnnotationDirectRunPreflightResult();",
+    );
   });
 
   it('runs review prompts through the direct API channel and passes the handler into preview actions', () => {
@@ -137,12 +231,15 @@ describe('IndexPage source', () => {
     const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
     const preferencesIndex = source.indexOf('const preferences = useIndexPagePreferences');
     const previewIndex = source.indexOf('const preview = useIndexPagePreviewActions');
-    const previewPreferenceIndex = source.indexOf('preferredPromptClient: preferences.preferredPromptClient', previewIndex);
+    const previewPreferenceIndex = source.indexOf('agentRunConcurrency: preferences.agentRunConcurrency', previewIndex);
+    const autoClearPreferenceIndex = source.indexOf('autoClearCompletedComments: preferences.autoClearCompletedComments', previewIndex);
 
     expect(preferencesIndex).toBeGreaterThan(-1);
     expect(previewIndex).toBeGreaterThan(-1);
     expect(previewPreferenceIndex).toBeGreaterThan(previewIndex);
+    expect(autoClearPreferenceIndex).toBeGreaterThan(previewIndex);
     expect(preferencesIndex).toBeLessThan(previewPreferenceIndex);
+    expect(preferencesIndex).toBeLessThan(autoClearPreferenceIndex);
   });
 
   it('wires the project default design through preferences, sidebar, and presentation props', () => {
@@ -187,12 +284,9 @@ describe('IndexPage source', () => {
     expect(source).toContain('buildMakeClientUpdateReminderDismissedKey');
     expect(source).toContain('readMakeClientUpdateReminderDismissed');
     expect(source).toContain('writeMakeClientUpdateReminderDismissed');
-    expect(source).toContain("type MakeClientUpdateReminderMode = 'update' | 'repair';");
-    expect(source).toContain("const reminderMode: MakeClientUpdateReminderMode = status?.repairAvailable === true ? 'repair' : 'update';");
-    expect(source).toContain("return mode === 'repair' ? `${key}.repair` : key;");
     expect(source).toContain('apiService.getMakeClientUpdateStatus(activeProjectId)');
     expect(source).toContain('setMakeClientUpdateAvailable(updateAvailable)');
-    expect(source).toContain('setMakeClientUpdateReminderVisible(updateAvailable && !readMakeClientUpdateReminderDismissed(activeProjectId, status.targetVersion, reminderMode))');
+    expect(source).toContain('setMakeClientUpdateReminderVisible(updateAvailable && !readMakeClientUpdateReminderDismissed(activeProjectId, status.targetVersion))');
     expect(source).toContain('setMakeClientUpdateReminderVisible(false);');
     expect(source).toContain('setMakeClientUpdateAvailable(false);');
     expect(source).toContain('handleMakeClientUpdateAvailabilityChange');
@@ -208,6 +302,16 @@ describe('IndexPage source', () => {
     expect(source).toContain('viewMode,');
     expect(source).toContain("return { item: resources.selectedTemplate, kind: 'template' as const };");
     expect(source).not.toContain('setResourceSection: () => undefined');
+  });
+
+  it('derives canvas voice availability from the shared canvas path resolver', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+
+    expect(source).toContain("import { resolveCanvasFilePath } from '../components/content/canvasFilePath';");
+    expect(source).toContain('const currentAssistantCanvasResource = useMemo');
+    expect(source).toContain('resolveCanvasFilePath(');
+    expect(source).toContain('currentAssistantCanvasResource as any');
+    expect(source).toContain('const canvasVoiceAvailable = isCanvasMode');
   });
 
   it('syncs the browser URL to the current short deep link state', () => {
@@ -466,14 +570,16 @@ describe('IndexPage source', () => {
     expect(source).toContain('function buildCanvasMcpServersForDirectRun(canvasFilePath: string): unknown[] | undefined');
     expect(submitHandlerSource).toContain('const result = await submitAnnotationPromptViaApi({');
     expect(submitHandlerSource).toContain('const canvasAssistantContext = buildCanvasAssistantContext(request);');
-    expect(submitHandlerSource).toContain('mcpServers: buildCanvasMcpServersForDirectRun(getAssistantContextCurrentFilePath(canvasAssistantContext)),');
-    expect(submitHandlerSource).toContain('const selectedProvider = resolveAcpPromptClientProvider(request.provider) || annotationProvider;');
+    expect(submitHandlerSource).toContain("mcpServers: request.source === 'canvas-viewport'");
+    expect(submitHandlerSource).toContain(': buildCanvasMcpServersForDirectRun(getAssistantContextCurrentFilePath(canvasAssistantContext)),');
+    expect(submitHandlerSource).toContain('const selectedProvider = resolveAcpPromptClientProvider(request.provider) || purposeProvider;');
     expect(submitHandlerSource).toContain('provider: selectedProvider,');
-    expect(submitHandlerSource).toContain('model: request.model ?? annotationModel,');
+    expect(submitHandlerSource).toContain('model: request.model ?? purposeModel,');
     expect(submitHandlerSource).toContain('mode: request.mode,');
     expect(submitHandlerSource).toContain('thought: request.thought,');
     expect(submitHandlerSource).toContain('onPrepared: request.onPrepared,');
     expect(submitHandlerSource).toContain('onAccepted: request.onAccepted,');
+    expect(submitHandlerSource).toContain('onEvent: request.onEvent,');
     expect(submitHandlerSource).toContain('signal: request.signal,');
     expect(directApiSubmitSource.indexOf('provider: selectedProvider,')).toBeGreaterThan(
       directApiSubmitSource.indexOf('scene: `canvas-${request.scene}-direct`,'),
@@ -504,7 +610,7 @@ describe('IndexPage source', () => {
     expect(submitSource).toContain("canvasFilePath: isStartGuideCanvasGeneration ? undefined : request.canvasFilePath");
   });
 
-  it('tracks prototype start drafts and creates a real prototype before first submission', () => {
+  it('tracks prototype start drafts without a hidden generation submission callback', () => {
     const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
     const draftStateSource = source.slice(
       source.indexOf('const [prototypeStartDraftActive'),
@@ -513,10 +619,6 @@ describe('IndexPage source', () => {
     const createDraftSource = source.slice(
       source.indexOf('const handleCreatePrototypeStartDraft = useCallback'),
       source.indexOf('const handleOpenPrototypeCreateDialog', source.indexOf('const handleCreatePrototypeStartDraft = useCallback')),
-    );
-    const createForDraftSource = source.slice(
-      source.indexOf('const handleCreatePrototypeForDraftStart = useCallback'),
-      source.indexOf('const handleSubmitCanvasAssistantPrompt = useCallback', source.indexOf('const handleCreatePrototypeForDraftStart = useCallback')),
     );
     const sidebarBuilderCall = source.slice(
       source.indexOf('const sidebarProps = useIndexPageSidebarPropsBuilder'),
@@ -540,34 +642,30 @@ describe('IndexPage source', () => {
     expect(createDraftSource).toContain('setResourceStartDraftActive(false);');
     expect(createDraftSource).toContain('setThemeStartDraftActive(false);');
     expect(createDraftSource).toContain('setPrototypeStartDraftActive(true);');
-    expect(createForDraftSource).toContain('apiService.createPlaceholderPrototype(requireProjectScope(workspace.activeProjectId))');
-    expect(createForDraftSource).toContain('const createdFromResult = buildCreatedPrototypeStartItem(result);');
-    expect(createForDraftSource).toContain('const refreshedPrototypes = await handleRefreshCanvasPrototypeItems(createdFromResult.name);');
-    expect(createForDraftSource).toContain('const created = refreshedPrototypes.find((item) => item.name === createdFromResult.name) || createdFromResult;');
-    expect(createForDraftSource).toContain('setSelectedItem(created);');
-    expect(createForDraftSource).toContain('setPrototypeStartDraftActive(false);');
-    expect(createForDraftSource).toContain('return created;');
-    expect(sidebarBuilderCall).toContain('prototypeStartDraftActive,');
+    expect(source).not.toContain('handleCreatePrototypeForDraftStart');
+    expect(source).not.toContain('buildCreatedPrototypeStartItem');
+    expect(sidebarBuilderCall).not.toContain('prototypeStartDraftActive,');
     expect(sidebarBuilderCall).toContain('handleCreatePrototypeStartDraft,');
     expect(presentationBuilderCall).toContain('prototypeStartDraftActive,');
-    expect(presentationBuilderCall).toContain('onCreatePrototypeForDraftStart: handleCreatePrototypeForDraftStart,');
+    expect(presentationBuilderCall).not.toContain('onCreatePrototypeForDraftStart');
   });
 
-  it('opens resource and design start requests in fresh visible assistant conversations', () => {
+  it('opens all start-guide requests with the conversation AI configuration', () => {
     const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
     const submitSource = source.slice(
       source.indexOf('const handleSubmitCanvasAssistantPrompt = useCallback'),
       source.indexOf('const switchProjectWithReturnTarget', source.indexOf('const handleSubmitCanvasAssistantPrompt = useCallback')),
     );
 
-    expect(submitSource).toContain("const shouldOpenStartGuideConversation = request.source === 'resource-start'");
+    expect(submitSource).toContain("const shouldOpenStartGuideConversation = request.source === 'placeholder-start'");
+    expect(submitSource).toContain("|| request.source === 'resource-start'");
     expect(submitSource).toContain("|| request.source === 'theme-start';");
-    expect(submitSource).toContain('const submitted = await handleSubmitAnnotationAssistantPrompt(');
+    expect(submitSource).toContain('const submitted = await handleSubmitConversationAssistantPrompt(');
     expect(submitSource).toContain('canvasAssistantContext,');
     expect(submitSource).toContain('forceNewThread: true,');
     expect(submitSource).toContain("waitUntil: 'started',");
     expect(submitSource).toContain('provider: selectedProvider,');
-    expect(submitSource).toContain('model: request.model ?? annotationModel,');
+    expect(submitSource).toContain('model: request.model ?? conversationModel,');
     expect(submitSource).toContain('mode: request.mode,');
     expect(submitSource).toContain('thought: request.thought,');
     expect(submitSource).toContain("return { ok: Boolean(submitted && (typeof submitted !== 'object' || submitted.ok !== false)) };");
@@ -599,8 +697,8 @@ describe('IndexPage source', () => {
     );
 
     expect(source).toContain("import { resolveAcpPromptClientProvider } from '@/common/acpModelConfig';");
-    expect(submitSource).toContain('if (!ensureDefaultAiConfigured(preferences.preferredPromptClient)) return false;');
-    expect(submitSource).toContain('const annotationPromptClient = preferences.annotationPromptClient || preferences.preferredPromptClient;');
+    expect(submitSource).toContain("if (!ensureDefaultAiConfigured(preferences.annotationPromptClient, '批注 AI')) return false;");
+    expect(submitSource).toContain('const annotationPromptClient = preferences.annotationPromptClient;');
     expect(submitSource).toContain('const annotationProvider = resolveAcpPromptClientProvider(annotationPromptClient);');
     expect(submitSource).toContain('if (!annotationProvider) return false;');
     expect(submitSource).toContain('const annotationModel = preferences.annotationModel || null;');
@@ -608,7 +706,9 @@ describe('IndexPage source', () => {
     expect(submitSource).toContain('model: options?.model ?? annotationModel,');
     expect(submitSource).toContain('autoSend: options?.autoSend,');
     expect(submitSource).toContain('agentRunConcurrency: preferences.agentRunConcurrency,');
-    expect(source).toContain('preferences.preferredPromptClient,');
+    expect(source).not.toContain('preferences.preferredPromptClient');
+    expect(source).toContain('preferences.conversationPromptClient,');
+    expect(source).toContain('preferences.canvasPromptClient,');
     expect(source).toContain('preferences.annotationPromptClient,');
     expect(source).toContain('preferences.annotationModel,');
     expect(source).toContain('preferences.agentRunConcurrency,');
@@ -632,10 +732,67 @@ describe('IndexPage source', () => {
 
     expect(guardSource).toContain('if (resolveAcpPromptClientProvider(normalizePromptClientPreference(promptClient))) return true;');
     expect(guardSource).toContain("openSettingsDialog('ai');");
-    expect(guardSource).toContain("messageApi.warning('请先在 AI 设置中选择本地 AI Agent');");
-    expect(acpOpenSource).toContain('if (!ensureDefaultAiConfigured(preferences.preferredPromptClient)) return;');
-    expect(imageOpenSource).toContain('if (!ensureDefaultAiConfigured(preferences.preferredPromptClient)) return;');
+    expect(guardSource).toContain('messageApi.warning(`请先在 AI 设置中配置${purposeLabel}`);');
+    expect(acpOpenSource).toContain("if (!ensureDefaultAiConfigured(preferences.conversationPromptClient, '对话 AI')) return;");
+    expect(imageOpenSource).toContain("if (!ensureDefaultAiConfigured(preferences.conversationPromptClient, '对话 AI')) return;");
     expect(source).toContain('ensureDefaultAiConfigured,');
+  });
+
+  it('prepares the selected resource parent before opening image AI', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+    const controllerStart = source.indexOf('const assistantController = useAssistantPanelController({');
+    const controllerEnd = source.indexOf('});', controllerStart);
+    const controllerSource = source.slice(controllerStart, controllerEnd);
+    const imageOpenStart = source.indexOf('const handleOpenImageAiPanel = useCallback');
+    const imageOpenEnd = source.indexOf('const handleCloseAiPanel', imageOpenStart);
+    const imageOpenSource = source.slice(imageOpenStart, imageOpenEnd);
+
+    expect(source).toContain("import { resolveImageAiResourceTargetFolder } from '../domains/assistant/imageAiResourceTarget';");
+    expect(source).toContain("const [imageAiSaveDirectory, setImageAiSaveDirectory] = useState('');");
+    expect(source.indexOf("const [imageAiSaveDirectory, setImageAiSaveDirectory] = useState('');"))
+      .toBeLessThan(controllerStart);
+    expect(controllerSource).toContain('imageAiSaveDirectory,');
+    expect(imageOpenSource).toContain('const handleOpenImageAiPanel = useCallback(async () => {');
+    expect(imageOpenSource).toContain('const targetFolder = resolveImageAiResourceTargetFolder({');
+    expect(imageOpenSource).toContain('sidebarTab,');
+    expect(imageOpenSource).toContain('selectedFolder: resources.selectedResourceFolder,');
+    expect(imageOpenSource).toContain('selectedResource: resources.selectedDoc,');
+    expect(imageOpenSource).toContain('const preparedFolder = await resources.prepareImageAiResourceFolder(targetFolder);');
+    expect(imageOpenSource).toContain('if (!preparedFolder) return;');
+    expect(imageOpenSource).toContain('setImageAiSaveDirectory(preparedFolder.absolutePath);');
+    expect(imageOpenSource.indexOf('setImageAiSaveDirectory(preparedFolder.absolutePath);'))
+      .toBeLessThan(imageOpenSource.indexOf('assistantController.openImageAiPanel();'));
+  });
+
+  it('refreshes Resources after ACP image saves without changing the current folder', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+    const controllerSource = source.slice(
+      source.indexOf('const assistantController = useAssistantPanelController({'),
+      source.indexOf('const syncAssistantCanvasComments = assistantController.syncAssistantCanvasComments'),
+    );
+
+    expect(source).toContain('const handleImageAiSaved = useCallback(() => {');
+    expect(source).toContain('void resources.refreshDocsResources().catch(');
+    expect(controllerSource).toContain('onImageSaved: handleImageAiSaved,');
+  });
+
+  it('routes annotation prompt cards to annotation AI and other canvas requests to canvas AI', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+    const submitSource = source.slice(
+      source.indexOf('const handleSubmitCanvasAssistantPrompt = useCallback'),
+      source.indexOf('const switchProjectWithReturnTarget', source.indexOf('const handleSubmitCanvasAssistantPrompt = useCallback')),
+    );
+
+    expect(submitSource).toContain("const isAnnotationPromptCard = request.source === 'annotation-prompt-card';");
+    expect(submitSource).toContain("const purposeLabel = isAnnotationPromptCard ? '批注 AI' : '画布 AI';");
+    expect(submitSource).toContain('if (!ensureDefaultAiConfigured(purposePromptClient, purposeLabel)) return { ok: false };');
+    expect(submitSource).toContain('const purposePromptClient = isAnnotationPromptCard');
+    expect(submitSource).toContain('? preferences.annotationPromptClient');
+    expect(submitSource).toContain(': preferences.canvasPromptClient;');
+    expect(submitSource).toContain('const purposeModel = isAnnotationPromptCard');
+    expect(submitSource).toContain('? preferences.annotationModel');
+    expect(submitSource).toContain(': preferences.canvasModel;');
+    expect(submitSource).toContain('model: request.model ?? purposeModel,');
   });
 
   it('returns visible direct API output artifacts from canvas generation submissions', () => {
@@ -647,12 +804,20 @@ describe('IndexPage source', () => {
 
     expect(source).toContain("import { mapCanvasDirectRunArtifacts } from '../domains/ai-generation/canvasDirectRun';");
     expect(submitSource).toContain('const result = await submitAnnotationPromptViaApi({');
+    expect(submitSource).toContain('threadId: request.threadId,');
+    expect(submitSource).toContain('conversationId: request.conversationId,');
+    expect(submitSource).toContain('referenceImages: request.referenceImages,');
+    expect(submitSource).toContain("permissionMode: request.source === 'canvas-viewport' ? 'bypassPermissions' : undefined,");
     expect(submitSource).toContain('targetPath: request.canvasFilePath || undefined,');
-    expect(submitSource).toContain('const artifacts = mapCanvasDirectRunArtifacts((result.artifacts || []) as Record<string, unknown>[], {');
+    expect(submitSource).toContain("mcpServers: request.source === 'canvas-viewport'");
+    expect(submitSource).toContain('? undefined');
+    expect(submitSource).toContain(': buildCanvasMcpServersForDirectRun(getAssistantContextCurrentFilePath(canvasAssistantContext)),');
+    expect(submitSource).toContain("const artifacts = request.source === 'canvas-viewport'");
+    expect(submitSource).toContain(': mapCanvasDirectRunArtifacts((result.artifacts || []) as Record<string, unknown>[], {');
     expect(submitSource).toContain('canvasFilePath: request.canvasFilePath,');
     expect(submitSource).toContain('runId: result.runId,');
     expect(submitSource).toContain('threadId: result.threadId,');
-    expect(submitSource).toContain('return { ok: true, artifacts };');
+    expect(submitSource).toContain("request.source === 'canvas-viewport' && result.output.trim()");
   });
 
   it('shows a short startup warning when the Make state directory is not writable', () => {
@@ -692,6 +857,17 @@ describe('IndexPage source', () => {
     expect(dialogsPropsSource).toContain('initialTab: initialCreateDialogTab,');
   });
 
+  it('does not thread a removed initial tab into the online theme drawer', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+    const dialogsSource = readFileSync(resolve(__dirname, '../components/app/IndexDialogs.tsx'), 'utf8');
+    const containerSource = readFileSync(resolve(__dirname, '../components/dialogs/CreateThemeDialogContainer.tsx'), 'utf8');
+
+    expect(source).not.toContain('initialThemeDialogTab');
+    expect(dialogsSource).not.toContain('initialTab?: \'import\' | \'onlineSelect\';');
+    expect(containerSource).not.toContain('ThemeDialogTab');
+    expect(containerSource).not.toContain('initialTab={state.initialTab}');
+  });
+
   it('tracks the requested settings tab before opening the settings dialog', () => {
     const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
     const dialogsSource = readFileSync(resolve(__dirname, '../components/app/IndexDialogs.tsx'), 'utf8');
@@ -699,14 +875,21 @@ describe('IndexPage source', () => {
     expect(source).toContain("import type { SettingsDialogAIContext, SettingsDialogInitialTab } from '../components/SettingsDialog';");
     expect(source).toContain("const [settingsDialogInitialTab, setSettingsDialogInitialTab] = useState<SettingsDialogInitialTab>('project');");
     expect(source).toContain('const [settingsDialogAIContext, setSettingsDialogAIContext] = useState<SettingsDialogAIContext | null>(null);');
+    expect(source).toContain('const [aiSettingsDialogOpen, setAiSettingsDialogOpen] = useState(false);');
+    expect(source).toContain('const [networkSettingsDialogOpen, setNetworkSettingsDialogOpen] = useState(false);');
+    expect(source).toContain('const openAISettingsDialog = useCallback');
+    expect(source).toContain('const openNetworkSettingsDialog = useCallback');
     expect(source).toContain("const openSettingsDialog = useCallback((tab: SettingsDialogInitialTab = 'project', aiContext?: SettingsDialogAIContext | null) => {");
     expect(source).toContain('setSettingsDialogInitialTab(tab);');
-    expect(source).toContain("setSettingsDialogAIContext(tab === 'ai' ? aiContext || null : null);");
+    expect(source).toContain('openAISettingsDialog(aiContext);');
+    expect(source).toContain('setSettingsDialogAIContext(null);');
     expect(source).toContain('setSettingsDialogOpen(true);');
     expect(source).toContain('openSettingsDialog,');
     expect(source).toContain('settingsDialogInitialTab,');
     expect(source).toContain('settingsDialogAIContext,');
     expect(dialogsSource).toContain('settingsDialogInitialTab: SettingsDialogInitialTab;');
+    expect(dialogsSource).toContain('aiSettingsDialogOpen: boolean;');
+    expect(dialogsSource).toContain('networkSettingsDialogOpen: boolean;');
     expect(dialogsSource).toContain('settingsDialogAIContext: SettingsDialogAIContext | null;');
     expect(dialogsSource).toContain('settingsDialogInitialTab,');
     expect(dialogsSource).toContain('settingsDialogAIContext,');
@@ -714,28 +897,20 @@ describe('IndexPage source', () => {
     expect(dialogsSource).toContain('initialAcpRuntime={settingsDialogAIContext?.runtime}');
     expect(dialogsSource).toContain('initialAcpFailureSource={settingsDialogAIContext?.failureSource}');
     expect(dialogsSource).toContain('initialAcpFailureMessage={settingsDialogAIContext?.failureMessage}');
+    expect(dialogsSource).toContain('standalone="network"');
   });
 
-  it('opens workspace version collaboration as a separate drawer from the sidebar menu', () => {
+  it('opens remote repository settings as a focused dialog from the Git popover', () => {
     const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
-    const sidebarBuilderSource = readFileSync(resolve(__dirname, './hooks/useIndexPageSidebarPropsBuilder.ts'), 'utf8');
     const dialogsSource = readFileSync(resolve(__dirname, '../components/app/IndexDialogs.tsx'), 'utf8');
-    const typesSource = readFileSync(resolve(__dirname, '../types/index-page.types.ts'), 'utf8');
 
-    expect(source).toContain('const [versionCollaborationDrawerOpen, setVersionCollaborationDrawerOpen] = useState(false);');
-    expect(source).toContain('setVersionCollaborationDrawerOpen,');
-    expect(source).toContain('versionCollaborationDrawerOpen,');
-    expect(source).toContain('versionCollaborationDrawerOpen,');
-    expect(sidebarBuilderSource).toContain('setVersionCollaborationDrawerOpen: Dispatch<SetStateAction<boolean>>;');
-    expect(sidebarBuilderSource).toContain('onVersionCollaborationClick: () => deps.setVersionCollaborationDrawerOpen(true),');
-    expect(typesSource).toContain('onVersionCollaborationClick: () => void;');
-    expect(dialogsSource).toContain('versionCollaborationDrawerOpen: boolean;');
-    expect(dialogsSource).toContain('setVersionCollaborationDrawerOpen: (open: boolean) => void;');
-    expect(source).toContain('const openVersionCollaborationFromSettings = useCallback(() => {');
-    expect(source).toContain('setSettingsDialogOpen(false);');
-    expect(source).toContain('setVersionCollaborationDrawerOpen(true);');
-    expect(dialogsSource).toContain('onOpenVersionCollaborationFromSettings: () => void;');
-    expect(dialogsSource).toContain('onOpenVersionCollaborationFromSettings,');
+    expect(source).toContain('const [remoteRepositorySettingsOpen, setRemoteRepositorySettingsOpen] = useState(false);');
+    expect(source).toContain('const openRemoteRepositorySettings = useCallback(() => {');
+    expect(source).toContain('onOpenRemoteRepositorySettings: openRemoteRepositorySettings,');
+    expect(dialogsSource).toContain('remoteRepositorySettingsOpen: boolean;');
+    expect(dialogsSource).toContain('setRemoteRepositorySettingsOpen: (open: boolean) => void;');
+    expect(dialogsSource).toContain('<RemoteRepositorySettingsDialog');
+    expect(dialogsSource).not.toContain('WorkspaceVersionCollaborationDrawer');
   });
 
   it('connects the hidden Admin bridge while a Web Agent panel is open', () => {
@@ -874,52 +1049,88 @@ describe('IndexPage source', () => {
     expect(autoOpenEffectSource).toContain("onlineOpenAutoRestorePendingRef.current = '';");
   });
 
-  it('keeps the assistant panel closed on the prototype placeholder start page', () => {
+  it('does not auto-restore the embedded assistant on compact viewports', () => {
     const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
     const autoOpenEffectStart = source.indexOf('if (!preferences.initialPreferencesLoaded || !assistantAutoOpenTargetPath) {');
     const autoOpenEffectEnd = source.indexOf('restoreAssistantPanel(assistantAutoOpenTargetPath, rememberedAiPanelMode)', autoOpenEffectStart);
-    const autoOpenEffectSource = source.slice(autoOpenEffectStart, autoOpenEffectEnd);
-    const autoCloseEffectStart = source.indexOf('if (!prototypePlaceholderAutoCloseKey) {');
-    const autoCloseEffectEnd = source.indexOf('}, [', autoCloseEffectStart);
-    const autoCloseEffectSource = source.slice(autoCloseEffectStart, autoCloseEffectEnd);
+    const autoOpenEffectSource = source.slice(source.lastIndexOf('useEffect(() => {', autoOpenEffectStart), autoOpenEffectEnd);
 
-    expect(source).toContain("const prototypePlaceholderActive = contentMode === 'preview' && viewMode === 'demo' && selectedItem?.placeholder === true;");
-    expect(source).toContain('const prototypePlaceholderAutoCloseKey = prototypePlaceholderActive && selectedItem');
-    expect(source).toContain("const closedPrototypePlaceholderAutoCloseKeyRef = useRef('');");
-    expect(autoOpenEffectSource).toContain('if (prototypePlaceholderActive) {');
-    expect(autoOpenEffectSource.indexOf('if (prototypePlaceholderActive) {'))
-      .toBeLessThan(autoOpenEffectSource.indexOf('const autoOpenTargetKey = assistantAutoOpenTargetPath;'));
-    expect(autoCloseEffectSource).toContain("closedPrototypePlaceholderAutoCloseKeyRef.current = '';");
-    expect(autoCloseEffectSource).toContain('if (!assistantController.assistantVisible) {');
-    expect(autoCloseEffectSource).toContain('if (closedPrototypePlaceholderAutoCloseKeyRef.current === prototypePlaceholderAutoCloseKey) {');
-    expect(autoCloseEffectSource).toContain('closedPrototypePlaceholderAutoCloseKeyRef.current = prototypePlaceholderAutoCloseKey;');
-    expect(autoCloseEffectSource.indexOf('if (!assistantController.assistantVisible) {'))
-      .toBeLessThan(autoCloseEffectSource.indexOf('closedPrototypePlaceholderAutoCloseKeyRef.current = prototypePlaceholderAutoCloseKey;'));
-    expect(autoCloseEffectSource).toContain('assistantController.hideAssistantPanelTemporarily();');
-    expect(autoCloseEffectSource).not.toContain('setAssistantAutoOpenDismissed(');
-    expect(autoCloseEffectSource).not.toContain('assistantController.handleToggleAssistant();');
+    expect(autoOpenEffectSource).toContain('if (assistantCompactViewport) {');
+    expect(autoOpenEffectSource).toContain('return;');
   });
 
-  it('restores a temporarily hidden assistant after leaving a prototype placeholder', () => {
+  it('routes manual assistant opens to a new window on compact viewports', () => {
     const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
-    const restoreHiddenEffectStart = source.indexOf('if (!assistantController.assistantPanelMounted) {');
-    const restoreHiddenEffectEnd = source.indexOf('}, [', restoreHiddenEffectStart);
-    const restoreHiddenEffectSource = source.slice(restoreHiddenEffectStart, restoreHiddenEffectEnd);
+    const openGeneralSource = source.slice(
+      source.indexOf('const handleOpenAcpWebAgent'),
+      source.indexOf('const handleOpenImageAiPanel', source.indexOf('const handleOpenAcpWebAgent')),
+    );
+    const openImageSource = source.slice(
+      source.indexOf('const handleOpenImageAiPanel'),
+      source.indexOf('const handleCloseAiPanel', source.indexOf('const handleOpenImageAiPanel')),
+    );
+    const assistantPanelPropsSource = source.slice(
+      source.indexOf('const assistantPanelProps = {'),
+      source.indexOf('const dialogsProps = {'),
+    );
 
-    expect(restoreHiddenEffectStart).toBeGreaterThan(-1);
-    expect(restoreHiddenEffectEnd).toBeGreaterThan(restoreHiddenEffectStart);
-    expect(restoreHiddenEffectSource).toContain('if (prototypePlaceholderActive) {');
-    expect(restoreHiddenEffectSource).toContain('if (prototypeWaitingGenerationActive) {');
-    expect(restoreHiddenEffectSource).toContain('if (!assistantController.assistantPanelMounted) {');
-    expect(restoreHiddenEffectSource).toContain('if (assistantController.assistantVisible) {');
-    expect(restoreHiddenEffectSource).toContain('if (!assistantAutoOpenTargetPath) {');
-    expect(restoreHiddenEffectSource).toContain('if (getAssistantAutoOpenDismissed(assistantAutoOpenDismissedStorageKey)) {');
-    expect(restoreHiddenEffectSource).toContain('const rememberedAiPanelMode = getAssistantAutoOpenPanelMode(assistantAutoOpenPanelModeStorageKey);');
-    expect(restoreHiddenEffectSource).toContain('restoreAssistantPanel(assistantAutoOpenTargetPath, rememberedAiPanelMode);');
-    expect(restoreHiddenEffectSource).not.toContain('onlineOpenAutoTriggeredRef.current');
+    expect(openGeneralSource).toContain('assistantCompactViewport');
+    expect(openGeneralSource).toContain('handleOpenAssistantInNewWindowNoContext(targetPath)');
+    expect(openImageSource).toContain('assistantCompactViewport');
+    expect(openImageSource).toContain('handleOpenImageAiPanelInNewWindow');
+    expect(assistantPanelPropsSource).toContain('!assistantCompactViewport');
   });
 
-  it('does not auto-open a closed mounted assistant panel after switching projects', () => {
+  it('hides an already-open embedded assistant when the viewport becomes compact', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+
+    expect(source).toContain('if (!assistantCompactViewport || !assistantController.assistantVisible) {');
+    expect(source).toContain('assistantController.hideAssistantPanelTemporarily();');
+  });
+
+  it('treats an existing prototype placeholder as an ordinary page shell', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+
+    expect(source).toContain("const prototypeStartDraftShellActive = contentMode === 'preview'");
+    expect(source).toContain('&& prototypeStartDraftActive');
+    expect(source).toContain('&& !selectedItem;');
+    expect(source).not.toContain('prototypePlaceholderActive');
+    expect(source).not.toContain('prototypePlaceholderAutoCloseKey');
+    expect(source).not.toContain('closedPrototypePlaceholderAutoCloseKeyRef');
+    expect(source).not.toContain('prototypeWaitingGenerationActive');
+    expect(source).not.toContain('prototypeWaitingGenerationAutoOpenKey');
+    expect(source).not.toContain('openedPrototypeWaitingGenerationKeyRef');
+  });
+
+  it('keeps the global assistant available for a no-resource prototype draft', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+    const draftShellDefinition = source.slice(
+      source.indexOf('const prototypeStartDraftShellActive ='),
+      source.indexOf('const preferences = useIndexPagePreferences'),
+    );
+    const autoOpenEffectStart = source.indexOf('if (!preferences.initialPreferencesLoaded || !assistantAutoOpenTargetPath) {');
+    const autoOpenEffectSource = source.slice(
+      source.lastIndexOf('useEffect(() => {', autoOpenEffectStart),
+      source.indexOf('const handleOpenAcpWebAgent', autoOpenEffectStart),
+    );
+    const restoreHiddenEffectStart = source.indexOf('if (!assistantController.assistantPanelMounted) {');
+    const restoreHiddenEffectSource = source.slice(
+      source.lastIndexOf('useEffect(() => {', restoreHiddenEffectStart),
+      source.indexOf('workspace.ensureSidebarTreeLoaded', restoreHiddenEffectStart),
+    );
+    const assistantPanelPropsSource = source.slice(
+      source.indexOf('const assistantPanelProps = {'),
+      source.indexOf('const dialogsProps = {'),
+    );
+
+    expect(draftShellDefinition).not.toContain('placeholder');
+    expect(autoOpenEffectSource).not.toContain('prototypeStartDraftShellActive');
+    expect(restoreHiddenEffectSource).not.toContain('prototypeStartDraftShellActive');
+    expect(assistantPanelPropsSource).toContain('mounted: conversationUiEnabled && !assistantCompactViewport && assistantController.assistantPanelMounted,');
+    expect(assistantPanelPropsSource).toContain('visible: conversationUiEnabled && !assistantCompactViewport && assistantController.assistantVisible,');
+  });
+
+  it('uses stable project ids to suppress auto-open only after real project switches', () => {
     const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
     const projectScopeEffectStart = source.indexOf('const previousAssistantAutoOpenProjectScopeRef = useRef');
     const autoOpenEffectStart = source.indexOf('if (!preferences.initialPreferencesLoaded || !assistantAutoOpenTargetPath) {');
@@ -933,90 +1144,15 @@ describe('IndexPage source', () => {
       restoreHiddenEffectStart,
       source.indexOf('restoreAssistantPanel(assistantAutoOpenTargetPath, rememberedAiPanelMode);', restoreHiddenEffectStart),
     );
-    const waitingEffectStart = source.indexOf('if (!prototypeWaitingGenerationActive) {');
-    const waitingEffectSource = source.slice(
-      waitingEffectStart,
-      source.indexOf("void restoreAssistantPanel(assistantAutoOpenTargetPath, 'general-ai');", waitingEffectStart),
-    );
-
     expect(projectScopeEffectStart).toBeGreaterThan(-1);
+    expect(source).toContain("const assistantAutoOpenProjectScope = workspace.activeProjectId || '';");
+    expect(source).not.toContain('const assistantAutoOpenProjectScope = workspace.activeProjectId\n        || workspace.projectTitle;');
     expect(projectScopeEffectSource).toContain('const previousScope = previousAssistantAutoOpenProjectScopeRef.current;');
-    expect(projectScopeEffectSource).toContain('if (previousScope && nextScope && previousScope !== nextScope && !assistantController.assistantVisible) {');
+    expect(projectScopeEffectSource).toContain('if (shouldSuppressAssistantAutoOpenForProjectChange(');
+    expect(projectScopeEffectSource).toContain('previousScope,\n            nextScope,\n            assistantController.assistantVisible,');
     expect(projectScopeEffectSource).toContain('assistantAutoOpenSuppressedProjectScopeRef.current = nextScope;');
     expect(autoOpenEffectSource).toContain('if (assistantAutoOpenSuppressedProjectScopeRef.current === assistantAutoOpenProjectScope) {');
     expect(restoreHiddenEffectSource).toContain('if (assistantAutoOpenSuppressedProjectScopeRef.current === assistantAutoOpenProjectScope) {');
-    expect(waitingEffectSource).not.toContain('if (assistantAutoOpenSuppressedProjectScopeRef.current === assistantAutoOpenProjectScope) {');
-  });
-
-  it('opens the assistant panel for waiting prototype previews with the active target path', () => {
-    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
-    const autoOpenEffectStart = source.indexOf('if (!preferences.initialPreferencesLoaded || !assistantAutoOpenTargetPath) {');
-    const autoOpenEffectEnd = source.indexOf('restoreAssistantPanel(assistantAutoOpenTargetPath, rememberedAiPanelMode)', autoOpenEffectStart);
-    const autoOpenEffectSource = source.slice(autoOpenEffectStart, autoOpenEffectEnd);
-    const waitingEffectStart = source.indexOf('if (!prototypeWaitingGenerationActive) {');
-    const waitingEffectEnd = source.indexOf('}, [', waitingEffectStart);
-    const waitingEffectSource = source.slice(waitingEffectStart, waitingEffectEnd);
-
-    expect(source).toContain("const prototypeWaitingGenerationActive = contentMode === 'preview' && viewMode === 'demo' && selectedItem?.generationStatus === 'waiting' && selectedItem?.placeholder !== true;");
-    expect(source).toContain('const prototypeWaitingGenerationAutoOpenKey = prototypeWaitingGenerationActive && selectedItem');
-    expect(source).toContain("const openedPrototypeWaitingGenerationKeyRef = useRef('');");
-    expect(autoOpenEffectSource).toContain('if (prototypeWaitingGenerationActive) {');
-    expect(autoOpenEffectSource.indexOf('if (prototypeWaitingGenerationActive) {'))
-      .toBeLessThan(autoOpenEffectSource.indexOf('const autoOpenTargetKey = assistantAutoOpenTargetPath;'));
-    expect(waitingEffectStart).toBeGreaterThan(-1);
-    expect(waitingEffectEnd).toBeGreaterThan(waitingEffectStart);
-    expect(waitingEffectSource).toContain("openedPrototypeWaitingGenerationKeyRef.current = '';");
-    expect(waitingEffectSource).toContain('if (!preferences.initialPreferencesLoaded) {');
-    expect(waitingEffectSource).toContain('if (!prototypeWaitingGenerationAutoOpenKey) {');
-    expect(waitingEffectSource).toContain('const waitingGenerationAutoOpenKey = prototypeWaitingGenerationAutoOpenKey;');
-    expect(waitingEffectSource).toContain('if (openedPrototypeWaitingGenerationKeyRef.current === waitingGenerationAutoOpenKey) {');
-    expect(waitingEffectSource).toContain('openedPrototypeWaitingGenerationKeyRef.current = waitingGenerationAutoOpenKey;');
-    expect(waitingEffectSource).toContain('if (!assistantAutoOpenTargetPath) {');
-    expect(waitingEffectSource.indexOf('if (!assistantAutoOpenTargetPath) {'))
-      .toBeLessThan(waitingEffectSource.indexOf('openedPrototypeWaitingGenerationKeyRef.current = waitingGenerationAutoOpenKey;'));
-    expect(waitingEffectSource).toContain('const rememberedAiPanelMode = getAssistantAutoOpenPanelMode(assistantAutoOpenPanelModeStorageKey);');
-    expect(waitingEffectSource).toContain('restoreAssistantPanel(assistantAutoOpenTargetPath, rememberedAiPanelMode);');
-    expect(waitingEffectSource).not.toContain("restoreAssistantPanel(assistantAutoOpenTargetPath, 'general-ai');");
-  });
-
-  it('preserves the remembered assistant panel mode when auto-opening waiting prototype previews', () => {
-    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
-    const waitingEffectStart = source.indexOf('if (!prototypeWaitingGenerationActive) {');
-    const waitingEffectEnd = source.indexOf('}, [', waitingEffectStart);
-    const waitingEffectSource = source.slice(waitingEffectStart, waitingEffectEnd);
-
-    expect(waitingEffectStart).toBeGreaterThan(-1);
-    expect(waitingEffectEnd).toBeGreaterThan(waitingEffectStart);
-    expect(waitingEffectSource).toContain("assistantAutoOpenSuppressedProjectScopeRef.current = '';");
-    expect(waitingEffectSource).toContain('setAssistantAutoOpenDismissed(assistantAutoOpenDismissedStorageKey, false);');
-    expect(waitingEffectSource).toContain('const rememberedAiPanelMode = getAssistantAutoOpenPanelMode(assistantAutoOpenPanelModeStorageKey);');
-    expect(waitingEffectSource).toContain('setAssistantAutoOpenPanelMode(assistantAutoOpenPanelModeStorageKey, rememberedAiPanelMode);');
-    expect(waitingEffectSource).not.toContain("setAssistantAutoOpenPanelMode(assistantAutoOpenPanelModeStorageKey, 'general-ai');");
-    expect(waitingEffectSource).not.toContain("restoreAssistantPanel(assistantAutoOpenTargetPath, 'general-ai');");
-    expect(waitingEffectSource.indexOf('const rememberedAiPanelMode = getAssistantAutoOpenPanelMode(assistantAutoOpenPanelModeStorageKey);'))
-      .toBeLessThan(waitingEffectSource.indexOf('setAssistantAutoOpenPanelMode(assistantAutoOpenPanelModeStorageKey, rememberedAiPanelMode);'));
-    expect(waitingEffectSource.indexOf("assistantAutoOpenSuppressedProjectScopeRef.current = '';"))
-      .toBeLessThan(waitingEffectSource.indexOf('void restoreAssistantPanel(assistantAutoOpenTargetPath, rememberedAiPanelMode);'));
-    expect(waitingEffectSource.indexOf('setAssistantAutoOpenDismissed(assistantAutoOpenDismissedStorageKey, false);'))
-      .toBeLessThan(waitingEffectSource.indexOf('void restoreAssistantPanel(assistantAutoOpenTargetPath, rememberedAiPanelMode);'));
-    expect(waitingEffectSource.indexOf('setAssistantAutoOpenPanelMode(assistantAutoOpenPanelModeStorageKey, rememberedAiPanelMode);'))
-      .toBeLessThan(waitingEffectSource.indexOf('void restoreAssistantPanel(assistantAutoOpenTargetPath, rememberedAiPanelMode);'));
-  });
-
-  it('does not retry failed automatic assistant starts for waiting prototype previews', () => {
-    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
-    const waitingEffectStart = source.indexOf('if (!prototypeWaitingGenerationActive) {');
-    const waitingEffectEnd = source.indexOf('}, [', waitingEffectStart);
-    const waitingEffectSource = source.slice(waitingEffectStart, waitingEffectEnd);
-
-    expect(waitingEffectStart).toBeGreaterThan(-1);
-    expect(waitingEffectEnd).toBeGreaterThan(waitingEffectStart);
-    expect(waitingEffectSource).toContain('const waitingGenerationAutoOpenKey = prototypeWaitingGenerationAutoOpenKey;');
-    expect(waitingEffectSource).toContain('const rememberedAiPanelMode = getAssistantAutoOpenPanelMode(assistantAutoOpenPanelModeStorageKey);');
-    expect(waitingEffectSource).toContain('openedPrototypeWaitingGenerationKeyRef.current = waitingGenerationAutoOpenKey;');
-    expect(waitingEffectSource).toContain('restoreAssistantPanel(assistantAutoOpenTargetPath, rememberedAiPanelMode);');
-    expect(waitingEffectSource).not.toContain('then((opened) => {');
-    expect(waitingEffectSource).not.toContain('if (!opened && openedPrototypeWaitingGenerationKeyRef.current === waitingGenerationAutoOpenKey) {');
   });
 
   it('passes assistant drag/drop and screenshot attachment handlers into the assistant panel and canvas', () => {
@@ -1048,12 +1184,8 @@ describe('IndexPage source', () => {
     expect(presentationBuilderCall).not.toContain('getAssistantArtifacts');
   });
 
-  it('keeps the global assistant sidebar available while a start page is active', () => {
+  it('keeps the global assistant sidebar for standard Make while disabling it on the Codex surface', () => {
     const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
-    const startStateSource = source.slice(
-      source.indexOf('const prototypePlaceholderActive = contentMode ==='),
-      source.indexOf('const preferences = useIndexPagePreferences'),
-    );
     const sidebarBuilderCall = source.slice(
       source.indexOf('const sidebarProps = useIndexPageSidebarPropsBuilder'),
       source.indexOf('const handleEnterSelectedPrototypePreview'),
@@ -1067,19 +1199,21 @@ describe('IndexPage source', () => {
       source.indexOf('const dialogsProps = {'),
     );
 
-    expect(startStateSource).toContain('const prototypeStartPageActive = prototypeStartDraftActive || prototypePlaceholderActive;');
-    expect(sidebarBuilderCall).toContain('prototypeStartPageActive,');
+    expect(sidebarBuilderCall).toContain('surfaceCapabilities,');
     expect(sidebarBuilderCall).toContain('webAgentPanelOpen: assistantController.assistantVisible,');
     expect(sidebarBuilderCall).toContain('aiPanelMode: assistantController.aiPanelMode,');
     expect(sidebarBuilderCall).toContain('handleOpenAcpWebAgent,');
     expect(sidebarBuilderCall).toContain('handleOpenImageAiPanel,');
     expect(presentationBuilderCall).toContain('assistantVisible: assistantController.assistantVisible,');
+    expect(presentationBuilderCall).toContain('surfaceCapabilities,');
     expect(presentationBuilderCall).toContain('webAgentPanelOpen: assistantController.assistantVisible,');
     expect(presentationBuilderCall).toContain('aiPanelMode: assistantController.aiPanelMode,');
     expect(presentationBuilderCall).toContain('handleToggleAssistant: handleToggleAssistantPanel,');
-    expect(assistantPanelPropsSource).toContain('mounted: assistantController.assistantPanelMounted,');
-    expect(assistantPanelPropsSource).toContain('visible: assistantController.assistantVisible,');
-    expect(source).not.toContain('startPageActive ? false : assistantController');
+    expect(source).toContain("import { resolveMakeSurface, resolveMakeSurfaceCapabilities } from './makeSurface';");
+    expect(source).toContain('const conversationUiEnabled = surfaceCapabilities.conversationUi;');
+    expect(assistantPanelPropsSource).toContain('mounted: conversationUiEnabled && !assistantCompactViewport && assistantController.assistantPanelMounted,');
+    expect(assistantPanelPropsSource).toContain('visible: conversationUiEnabled && !assistantCompactViewport && assistantController.assistantVisible,');
+    expect(source).not.toContain('placeholderActive ? false : assistantController');
     expect(source).not.toContain('startPageActive ? undefined : handleOpen');
   });
 
@@ -1093,6 +1227,30 @@ describe('IndexPage source', () => {
     expect(handlerSource).toContain('resources.setSelectedResourceFolder(null);');
     expect(handlerSource.indexOf('resources.setSelectedResourceFolder(null);'))
       .toBeLessThan(handlerSource.indexOf('preview.handleSelectDoc(item);'));
+  });
+
+  it('opens annotation-managed documents in the document editor', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+    const handlerSource = source.slice(
+      source.indexOf('const handleEditDocumentFromAnnotation = useCallback'),
+      source.indexOf('const initialProjectDocumentEditorOpenedRef = useRef'),
+    );
+
+    expect(handlerSource).toContain("window.open(projectDocumentUrl, '_blank', 'noopener,noreferrer');");
+    expect(handlerSource).toContain("node.type !== 'markdown' && node.type !== 'html'");
+    expect(handlerSource).toContain("node.type === 'markdown' ? node.markdownPath : node.htmlPath");
+    expect(handlerSource).not.toContain('preview.handleSelectDoc(item);');
+    expect(handlerSource).not.toContain("handleEnableDocEdit('edit'");
+  });
+
+  it('honors project document deep links that request edit mode', () => {
+    const source = readFileSync(resolve(__dirname, './IndexPage.tsx'), 'utf8');
+    expect(source).toContain('const shouldOpenInitialProjectDocumentEditor');
+    expect(source).toContain('initialResourceDeepLink.openEditor === true');
+    expect(source).toContain("isHtmlCommentableResource(resources.selectedDoc) ? 'comment' : 'edit'");
+    expect(source).toContain('waitForDocumentPreviewReady(');
+    expect(source).toContain('preview.previewIframeRef.current');
+    expect(source).toContain('preview.primaryIframeUrl');
   });
 
   it('threads the workspace project into project-owned dialogs and document uploads', () => {

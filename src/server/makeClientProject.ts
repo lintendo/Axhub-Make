@@ -26,12 +26,6 @@ import {
 } from './projectCore/index.ts';
 
 import { buildLocalCommandEnv, runLocalCommand } from './localCommand.ts';
-import {
-  MakeClientPackageJsonError,
-  mergeMakeClientPackageJson,
-  parseMakeClientPackageJson,
-  type MakeClientPackageJsonSource,
-} from './makeClientPackageJson.ts';
 import type { DiagnosticLog } from './diagnosticLog.ts';
 import { extractZipBufferToDirectory } from './zipArchive.ts';
 import {
@@ -42,12 +36,19 @@ import {
   makeClientTemplatePrimaryDownloadUrl,
   makeClientTemplatePrimaryManifestUrl,
 } from '../common/makeClientTemplate.ts';
+import { DOCUMENT_TEMPLATES } from '../common/documentTemplates.ts';
+import {
+  deriveRegistryProbePackages,
+  isRetryableRegistryError,
+  registryInstallArgs,
+  resolveMakeClientRegistryRoute,
+  type MakeClientRegistryRoute,
+} from './makeClientRegistryRouting.ts';
 
 export type MakeClientPhase =
   | 'template'
   | 'clone'
   | 'download-template'
-  | 'merge-package'
   | 'backup'
   | 'overwrite'
   | 'install'
@@ -108,19 +109,11 @@ interface MakeClientDevInternalResult extends MakeClientDevResult {
 
 const MAKE_CLIENT_RUNTIME_PATCH_FILES = [
   'vite-plugins/clientPreviewPlugin.ts',
+  'vite-plugins/localEditingApi.ts',
   'vite-plugins/canvasHotUpdateFilter.ts',
   'vite-plugins/utils/moduleSpecifierQuery.ts',
   'vite-plugins/utils/previewTitle.ts',
 ];
-
-const MAKE_CLIENT_RESOURCE_TEMPLATE_FILES = [
-  'src/resources/templates/prd-template.md',
-  'src/resources/templates/prd-comprehensive-template.md',
-  'src/resources/templates/prototype-review-report-template.md',
-  'src/resources/templates/ui-review-report-template.md',
-  'src/resources/templates/规格文档 HTML 模板.html',
-  'src/resources/templates/规格文档 Markdown 模板.md',
-] as const;
 
 export interface MakeClientDevStatus {
   projectId: string;
@@ -170,7 +163,6 @@ export interface MakeClientUpdateStatus {
   metadataSource: MakeClientUpdateMetadataSource;
   metadataError?: string;
   updateAvailable: boolean;
-  repairAvailable: boolean;
   canApply: boolean;
   backupPolicy: MakeClientUpdateBackupPolicy;
   lastBackup: MakeClientUpdateBackupRecord | null;
@@ -211,7 +203,6 @@ export const MAKE_CLIENT_ERROR_STATUS: Record<string, number> = {
   MAKE_PROJECT_ID_CONFLICT: 409,
   MAKE_CLIENT_SOURCE_UNAVAILABLE: 502,
   MAKE_CLIENT_TEMPLATE_UNAVAILABLE: 500,
-  MAKE_CLIENT_PACKAGE_INVALID: 409,
   MAKE_CLIENT_INSTALL_FAILED: 500,
   MAKE_CLIENT_METADATA_SYNC_FAILED: 500,
   MAKE_CLIENT_UPDATE_NOT_AVAILABLE: 409,
@@ -247,6 +238,8 @@ const MAKE_CLIENT_PROGRESS_LOG_ENV = 'AXHUB_MAKE_PROGRESS_LOG';
 const SKIP_AUTO_START_SERVER_ENV = 'AXHUB_MAKE_SKIP_AUTO_START_SERVER';
 const MAKE_CLIENT_RUNTIME_HEARTBEAT_MAX_AGE_MS = 15_000;
 const DEFAULT_MAKE_CLIENT_TEMPLATE_TIMEOUT_MS = 3 * 60_000;
+const DEFAULT_MAKE_CLIENT_TEMPLATE_PROBE_TIMEOUT_MS = 2_000;
+const MAKE_CLIENT_TEMPLATE_GITHUB_PREFERENCE_WINDOW_MS = 150;
 const DEFAULT_MAKE_CLIENT_TEMPLATE_MANIFEST_TIMEOUT_MS = 15_000;
 const DEFAULT_MAKE_CLIENT_GIT_CLONE_TIMEOUT_MS = 60_000;
 const DEFAULT_MAKE_CLIENT_INSTALL_TIMEOUT_MS = 10 * 60_000;
@@ -482,7 +475,10 @@ async function runMakeClientCommand(
         : phase === 'install'
           ? 'MAKE_CLIENT_INSTALL_FAILED'
           : 'MAKE_CLIENT_METADATA_SYNC_FAILED';
-    throw new MakeClientProjectError(code, output || error?.message || 'Make client command failed', { phase });
+    throw new MakeClientProjectError(code, output || error?.message || 'Make client command failed', {
+      phase,
+      ...(errorCode ? { details: { commandErrorCode: errorCode } } : {}),
+    });
   }
 }
 
@@ -746,7 +742,11 @@ function extractTemplateZip(zipBuffer: Uint8Array, destinationRoot: string): voi
 
 async function downloadTemplateZip(url: string): Promise<Uint8Array> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DEFAULT_MAKE_CLIENT_TEMPLATE_TIMEOUT_MS);
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, DEFAULT_MAKE_CLIENT_TEMPLATE_TIMEOUT_MS);
   try {
     const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) {
@@ -1149,6 +1149,92 @@ function npmCommand(): string {
   return process.platform === 'win32' ? 'npm.cmd' : 'npm';
 }
 
+async function resolveProjectRegistryRoute(
+  runner: MakeClientCommandRunner,
+  projectRoot: string,
+): Promise<MakeClientRegistryRoute> {
+  const runCommand = runner.runCommand || runLocalCommand;
+  const route = await resolveMakeClientRegistryRoute({
+    cwd: projectRoot,
+    npmCommand: npmCommand(),
+    probePackages: deriveRegistryProbePackages(readJsonRecord(path.join(projectRoot, 'package.json'))),
+    runCommand: (command, args, options) => runCommand(command, args, {
+      ...options,
+      maxBuffer: 1024 * 1024,
+    }),
+  });
+  if (shouldLogMakeClientProgress()) {
+    if (route.mode === 'automatic') {
+      const timings = route.probes
+        .map((probe) => `${probe.id}=${probe.ok ? `${probe.durationMs}ms` : 'failed'}`)
+        .join(' ');
+      console.info(`[make-client:registry] mode=automatic selected=${route.selected.id} reason=${route.reason} ${timings}`);
+    } else {
+      console.info(`[make-client:registry] mode=configured reason=${route.reason}`);
+    }
+  }
+  return route;
+}
+
+function registryCandidates(route: MakeClientRegistryRoute): Array<string | undefined> {
+  return route.mode === 'automatic'
+    ? [route.selected.url, route.alternate.url]
+    : [undefined];
+}
+
+async function runMakeClientInstallWithRegistryRoute(params: {
+  args: string[];
+  method: 'npm' | 'pnpm';
+  projectRoot: string;
+  route: MakeClientRegistryRoute;
+  runner: MakeClientCommandRunner;
+}): Promise<void> {
+  const command = params.method === 'npm' ? npmCommand() : 'pnpm';
+  const candidates = registryCandidates(params.route);
+  let lastError: unknown;
+  for (let index = 0; index < candidates.length; index += 1) {
+    const registryUrl = candidates[index];
+    try {
+      await runMakeClientCommand(
+        params.runner,
+        command,
+        registryInstallArgs(params.args, registryUrl),
+        params.projectRoot,
+        'install',
+        { timeoutMs: DEFAULT_MAKE_CLIENT_INSTALL_TIMEOUT_MS },
+      );
+      return;
+    } catch (error) {
+      lastError = error;
+      if (params.method === 'npm' && isNpmArboristNullPropertyError(error)) {
+        try {
+          await runMakeClientCommand(
+            params.runner,
+            command,
+            registryInstallArgs([...params.args, '--legacy-peer-deps'], registryUrl),
+            params.projectRoot,
+            'install',
+            { timeoutMs: DEFAULT_MAKE_CLIENT_INSTALL_TIMEOUT_MS },
+          );
+          return;
+        } catch (legacyError) {
+          lastError = legacyError;
+        }
+      }
+      const hasAlternate = index + 1 < candidates.length;
+      if (!hasAlternate || !isRetryableRegistryError(lastError)) {
+        throw lastError;
+      }
+      if (shouldLogMakeClientProgress() && params.route.mode === 'automatic') {
+        console.info(
+          `[make-client:registry] retry method=${params.method} from=${index === 0 ? params.route.selected.id : params.route.alternate.id}`,
+        );
+      }
+    }
+  }
+  throw lastError;
+}
+
 function viteBinPath(projectRoot: string): string {
   const binName = process.platform === 'win32' ? 'vite.cmd' : 'vite';
   return path.join(projectRoot, 'node_modules', '.bin', binName);
@@ -1184,25 +1270,24 @@ async function ensureMakeClientDependencies(
     return 'skipped';
   }
 
+  const registryRoute = await resolveProjectRegistryRoute(runner, projectRoot);
   try {
-    await runMakeClientCommand(runner, npmCommand(), ['install', '--include=dev'], projectRoot, 'install', {
-      timeoutMs: DEFAULT_MAKE_CLIENT_INSTALL_TIMEOUT_MS,
+    await runMakeClientInstallWithRegistryRoute({
+      args: ['install', '--include=dev'],
+      method: 'npm',
+      projectRoot,
+      route: registryRoute,
+      runner,
     });
     return 'npm';
   } catch (npmError) {
-    if (isNpmArboristNullPropertyError(npmError)) {
-      try {
-        await runMakeClientCommand(runner, npmCommand(), ['install', '--include=dev', '--legacy-peer-deps'], projectRoot, 'install', {
-          timeoutMs: DEFAULT_MAKE_CLIENT_INSTALL_TIMEOUT_MS,
-        });
-        return 'npm';
-      } catch {
-        // Fall through to pnpm with the original npm error preserved in diagnostics.
-      }
-    }
     try {
-      await runMakeClientCommand(runner, 'pnpm', ['install', '--prod=false'], projectRoot, 'install', {
-        timeoutMs: DEFAULT_MAKE_CLIENT_INSTALL_TIMEOUT_MS,
+      await runMakeClientInstallWithRegistryRoute({
+        args: ['install', '--prod=false'],
+        method: 'pnpm',
+        projectRoot,
+        route: registryRoute,
+        runner,
       });
       return 'pnpm';
     } catch (pnpmError) {
@@ -1250,52 +1335,150 @@ async function resolveMakeClientDevCommandForProject(
   return resolveMakeClientDevCommand(installMethod, projectRoot);
 }
 
-async function fetchMakeClientTemplateFromRemote(
-  runner: MakeClientCommandRunner,
-  targetRoot: string,
-): Promise<{ markerRepository: string; templateUrl: string; templateVersion?: string }> {
-  void runner;
-  const failures: Array<{ url: string; cache: { status: MakeClientTemplateCacheStatus; path: string } | null; error: string }> = [];
-  const templateMetadata = await resolveMakeClientUpdateMetadata();
-  const bundledTemplateSources = makeClientTemplateSources();
-  const preferredTemplateSources = compareTemplateVersions(
-    templateMetadata.version,
-    DEFAULT_MAKE_CLIENT_TEMPLATE_VERSION,
-  ) >= 0
-    ? [...templateMetadata.sources, ...bundledTemplateSources]
-    : bundledTemplateSources;
-  const templateSources = preferredTemplateSources.filter((source, index) => (
-    preferredTemplateSources.findIndex((candidate) => candidate.url === source.url) === index
-  ));
-  const tempParent = fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-make-client-template-'));
+interface ExtractedMakeClientTemplateSource {
+  cache: { status: MakeClientTemplateCacheStatus; path: string };
+  index: number;
+  source: MakeClientTemplateSource;
+  templateRoot: string;
+}
 
+interface MakeClientTemplateProbe {
+  durationMs: number;
+  index: number;
+  ok: boolean;
+  source: MakeClientTemplateSource;
+}
+
+interface MakeClientTemplateFailure {
+  cache: { status: MakeClientTemplateCacheStatus; path: string } | null;
+  error: string;
+  url: string;
+}
+
+function removeTemplateCache(cachePath: string): void {
+  fs.rmSync(cachePath, { force: true });
+  fs.rmSync(makeClientTemplateCacheManifestPath(cachePath), { force: true });
+}
+
+function logSelectedMakeClientTemplate(source: MakeClientTemplateSource, cache: { status: MakeClientTemplateCacheStatus; path: string }): void {
+  if (shouldLogMakeClientProgress()) {
+    console.info(`[make-client:template] selected=${source.id} cache=${cache.status}`);
+  }
+}
+
+async function probeMakeClientTemplateSource(source: MakeClientTemplateSource, index: number): Promise<MakeClientTemplateProbe> {
+  const controller = new AbortController();
+  const startedAt = Date.now();
+  const timeout = setTimeout(() => controller.abort(), DEFAULT_MAKE_CLIENT_TEMPLATE_PROBE_TIMEOUT_MS);
   try {
-    for (const source of templateSources) {
-      const checkoutRoot = path.join(tempParent, failures.length === 0 ? 'primary' : `fallback-${failures.length}`);
-      let cache: { status: MakeClientTemplateCacheStatus; path: string } | null = null;
-      try {
-        const cached = await readTemplateZipWithCache(source);
-        cache = cached.cache;
-        const zipBuffer = cached.zipBuffer;
-        extractTemplateZip(zipBuffer, checkoutRoot);
-        copyMakeClientTemplateDirectory(checkoutRoot, targetRoot);
-        return {
-          markerRepository: source.markerRepository,
-          templateUrl: source.url,
-          ...(source.templateVersion ? { templateVersion: source.templateVersion } : {}),
-        };
-      } catch (error) {
-        failures.push({
-          url: source.url,
-          cache,
-          error: templateErrorMessage(error),
-        });
-        fs.rmSync(checkoutRoot, { recursive: true, force: true });
-        fs.rmSync(targetRoot, { recursive: true, force: true });
-      }
-    }
+    const response = await fetch(source.url, { method: 'HEAD', signal: controller.signal });
+    return {
+      durationMs: Date.now() - startedAt,
+      index,
+      ok: response.ok,
+      source,
+    };
+  } catch {
+    return {
+      durationMs: Date.now() - startedAt,
+      index,
+      ok: false,
+      source,
+    };
   } finally {
-    fs.rmSync(tempParent, { recursive: true, force: true });
+    clearTimeout(timeout);
+  }
+}
+
+async function rankMakeClientTemplateSources(sources: MakeClientTemplateSource[]): Promise<MakeClientTemplateProbe[]> {
+  if (sources.length <= 1) {
+    return sources.map((source, index) => ({ durationMs: 0, index, ok: true, source }));
+  }
+
+  const probes = await Promise.all(sources.map((source, index) => probeMakeClientTemplateSource(source, index)));
+  const healthy = probes.filter((probe) => probe.ok);
+  const fastestHealthyDuration = healthy.reduce(
+    (fastest, probe) => Math.min(fastest, probe.durationMs),
+    Number.POSITIVE_INFINITY,
+  );
+  const githubIsClose = healthy.some(
+    (probe) => probe.source.id === 'github'
+      && probe.durationMs <= fastestHealthyDuration + MAKE_CLIENT_TEMPLATE_GITHUB_PREFERENCE_WINDOW_MS,
+  );
+  const compareByProbe = (left: MakeClientTemplateProbe, right: MakeClientTemplateProbe) => {
+    if (githubIsClose && left.source.id === 'github' && right.source.id !== 'github') {
+      return -1;
+    }
+    if (githubIsClose && right.source.id === 'github' && left.source.id !== 'github') {
+      return 1;
+    }
+    return left.durationMs - right.durationMs || left.index - right.index;
+  };
+
+  return [
+    ...healthy.sort(compareByProbe),
+    ...probes.filter((probe) => !probe.ok).sort((left, right) => left.index - right.index),
+  ];
+}
+
+function cacheFailure(
+  failures: Array<MakeClientTemplateFailure | undefined>,
+  index: number,
+  source: MakeClientTemplateSource,
+  cache: { status: MakeClientTemplateCacheStatus; path: string } | null,
+  error: unknown,
+): void {
+  failures[index] = {
+    url: source.url,
+    cache,
+    error: templateErrorMessage(error),
+  };
+}
+
+async function extractFirstValidMakeClientTemplate(params: {
+  failurePhase: MakeClientPhase;
+  sources: MakeClientTemplateSource[];
+  tempParent: string;
+}): Promise<ExtractedMakeClientTemplateSource> {
+  const failures: Array<MakeClientTemplateFailure | undefined> = [];
+
+  // Cache hits are already local, so validate them before doing any remote probes.
+  for (const [index, source] of params.sources.entries()) {
+    const cachePath = makeClientTemplateCachePath(source.url);
+    const status = getTemplateCacheStatus(cachePath, source);
+    if (status !== 'hit') {
+      continue;
+    }
+    const templateRoot = path.join(params.tempParent, `source-${index}`);
+    const cache = { status, path: cachePath };
+    try {
+      extractTemplateZip(new Uint8Array(fs.readFileSync(cachePath)), templateRoot);
+      logSelectedMakeClientTemplate(source, cache);
+      return { cache, index, source, templateRoot };
+    } catch (error) {
+      cacheFailure(failures, index, source, cache, error);
+      removeTemplateCache(cachePath);
+      fs.rmSync(templateRoot, { recursive: true, force: true });
+    }
+  }
+
+  const rankedSources = await rankMakeClientTemplateSources(params.sources);
+  for (const { index, source } of rankedSources) {
+    const templateRoot = path.join(params.tempParent, `source-${index}`);
+    let cache: { status: MakeClientTemplateCacheStatus; path: string } | null = null;
+    try {
+      const cached = await readTemplateZipWithCache(source);
+      cache = cached.cache;
+      extractTemplateZip(cached.zipBuffer, templateRoot);
+      logSelectedMakeClientTemplate(source, cache);
+      return { cache, index, source, templateRoot };
+    } catch (error) {
+      cacheFailure(failures, index, source, cache, error);
+      if (cache) {
+        removeTemplateCache(cache.path);
+      }
+      fs.rmSync(templateRoot, { recursive: true, force: true });
+    }
   }
 
   throw new MakeClientProjectError(
@@ -1303,10 +1486,54 @@ async function fetchMakeClientTemplateFromRemote(
     'Failed to download Make client template from all remote sources',
     {
       status: 500,
-      phase: 'template',
-      details: { sources: failures },
+      phase: params.failurePhase,
+      details: { sources: failures.filter((failure): failure is MakeClientTemplateFailure => Boolean(failure)) },
     },
   );
+}
+
+async function fetchMakeClientTemplateFromRemote(
+  runner: MakeClientCommandRunner,
+  targetRoot: string,
+): Promise<{ markerRepository: string; templateUrl: string; templateVersion?: string }> {
+  void runner;
+  const templateMetadata = await resolveMakeClientUpdateMetadata();
+  const templateSources = compareTemplateVersions(
+    templateMetadata.version,
+    DEFAULT_MAKE_CLIENT_TEMPLATE_VERSION,
+  ) >= 0
+    ? templateMetadata.sources
+    : makeClientTemplateSources();
+  const tempParent = fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-make-client-template-'));
+
+  try {
+    const winner = await extractFirstValidMakeClientTemplate({
+      failurePhase: 'template',
+      sources: templateSources,
+      tempParent,
+    });
+    try {
+      copyMakeClientTemplateDirectory(winner.templateRoot, targetRoot);
+    } catch (error) {
+      fs.rmSync(targetRoot, { recursive: true, force: true });
+      throw new MakeClientProjectError(
+        'MAKE_CLIENT_TEMPLATE_UNAVAILABLE',
+        templateErrorMessage(error),
+        {
+          status: 500,
+          phase: 'template',
+          details: { source: winner.source.url },
+        },
+      );
+    }
+    return {
+      markerRepository: winner.source.markerRepository,
+      templateUrl: winner.source.url,
+      ...(winner.source.templateVersion ? { templateVersion: winner.source.templateVersion } : {}),
+    };
+  } finally {
+    fs.rmSync(tempParent, { recursive: true, force: true });
+  }
 }
 
 function normalizeRelativePath(value: string): string {
@@ -1473,12 +1700,7 @@ export async function getMakeClientUpdateStatus(
   const metadata = await resolveMakeClientUpdateMetadata();
   const targetVersion = metadata.version;
   const templateSources = metadata.sources;
-  const versionUpdateAvailable = isTemplateUpdateAvailable(currentVersion, targetVersion);
-  const repairAvailable = compareTemplateVersions(currentVersion, targetVersion) === 0
-    && MAKE_CLIENT_RESOURCE_TEMPLATE_FILES.some((relativePath) => (
-      isMakeClientResourceTemplateTargetMissing(root, relativePath)
-    ));
-  const updateAvailable = versionUpdateAvailable || repairAvailable;
+  const updateAvailable = isTemplateUpdateAvailable(currentVersion, targetVersion);
   const blockedReasons = buildMakeClientUpdateBlockedReasons({
     updateAvailable,
     templateSources,
@@ -1492,7 +1714,6 @@ export async function getMakeClientUpdateStatus(
     metadataSource: metadata.source,
     ...(metadata.error ? { metadataError: metadata.error } : {}),
     updateAvailable,
-    repairAvailable,
     canApply: blockedReasons.length === 0,
     backupPolicy: 'zip-before-overwrite',
     lastBackup: readLatestMakeClientUpdateBackupRecord(root),
@@ -1520,40 +1741,77 @@ async function extractMakeClientUpdateTemplate(
   source: MakeClientTemplateSource;
 }> {
   const tempParent = fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-make-client-update-template-'));
-  const failures: Array<{ url: string; cache: { status: MakeClientTemplateCacheStatus; path: string } | null; error: string }> = [];
+  try {
+    const winner = await extractFirstValidMakeClientTemplate({
+      failurePhase: 'download-template',
+      sources: sources?.length ? sources : makeClientTemplateSources({ version: targetVersion }),
+      tempParent,
+    });
+    return {
+      tempParent,
+      templateRoot: winner.templateRoot,
+      source: winner.source,
+    };
+  } catch (error) {
+    fs.rmSync(tempParent, { recursive: true, force: true });
+    throw error;
+  }
+}
 
-  for (const source of (sources?.length ? sources : makeClientTemplateSources({ version: targetVersion }))) {
-    const checkoutRoot = path.join(tempParent, failures.length === 0 ? 'primary' : `fallback-${failures.length}`);
-    let cache: { status: MakeClientTemplateCacheStatus; path: string } | null = null;
-    try {
-      const cached = await readTemplateZipWithCache(source);
-      cache = cached.cache;
-      extractTemplateZip(cached.zipBuffer, checkoutRoot);
-      return {
-        tempParent,
-        templateRoot: checkoutRoot,
-        source,
-      };
-    } catch (error) {
-      failures.push({
-        url: source.url,
-        cache,
-        error: templateErrorMessage(error),
-      });
-      fs.rmSync(checkoutRoot, { recursive: true, force: true });
-    }
+export async function restoreMakeClientTemplateFile(
+  projectRoot: string,
+  relativePath: string,
+): Promise<{ restored: true; version: string; sourceUrl: string }> {
+  const root = path.resolve(projectRoot);
+  const normalizedPath = normalizeRelativePath(relativePath);
+  if (!normalizedPath || normalizedPath !== relativePath.replace(/\\/gu, '/')) {
+    throw new MakeClientProjectError(
+      'MAKE_CLIENT_TEMPLATE_UNAVAILABLE',
+      'Invalid Make client template file path',
+      { status: 400, phase: 'template' },
+    );
+  }
+  const targetPath = path.resolve(root, ...normalizedPath.split('/'));
+  if (!isInsideRoot(root, targetPath)) {
+    throw new MakeClientProjectError(
+      'MAKE_CLIENT_TEMPLATE_UNAVAILABLE',
+      'Unsafe Make client template file path',
+      { status: 400, phase: 'template' },
+    );
+  }
+  if (fs.existsSync(targetPath)) {
+    throw new MakeClientProjectError(
+      'MAKE_CLIENT_TEMPLATE_UNAVAILABLE',
+      'Make client template file already exists',
+      { status: 409, phase: 'template' },
+    );
   }
 
-  fs.rmSync(tempParent, { recursive: true, force: true });
-  throw new MakeClientProjectError(
-    'MAKE_CLIENT_TEMPLATE_UNAVAILABLE',
-    'Failed to download Make client template from all remote sources',
-    {
-      status: 500,
-      phase: 'download-template',
-      details: { sources: failures },
-    },
-  );
+  const metadata = await resolveMakeClientUpdateMetadata();
+  const extractedTemplate = await extractMakeClientUpdateTemplate(metadata.version, metadata.sources);
+  try {
+    const sourcePath = path.resolve(extractedTemplate.templateRoot, ...normalizedPath.split('/'));
+    if (
+      !isInsideRoot(extractedTemplate.templateRoot, sourcePath)
+      || !fs.existsSync(sourcePath)
+      || !fs.statSync(sourcePath).isFile()
+    ) {
+      throw new MakeClientProjectError(
+        'MAKE_CLIENT_TEMPLATE_UNAVAILABLE',
+        `Official Make client template file is missing: ${normalizedPath}`,
+        { status: 502, phase: 'template' },
+      );
+    }
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    fs.copyFileSync(sourcePath, targetPath, fs.constants.COPYFILE_EXCL);
+    return {
+      restored: true,
+      version: metadata.version,
+      sourceUrl: extractedTemplate.source.url,
+    };
+  } finally {
+    fs.rmSync(extractedTemplate.tempParent, { recursive: true, force: true });
+  }
 }
 
 function shouldSkipMakeClientUpdateEntry(relativePath: string, entryName: string): boolean {
@@ -1595,73 +1853,7 @@ function shouldSkipMakeClientUpdateEntry(relativePath: string, entryName: string
   return false;
 }
 
-function isMakeClientResourceTemplatePath(relativePath: string): boolean {
-  return normalizeRelativePath(relativePath).startsWith('src/resources/templates/');
-}
-
-function isMakeClientResourceTemplateTargetMissing(projectRoot: string, relativePath: string): boolean {
-  let currentPath = path.resolve(projectRoot);
-  for (const segment of normalizeRelativePath(relativePath).split('/')) {
-    currentPath = path.join(currentPath, segment);
-    try {
-      const stats = fs.lstatSync(currentPath);
-      if (stats.isSymbolicLink() || !stats.isDirectory()) {
-        return false;
-      }
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return true;
-      }
-      return false;
-    }
-  }
-  return false;
-}
-
-function readMakeClientPackageJsonForUpdate(
-  filePath: string,
-  source: MakeClientPackageJsonSource,
-): { content: string; packageJson: Record<string, unknown> } {
-  let content: string;
-  try {
-    content = fs.readFileSync(filePath, 'utf8');
-  } catch {
-    if (source === 'template') {
-      throw new MakeClientProjectError(
-        'MAKE_CLIENT_TEMPLATE_UNAVAILABLE',
-        'Make client template package.json is missing',
-        { status: 500, phase: 'merge-package', details: { source, filePath } },
-      );
-    }
-    throw new MakeClientProjectError(
-      'MAKE_CLIENT_PACKAGE_INVALID',
-      'Make client project package.json is missing or unreadable',
-      { status: 409, phase: 'merge-package', details: { source, filePath } },
-    );
-  }
-
-  try {
-    return { content, packageJson: parseMakeClientPackageJson(source, content) };
-  } catch (error) {
-    if (!(error instanceof MakeClientPackageJsonError)) throw error;
-    throw new MakeClientProjectError(
-      'MAKE_CLIENT_PACKAGE_INVALID',
-      error.message,
-      {
-        status: source === 'project' ? 409 : 500,
-        phase: 'merge-package',
-        details: { source, filePath },
-      },
-    );
-  }
-}
-
-function collectMakeClientUpdateTemplateFiles(
-  templateRoot: string,
-  projectRoot?: string,
-  options: { resourceTemplatesOnly?: boolean } = {},
-): string[] {
-  const markerRelativePath = '.axhub/make/client.json';
+function collectMakeClientUpdateTemplateFiles(templateRoot: string): string[] {
   const files: string[] = [];
   const walk = (sourceDir: string, relativeDir = '') => {
     for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
@@ -1679,43 +1871,9 @@ function collectMakeClientUpdateTemplateFiles(
       }
     }
   };
-  if (!options.resourceTemplatesOnly) {
-    walk(templateRoot);
-  }
-
-  const resourceTemplatesRoot = path.join(templateRoot, 'src', 'resources', 'templates');
-  if (projectRoot && fs.existsSync(resourceTemplatesRoot) && fs.statSync(resourceTemplatesRoot).isDirectory()) {
-    const collectMissingResourceTemplates = (sourceDir: string, relativeDir: string) => {
-      for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
-        const relativePath = path.join(relativeDir, entry.name);
-        const sourcePath = path.join(sourceDir, entry.name);
-        if (entry.isDirectory()) {
-          collectMissingResourceTemplates(sourcePath, relativePath);
-          continue;
-        }
-        if (!entry.isFile()) continue;
-
-        const normalizedPath = normalizeRelativePath(relativePath);
-        const targetPath = path.resolve(projectRoot, ...normalizedPath.split('/'));
-        if (!isInsideRoot(projectRoot, targetPath)) {
-          throw new MakeClientProjectError(
-            'MAKE_CLIENT_TEMPLATE_UNAVAILABLE',
-            `Unsafe Make client resource template path: ${normalizedPath}`,
-            { status: 500, phase: 'overwrite' },
-          );
-        }
-        if (isMakeClientResourceTemplateTargetMissing(projectRoot, normalizedPath)) {
-          files.push(normalizedPath);
-        }
-      }
-    };
-    collectMissingResourceTemplates(resourceTemplatesRoot, path.join('src', 'resources', 'templates'));
-  }
-
-  const plannedFiles = Array.from(new Set(files.filter((relativePath) => relativePath !== markerRelativePath))).sort();
-  return plannedFiles.length > 0 || !options.resourceTemplatesOnly
-    ? [...plannedFiles, markerRelativePath]
-    : [];
+  walk(templateRoot);
+  files.push('.axhub/make/client.json');
+  return Array.from(new Set(files)).sort();
 }
 
 function createMakeClientUpdateBackupRoot(projectRoot: string): string {
@@ -1824,31 +1982,33 @@ function readLatestMakeClientUpdateBackupRecord(projectRoot: string): MakeClient
   return records[0] || null;
 }
 
-function writeUtf8FileAtomically(targetPath: string, content: string): void {
-  const tempPath = path.join(
-    path.dirname(targetPath),
-    `.${path.basename(targetPath)}.${process.pid}.${crypto.randomUUID()}.tmp`,
-  );
-  try {
-    fs.writeFileSync(tempPath, content, 'utf8');
-    fs.renameSync(tempPath, targetPath);
-  } finally {
-    fs.rmSync(tempPath, { force: true });
-  }
-}
-
 function writeMakeClientUpdateTemplateFiles(params: {
   projectRoot: string;
   templateRoot: string;
   plannedFiles: string[];
-  packageJsonContent: string;
   marker: MakeClientMarker;
   source: MakeClientTemplateSource;
   targetVersion: string;
-  writtenFiles: string[];
 }): string[] {
-  const markerRelativePath = '.axhub/make/client.json';
-  for (const relativePath of params.plannedFiles.filter((file) => file !== markerRelativePath)) {
+  const preservedDocumentTemplatePaths = new Set<string>(DOCUMENT_TEMPLATES.map((template) => template.path));
+  const writtenFiles: string[] = [];
+  for (const relativePath of params.plannedFiles) {
+    if (relativePath === '.axhub/make/client.json') {
+      writeMakeClientMarker(params.projectRoot, {
+        schemaVersion: 1,
+        kind: 'axhub-make-client',
+        repository: params.source.markerRepository,
+        templateUrl: params.source.url,
+        templateVersion: params.source.templateVersion || params.targetVersion,
+        project: {
+          id: params.marker.project.id,
+          name: params.marker.project.name,
+        },
+      });
+      writtenFiles.push(relativePath);
+      continue;
+    }
+
     const sourcePath = path.resolve(params.templateRoot, ...relativePath.split('/'));
     const targetPath = path.resolve(params.projectRoot, ...relativePath.split('/'));
     if (!isInsideRoot(params.templateRoot, sourcePath) || !isInsideRoot(params.projectRoot, targetPath)) {
@@ -1861,37 +2021,14 @@ function writeMakeClientUpdateTemplateFiles(params: {
     if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
       continue;
     }
-    if (
-      isMakeClientResourceTemplatePath(relativePath)
-      && !isMakeClientResourceTemplateTargetMissing(params.projectRoot, relativePath)
-    ) {
+    if (preservedDocumentTemplatePaths.has(relativePath) && fs.existsSync(targetPath)) {
       continue;
     }
     fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    if (relativePath === 'package.json') {
-      writeUtf8FileAtomically(targetPath, params.packageJsonContent);
-    } else {
-      fs.copyFileSync(sourcePath, targetPath);
-    }
-    params.writtenFiles.push(relativePath);
+    fs.copyFileSync(sourcePath, targetPath);
+    writtenFiles.push(relativePath);
   }
-
-  // The marker is the update commit point: write it only after every template file succeeds.
-  if (params.plannedFiles.includes(markerRelativePath)) {
-    writeMakeClientMarker(params.projectRoot, {
-      schemaVersion: 1,
-      kind: 'axhub-make-client',
-      repository: params.source.markerRepository,
-      templateUrl: params.source.url,
-      templateVersion: params.source.templateVersion || params.targetVersion,
-      project: {
-        id: params.marker.project.id,
-        name: params.marker.project.name,
-      },
-    });
-    params.writtenFiles.push(markerRelativePath);
-  }
-  return params.writtenFiles;
+  return writtenFiles;
 }
 
 function hasPnpmLockfile(projectRoot: string): boolean {
@@ -1921,25 +2058,25 @@ async function installMakeClientDependenciesWithMethod(
   runner: MakeClientCommandRunner,
   projectRoot: string,
   method: 'pnpm' | 'npm',
+  registryRoute: MakeClientRegistryRoute,
 ): Promise<'pnpm' | 'npm'> {
   if (method === 'pnpm') {
-    await runMakeClientCommand(runner, 'pnpm', ['install', '--prod=false'], projectRoot, 'install', {
-      timeoutMs: DEFAULT_MAKE_CLIENT_INSTALL_TIMEOUT_MS,
+    await runMakeClientInstallWithRegistryRoute({
+      args: ['install', '--prod=false'],
+      method,
+      projectRoot,
+      route: registryRoute,
+      runner,
     });
     return 'pnpm';
   }
-  try {
-    await runMakeClientCommand(runner, npmCommand(), ['install', '--include=dev'], projectRoot, 'install', {
-      timeoutMs: DEFAULT_MAKE_CLIENT_INSTALL_TIMEOUT_MS,
-    });
-  } catch (npmError) {
-    if (!isNpmArboristNullPropertyError(npmError)) {
-      throw npmError;
-    }
-    await runMakeClientCommand(runner, npmCommand(), ['install', '--include=dev', '--legacy-peer-deps'], projectRoot, 'install', {
-      timeoutMs: DEFAULT_MAKE_CLIENT_INSTALL_TIMEOUT_MS,
-    });
-  }
+  await runMakeClientInstallWithRegistryRoute({
+    args: ['install', '--include=dev'],
+    method,
+    projectRoot,
+    route: registryRoute,
+    runner,
+  });
   return 'npm';
 }
 
@@ -1948,9 +2085,10 @@ async function installMakeClientDependenciesForUpdate(
   projectRoot: string,
 ): Promise<'pnpm' | 'npm'> {
   const errors: Partial<Record<'pnpm' | 'npm', string>> = {};
+  const registryRoute = await resolveProjectRegistryRoute(runner, projectRoot);
   for (const method of preferredMakeClientInstallMethods(projectRoot)) {
     try {
-      return await installMakeClientDependenciesWithMethod(runner, projectRoot, method);
+      return await installMakeClientDependenciesWithMethod(runner, projectRoot, method, registryRoute);
     } catch (error) {
       errors[method] = commandErrorMessage(error);
     }
@@ -2101,14 +2239,9 @@ export async function applyMakeClientUpdate(
 ): Promise<MakeClientUpdateApplyResult> {
   const root = path.resolve(projectRoot);
   const runner = options.commandRunner || defaultCommandRunner();
-  const packageRelativePath = 'package.json';
-  const projectPackagePath = path.join(root, packageRelativePath);
-  const projectPackage = readMakeClientPackageJsonForUpdate(projectPackagePath, 'project');
   const marker = validateExistingMakeClientProject(root);
   const status = await getMakeClientUpdateStatus(projectId, root, { commandRunner: runner });
   assertMakeClientUpdateCanApply(status);
-  const resourceRepairOnly = status.repairAvailable
-    && compareTemplateVersions(status.currentVersion, status.targetVersion) === 0;
 
   let extractedTemplate: Awaited<ReturnType<typeof extractMakeClientUpdateTemplate>> | null = null;
   let backupRoot = '';
@@ -2136,20 +2269,12 @@ export async function applyMakeClientUpdate(
   try {
     extractedTemplate = await extractMakeClientUpdateTemplate(status.targetVersion, status.template.sources);
     templateUrl = extractedTemplate.source.url;
-    plannedFiles = collectMakeClientUpdateTemplateFiles(extractedTemplate.templateRoot, root, {
-      resourceTemplatesOnly: resourceRepairOnly,
-    });
-    if (resourceRepairOnly && plannedFiles.length === 0) {
-      throw new MakeClientProjectError(
-        'MAKE_CLIENT_UPDATE_NOT_AVAILABLE',
-        '当前客户端模板已完整，无需修复',
-        { status: 409, phase: 'version' },
-      );
-    }
+    plannedFiles = collectMakeClientUpdateTemplateFiles(extractedTemplate.templateRoot);
+    const packageRelativePath = 'package.json';
     const templatePackagePath = path.join(extractedTemplate.templateRoot, packageRelativePath);
-    const templatePackage = readMakeClientPackageJsonForUpdate(templatePackagePath, 'template');
-    const packageJsonContent = mergeMakeClientPackageJson(projectPackage.packageJson, templatePackage.packageJson);
-    const packageChanged = !resourceRepairOnly && packageJsonContent !== projectPackage.content;
+    const projectPackagePath = path.join(root, packageRelativePath);
+    const packageChanged = fs.existsSync(templatePackagePath)
+      && fs.readFileSync(templatePackagePath, 'utf8') !== (fs.existsSync(projectPackagePath) ? fs.readFileSync(projectPackagePath, 'utf8') : '');
 
     backupRoot = createMakeClientUpdateBackupRoot(root);
     backupExistingMakeClientUpdateFiles(root, backupRoot, plannedFiles);
@@ -2165,21 +2290,19 @@ export async function applyMakeClientUpdate(
       createdAt,
     });
 
-    writeMakeClientUpdateTemplateFiles({
+    writtenFiles = writeMakeClientUpdateTemplateFiles({
       projectRoot: root,
       templateRoot: extractedTemplate.templateRoot,
       plannedFiles,
-      packageJsonContent,
       marker,
       source: extractedTemplate.source,
       targetVersion: status.targetVersion,
-      writtenFiles,
     });
 
     let metadataSynced = false;
     let postUpdateWarning: MakeClientUpdatePostUpdateWarning | undefined;
     try {
-      if (!resourceRepairOnly && (packageChanged || !hasInstalledMakeClientDependencies(root))) {
+      if (packageChanged || !hasInstalledMakeClientDependencies(root)) {
         installMethod = await installMakeClientDependenciesForUpdate(runner, root);
       }
       await syncMakeClientMetadataWithNpm(runner, root);

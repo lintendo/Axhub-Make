@@ -2,8 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { readCommentAsset, removeCommentAssets, writeCommentAssets } from './commentAssetFiles.ts';
-import { readJsonBody, sendCorsJson, sendCorsPreflight } from './http.ts';
+import { readJsonBody, sendCorsJson, sendCorsPreflight, sendFile } from './http.ts';
 import {
   resolveDocumentCommentStorage,
   type DocumentCommentStorage,
@@ -84,12 +83,7 @@ function assetFileName(id: unknown, index: number, extension: string): string {
   return `${safe || `image-${index + 1}`}.${extension}`;
 }
 
-function persistImageAssets(
-  document: Record<string, unknown>,
-  resolved: DocumentCommentStorage,
-  projectRoot: string,
-): Record<string, unknown> {
-  const writes: Array<{ relativePath: string; data: Buffer }> = [];
+function persistImageAssets(document: Record<string, unknown>, resolved: DocumentCommentStorage): Record<string, unknown> {
   const images = (Array.isArray(document.images) ? document.images : []).map((rawImage, index) => {
     const image = isRecord(rawImage) ? { ...rawImage } : {};
     const parsed = parseImageDataUrl(image.data);
@@ -98,7 +92,8 @@ function persistImageAssets(
       const fileName = assetFileName(image.id, index, extension);
       const fullPath = path.join(resolved.assetDir, fileName);
       if (!fullPath.startsWith(resolved.assetDir + path.sep)) throw new Error('Invalid document comment asset path');
-      writes.push({ relativePath: fileName, data: parsed.buffer });
+      fs.mkdirSync(resolved.assetDir, { recursive: true });
+      fs.writeFileSync(fullPath, parsed.buffer);
       image.assetPath = `.axhub/make/comment-assets/${resolved.documentHash}/${fileName}`;
       image.mimeType = image.mimeType || parsed.mimeType;
       image.size = Number(image.size ?? parsed.buffer.length);
@@ -106,7 +101,6 @@ function persistImageAssets(
     delete image.data;
     return image;
   });
-  writeCommentAssets(projectRoot, resolved.assetDir, writes);
   return { ...document, images };
 }
 
@@ -125,34 +119,22 @@ function collectAssetPaths(document: Record<string, unknown> | null, resolved: D
   }));
 }
 
-function removeUnreferencedImageAssets(
-  previous: Record<string, unknown> | null,
-  next: Record<string, unknown>,
-  resolved: DocumentCommentStorage,
-  projectRoot: string,
-): void {
+function removeUnreferencedImageAssets(previous: Record<string, unknown> | null, next: Record<string, unknown>, resolved: DocumentCommentStorage): void {
   const nextPaths = collectAssetPaths(next, resolved);
   const previousPaths = collectAssetPaths(previous, resolved);
-  const relativePaths: string[] = [];
   for (const assetPath of previousPaths) {
     if (nextPaths.has(assetPath)) continue;
     const filePath = path.resolve(resolved.commentFilePath, '..', '..', '..', '..', assetPath);
     if (!filePath.startsWith(resolved.assetDir + path.sep)) continue;
-    relativePaths.push(path.relative(resolved.assetDir, filePath));
-  }
-  try {
-    removeCommentAssets(projectRoot, resolved.assetDir, relativePaths);
-  } catch (error) {
-    console.warn('[Make] Failed to remove document comment assets:', error);
+    try {
+      if (fs.existsSync(filePath)) fs.rmSync(filePath, { force: true });
+    } catch (error) {
+      console.warn('[Make] Failed to remove document comment asset:', error);
+    }
   }
 }
 
-function hydrateImages(
-  document: Record<string, unknown>,
-  resolved: DocumentCommentStorage,
-  url: URL,
-  projectRoot: string,
-): Record<string, unknown> {
+function hydrateImages(document: Record<string, unknown>, resolved: DocumentCommentStorage, url: URL): Record<string, unknown> {
   if (url.searchParams.get('hydrateImages') !== '1') return document;
   return {
     ...document,
@@ -161,11 +143,9 @@ function hydrateImages(
       const assetPath = normalizeAssetPath(image.assetPath, resolved);
       if (!assetPath) return image;
       const filePath = path.resolve(resolved.commentFilePath, '..', '..', '..', '..', assetPath);
-      if (!filePath.startsWith(resolved.assetDir + path.sep)) return image;
-      const asset = readCommentAsset(projectRoot, resolved.assetDir, path.relative(resolved.assetDir, filePath));
-      if (!asset) return image;
+      if (!filePath.startsWith(resolved.assetDir + path.sep) || !fs.existsSync(filePath)) return image;
       const mimeType = String(image.mimeType || 'image/png');
-      image.data = `data:${mimeType};base64,${asset.data.toString('base64')}`;
+      image.data = `data:${mimeType};base64;${fs.readFileSync(filePath).toString('base64')}`.replace(';base64;', ';base64,');
       return image;
     }),
   };
@@ -184,27 +164,8 @@ function sendAsset(req: IncomingMessage, res: ServerResponse, context: DocumentC
     return true;
   }
   const filePath = path.resolve(resolved.commentFilePath, '..', '..', '..', '..', asset);
-  const loaded = filePath.startsWith(resolved.assetDir + path.sep)
-    ? readCommentAsset(context.project.root, resolved.assetDir, path.relative(resolved.assetDir, filePath))
-    : null;
-  if (!loaded) {
+  if (!filePath.startsWith(resolved.assetDir + path.sep) || !sendFile(res, filePath, { cacheControl: 'no-store' })) {
     sendCorsJson(res, { error: 'Asset not found' }, { status: 404 });
-  } else {
-    const mimeType = path.extname(loaded.filePath).toLowerCase() === '.jpg'
-      || path.extname(loaded.filePath).toLowerCase() === '.jpeg'
-      ? 'image/jpeg'
-      : path.extname(loaded.filePath).toLowerCase() === '.gif'
-        ? 'image/gif'
-        : path.extname(loaded.filePath).toLowerCase() === '.webp'
-          ? 'image/webp'
-          : path.extname(loaded.filePath).toLowerCase() === '.svg'
-            ? 'image/svg+xml'
-            : 'image/png';
-    res.statusCode = 200;
-    res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Length', String(loaded.data.length));
-    res.setHeader('Cache-Control', 'no-store');
-    res.end(loaded.data);
   }
   return true;
 }
@@ -230,7 +191,7 @@ export function handleDocumentCommentsApi(
     const document = readStoredDocument(resolved.commentFilePath);
     sendCorsJson(res, {
       exists: Boolean(document),
-      document: document ? hydrateImages(document, resolved, url, context.project.root) : null,
+      document: document ? hydrateImages(document, resolved, url) : null,
       path: resolved.projectRelativeCommentPath,
     });
     return true;
@@ -244,12 +205,10 @@ export function handleDocumentCommentsApi(
       const merged = reason === 'restore' && previous
         ? normalizeDocument(compactObservedTombstones(previous, observed), resolved)
         : reason === 'clear' ? normalized : mergeStoredTombstones(previous, normalized);
-      const document = persistImageAssets(merged, resolved, context.project.root);
+      const document = persistImageAssets(merged, resolved);
       fs.mkdirSync(path.dirname(resolved.commentFilePath), { recursive: true });
       fs.writeFileSync(resolved.commentFilePath, `${JSON.stringify(document, null, 2)}\n`, 'utf8');
-      if (reason === 'restore' || reason === 'clear') {
-        removeUnreferencedImageAssets(previous, document, resolved, context.project.root);
-      }
+      if (reason === 'restore' || reason === 'clear') removeUnreferencedImageAssets(previous, document, resolved);
       sendCorsJson(res, { ok: true, exists: true, document, path: resolved.projectRelativeCommentPath });
     }).catch((error) => sendCorsJson(res, { error: error?.message || 'Failed to write document comments' }, { status: 400 }));
     return true;

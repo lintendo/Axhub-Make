@@ -26,7 +26,7 @@ describe('resource deep links', () => {
     it('does not wait for sidebar scans before opening direct project files', () => {
         expect(doesResourceDeepLinkRequireSidebarAssets({
             resourceType: 'project-doc',
-            resourceId: 'src/resources/examples/demo.assets/diagrams/mermaid-1.excalidraw',
+            resourceId: 'src/resources/.assets/examples/demo.html/diagrams/mermaid-1.excalidraw',
         })).toBe(false);
         expect(doesResourceDeepLinkRequireSidebarAssets({
             resourceType: 'doc',
@@ -53,6 +53,14 @@ describe('resource deep links', () => {
         });
     });
 
+    it('preserves the Codex page surface when a deep link is generated from it', () => {
+        expect(buildIndexDeepLinkUrl({
+            resourceType: 'prototype',
+            resourceId: 'home',
+            projectId: 'client-a',
+        }, 'http://localhost:51720/?surface=codex')).toBe('http://localhost:51720/?projectId=client-a&p=home&surface=codex');
+    });
+
     it('builds and parses one canonical manual preview device parameter', () => {
         const url = buildIndexDeepLinkUrl({
             resourceType: 'prototype',
@@ -68,6 +76,25 @@ describe('resource deep links', () => {
             view: 'demo',
             projectId: 'client-a',
             device: '1280x800',
+            collapseSidebar: false,
+        });
+    });
+
+    it('preserves an explicit desktop preview parameter', () => {
+        const url = buildIndexDeepLinkUrl({
+            resourceType: 'prototype',
+            resourceId: 'home',
+            projectId: 'client-a',
+            device: 'desktop',
+        }, 'http://localhost:51720/current/path?ignored=1');
+
+        expect(url).toBe('http://localhost:51720/?projectId=client-a&p=home&device=desktop');
+        expect(parseIndexDeepLink(url)).toEqual({
+            resourceType: 'prototype',
+            resourceId: 'home',
+            view: 'demo',
+            projectId: 'client-a',
+            device: 'desktop',
             collapseSidebar: false,
         });
     });
@@ -152,6 +179,21 @@ describe('resource deep links', () => {
             resourceType: 'project-doc',
             resourceId: 'src/prototypes/annotation-demo/docs/prd-03-states.md',
             projectId: 'client-a',
+            collapseSidebar: true,
+        });
+
+        const editorUrl = buildIndexDeepLinkUrl({
+            resourceType: 'project-doc',
+            resourceId: 'src/prototypes/annotation-demo/docs/prd-03-states.md',
+            projectId: 'client-a',
+            openEditor: true,
+        }, 'http://localhost:51720/old/path');
+        expect(editorUrl).toBe('http://localhost:51720/?projectId=client-a&docPath=src%2Fprototypes%2Fannotation-demo%2Fdocs%2Fprd-03-states.md&edit=1');
+        expect(parseIndexDeepLink(editorUrl)).toEqual({
+            resourceType: 'project-doc',
+            resourceId: 'src/prototypes/annotation-demo/docs/prd-03-states.md',
+            projectId: 'client-a',
+            openEditor: true,
             collapseSidebar: true,
         });
 
@@ -345,11 +387,58 @@ describe('resource deep links', () => {
             viewMode: 'demo',
             collapseSidebar: false,
         });
+
+        expect(resolveIndexDeepLinkSelection({
+            resourceType: 'project-doc',
+            resourceId: 'templates/prototype-spec.html',
+            projectId: 'client-a',
+            collapseSidebar: false,
+        }, {
+            prototypes: [],
+            docs: [],
+        })).toEqual({
+            kind: 'doc',
+            item: {
+                name: 'templates/prototype-spec.html',
+                displayName: 'prototype-spec.html',
+                jsUrl: '',
+                specUrl: '/api/projects/client-a/document-content?path=templates%2Fprototype-spec.html',
+                previewUrl: '/api/projects/client-a/document-content?path=templates%2Fprototype-spec.html',
+                filePath: 'templates/prototype-spec.html',
+                projectId: 'client-a',
+                resourceId: 'templates/prototype-spec.html',
+                projectDocumentPath: 'templates/prototype-spec.html',
+            },
+            sidebarTab: 'document',
+            viewMode: 'demo',
+            collapseSidebar: false,
+        });
+
+        expect(resolveIndexDeepLinkSelection({
+            resourceType: 'project-doc',
+            resourceId: 'src/prototypes/annotation-demo/docs/interactive.html',
+            projectId: 'client-a',
+            openEditor: true,
+            collapseSidebar: true,
+        }, {
+            prototypes: [],
+            docs: [],
+        })).toMatchObject({
+            kind: 'doc',
+            item: {
+                filePath: 'src/prototypes/annotation-demo/docs/interactive.html',
+                previewUrl: '/api/projects/client-a/document-content?path=src%2Fprototypes%2Fannotation-demo%2Fdocs%2Finteractive.html',
+                projectDocumentPath: 'src/prototypes/annotation-demo/docs/interactive.html',
+            },
+            sidebarTab: 'document',
+            viewMode: 'demo',
+            collapseSidebar: true,
+        });
     });
 
     it('resolves hidden HTML-review canvas and Draw.io artifacts without listing asset folders', () => {
-        const canvasPath = 'src/resources/examples/demo.assets/diagrams/mermaid-1.excalidraw';
-        const drawioPath = 'src/resources/examples/demo.assets/diagrams/drawio-1.drawio.svg';
+        const canvasPath = 'src/resources/.assets/examples/demo.html/diagrams/mermaid-1.excalidraw';
+        const drawioPath = 'src/resources/.assets/examples/demo.html/diagrams/drawio-1.drawio.svg';
 
         expect(resolveIndexDeepLinkSelection({
             resourceType: 'project-doc',
@@ -360,8 +449,8 @@ describe('resource deep links', () => {
         }, { prototypes: [], docs: [] })).toMatchObject({
             kind: 'doc',
             item: {
-                name: 'examples/demo.assets/diagrams/mermaid-1.excalidraw',
-                resourceId: 'examples/demo.assets/diagrams/mermaid-1.excalidraw',
+                name: '.assets/examples/demo.html/diagrams/mermaid-1.excalidraw',
+                resourceId: '.assets/examples/demo.html/diagrams/mermaid-1.excalidraw',
                 filePath: canvasPath,
                 projectDocumentPath: canvasPath,
                 canvasFilePath: canvasPath,
@@ -378,8 +467,8 @@ describe('resource deep links', () => {
         }, { prototypes: [], docs: [] })).toMatchObject({
             kind: 'doc',
             item: {
-                name: 'examples/demo.assets/diagrams/drawio-1.drawio.svg',
-                resourceId: 'examples/demo.assets/diagrams/drawio-1.drawio.svg',
+                name: '.assets/examples/demo.html/diagrams/drawio-1.drawio.svg',
+                resourceId: '.assets/examples/demo.html/diagrams/drawio-1.drawio.svg',
                 filePath: drawioPath,
                 projectDocumentPath: drawioPath,
                 openMode: 'drawio',

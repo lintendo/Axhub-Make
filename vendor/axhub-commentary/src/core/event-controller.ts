@@ -41,6 +41,8 @@ export interface EventModifiers {
 /** Selection event data */
 export interface SelectEvent {
   element: Element;
+  /** The innermost page element hit by the pointer before target resolution. */
+  initialElement?: Element;
   modifiers: EventModifiers;
   clientX: number;
   clientY: number;
@@ -49,6 +51,8 @@ export interface SelectEvent {
 /** Double-click event data for selected elements */
 export interface DoubleClickSelectedEvent {
   element: Element;
+  /** Raw page element path ordered from the innermost hit to outer ancestors. */
+  pathElements: readonly Element[];
   modifiers: EventModifiers;
   clientX: number;
   clientY: number;
@@ -205,6 +209,35 @@ const NON_PRIMARY_BUTTON_BYPASS_EVENTS = new Set([
   'auxclick',
 ]);
 
+// Page dialogs (Radix, Ant Design, and native <dialog>) own their form
+// controls while open. Let those controls receive native events so opening a
+// modal does not make its inputs/buttons unusable under Commentary capture.
+const PAGE_FOCUS_TRAP_SELECTOR = [
+  '.ant-modal-wrap',
+  '[role="dialog"]',
+  '[aria-modal="true"]',
+  'dialog[open]',
+].join(', ');
+const PAGE_FOCUS_TRAP_CONTROL_SELECTOR = [
+  'button',
+  'input',
+  'textarea',
+  'select',
+  'option',
+  'label',
+  'a[href]',
+  '[contenteditable="true"]',
+  '[role="button"]',
+  '[role="checkbox"]',
+  '[role="combobox"]',
+  '[role="tab"]',
+  '[role="menuitem"]',
+  '[role="option"]',
+  '[role="switch"]',
+  '[role="slider"]',
+  '[data-axhub-review-interactive]',
+].join(', ');
+
 // =============================================================================
 // Implementation
 // =============================================================================
@@ -279,6 +312,7 @@ export function createEventController(options: EventControllerOptions): EventCon
   let nativeTextSelectionClickCandidate: {
     pointerId: number;
     target: Element;
+    initialElement?: Element;
     modifiers: EventModifiers;
     startClientX: number;
     startClientY: number;
@@ -288,6 +322,7 @@ export function createEventController(options: EventControllerOptions): EventCon
   const TOUCH_TAP_THRESHOLD_PX = 15;
   let touchTapCandidate: {
     target: Element;
+    initialElement?: Element;
     modifiers: EventModifiers;
     clientX: number;
     clientY: number;
@@ -310,6 +345,62 @@ export function createEventController(options: EventControllerOptions): EventCon
       // Fallback to target check
     }
     return isOverlayElement(event.target);
+  }
+
+  function isPageFocusTrapControlEvent(event: Event): boolean {
+    let path: EventTarget[] = [];
+    try {
+      path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+    } catch {
+      path = [];
+    }
+    if (event.target && !path.includes(event.target)) path.push(event.target);
+
+    let inFocusTrap = false;
+    let isControl = false;
+    for (const candidate of path) {
+      if (!(candidate instanceof Element) || typeof candidate.matches !== 'function') continue;
+      if (candidate.matches(PAGE_FOCUS_TRAP_SELECTOR)) {
+        if (candidate.getAttribute('data-state') === 'closed') continue;
+        if (candidate.getAttribute('aria-hidden') === 'true') continue;
+        if (candidate.matches('dialog') && !candidate.hasAttribute('open')) continue;
+        inFocusTrap = true;
+      }
+      if (candidate.matches(PAGE_FOCUS_TRAP_CONTROL_SELECTOR)) isControl = true;
+    }
+    return inFocusTrap && isControl;
+  }
+
+  function getPageElementPath(event: Event, fallback: Element): Element[] {
+    try {
+      if (typeof event.composedPath === 'function') {
+        const elements = event
+          .composedPath()
+          .filter(
+            (node): node is Element =>
+              node instanceof Element && node.isConnected && !isOverlayElement(node),
+          );
+        if (elements.length > 0) return elements;
+      }
+    } catch {
+      // Fall back to the stable selected element below.
+    }
+    return [fallback];
+  }
+
+  function getInitialSelectionElement(event: Event, target: Element): Element | undefined {
+    try {
+      if (typeof event.composedPath === 'function') {
+        const initialElement = event.composedPath().find(
+          (node): node is Element =>
+            node instanceof Element && node.isConnected && !isOverlayElement(node),
+        );
+        if (initialElement && initialElement !== target) return initialElement;
+      }
+    } catch {
+      // Fall back to the resolved selection target below.
+    }
+    return undefined;
   }
 
   /**
@@ -353,6 +444,10 @@ export function createEventController(options: EventControllerOptions): EventCon
     }
 
     if (isAxhubAnnotationDirectActionEvent(event)) {
+      return true;
+    }
+
+    if (isPageFocusTrapControlEvent(event)) {
       return true;
     }
 
@@ -476,6 +571,7 @@ export function createEventController(options: EventControllerOptions): EventCon
       setMode('selecting');
       onSelect({
         element: candidate.target,
+        ...(candidate.initialElement ? { initialElement: candidate.initialElement } : {}),
         modifiers: candidate.modifiers,
         clientX: candidate.startClientX,
         clientY: candidate.startClientY,
@@ -848,10 +944,12 @@ export function createEventController(options: EventControllerOptions): EventCon
       const modifiers = extractModifiers(event);
       const target = getTargetElementForSelection(event, event.clientX, event.clientY, modifiers);
       if (!target) return;
+      const initialElement = getInitialSelectionElement(event, target);
 
       nativeTextSelectionClickCandidate = {
         pointerId: getEventPointerId(event),
         target,
+        ...(initialElement ? { initialElement } : {}),
         modifiers,
         startClientX: event.clientX,
         startClientY: event.clientY,
@@ -883,7 +981,14 @@ export function createEventController(options: EventControllerOptions): EventCon
         dragCandidate = null;
         if (isTouch) {
           // Mobile: keep direct reselection via deferred touch-tap
-          touchTapCandidate = { target, modifiers, clientX: event.clientX, clientY: event.clientY };
+          const initialElement = getInitialSelectionElement(event, target);
+          touchTapCandidate = {
+            target,
+            ...(initialElement ? { initialElement } : {}),
+            modifiers,
+            clientX: event.clientX,
+            clientY: event.clientY,
+          };
           return;
         }
         // Desktop: deselect first — bubble card disappears, back to hover mode
@@ -893,11 +998,20 @@ export function createEventController(options: EventControllerOptions): EventCon
 
       if (target && selected && target === selected && !onStartDrag) {
         if (isTouch) {
-          touchTapCandidate = { target, modifiers, clientX: event.clientX, clientY: event.clientY };
+          const initialElement = getInitialSelectionElement(event, target);
+          touchTapCandidate = {
+            target,
+            ...(initialElement ? { initialElement } : {}),
+            modifiers,
+            clientX: event.clientX,
+            clientY: event.clientY,
+          };
           return;
         }
+        const initialElement = getInitialSelectionElement(event, target);
         onSelect({
           element: target,
+          ...(initialElement ? { initialElement } : {}),
           modifiers,
           clientX: event.clientX,
           clientY: event.clientY,
@@ -949,14 +1063,24 @@ export function createEventController(options: EventControllerOptions): EventCon
 
     // On mobile touch, defer selection to pointerup to avoid selecting during scroll
     if (isTouch) {
-      touchTapCandidate = { target, modifiers, clientX: event.clientX, clientY: event.clientY, nextMode: 'selecting' };
+      const initialElement = getInitialSelectionElement(event, target);
+      touchTapCandidate = {
+        target,
+        ...(initialElement ? { initialElement } : {}),
+        modifiers,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        nextMode: 'selecting',
+      };
       return;
     }
 
     // Transition to selecting mode
     setMode('selecting');
+    const initialElement = getInitialSelectionElement(event, target);
     onSelect({
       element: target,
+      ...(initialElement ? { initialElement } : {}),
       modifiers,
       clientX: event.clientX,
       clientY: event.clientY,
@@ -987,6 +1111,7 @@ export function createEventController(options: EventControllerOptions): EventCon
 
     onDoubleClickSelected({
       element: selected,
+      pathElements: getPageElementPath(event, selected),
       modifiers,
       clientX: event.clientX,
       clientY: event.clientY,
@@ -1055,6 +1180,7 @@ export function createEventController(options: EventControllerOptions): EventCon
         }
         onSelect({
           element: tap.target,
+          ...(tap.initialElement ? { initialElement: tap.initialElement } : {}),
           modifiers: tap.modifiers,
           clientX: tap.clientX,
           clientY: tap.clientY,

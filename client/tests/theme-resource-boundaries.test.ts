@@ -169,6 +169,15 @@ describe('theme resource boundaries', () => {
     }
   });
 
+  it('does not treat spec-only source directories as importable themes', () => {
+    for (const themeDir of listThemeDirs()) {
+      const hasSpecOnlySource = fs.existsSync(path.join(themeDir, 'DESIGN.md'))
+        && fs.existsSync(path.join(themeDir, 'SOURCE.md'))
+        && !fs.existsSync(path.join(themeDir, 'index.tsx'));
+      expect(hasSpecOnlySource, `${path.basename(themeDir)} is a spec-only directory and must not be bundled`).toBe(false);
+    }
+  });
+
   it('keeps every local theme resource reference inside its own theme directory', () => {
     for (const themeDir of listThemeDirs()) {
       const indexPath = path.join(themeDir, 'index.tsx');

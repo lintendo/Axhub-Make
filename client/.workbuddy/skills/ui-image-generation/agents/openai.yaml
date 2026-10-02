@@ -1,0 +1,4 @@
+interface:
+  display_name: "项目图片生成"
+  short_description: "生成 UI、网站与项目图片素材"
+  default_prompt: "使用 $ui-image-generation 生成或编辑 UI、网站或其他图片素材。"

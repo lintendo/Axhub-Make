@@ -110,7 +110,15 @@ export function writeServerInfo(
   };
   const infoPath = getEffectiveServerInfoPath(projectRoot, role, options);
   fs.mkdirSync(path.dirname(infoPath), { recursive: true });
-  fs.writeFileSync(infoPath, JSON.stringify(normalized, null, 2), 'utf8');
+  const temporaryPath = `${infoPath}.tmp-${process.pid}-${Date.now()}`;
+  try {
+    fs.writeFileSync(temporaryPath, JSON.stringify(normalized, null, 2), 'utf8');
+    fs.renameSync(temporaryPath, infoPath);
+  } finally {
+    if (fs.existsSync(temporaryPath)) {
+      fs.unlinkSync(temporaryPath);
+    }
+  }
   return normalized;
 }
 

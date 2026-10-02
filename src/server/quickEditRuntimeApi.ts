@@ -1168,6 +1168,7 @@ export const QUICK_EDIT_RUNTIME_SCRIPT = String.raw`(() => {
       const payloadOptions = data && data.payload && typeof data.payload === 'object' ? data.payload : {};
       const options = { ...payloadOptions, ...data };
       const result = await exportCore.captureDocumentScreenshot('#root', {
+        ...(options.scope === 'viewport' || options.scope === 'full-page' ? { scope: options.scope } : {}),
         targetWidth: options.targetWidth,
         targetHeight: options.targetHeight,
         ...(options.targetPixelRatio !== undefined ? { targetPixelRatio: options.targetPixelRatio } : {}),
@@ -1222,19 +1223,19 @@ export const QUICK_EDIT_RUNTIME_SCRIPT = String.raw`(() => {
   };
   prototypeRuntime.reportError = reportPrototypeError;
 
-	  window.addEventListener('error', (event) => {
-	    const resourceMeta = getResourceLoadMeta(event.target);
-	    if (resourceMeta) {
-	      if (resourceMeta.tagName === 'SCRIPT' && tryRecoverTransientViteResource(resourceMeta.sourceFile)) {
-	        return;
-	      }
-	      if (resourceMeta.tagName === 'SCRIPT' && isPreviewLoaderResourceIssue(resourceMeta.sourceFile)) {
-	        diagnoseAndReportPreviewLoaderFailure(resourceMeta);
-	        return;
-	      }
-	      autoReportPrototypeError(event.error || resourceMeta.message, resourceMeta);
-	      return;
-	    }
+  function handleWindowError(event) {
+    const resourceMeta = getResourceLoadMeta(event.target);
+    if (resourceMeta) {
+      if (resourceMeta.tagName === 'SCRIPT' && tryRecoverTransientViteResource(resourceMeta.sourceFile)) {
+        return;
+      }
+      if (resourceMeta.tagName === 'SCRIPT' && isPreviewLoaderResourceIssue(resourceMeta.sourceFile)) {
+        diagnoseAndReportPreviewLoaderFailure(resourceMeta);
+        return;
+      }
+      autoReportPrototypeError(event.error || resourceMeta.message, resourceMeta);
+      return;
+    }
     autoReportPrototypeError(event.error || event.message, {
       type: 'window-error',
       message: event.message,
@@ -1242,19 +1243,52 @@ export const QUICK_EDIT_RUNTIME_SCRIPT = String.raw`(() => {
       line: event.lineno,
       column: event.colno,
     });
-  }, true);
+  }
 
-  window.addEventListener('unhandledrejection', (event) => {
+  function handleUnhandledRejection(event) {
     autoReportPrototypeError(event.reason || 'Unhandled promise rejection', {
       type: 'unhandledrejection',
     });
-  }, true);
+  }
+
+  function replayEarlyRuntimeErrors() {
+    const captureState = window.__AXHUB_EARLY_RUNTIME_ERROR_CAPTURE__;
+    if (!captureState || !Array.isArray(captureState.queue)) {
+      return;
+    }
+    const queuedEvents = captureState.queue.splice(0);
+    try {
+      captureState.stop?.();
+    } catch {
+      // Continue replaying captured failures even if early-listener cleanup fails.
+    }
+    for (const event of queuedEvents) {
+      if (event?.eventType === 'unhandledrejection') {
+        handleUnhandledRejection(event);
+      } else {
+        handleWindowError(event || {});
+      }
+    }
+  }
+
+  window.addEventListener('error', handleWindowError, true);
+  window.addEventListener('unhandledrejection', handleUnhandledRejection, true);
+  replayEarlyRuntimeErrors();
 
   window.addEventListener('message', (event) => {
     const data = event.data || {};
     if (data.type === 'axhub.quickEdit.requestRuntimeReady') {
       updateHostRuntimeOrigin(data);
       quickEdit.postReady();
+      return;
+    }
+    if (
+      data.type === 'AXHUB_PROTOTYPE_EDITOR_HOST_TOOLBAR_ACTION'
+      && data.action?.type === 'toggle-selection-mode'
+      && data.action.active === false
+    ) {
+      updateHostRuntimeOrigin(data);
+      exit();
       return;
     }
     if (data.type === 'axhub.quickEdit.enter') {

@@ -14,6 +14,7 @@ interface MobileIndexLayoutProps {
     onOpenImageAiPanel: () => void;
     onOpenItem: (item: ItemData) => void;
     onOpenAssistantWithItemContext: (item: ItemData) => void;
+    conversationUi?: boolean;
 }
 
 export default function MobileIndexLayout({
@@ -26,6 +27,7 @@ export default function MobileIndexLayout({
     onOpenImageAiPanel,
     onOpenItem,
     onOpenAssistantWithItemContext,
+    conversationUi = true,
 }: MobileIndexLayoutProps) {
     const mobilePrototypes = items.filter((item) => {
         const lower = searchText.toLowerCase();
@@ -62,7 +64,8 @@ export default function MobileIndexLayout({
                         </h1>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Button
+                        {conversationUi ? (
+                            <Button
                             variant="ghost"
                             size="icon"
                             title="在线对话 AI"
@@ -70,8 +73,10 @@ export default function MobileIndexLayout({
                             onClick={onOpenAssistant}
                         >
                             <Sparkles className="h-4 w-4" />
-                        </Button>
-                        <Button
+                            </Button>
+                        ) : null}
+                        {conversationUi ? (
+                            <Button
                             variant="ghost"
                             size="icon"
                             title="生图 AI"
@@ -79,7 +84,8 @@ export default function MobileIndexLayout({
                             onClick={onOpenImageAiPanel}
                         >
                             <ImageIcon className="h-4 w-4" />
-                        </Button>
+                            </Button>
+                        ) : null}
                         <Button
                             variant="ghost"
                             size="icon"
@@ -139,7 +145,8 @@ export default function MobileIndexLayout({
                                         </div>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                        <Button
+                                        {conversationUi ? (
+                                            <Button
                                             variant="ghost"
                                             size="icon"
                                             title="使用上下文对话"
@@ -150,7 +157,8 @@ export default function MobileIndexLayout({
                                             }}
                                         >
                                             <MessageCircle className="h-4 w-4" />
-                                        </Button>
+                                            </Button>
+                                        ) : null}
                                     </div>
                                 </div>
                             ))

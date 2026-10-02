@@ -49,6 +49,7 @@ export default function NewSidebar(rawProps: NewSidebarProps) {
         onSelectResourceFolder,
         onSelectTheme,
         handleMenuClick,
+        onOpenLocalPublishDialog,
         handleRenameItem,
         handleDuplicateItem,
         handleDeleteItem,
@@ -69,6 +70,7 @@ export default function NewSidebar(rawProps: NewSidebarProps) {
         preferredIDE,
         ideAvailability,
         agentAvailability,
+        skipLanPreviewAuth,
         onOpenAcpWebAgent,
         onOpenImageAiPanel,
         onOpenWebAgentInPanel,
@@ -76,7 +78,6 @@ export default function NewSidebar(rawProps: NewSidebarProps) {
         onCloseAiPanel,
         onCloseWebAgentPanel,
         onSettingsClick,
-        onVersionCollaborationClick,
         onOpenAISettings,
         onToggleTheme,
         projectTitle,
@@ -104,6 +105,7 @@ export default function NewSidebar(rawProps: NewSidebarProps) {
         onSidebarTreePersist,
         webAgentPanelOpen,
         aiPanelMode,
+        externalOpenMenu,
     } = resolveNewSidebarProps(rawProps);
 
     const handleSidebarTabChange = (tab: SidebarTab) => {
@@ -244,17 +246,20 @@ export default function NewSidebar(rawProps: NewSidebarProps) {
                     const themeItem = themes.find((item) => item.name === theme.name) || theme as ThemeResourceItem;
                     void Promise.resolve(handleDownloadThemeZip(themeItem));
                 }}
+                onOpenLocalPublishDialog={onOpenLocalPublishDialog}
                 loading={loading}
                 handleOpenProjectInIDE={handleOpenProjectInIDE}
                 preferredIDE={preferredIDE}
                 ideAvailability={ideAvailability}
                 agentAvailability={agentAvailability}
+                skipLanPreviewAuth={skipLanPreviewAuth}
                 onOpenAcpWebAgent={onOpenAcpWebAgent}
                 onOpenImageAiPanel={onOpenImageAiPanel}
                 onOpenWebAgentInPanel={onOpenWebAgentInPanel}
                 onExecutePrompt={onExecutePrompt}
                 webAgentPanelOpen={webAgentPanelOpen}
                 aiPanelMode={aiPanelMode}
+                externalOpenMenu={externalOpenMenu}
                 onCloseAiPanel={onCloseAiPanel}
                 onCloseWebAgentPanel={onCloseWebAgentPanel}
                 onPreferredIDEChange={onPreferredIDEChange}
@@ -266,7 +271,6 @@ export default function NewSidebar(rawProps: NewSidebarProps) {
                 handleVersionManagement={versionHandler}
                 handleDeleteItem={deleteHandler}
                 onSettingsClick={onSettingsClick}
-                onVersionCollaborationClick={onVersionCollaborationClick}
                 onToggleTheme={onToggleTheme}
                 selectedTheme={selectedTheme}
                 defaultThemeName={defaultThemeName}

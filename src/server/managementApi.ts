@@ -36,17 +36,22 @@ import {
   streamDirectoryAsZip,
 } from './http.ts';
 import { handleAiArtifactHistoryApi } from './managementApi.aiArtifactHistory.ts';
+import { handleAiServiceProxyApi } from './managementApi.aiServices.ts';
 import { handleAiRunsApi } from './managementApi.aiRuns.ts';
 import { handleAcpRuntimeEventsApi } from './managementApi.acpRuntimeEvents.ts';
+import { handleAssistantWorkApi } from './assistantWorkApi.ts';
+import { getAssistantWorkRuntime } from './assistantWorkRuntime.ts';
 import { handleAxhubApi } from './managementApi.axhub.ts';
 import { handleAssistantPromptIde } from './managementApi.assistantIde.ts';
 import { handleBridgeAndImageProxy } from './managementApi.bridge.ts';
 import { handleCanvasApi } from './managementApi.canvas.ts';
 import { handleCodeReviewApi } from './managementApi.codeReview.ts';
 import { handleCloudPublishingApi, type CommandExecutor } from './managementApi.cloudPublishing.ts';
+import { handleLocalPublishingApi } from './managementApi.localPublishing.ts';
 import { handleConfigApi, readMakeServerVersion } from './managementApi.config.ts';
 import { handleProjectDataAndThemeApi } from './managementApi.dataTheme.ts';
 import { handleProjectDocsApi } from './managementApi.docs.ts';
+import { handleDocumentTemplatesApi } from './managementApi.documentTemplates.ts';
 import { handleEntriesCompatibilityApi } from './managementApi.entries.ts';
 import { handleSourceBackedExports, handleUnavailableManagement } from './managementApi.exports.ts';
 import { handleFileOperationsApi } from './managementApi.fileOperations.ts';
@@ -77,6 +82,7 @@ import { handleHtmlResourceEditingApi } from './htmlResourceEditing.ts';
 import { handleQuickEditRuntimeApi } from './quickEditRuntimeApi.ts';
 import { hasFigmaMakeArtifactCapability } from './exportMakeArtifacts.ts';
 import { getCanvasBridgeHub } from './canvasBridge.ts';
+import { AXHUB_CANVAS_MCP_PATH } from './axhubCanvasMcp.ts';
 import { selectLocalDirectory } from './localDirectoryPicker.ts';
 import {
   createAssistantRuntimeResponse,
@@ -105,6 +111,7 @@ export interface ManagementApiOptions {
   devMode?: boolean;
   diagnosticLog?: DiagnosticLog;
   axhubOnlineBaseUrl?: string;
+  axhubCanvasMcpToken?: string;
   cloudPublishingCommandExecutor?: CommandExecutor;
   gitWorkspaceCommandExecutor?: GitWorkspaceCommandExecutor;
 }
@@ -278,16 +285,10 @@ function addOrUpdateRegistryProjectByRoot(
   const root = path.resolve(params.root);
   const existingByRoot = findRegisteredProjectByRoot(registry.listProjects(), root);
   if (existingByRoot) {
-    const { identity } = syncProjectIdentitySource(root, {
-      metadataPath: params.metadataPath,
-      fallback: params,
-      projectId: existingByRoot.id,
-    });
-    return registry.updateProject(existingByRoot.id, {
-      name: identity.name,
-      root,
-      metadataPath: params.metadataPath,
-    });
+    const error = new Error(`Project path already registered: ${root}`) as Error & { code?: string; status?: number };
+    error.code = 'MAKE_PROJECT_PATH_CONFLICT';
+    error.status = 409;
+    throw error;
   }
   const projectId = allocateRegisteredProjectId(
     params.id,
@@ -1090,8 +1091,7 @@ function resolveUnavailableStartupProject(
 function isStartupConfigGetRoute(pathname: string): boolean {
   return pathname === '/api/config'
     || pathname === '/api/config/bootstrap'
-    || pathname === '/api/config/availability'
-    || pathname === '/api/config/ai-image/codex-local';
+    || pathname === '/api/config/availability';
 }
 
 function isStartupSidebarTreeTab(value: string): boolean {
@@ -1456,6 +1456,10 @@ export async function handleManagementApi(req: IncomingMessage, res: ServerRespo
     updateRegisteredProjectTitle,
   })) return true;
 
+  if (handleAiServiceProxyApi(req, res, options, requestContext, pathname, {
+    getServerConfigStoreForRequest,
+  })) return true;
+
   if (handleAiRunsApi(req, res, options, pathname, {
     resolveProjectContext,
     getServerConfigStoreForRequest,
@@ -1470,6 +1474,26 @@ export async function handleManagementApi(req: IncomingMessage, res: ServerRespo
     getServerConfigStoreForRequest,
   )) return true;
 
+  if (pathname === '/api/assistant-work' || pathname.startsWith('/api/assistant-work/')) {
+    const config = getServerConfigStoreForRequest(options).getConfig({ activeProjectRoot });
+    const apiBaseUrl = config.assistant.apiBaseUrl
+      || (config.assistant.webBaseUrl ? `${config.assistant.webBaseUrl.replace(/\/+$/u, '')}/api` : 'http://localhost:32124/api');
+    const configuredCanvasProvider = config.automation.canvasPromptClient?.replace(/^acp:/u, '') || '';
+    const runtime = getAssistantWorkRuntime({
+      projectRoot: activeProjectRoot,
+      projectId: requestContext.project.id,
+      acpApiBaseUrl: apiBaseUrl,
+      mcpUrl: `${options.origin}${AXHUB_CANVAS_MCP_PATH}`,
+      mcpToken: options.axhubCanvasMcpToken,
+      provider: configuredCanvasProvider && configuredCanvasProvider !== 'manual' ? configuredCanvasProvider : 'codex',
+      model: config.automation.canvasModel,
+      concurrency: config.automation.agentRunConcurrency,
+    });
+    if (await handleAssistantWorkApi(req, res, {
+      projectId: requestContext.project.id,
+    }, runtime)) return true;
+  }
+
   if (handleAiArtifactHistoryApi(req, res, requestContext, pathname)) return true;
 
   if (handleCloudPublishingApi(req, res, options, pathname, {
@@ -1482,6 +1506,14 @@ export async function handleManagementApi(req: IncomingMessage, res: ServerRespo
     sendDisabledCapability,
   })) return true;
 
+  if (handleLocalPublishingApi(req, res, options, pathname, {
+    resolveProjectContext,
+    resolveSourceFileFromMetadata,
+    findProjectResourceByPath,
+    getDeclaredResourceWriteDir: getDeclaredResourceWriteDir as any,
+    sendDisabledCapability,
+  })) return true;
+
   if (handleProjectDocsApi(req, res, requestContext, options, pathname, {
     createProjectContextFromBody,
     getDeclaredResourceWriteDir,
@@ -1489,6 +1521,7 @@ export async function handleManagementApi(req: IncomingMessage, res: ServerRespo
     sendResourceWriteAdapterRequired,
     createProjectRelativePath,
   })) return true;
+  if (handleDocumentTemplatesApi(req, res, requestContext, pathname)) return true;
   if (handleProjectDataAndThemeApi(req, res, requestContext, options, pathname, {
     createProjectContextFromBody,
     getDeclaredResourceWriteDir,

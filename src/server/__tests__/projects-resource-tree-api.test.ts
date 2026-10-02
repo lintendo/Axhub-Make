@@ -47,7 +47,7 @@ import {
   writeProjectMetadata as writeBaseProjectMetadata,
 } from './projects-api.helpers';
 import { getMakeClientMarkerPath } from '../projectCore/index.ts';
-import { buildSystemOpenCommand } from '../managementApi.workspace.ts';
+import { buildSystemOpenCommand, openPathInSystem } from '../managementApi.workspace.ts';
 import { runLocalCommand } from '../localCommand.ts';
 
 const runLocalCommandMock = vi.mocked(runLocalCommand);
@@ -812,6 +812,76 @@ describe('make-server resource sidebar filesystem tree API', () => {
     }
   });
 
+  it('ensures and reuses a named real resource folder for image AI storage', async () => {
+    const projectRoot = createTempRoot();
+    writeResourceProject(projectRoot);
+
+    const server = await startTestServer(projectRoot);
+    try {
+      const requestUrl = scopeProjectApiUrl(
+        projectRoot,
+        `${server.origin}/api/workspace/navigation/folders?tab=docs`,
+      );
+      const ensureFolder = () => fetch(requestUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderPath: 'images' }),
+      }).then(async (response) => ({ status: response.status, body: await response.json() }));
+
+      const first = await ensureFolder();
+      const second = await ensureFolder();
+
+      expect(first.status).toBe(201);
+      expect(first.body.created).toBe(true);
+      expect(first.body.folder).toMatchObject({
+        id: 'folder-docs-images',
+        kind: 'folder',
+        title: 'images',
+        path: 'images',
+        folderPath: 'images',
+      });
+      expect(first.body.absolutePath).toBe(path.join(projectRoot, 'src/resources/images'));
+      expect(second.status).toBe(200);
+      expect(second.body.created).toBe(false);
+      expect(second.body.absolutePath).toBe(first.body.absolutePath);
+      expect(fs.readdirSync(path.join(projectRoot, 'src/resources')).filter((name) => name === 'images')).toHaveLength(1);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('rejects unsafe named resource folders and non-directory collisions', async () => {
+    const projectRoot = createTempRoot();
+    writeResourceProject(projectRoot);
+
+    const server = await startTestServer(projectRoot);
+    try {
+      const requestUrl = scopeProjectApiUrl(
+        projectRoot,
+        `${server.origin}/api/workspace/navigation/folders?tab=docs`,
+      );
+      const ensureFolder = (folderPath: string) => fetch(requestUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderPath }),
+      });
+
+      for (const unsafePath of ['../outside', '/absolute', 'C:\\absolute', 'nested//empty', 'nested/./relative']) {
+        const response = await ensureFolder(unsafePath);
+        expect(response.status).toBe(400);
+      }
+
+      fs.writeFileSync(path.join(projectRoot, 'src/resources/images'), 'not a directory', 'utf8');
+      const collisionResponse = await ensureFolder('images');
+      expect(collisionResponse.status).toBe(409);
+      await expect(collisionResponse.json()).resolves.toMatchObject({
+        error: 'Resource folder path is not a directory',
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it('opens resource files and folders through the local filesystem opener', async () => {
     const projectRoot = createTempRoot();
     writeResourceProject(projectRoot);
@@ -951,12 +1021,12 @@ describe('make-server resource sidebar filesystem tree API', () => {
       args: [targetPath],
     });
     expect(buildSystemOpenCommand(windowsTargetPath, 'win32')).toEqual({
-      command: 'powershell.exe',
+      command: 'cmd.exe',
       args: [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        'Invoke-Item -LiteralPath $args[0] -ErrorAction Stop',
+        '/d',
+        '/c',
+        'start',
+        'explorer.exe',
         windowsTargetPath,
       ],
     });
@@ -964,6 +1034,22 @@ describe('make-server resource sidebar filesystem tree API', () => {
       command: 'xdg-open',
       args: [targetPath],
     });
+  });
+
+  it('detaches the Windows filesystem opener from inherited process handles', async () => {
+    const windowsTargetPath = 'E:\\make16\\src\\resources\\new-folder';
+
+    await openPathInSystem(windowsTargetPath, 'win32');
+
+    expect(runLocalCommandMock).toHaveBeenCalledWith(
+      'cmd.exe',
+      ['/d', '/c', 'start', 'explorer.exe', windowsTargetPath],
+      {
+        timeoutMs: 10000,
+        detached: true,
+        stdio: 'ignore',
+      },
+    );
   });
 
   it('moves resource files and folders when the resource tree is persisted', async () => {

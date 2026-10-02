@@ -1,3 +1,4 @@
+import { getDocumentTemplate, type DocumentTemplateId } from '../../common/documentTemplates';
 import type { ProjectScope } from './projectScope';
 import { withProjectScope } from './projectScope';
 
@@ -25,14 +26,6 @@ async function parseTextResponse(response: Response, fallbackMessage: string): P
 
 export type DocumentTemplateOutputFormat = '' | 'md' | 'html' | 'mermaid' | 'drawio';
 
-function isVisibleDocumentTemplateName(name: string): boolean {
-    const normalized = name.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-    const lowerName = normalized.toLowerCase();
-    if (!normalized || lowerName === 'readme.md' || lowerName === 'readme.html') return false;
-    if (!lowerName.endsWith('.md') && !lowerName.endsWith('.html')) return false;
-    return normalized.split('/').every((segment) => segment && !segment.startsWith('.'));
-}
-
 export function isDocumentTemplateCompatibleWithFormat(
     templateName: string,
     format: DocumentTemplateOutputFormat,
@@ -53,18 +46,19 @@ export function filterCompatibleDocumentTemplates<T extends { name: string }>(
 }
 
 export function normalizeDocumentTemplateList(value: unknown): DocumentTemplateOption[] {
-    if (!Array.isArray(value)) return [];
-    return value.flatMap((item) => {
+    const items = value && typeof value === 'object' && Array.isArray((value as { templates?: unknown }).templates)
+        ? (value as { templates: unknown[] }).templates
+        : [];
+    return items.flatMap((item) => {
         if (!item || typeof item !== 'object') return [];
         const record = item as Record<string, unknown>;
-        const name = typeof record.name === 'string' ? record.name.trim().replace(/\\/g, '/') : '';
-        if (!isVisibleDocumentTemplateName(name)) return [];
-        const fallbackDisplayName = name.replace(/\.[^.]+$/u, '');
+        const template = getDocumentTemplate(record.id);
+        if (!template || record.exists !== true || record.path !== template.path) return [];
         return [{
-            name,
+            name: template.path,
             displayName: typeof record.displayName === 'string' && record.displayName.trim()
                 ? record.displayName.trim()
-                : fallbackDisplayName,
+                : template.displayName,
             description: typeof record.description === 'string' ? record.description.trim() : '',
         }];
     });
@@ -72,17 +66,15 @@ export function normalizeDocumentTemplateList(value: unknown): DocumentTemplateO
 
 export const documentTemplatesApi = {
     async list(scope: ProjectScope): Promise<DocumentTemplateOption[]> {
-        const response = await fetch(withProjectScope('/api/docs/templates', scope));
+        const response = await fetch(withProjectScope('/api/document-templates', scope));
         const data = await parseJsonResponse<unknown>(response, '读取文档模板失败');
         return normalizeDocumentTemplateList(data);
     },
 
-    async read(templateName: string, scope: ProjectScope): Promise<string> {
-        const normalizedName = String(templateName || '').trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-        if (!isVisibleDocumentTemplateName(normalizedName)) {
-            throw new Error('模板名称无效');
-        }
-        const response = await fetch(withProjectScope(`/api/docs/templates/${encodeURIComponent(normalizedName)}`, scope));
+    async read(templateId: DocumentTemplateId, scope: ProjectScope): Promise<string> {
+        const template = getDocumentTemplate(templateId);
+        if (!template) throw new Error('模板 ID 无效');
+        const response = await fetch(withProjectScope(`/api/document-templates/${encodeURIComponent(template.id)}`, scope));
         return parseTextResponse(response, '读取文档模板内容失败');
     },
 };

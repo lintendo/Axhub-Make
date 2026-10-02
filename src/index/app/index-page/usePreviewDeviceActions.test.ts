@@ -67,17 +67,39 @@ describe('usePreviewDeviceActions URL state', () => {
     invalid.unmount();
   });
 
-  it('derives narrow desktop display without serializing the automatic size', () => {
-    const hook = renderHook('');
+  it('restores an explicit desktop selection from the URL', () => {
+    const hook = renderHook('?device=desktop');
 
-    act(() => hook.value?.handlePreviewContainerSizeChange(1279));
+    act(() => hook.value?.handlePreviewContainerSizeChange(500));
     expect(hook.value?.previewConfig).toMatchObject({
       singlePreset: 'custom',
       customWidth: 1440,
       customHeight: 900,
       adaptiveDesktop: true,
     });
-    expect(hook.value?.previewDeviceParam).toBeNull();
+    expect(hook.value?.previewDeviceParam).toBe('desktop');
+    hook.unmount();
+  });
+
+  it('keeps desktop intent while scaling the canvas after the assistant narrows the preview', () => {
+    const hook = renderHook('');
+
+    act(() => hook.value?.handlePreviewContainerSizeChange(1400));
+    act(() => hook.value?.handleSelectPreviewSinglePreset('desktop'));
+    expect(hook.value?.previewConfig).toMatchObject({
+      singlePreset: 'desktop',
+      adaptiveDesktop: false,
+    });
+    expect(hook.value?.previewDeviceParam).toBe('desktop');
+
+    act(() => hook.value?.handlePreviewContainerSizeChange(1000));
+    expect(hook.value?.previewConfig).toMatchObject({
+      singlePreset: 'custom',
+      customWidth: 1440,
+      customHeight: 900,
+      adaptiveDesktop: true,
+    });
+    expect(hook.value?.previewDeviceParam).toBe('desktop');
 
     act(() => hook.value?.handleSelectCustomPreview());
     expect(hook.value?.previewConfig).toMatchObject({
@@ -89,8 +111,13 @@ describe('usePreviewDeviceActions URL state', () => {
     expect(hook.value?.previewDeviceParam).toBe('1440x900');
 
     act(() => hook.value?.handleSelectPreviewSinglePreset('desktop'));
-    expect(hook.value?.previewConfig.adaptiveDesktop).toBe(true);
-    expect(hook.value?.previewDeviceParam).toBeNull();
+    expect(hook.value?.previewConfig).toMatchObject({
+      singlePreset: 'custom',
+      customWidth: 1440,
+      customHeight: 900,
+      adaptiveDesktop: true,
+    });
+    expect(hook.value?.previewDeviceParam).toBe('desktop');
     hook.unmount();
   });
 
@@ -117,13 +144,16 @@ describe('usePreviewDeviceActions URL state', () => {
     hook.unmount();
   });
 
-  it('locks the automatic viewport decision while annotation collapses the sidebar', () => {
+  it('stabilizes annotation layout changes while following real workspace resizing', () => {
     const hook = renderHook('');
 
-    act(() => hook.value?.handlePreviewContainerSizeChange(1279));
+    act(() => {
+      hook.value?.handlePreviewContainerSizeChange(1279);
+      hook.value?.handlePreviewExternalWorkspaceWidthChange(1519);
+    });
     expect(hook.value?.previewConfig.adaptiveDesktop).toBe(true);
 
-    act(() => hook.value?.lockAdaptiveDesktopPreview());
+    act(() => hook.value?.startPreviewLayoutStabilization('annotation-sidebar'));
     act(() => hook.value?.handlePreviewContainerSizeChange(1519));
     expect(hook.value?.previewConfig).toMatchObject({
       singlePreset: 'custom',
@@ -132,20 +162,31 @@ describe('usePreviewDeviceActions URL state', () => {
       adaptiveDesktop: true,
     });
 
-    act(() => hook.value?.unlockAdaptiveDesktopPreview());
+    act(() => {
+      hook.value?.handlePreviewExternalWorkspaceWidthChange(1760);
+      hook.value?.handlePreviewContainerSizeChange(1760);
+    });
     expect(hook.value?.previewConfig).toMatchObject({
       singlePreset: 'desktop',
       adaptiveDesktop: false,
     });
+
+    act(() => hook.value?.endPreviewLayoutStabilization('annotation-sidebar'));
     hook.unmount();
   });
 
-  it('keeps manual device changes effective while the automatic viewport is locked', () => {
+  it('keeps overlapping layout owners independent and manual device changes effective', () => {
     const hook = renderHook('');
 
-    act(() => hook.value?.handlePreviewContainerSizeChange(1279));
-    act(() => hook.value?.lockAdaptiveDesktopPreview());
-    act(() => hook.value?.handlePreviewContainerSizeChange(1519));
+    act(() => {
+      hook.value?.handlePreviewContainerSizeChange(1350);
+      hook.value?.handlePreviewExternalWorkspaceWidthChange(1590);
+    });
+    act(() => {
+      hook.value?.startPreviewLayoutStabilization('annotation-sidebar');
+      hook.value?.startPreviewLayoutStabilization('review-panel');
+      hook.value?.handlePreviewContainerSizeChange(970);
+    });
     act(() => hook.value?.handleSelectPreviewSinglePreset('mobile'));
     expect(hook.value?.previewConfig).toMatchObject({
       singlePreset: 'mobile',
@@ -156,6 +197,20 @@ describe('usePreviewDeviceActions URL state', () => {
     expect(hook.value?.previewConfig).toMatchObject({
       singlePreset: 'desktop',
       adaptiveDesktop: false,
+    });
+
+    act(() => hook.value?.endPreviewLayoutStabilization('annotation-sidebar'));
+    expect(hook.value?.previewConfig).toMatchObject({
+      singlePreset: 'desktop',
+      adaptiveDesktop: false,
+    });
+
+    act(() => hook.value?.endPreviewLayoutStabilization('review-panel'));
+    expect(hook.value?.previewConfig).toMatchObject({
+      singlePreset: 'custom',
+      customWidth: 1440,
+      customHeight: 900,
+      adaptiveDesktop: true,
     });
     hook.unmount();
   });

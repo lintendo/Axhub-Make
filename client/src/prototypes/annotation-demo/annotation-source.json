@@ -16,7 +16,7 @@
             ".annotation-guide-hero"
           ]
         },
-        "aiPrompt": "说明为什么原型可以成为主需求载体。",
+        "aiPrompt": "说明 PRD、原型和页面细节之间的关系。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#D97706",
@@ -247,14 +247,14 @@
       {
         "id": "directory-practice",
         "index": 11,
-        "title": "原型目录",
+        "title": "页面目录",
         "pageId": "prototype-directory",
         "locator": {
           "selectors": [
             "[data-annotation-id=\"directory-practice\"]"
           ]
         },
-        "aiPrompt": "说明目录如何组织页面、文档和链接。",
+        "aiPrompt": "说明目录如何组织原型页面和外部链接。",
         "annotationText": "",
         "hasMarkdown": true,
         "color": "#D97706",
@@ -263,19 +263,17 @@
         "updatedAt": 1779667200000
       }
     ],
-    "updatedAt": 1782570827439
+    "updatedAt": 1788249669722
   },
   "markdownMap": {
-    "prototype-as-prd-purpose": "# 原型是主需求载体\n\n当原型已经能表达页面结构、交互路径和状态变化时，PRD 的重点就从重复描述界面转向补充判断依据。\n\n标注用于说明原因、边界、例外和未决事项。",
+    "prototype-as-prd-purpose": "# 原型即 PRD\n\n传统方式将 PRD 与原型分开交付：需求写在文档里，页面和交互留在原型里。评审或开发时，需要反复查找两者的对应关系。\n\n原型即 PRD 把完整需求文档放进可运行原型。读者可以顺着文档理解背景、流程和规则，再通过锚点直达相关页面或元素，对照真实交互与状态；局部的边界和例外则用标注补充。",
     "content-preview-node": "# Markdown 示例\n\n这个节点展示 Markdown 标注正文。你可以写列表、表格，也可以写 `行内代码` 来解释字段、状态或接口约束。\n\n- 适合解释复杂逻辑\n- 适合补充业务规则\n- 适合沉淀评审结论",
     "content-category-node": "# 多颜色标注\n\n多颜色标注用于区分说明、风险、待确认、设计补充等不同类型的信息。\n\n在这份演示里，橙色、绿色和紫色是功能性标注颜色；整体文档主题仍保持 Swiss 参考里的 IKB 蓝和灰阶系统。",
     "content-filter-node": "# 筛选颜色\n\n筛选颜色可以让评审只看当前讨论主题。例如先看风险，再看补充说明，最后看待确认项。\n\n这能减少一次评审里同时处理太多信息的问题。",
     "content-multi-node-note": "# 一个节点多种标注\n\n一个节点多种标注适合表达同一元素的多个层次：交互说明、业务规则、异常边界可以同时存在，但用不同标题和颜色区分。\n\n这样不会把页面拆得太碎，也不会把所有解释挤在一条长说明里。",
     "state-list-card": "# 列表页状态\n\n文案标注和状态标注可以同时存在。点击上方的状态控制后，列表页会在空列表和有内容之间切换。\n\n空列表不是没有内容，而是需要说明下一步入口和业务原因。",
     "state-metric-card": "# 指标卡状态\n\n文案标注和状态标注可以同时存在。点击上方的状态控制后，指标会展示偏低、正常和偏高三种表达。\n\n指标状态的价值是把数字背后的判断标准也沉淀下来。",
-    "directory-practice": "# 原型目录\n\n原型目录用于组织页面、文档和链接。页面负责运行体验，文档负责补充长说明，链接负责连接外部设计来源或参考资料。\n\n目录让评审者不需要离开原型，也能找到完整资料。",
-    "enable-annotation-methods": "# 标注内容\n\n可以生成的内容包括任意元素标注、状态标注、原型目录内容和默认设置状态。\n\n# 开启方式\n\n你可以通过 AI 或者手动开启标注，推荐前者。\n\n- 批注工具：通过批注工具的技能可以新建标注。\n- Agent 标注技能：使用项目内置的技能，即可任意生成和编辑标注。\n- 批注模式更多菜单：批注模式下，从更多菜单开启标注。",
-    "edit-comments-methods": "# AI 编辑\n\n- 对话框直接提：在对话框直接跟 AI 提修改要求。\n- 批注后通过 AI 执行：先留下批注，再让 AI 按批注执行。\n\n# 手动编辑\n\n- 编辑节点：通过批注新增节点和编辑节点内容。\n- 编辑文档：批注文章时直接编辑文档内容（需要 AI 关联文档）。"
+    "directory-practice": "# 页面目录\n\n页面目录组织原型页面和外部链接。页面入口切换可运行页面，链接入口打开设计来源或参考资料。\n\n完整 PRD 从独立的文档目录阅读，不占用页面目录。"
   },
   "assetMap": {},
   "directory": {
@@ -307,19 +305,19 @@
           {
             "type": "route",
             "id": "route-prototype-directory",
-            "title": "原型目录",
+            "title": "页面目录",
             "route": "prototype-directory"
           },
           {
             "type": "route",
             "id": "route-generate-annotation",
-            "title": "开启标注",
+            "title": "开启 PRD 和标注",
             "route": "generate-annotation"
           },
           {
             "type": "route",
             "id": "route-edit-comments",
-            "title": "编辑标注",
+            "title": "编辑 PRD 和标注",
             "route": "edit-comments"
           },
           {
@@ -327,50 +325,6 @@
             "id": "route-agent-read",
             "title": "Agent 读取",
             "route": "agent-read"
-          }
-        ]
-      },
-      {
-        "type": "folder",
-        "id": "directory-documents",
-        "title": "文档",
-        "defaultExpanded": true,
-        "children": [
-          {
-            "type": "markdown",
-            "id": "prd-overview",
-            "title": "PRD 00｜总览",
-            "markdownPath": "docs/prd-00-overview.md"
-          },
-          {
-            "type": "markdown",
-            "id": "prd-roles",
-            "title": "PRD 01｜角色",
-            "markdownPath": "docs/prd-01-roles.md"
-          },
-          {
-            "type": "markdown",
-            "id": "prd-flow",
-            "title": "PRD 02｜流程",
-            "markdownPath": "docs/prd-02-flow.md"
-          },
-          {
-            "type": "markdown",
-            "id": "prd-states",
-            "title": "PRD 03｜状态",
-            "markdownPath": "docs/prd-03-states.md"
-          },
-          {
-            "type": "markdown",
-            "id": "prd-risks",
-            "title": "PRD 04｜风险",
-            "markdownPath": "docs/prd-04-risks.md"
-          },
-          {
-            "type": "markdown",
-            "id": "prd-handoff",
-            "title": "PRD 05｜交付",
-            "markdownPath": "docs/prd-05-handoff.md"
           }
         ]
       },
@@ -386,6 +340,67 @@
             "title": "设计来源：op7418/guizang-ppt-skill",
             "href": "https://github.com/op7418/guizang-ppt-skill",
             "target": "blank"
+          }
+        ]
+      }
+    ]
+  },
+  "documents": {
+    "nodes": [
+      {
+        "type": "folder",
+        "id": "documents-prd",
+        "title": "文档",
+        "defaultExpanded": true,
+        "children": [
+          {
+            "type": "markdown",
+            "id": "prd-overview",
+            "title": "PRD 00｜总览",
+            "readerMode": "split",
+            "markdownPath": "docs/prd-00-overview.md"
+          },
+          {
+            "type": "markdown",
+            "id": "prd-roles",
+            "title": "PRD 01｜角色",
+            "readerMode": "split",
+            "markdownPath": "docs/prd-01-roles.md"
+          },
+          {
+            "type": "markdown",
+            "id": "prd-flow",
+            "title": "PRD 02｜流程",
+            "readerMode": "split",
+            "markdownPath": "docs/prd-02-flow.md"
+          },
+          {
+            "type": "markdown",
+            "id": "prd-states",
+            "title": "PRD 03｜状态",
+            "readerMode": "split",
+            "markdownPath": "docs/prd-03-states.md"
+          },
+          {
+            "type": "markdown",
+            "id": "prd-risks",
+            "title": "PRD 04｜风险",
+            "readerMode": "split",
+            "markdownPath": "docs/prd-04-risks.md"
+          },
+          {
+            "type": "markdown",
+            "id": "prd-handoff",
+            "title": "PRD 05｜交付",
+            "readerMode": "split",
+            "markdownPath": "docs/prd-05-handoff.md"
+          },
+          {
+            "type": "html",
+            "id": "prd-metrics-html",
+            "title": "PRD 06｜指标阅读",
+            "readerMode": "split",
+            "htmlPath": "docs/prd-06-metrics.html"
           }
         ]
       }

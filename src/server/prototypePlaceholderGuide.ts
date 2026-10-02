@@ -7,7 +7,7 @@ export const PROTOTYPE_PLACEHOLDER_GUIDE = {
     '打开草稿创作原型',
   ],
   tips: [
-    '模型不要用 auto，推荐：Claude Opus 4.8、Gemini 3.1 Pro、GPT-5.5、Kimi K2.7、GLM-5.2。',
+    '模型不要用 auto，推荐：Claude Opus 4.8、Gemini 3.1 Pro、GPT-5.5、Kimi K2.7、GLM-5.3。',
     '一个任务开一个新对话，避免多个需求互相干扰。',
     '多用图片和语音描述，截图、草图和参考页面通常比长文字更清楚。',
     '如果已有视觉规范，建议先创建设计系统。',

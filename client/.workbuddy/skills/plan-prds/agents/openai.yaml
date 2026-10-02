@@ -1,0 +1,4 @@
+interface:
+  display_name: "PRD 规划"
+  short_description: "采集网站、截图与产品资料，建立来源清单并规划可追溯的 PRD"
+  default_prompt: "使用 $plan-prds 收集当前产品资料，建立产品入口、来源清单和 PRD 计划。"

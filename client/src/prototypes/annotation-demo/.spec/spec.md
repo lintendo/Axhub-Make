@@ -1,25 +1,25 @@
-# 标注演示规格
+# PRD 演示规格
 
 > 本文档是用户与 Agent 围绕当前原型进行方案沟通、确认和持续生成的事实依据。只维护当前有效方案，并简短记录会影响当前原型的重要用户决策和变更。
 
 ## 当前方案
 
 - 原型意图：说明 Axhub Make 如何把可运行原型、节点标注、状态控制和补充文档组织在同一个评审入口中，以原型承载界面和交互，以标注补充边界、原因和决策。
-- 使用场景：产品负责人、设计师、研发、评审者和 Agent 沿七个章节理解标注协作方式，并从目录切换页面、阅读六篇 PRD 文档或打开外部设计来源。
-- 当前表达：七个 Hash 章节依次呈现“原型即 PRD”、内容标注、状态标注、原型目录、开启标注、编辑标注和 Agent 读取；默认章节为 `prototype-as-prd`。
+- 使用场景：产品负责人、设计师、研发、评审者和 Agent 沿八个章节理解 PRD 与原型的协作方式，并从目录切换页面、阅读七篇文档或打开外部设计来源。
+- 当前表达：页面目录负责入口组织，文档模式章节说明独立阅读方式；Markdown 与 HTML 文章通过页内锚点、文档间链接和原型目标链接串联，页面目录和文档目录互斥激活。
 
 ## 事实与输入
 
 ### 用户确认事实
 
-- 原型名称为“标注演示”，原型 id 为 `annotation-demo`。
+- 原型名称为“PRD 演示”，原型 id 为 `annotation-demo`。
 - 当前主规格采用 Markdown，固定路径为 `.spec/spec.md`；原 `.spec/spec.html` 删除，不保留双格式主规格。
 
 ### 参考资料
 
-- `src/prototypes/annotation-demo/index.tsx`：七个章节、页面文案、状态渲染、目录内联和 `AnnotationViewer` 配置。
+- `src/prototypes/annotation-demo/index.tsx`：八个章节、页面文案、状态渲染、目录内联和 `AnnotationViewer` 配置。
 - `src/prototypes/annotation-demo/style.css`：Swiss 文档式布局、IKB 强调色、响应式断点和可访问性表现。
-- `src/prototypes/annotation-demo/annotation-source.json`：11 个标注节点、三种标注颜色、Markdown 正文、三组分段控件和目录树。
+- `src/prototypes/annotation-demo/annotation-source.json`：11 个标注节点、七篇 PRD 文章、三种标注颜色、Markdown 正文、三组分段控件和目录树。
 - `src/prototypes/annotation-demo/docs/prd-00-overview.md` 至 `docs/prd-05-handoff.md`：总览、角色、流程、状态、风险和交付说明。
 - `src/prototypes/annotation-demo/assets/`：开启标注、编辑标注、Agent 读取等章节和目录文档使用的六张截图。
 - `src/common/useHashPage.ts`：Hash/查询参数解析、页面切换和嵌入宿主路由通知。
@@ -33,10 +33,11 @@
 
 ### 本次呈现
 
-- 七个 Hash 章节及侧栏、上一页、下一页导航。
+- 八个 Hash 章节及侧栏、上一页、下一页导航。
 - 任意元素说明、Markdown 正文、三种功能性标注颜色、颜色筛选和同一节点多条标注。
 - 结果、列表、指标三类状态及其由标注分段控件提供的分支。
-- 由七个页面、六篇 PRD 文档和一个外部链接构成的原型目录。
+- 由八个页面、七篇文档和一个外部链接构成的页面目录与独立文档目录。
+- 文档模式章节说明 Markdown 与 HTML 的独立阅读；进入章节时只打开总览文章、不展开文档目录。两种正文均支持页内定位、文档间跳转和原型目标链接。
 - 开启标注的三种方式、编辑标注的两组方式，以及 Agent 读取源码、标注、文档和截图的说明。
 
 ### 本次不呈现
@@ -53,8 +54,9 @@
 | `prototype-as-prd` / 原型即 PRD | 建立“原型是需求主载体”的核心原则 | 章节头、“我们的目的”、三维度对比表；说明统一入口、生产效率和研发效率 | `01 · PRINCIPLE`；“原型即 PRD”与“原型 + PRD”对比 | 默认页；下一页为 `content-annotation` |
 | `content-annotation` / 内容标注 | 演示标注的基本阅读与组织方式 | 点击预览节点、多颜色标注、侧边栏筛选、同一节点多条标注 | `#D97706` 说明、`#059669` 分类、`#7C3AED` 筛选；4 个定位节点承载 6 条标注 | 上接核心原则，下接状态标注 |
 | `state-annotation` / 状态标注 | 演示由标注控件切换的业务状态 | 结果页、列表页、指标卡三张状态卡 | `result_state`、`list_state`、`metric_state` | 上接内容标注，下接原型目录 |
-| `prototype-directory` / 原型目录 | 说明页面、文档和链接在同一目录中的组织方式 | 七个页面 route；PRD 00–05；外部设计来源 `op7418/guizang-ppt-skill` | 目录三个文件夹默认展开；外部链接在新窗口打开 | route 节点可切换到任一已注册章节 |
-| `generate-annotation` / 开启标注 | 说明可生成的标注内容和开启方式 | 任意元素标注、状态标注、目录内容、默认状态；批注工具、Agent 标注技能、批注模式更多菜单 | `assets/make-annotation.png`、`ai-skill-open.png`、`comment-menu-open.png` | 上接目录，下接编辑标注 |
+| `prototype-directory` / 页面目录 | 说明页面、文档和链接在同一目录中的组织方式 | 八个页面 route；外部设计来源 `op7418/guizang-ppt-skill` | 页面目录和文档目录是互斥入口；外部链接在新窗口打开 | route 节点可切换到任一已注册章节 |
+| `document-mode` / 文档模式 | 说明文档目录的独立阅读方式和文章定位关系 | 独立文档阅读、默认分屏、Markdown 与 HTML、页内锚点、文档间链接和跨页面目标链接 | PRD 00 的正文链接与 PRD 06 的指标阅读 HTML；六篇 Markdown 文章顶部有透明锚点 | 上接原型即 PRD，下接内容标注 |
+| `generate-annotation` / 开启标注 | 说明可生成的标注内容和开启方式 | 任意元素标注、状态标注、目录内容、默认状态；人工开启、AI 开启 | `assets/make-annotation.png`、`ai-skill-open.png` | 上接文档模式，下接编辑标注 |
 | `edit-comments` / 编辑标注 | 说明 AI 编辑和手动编辑两组方式 | 对话框直接提、批注后通过 AI 执行、编辑节点、编辑文档 | `assets/manual-edit-comment.png`、`document-edit.png`；编辑文档需要 AI 关联文档 | 上接开启标注，下接 Agent 读取 |
 | `agent-read` / Agent 读取 | 说明开发 Agent 可获取的上下文 | 源码、标注内容、文档内容、截图四类来源 | `assets/agent-read.png` | 最后一章；上一页为 `edit-comments` |
 
@@ -68,8 +70,9 @@
 | 结果状态 | `result_state` 初始值为 `success` | 在分段控件选择成功或失败 | `success`：提交成功、绿色符号、“查看详情”；`failure`：提交失败、危险色符号、“重新提交” | 未知值回退 `success`；动作按钮不执行提交或重试 |
 | 列表状态 | `list_state` 初始值为 `empty` | 在分段控件选择空列表或有内容 | `empty`：暂无数据；`filled`：显示“首页主按钮文案确认、空状态插画替换、指标卡阈值复核” | 未知值回退 `empty` |
 | 指标状态 | `metric_state` 初始值为 `normal` | 在分段控件选择偏低、正常或偏高 | `low`：32% / 低于目标 18%；`normal`：68% / 接近目标区间；`high`：92% / 高于目标 12% | 未知值回退 `normal` |
-| 原型目录 route | 目录 route 为字符串且匹配七个章节之一 | 点击页面节点 | 调用 `setPage` 切换章节；不匹配的 route 不处理 | 目录保持可继续浏览 |
-| 原型目录文档与链接 | 目录数据已载入 | 打开 Markdown 文档或外部链接 | 六篇文档正文由构建依赖图内联；五个图片令牌替换为本地素材 URL；外部来源在新窗口打开 | 不请求运行时相对 Markdown 文件，不改写原型状态 |
+| 页面目录 route | 目录 route 为字符串且匹配八个章节之一 | 点击页面节点 | 调用 `setPage` 切换章节；不匹配的 route 不处理 | 目录保持可继续浏览 |
+| 页面目录文档与链接 | 目录数据已载入 | 打开 Markdown、HTML 文档或外部链接 | 七篇正文由构建依赖图内联；图片令牌替换为本地素材 URL；外部来源在新窗口打开 | 不请求运行时相对文档文件，不改写原型状态 |
+| 独立文档阅读 | 文档模式章节或文档目录已打开文章 | 打开正文中的锚点或目标链接 | 默认分屏；页内锚点滚动文章，文档间链接切换文章，原型目标链接可切页定位；进入文档模式章节时目录保持收起 | 文章保持打开，便于对照页面 |
 | Viewer 工具栏 | `AnnotationViewer` 已挂载 | 使用目录、主题切换或颜色筛选 | 具体面板行为由 `@axhub/annotation` 提供；原型只传入 source 和 options | 不向 Make 宿主回写批注内容 |
 | 嵌入宿主通知 | 当前窗口嵌入父窗口 | 路由注册或 Hash 变化 | 发送 `AXHUB_PROTOTYPE_ROUTE_INFO` 或 `AXHUB_PROTOTYPE_PAGE_CHANGE`，只包含路由信息 | 独立窗口不发送；消息不包含批注内容 |
 
@@ -90,3 +93,5 @@
 | 2026-07-13 | 以当前可运行实现反向归纳主规格。 | 功能、文案、状态和边界均须可追溯，不写入未经证据证明的未来行为。 |
 | 2026-07-13 | 未发现原型专属 `DESIGN.md` 时只记录可观察设计语言。 | 记录 Swiss / IKB 和当前 CSS 事实，不补造主题来源。 |
 | 2026-07-14 | 将默认主规格由 HTML 改为 Markdown，并严格采用仓库 Markdown 模板。 | 主规格固定为 `.spec/spec.md`；删除 `.spec/spec.html` 及其仅服务文档自身的交互描述。 |
+| 2026-08-29 | 将文档说明并入页面目录章节，不再单独维护聚合文档。 | 保留 PRD 00-05 文档及稳定锚点，页面目录和文档目录互斥激活，文档默认分屏阅读。 |
+| 2026-08-30 | 保留原有文档模式章节；锚点演示融入现有 PRD 正文，不新增独立聚合文档或独立演示卡片。 | 恢复 `document-mode` Hash 章节和目录 route；PRD 00 增加真实的本文档定位、文档间相对跳转和跨页面目标链接。 |

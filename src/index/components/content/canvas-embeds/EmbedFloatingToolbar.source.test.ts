@@ -11,27 +11,14 @@ describe('EmbedFloatingToolbar source', () => {
         expect(source).not.toContain("deactivateActivePreviewForCanvasEdit('content-scale')");
     });
 
-    it('centers preview session hints in the canvas container so transformed ancestors cannot offset them', () => {
+    it('does not render preview session hint copy', () => {
         const source = readFileSync(resolve(__dirname, './EmbedFloatingToolbar.tsx'), 'utf8');
-        const hintStart = source.indexOf('{previewSessionHint ? (');
-        const hintEnd = source.indexOf('{previewSessionHint.message}', hintStart);
-        const hintSource = source.slice(hintStart, hintEnd);
-
-        expect(hintSource).toContain("position: 'absolute'");
-        expect(hintSource).toContain("left: '50%'");
-        expect(hintSource).toContain("top: '50%'");
-        expect(hintSource).toContain("transform: 'translate(-50%, -50%)'");
-        expect(hintSource).toContain('fontSize: 14');
-        expect(hintSource).not.toContain("position: 'fixed'");
-        expect(hintSource).not.toContain('PREVIEW_SESSION_HINT_TOP');
-        expect(hintSource).not.toContain("transform: 'translateX(-50%)'");
-    });
-
-    it('shows an entered-preview hint when an embed preview becomes active', () => {
-        const source = readFileSync(resolve(__dirname, './EmbedFloatingToolbar.tsx'), 'utf8');
-
-        expect(source).toMatch(/resolveEmbedPreviewSessionHint\(\{\s*kind: 'entered'/);
-        expect(source).toContain('showPreviewSessionHint(');
+        expect(source).not.toContain('resolveEmbedPreviewSessionHint');
+        expect(source).not.toContain('resolveEmbedPreviewExitPointerDecision');
+        expect(source).not.toContain('previewSessionHint');
+        expect(source).not.toContain('exitPromptRef');
+        expect(source).not.toContain('已进入预览页面');
+        expect(source).not.toContain('再次点击退出预览');
     });
 
     it('uses the shared node title label for existing preview node titles', () => {
@@ -67,15 +54,25 @@ describe('EmbedFloatingToolbar source', () => {
         expect(resolverSource).toContain('return resolveString(el?.customData?.openUrl) || resolveString(el?.link);');
     });
 
-    it('keeps first selection select-only and only activates on a later selected click without drag', () => {
+    it('enters preview only from a double click on the selected embed', () => {
         const source = readFileSync(resolve(__dirname, './EmbedFloatingToolbar.tsx'), 'utf8');
 
-        expect(source).toContain('resolveEmbedClickActivationMode');
-        expect(source).toContain('selectedEmbedIdAtPointerDown: prevSelectedEmbedIdRef.current');
-        expect(source).toContain('resolveSelectionActivationMode(currentSelectedId, prevId, pointerIntent)');
-        expect(source).toContain("if (activationMode === 'activate') {");
-        expect(source).not.toContain('pendingSelectionActivationIdRef');
-        expect(source).not.toContain("const activationMode = pointerIntent?.released && !pointerIntent.moved ? 'activate' : 'select-only';");
+        expect(source).toContain("addEventListener('dblclick'");
+        expect(source).toContain("AXHUB_EMBED_ACTIVATE_REQUESTED_EVENT");
+        expect(source).toContain("activationMode: 'activate'");
+        expect(source).not.toContain('resolveEmbedClickActivationMode');
+        expect(source).not.toContain('resolveSelectionActivationMode');
+        expect(source).not.toContain("dispatchEmbedSelectionChanged(info.elementId, true, 'activate')");
+    });
+
+    it('renders an outside-preview mask that exits without forwarding the click', () => {
+        const source = readFileSync(resolve(__dirname, './EmbedFloatingToolbar.tsx'), 'utf8');
+
+        expect(source).toContain('handlePreviewMaskExit');
+        expect(source).toContain('AXHUB_EMBED_EXIT_PREVIEW_EVENT');
+        expect(source).toContain('pointerEvents: \'auto\'');
+        expect(source).toContain('background: \'transparent\'');
+        expect(source).toContain('activePreviewRef.current');
     });
 
     it('clears tooltips when switching embed view modes because the hovered button unmounts', () => {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { CanvasAiScene } from '../../domains/shared/CanvasGenerationComposer';
 import { StartPromptCard, type StartPromptCardIcon } from './StartPromptCard';
+import { StartPromptGrid } from './StartPromptGrid';
 import {
   resolveResourceStartPromptSelection,
   type ResourceStartPromptImageSize,
@@ -21,8 +22,10 @@ export function ResourceStartPromptGrid({
   cards,
   activeScene,
   disabled,
+  copyOnSelect = false,
   selectPrompt,
   onCopyPrompt,
+  onExecutePrompt,
   onSceneChange,
   onImageSizeChange,
   onPrdPlanningChange,
@@ -30,8 +33,10 @@ export function ResourceStartPromptGrid({
   cards: readonly ResourceStartPromptCard[];
   activeScene: CanvasAiScene;
   disabled: boolean;
+  copyOnSelect?: boolean;
   selectPrompt: (prompt: string) => void;
   onCopyPrompt: (card: ResourceStartPromptCard) => void | Promise<void>;
+  onExecutePrompt?: (card: ResourceStartPromptCard) => void | Promise<void>;
   onSceneChange: (scene: ResourceStartPromptScene) => void;
   onImageSizeChange: (size: ResourceStartPromptImageSize) => void;
   onPrdPlanningChange: (enabled: boolean) => void;
@@ -49,6 +54,10 @@ export function ResourceStartPromptGrid({
 
   const handleSelectCard = (card: ResourceStartPromptCard) => {
     if (disabled) return;
+    if (copyOnSelect) {
+      void onCopyPrompt(card);
+      return;
+    }
     if (card.imageSize) {
       onImageSizeChange(card.imageSize);
     }
@@ -65,10 +74,7 @@ export function ResourceStartPromptGrid({
   };
 
   return (
-    <ul
-      className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
-      aria-label="资源生成能力"
-    >
+    <StartPromptGrid ariaLabel="资源生成能力">
       {cards.map((card) => (
         <StartPromptCard
           key={card.id}
@@ -77,8 +83,9 @@ export function ResourceStartPromptGrid({
           selectionDisabled={disabled}
           onSelect={() => handleSelectCard(card)}
           onCopy={() => onCopyPrompt(card)}
+          onExecute={onExecutePrompt ? () => onExecutePrompt(card) : undefined}
         />
       ))}
-    </ul>
+    </StartPromptGrid>
   );
 }

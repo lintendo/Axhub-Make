@@ -15,6 +15,8 @@ import {
   type EditorThemeMode,
 } from './theme';
 import { isMobileDevice } from '../../utils/mobile-detect';
+import { resolveCspNonce } from '../csp-nonce';
+import { resolveRuntimePopupContainerFromTrigger } from './popup-container';
 import type { CommentaryHostToolbarState } from '../../web-editor-types';
 import type {
   BreadcrumbsHandle,
@@ -154,6 +156,8 @@ export function createWebEditorUiRuntime(options: WebEditorUiRuntimeOptions): We
     aiExecutionProviderOptions: [],
     darkMode: false,
     disablePageAnimations: false,
+    captureTargetScreenshotAvailable: false,
+    captureTargetScreenshot: false,
     pageZoomEnabled: false,
     copySkillInstallPromptDisabled: true,
     selectionModeActive: options.initialSelectionModeActive ?? true,
@@ -167,6 +171,7 @@ export function createWebEditorUiRuntime(options: WebEditorUiRuntimeOptions): We
 
   function RuntimeMount(): React.ReactElement {
     const styleCache = React.useMemo(() => createCache(), []);
+    const cspNonce = React.useMemo(() => resolveCspNonce(), []);
     const popupContainerRef = React.useRef<HTMLDivElement | null>(null);
     const [themeMode, setThemeMode] = React.useState<EditorThemeMode>(() =>
       options.propertyPanelOptions?.getUiSettings?.()?.darkMode ? 'dark' : 'light',
@@ -181,7 +186,13 @@ export function createWebEditorUiRuntime(options: WebEditorUiRuntimeOptions): We
       <StyleProvider cache={styleCache} container={options.shadowRoot}>
         <ConfigProvider
           componentSize="small"
-          getPopupContainer={() => popupContainerRef.current ?? options.container}
+          csp={cspNonce ? { nonce: cspNonce } : undefined}
+          getPopupContainer={(trigger) =>
+            resolveRuntimePopupContainerFromTrigger(
+              trigger,
+              popupContainerRef.current ?? options.container,
+            )
+          }
           theme={createRuntimeAntdTheme(themeMode)}
         >
           <App>
@@ -241,8 +252,8 @@ export function createWebEditorUiRuntime(options: WebEditorUiRuntimeOptions): We
           enterCommentInput(mode?: CommentEntryMode) {
             propertyPanelBridge.runOrQueue((api) => api.enterCommentInput?.(mode));
           },
-          enterInlineTextEdit() {
-            propertyPanelBridge.runOrQueue((api) => api.enterInlineTextEdit?.());
+          enterInlineTextEdit(element?: HTMLElement | null) {
+            propertyPanelBridge.runOrQueue((api) => api.enterInlineTextEdit?.(element));
           },
           getHostToolbarState() {
             return propertyPanelRef.current?.getHostToolbarState() ?? getFallbackHostToolbarState();
@@ -274,8 +285,8 @@ export function createWebEditorUiRuntime(options: WebEditorUiRuntimeOptions): We
         refresh() {
           breadcrumbsBridge.runOrQueue((api) => api.refresh());
         },
-        enterInlineTextEdit() {
-          breadcrumbsBridge.runOrQueue((api) => api.enterInlineTextEdit?.());
+        enterInlineTextEdit(element?: HTMLElement | null) {
+          breadcrumbsBridge.runOrQueue((api) => api.enterInlineTextEdit?.(element));
         },
         dispose,
       }

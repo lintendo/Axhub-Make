@@ -1,37 +1,13 @@
 import { ItemData, ViewMode } from '../types';
+import { STALE_AGENT_BRIDGE_QUERY_PARAMS } from '../../common/editorLaunchQuery';
 
 export interface BuildEditorUrlOptions {
     width?: number;
     mobileMode?: boolean;
     hostToolbar?: boolean;
     annotationSession?: boolean;
+    mockExternalComments?: boolean;
 }
-
-const STALE_AGENT_BRIDGE_QUERY_PARAMS = [
-    'agentApiBaseUrl',
-    'apiBaseUrl',
-    'agentIntegrationChannel',
-    'integrationChannel',
-    'agentTargetClientId',
-    'integrationClientId',
-    'cwd',
-    'workdir',
-    'provider',
-    'tool',
-    'targetPath',
-    'context',
-    'editorIntegrationWs',
-    'editorApiBaseUrl',
-    'editorIntegrationChannel',
-    'editorClientId',
-    'editorSessionId',
-    'editorPageUrl',
-    'editorMobileMode',
-    'mobileMode',
-    'agentToolbar',
-    'annotationSession',
-    'inspecta',
-] as const;
 
 function clearStaleAgentBridgeQueryParams(url: URL) {
     for (const key of STALE_AGENT_BRIDGE_QUERY_PARAMS) {
@@ -60,6 +36,12 @@ export function appendEditorLaunchOptionsToUrl(
 
     if (options?.annotationSession) {
         url.searchParams.set('annotationSession', '1');
+    }
+
+    if (options?.mockExternalComments) {
+        url.searchParams.set('mockExternalComments', '1');
+    } else {
+        url.searchParams.delete('mockExternalComments');
     }
 
     return url;
@@ -147,6 +129,17 @@ export function buildLANItemUrl(
     const url = buildRawItemUrl(selectedItem, viewMode);
     if (!url) return '';
     return rewriteLocalOnlyUrlToLAN(url).toString();
+}
+
+export function buildLANServerUrl(inputUrl: string): string {
+    const raw = String(inputUrl || '').trim();
+    if (!raw) return '';
+    try {
+        const url = new URL(raw, window.location.origin);
+        return rewriteLocalOnlyUrlToLAN(url).toString();
+    } catch {
+        return raw;
+    }
 }
 
 /**

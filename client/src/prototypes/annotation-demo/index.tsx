@@ -1,11 +1,12 @@
 /**
- * @name 标注演示
+ * @name PRD 演示
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     ArrowLeft,
     ArrowRight,
+    BookOpen,
     Bot,
     FileText,
     FolderTree,
@@ -20,19 +21,21 @@ import {
     AnnotationViewer,
     type AnnotationDirectoryRouteNode,
     type AnnotationSourceDocument,
+    type AnnotationViewerApi,
     type AnnotationViewerOptions,
     useProtoDevState,
 } from '@axhub/annotation';
 import { defineHashPageRoute, useHashPage } from '../../common/useHashPage';
 import agentReadAsset from './assets/agent-read.png';
 import aiSkillOpenAsset from './assets/ai-skill-open.png';
-import commentMenuOpenAsset from './assets/comment-menu-open.png';
 import documentEditAsset from './assets/document-edit.png';
 import makeAnnotationAsset from './assets/make-annotation.png';
 import manualEditCommentAsset from './assets/manual-edit-comment.png';
 import annotationSourceDocument from './annotation-source.json';
+import { openDocumentPreview } from './openDocumentPreview';
 import prdFlowMarkdown from './docs/prd-02-flow.md?raw';
 import prdHandoffMarkdown from './docs/prd-05-handoff.md?raw';
+import prdMetricsHtml from './docs/prd-06-metrics.html?raw';
 import prdOverviewMarkdown from './docs/prd-00-overview.md?raw';
 import prdRisksMarkdown from './docs/prd-04-risks.md?raw';
 import prdRolesMarkdown from './docs/prd-01-roles.md?raw';
@@ -44,6 +47,7 @@ type ChapterId =
     | 'content-annotation'
     | 'state-annotation'
     | 'prototype-directory'
+    | 'document-mode'
     | 'generate-annotation'
     | 'edit-comments'
     | 'agent-read';
@@ -70,6 +74,8 @@ type DirectoryNodeWithMarkdownPath = {
     type?: string;
     markdown?: string;
     markdownPath?: string;
+    html?: string;
+    htmlPath?: string;
     children?: DirectoryNodeWithMarkdownPath[];
 };
 
@@ -83,13 +89,21 @@ type ResultState = Required<ProtoState>['result_state'];
 type ListState = Required<ProtoState>['list_state'];
 type MetricState = Required<ProtoState>['metric_state'];
 
+type AnnotationDemoViewerOptions = AnnotationViewerOptions & {
+    onTargetRoute?: (context: {
+        pageId: string;
+        route?: AnnotationDirectoryRouteNode | null;
+    }) => void | Promise<void>;
+};
+
 const annotationRoute = defineHashPageRoute([
     { id: 'prototype-as-prd', title: '原型即 PRD' },
+    { id: 'document-mode', title: '文档模式' },
     { id: 'content-annotation', title: '内容标注' },
     { id: 'state-annotation', title: '状态标注' },
-    { id: 'prototype-directory', title: '原型目录' },
-    { id: 'generate-annotation', title: '开启标注' },
-    { id: 'edit-comments', title: '编辑标注' },
+    { id: 'prototype-directory', title: '页面目录' },
+    { id: 'generate-annotation', title: '开启 PRD 和标注' },
+    { id: 'edit-comments', title: '编辑 PRD 和标注' },
     { id: 'agent-read', title: 'Agent 读取' },
 ], { defaultPageId: 'prototype-as-prd' });
 
@@ -98,14 +112,22 @@ const chapters: Chapter[] = [
         id: 'prototype-as-prd',
         title: '原型即 PRD',
         eyebrow: '01 · PRINCIPLE',
-        summary: '我们的核心思想是把可运行原型作为需求主载体，用标注补充边界、原因和决策，让原型本身承担 PRD 的表达与交付价值。',
+        summary: '将完整 PRD 放进可运行原型，沿文档阅读需求，通过锚点查看对应页面；标注补充局部规则和异常情况。',
         metrics: { wordCount: '约 860 字', readingTime: '约 3 分钟' },
         icon: FileText,
     },
     {
+        id: 'document-mode',
+        title: '文档模式',
+        eyebrow: '02 · DOCUMENT',
+        summary: 'Markdown 与 HTML 文档均可与原型并排阅读，正文锚点直达对应页面和元素。',
+        metrics: { wordCount: '约 480 字', readingTime: '约 2 分钟' },
+        icon: BookOpen,
+    },
+    {
         id: 'content-annotation',
         title: '内容标注',
-        eyebrow: '02 · CONTENT',
+        eyebrow: '03 · CONTENT',
         summary: '用四张预览卡片展示内容标注的基本阅读方式、颜色分类、侧边栏筛选和同一节点多标注能力。',
         metrics: { wordCount: '约 620 字', readingTime: '约 2 分钟' },
         icon: MessageSquareText,
@@ -113,39 +135,39 @@ const chapters: Chapter[] = [
     {
         id: 'state-annotation',
         title: '状态标注',
-        eyebrow: '03 · STATE',
+        eyebrow: '04 · STATE',
         summary: '用三张演示卡片展示常见页面状态：结果页成功/失败、列表页空/有内容，以及指标卡偏低/正常/偏高。',
         metrics: { wordCount: '约 690 字', readingTime: '约 2 分钟' },
         icon: SlidersHorizontal,
     },
     {
         id: 'prototype-directory',
-        title: '原型目录',
-        eyebrow: '04 · DIRECTORY',
-        summary: '原型目录主要承载三种入口：页面、文档和链接。右侧目录按钮打开后，可以在同一个面板里切换页面、阅读 PRD，并打开外部资料。',
+        title: '页面目录',
+        eyebrow: '05 · DIRECTORY',
+        summary: '页面目录组织原型页面和外部链接；PRD 文档从独立的文档目录阅读。',
         metrics: { wordCount: '约 360 字', readingTime: '约 1 分钟' },
         icon: FolderTree,
     },
     {
         id: 'generate-annotation',
-        title: '开启标注',
-        eyebrow: '05 · ENABLE',
-        summary: '你可以通过 AI 或者手动开启标注，推荐前者。',
+        title: '开启 PRD 和标注',
+        eyebrow: '06 · ENABLE',
+        summary: 'PRD 与标注从同一入口同时开启，可选择人工准备或由 AI 生成初稿。',
         metrics: { wordCount: '约 280 字', readingTime: '约 1 分钟' },
         icon: Sparkles,
     },
     {
         id: 'edit-comments',
-        title: '编辑标注',
-        eyebrow: '06 · EDIT',
-        summary: '编辑标注分为 AI 编辑和手动编辑。AI 可直接在对话里提出，也可先批注再执行；手动则用于补节点和改内容。',
+        title: '编辑 PRD 和标注',
+        eyebrow: '07 · EDIT',
+        summary: 'PRD 从顶部文档管理编辑；页面标注可通过 AI 或手动方式继续完善。',
         metrics: { wordCount: '约 360 字', readingTime: '约 1 分钟' },
         icon: PencilLine,
     },
     {
         id: 'agent-read',
         title: 'Agent 读取',
-        eyebrow: '07 · READ',
+        eyebrow: '08 · READ',
         summary: '开发 Agent 可以通过技能读取源码、标注内容、文档内容和截图，便于理解上下文并继续开发。',
         metrics: { wordCount: '约 160 字', readingTime: '约 1 分钟' },
         icon: Bot,
@@ -155,88 +177,64 @@ const chapters: Chapter[] = [
 const comparisonRows: ComparisonRow[] = [
     {
         dimension: '统一入口',
-        prototypeOnly: '页面、标注和补充文档都围绕同一个原型入口展开。',
+        prototypeOnly: 'PRD 与页面在同一个原型中，文档锚点可直达对应页面或元素。',
         traditional: '交付、评审和阅读分散在原型、PRD、截图和沟通记录里。',
     },
     {
         dimension: '生产效率',
-        prototypeOnly: 'AI 生成原型时同步生成标注，后续改页面即可快速更新说明。',
+        prototypeOnly: '需求和页面在同一个项目中维护，修改后可以直接对照，减少重复整理交付材料。',
         traditional: '页面做一遍，文档再写一遍，变更后还要额外维护同步。',
     },
     {
         dimension: '研发效率',
-        prototypeOnly: '代码多数时候是更好的信息源，下游 AI Agent 能按真实实现理解效果。',
+        prototypeOnly: '研发阅读 PRD 时可以跳转到对应页面，结合真实交互、状态和代码理解需求。',
         traditional: '文字 PRD 需要再翻译成结构、状态和交互，容易产生理解偏差。',
     },
 ];
 
 const openAnnotationMethods = [
     {
-        title: '批注工具',
-        detail: '通过批注工具的技能可以新建标注',
+        title: '人工开启',
+        detail: '从原型顶部入口开启 PRD 和标注，进入人工编辑状态后整理文档与页面说明。',
         image: makeAnnotationAsset,
     },
     {
-        title: 'Agent 标注技能',
-        detail: '使用项目内置的技能，即可任意生成和编辑标注',
+        title: 'AI 开启',
+        detail: '从同一个顶部入口交给 AI，让 Agent 根据当前原型生成 PRD 和首版标注，再由人校正。',
         image: aiSkillOpenAsset,
-    },
-    {
-        title: '批注模式更多菜单',
-        detail: '批注模式下，从更多菜单开启标注。',
-        image: commentMenuOpenAsset,
-    },
-];
-
-const capabilityItems = [
-    {
-        title: '任意元素标注',
-        detail: '按钮、卡片、表格、标题和整块内容都可以作为解释节点。',
-    },
-    {
-        title: '状态标注',
-        detail: '成功、失败、空列表、指标高低等状态可以直接挂在节点上。',
-    },
-    {
-        title: '原型目录内容',
-        detail: '页面、文档和链接可以被整理成目录，评审时从一个入口打开。',
-    },
-    {
-        title: '默认设置状态',
-        detail: '可以记录进入页面时默认展示的状态，让演示保持稳定。',
     },
 ];
 
 const editCommentGroups = [
     {
         title: 'AI 编辑',
-        detail: '把修改意图交给 AI 处理。',
+        detail: '从原型顶部的标注入口进入编辑状态后，把修改意图交给 AI 处理。',
         methods: [
             {
                 title: '对话框直接提',
-                detail: '在对话框直接跟 AI 提修改要求。',
+                detail: '进入编辑状态后，在对话框直接跟 AI 提修改要求。',
                 image: aiSkillOpenAsset,
             },
             {
                 title: '批注后通过 AI 执行',
-                detail: '先留下批注，再让 AI 按批注执行。',
+                detail: '进入编辑状态后，先留下批注，再让 AI 按批注执行。',
                 image: makeAnnotationAsset,
             },
         ],
     },
     {
         title: '手动编辑',
-        detail: '用于少量校正和补充。',
+        detail: '从同一顶部入口进入编辑状态后，用于少量校正和补充。',
         methods: [
             {
-                title: '编辑节点',
-                detail: '通过批注新增节点和编辑节点内容。',
-                image: manualEditCommentAsset,
+                title: '编辑文档',
+                detail: '从顶部的“文档管理”打开 PRD，直接编辑对应文档。',
+                image: documentEditAsset,
             },
             {
-                title: '编辑文档',
-                detail: '批注文章时直接编辑文档内容（需要 AI 关联文档）。',
-                image: documentEditAsset,
+                title: '编辑标注',
+                detail: '选择页面元素后，直接新增或修改对应的标注内容。',
+                image: manualEditCommentAsset,
             },
         ],
     },
@@ -249,11 +247,6 @@ const directoryTypeCards = [
         icon: FileText,
         title: '页面',
         body: '切换原型 route，进入真实页面上下文。',
-    },
-    {
-        icon: MessageSquareText,
-        title: '文档',
-        body: '阅读 PRD、规则说明、验收清单等长内容。',
     },
     {
         icon: Link2,
@@ -334,9 +327,12 @@ const directoryMarkdownByPath: Record<string, string> = {
     'docs/prd-05-handoff.md': prdHandoffMarkdown,
 };
 
+const directoryHtmlByPath: Record<string, string> = {
+    'docs/prd-06-metrics.html': prdMetricsHtml,
+};
+
 const directoryMarkdownAssetTokens: Record<string, string> = {
     '__ANNOTATION_IMAGE_AI_SKILL_OPEN__': aiSkillOpenAsset,
-    '__ANNOTATION_IMAGE_COMMENT_MENU_OPEN__': commentMenuOpenAsset,
     '__ANNOTATION_IMAGE_AGENT_READ__': agentReadAsset,
     '__ANNOTATION_IMAGE_MANUAL_EDIT_COMMENT__': manualEditCommentAsset,
     '__ANNOTATION_IMAGE_DOCUMENT_EDIT__': documentEditAsset,
@@ -350,9 +346,10 @@ function resolveDirectoryMarkdownAssets(markdown: string): string {
     return resolvedMarkdown;
 }
 
-function inlineDirectoryMarkdown(source: typeof annotationSourceDocument): AnnotationSourceDocument {
+function inlineDirectoryDocuments(source: typeof annotationSourceDocument): AnnotationSourceDocument {
     const clonedSource = JSON.parse(JSON.stringify(source)) as AnnotationSourceDocument & {
         directory?: { nodes?: DirectoryNodeWithMarkdownPath[] };
+        documents?: { nodes?: DirectoryNodeWithMarkdownPath[] };
     };
 
     const visit = (nodes?: DirectoryNodeWithMarkdownPath[]) => {
@@ -361,11 +358,15 @@ function inlineDirectoryMarkdown(source: typeof annotationSourceDocument): Annot
             if (node.type === 'markdown' && node.markdownPath) {
                 node.markdown = resolveDirectoryMarkdownAssets(directoryMarkdownByPath[node.markdownPath] || '');
             }
+            if (node.type === 'html' && node.htmlPath) {
+                node.html = directoryHtmlByPath[node.htmlPath] || '';
+            }
             visit(node.children);
         });
     };
 
     visit(clonedSource.directory?.nodes);
+    visit(clonedSource.documents?.nodes);
     return clonedSource;
 }
 
@@ -426,10 +427,10 @@ function PrototypeAsPrdView() {
             <ManuscriptSection title="我们的目的">
                 <div className="annotation-guide-section-body">
                     <p>
-                        现在 AI 生成的原型已经足够完整，能把界面结构、交互路径、状态变化和数据关系直接表达出来。对下游 Agent 来说，代码化原型就是最好的 PRD：它不是抽象描述，而是可运行、可检查、可继续修改的需求上下文。
+                        传统方式将 PRD 与原型分开交付：需求写在文档里，页面和交互留在原型里。评审或开发时，需要反复查找两者的对应关系。
                     </p>
                     <p>
-                        所以我们以原型为主，用标注补充原因、边界、例外和决策记录，达到替代传统 PRD 的效果。
+                        原型即 PRD 把完整需求文档放进可运行原型。读者可以顺着文档理解背景、流程和规则，再通过锚点直达相关页面或元素，对照真实交互与状态；局部的边界和例外则用标注补充。
                     </p>
                 </div>
             </ManuscriptSection>
@@ -439,8 +440,8 @@ function PrototypeAsPrdView() {
                         <thead>
                             <tr>
                                 <th scope="col">维度</th>
-                <th scope="col">原型即 PRD</th>
-                <th scope="col">原型 + PRD</th>
+                                <th scope="col">原型即 PRD</th>
+                                <th scope="col">原型 + PRD</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -635,7 +636,7 @@ function DirectoryGuideView({ chapter }: { chapter: Chapter }) {
             <div className="annotation-guide-directory-pointer" aria-hidden="true">
                 <div>
                     <span>点击这里打开目录</span>
-                    <strong>页面 / 文档 / 链接</strong>
+                    <strong>页面 / 链接</strong>
                 </div>
                 <ArrowRight size={96} strokeWidth={1.4} />
             </div>
@@ -643,43 +644,46 @@ function DirectoryGuideView({ chapter }: { chapter: Chapter }) {
     );
 }
 
+function DocumentModeView() {
+    return (
+        <ManuscriptSection id="document-mode-reading" title="文档阅读">
+            <div className="annotation-guide-section-body" data-annotation-id="document-mode-reading">
+                <div className="annotation-guide-document-features">
+                    <article>
+                        <span>01</span>
+                        <div><h4>分屏阅读</h4><p>PRD 与可运行页面并排显示，阅读需求时可以直接对照真实交互和状态。</p></div>
+                    </article>
+                    <article>
+                        <span>02</span>
+                        <div><h4>文档目录</h4><p>七篇 PRD 在独立目录中组织，切换页面时仍可继续阅读当前文档。</p></div>
+                    </article>
+                    <article>
+                        <span>03</span>
+                        <div><h4>页面锚点</h4><p>正文链接可以直达对应页面或元素，也支持页内定位和文档间跳转。</p></div>
+                    </article>
+                    <article>
+                        <span>04</span>
+                        <div><h4>文档格式</h4><p>Markdown 适合持续维护的需求正文；HTML 可以承载图表和交互，两种文章都能通过锚点连接原型。</p></div>
+                    </article>
+                </div>
+            </div>
+        </ManuscriptSection>
+    );
+}
+
 function EnableAnnotationPractice() {
     return (
         <>
-        <ManuscriptSection id="enable-methods" title="标注内容">
-            <div className="annotation-guide-generate-section-body" data-annotation-id="enable-annotation-methods">
-                <p>
-                    标注内容先覆盖原型里最需要解释的部分，再交给人继续校正。它可以生成任意元素的说明、状态说明、原型目录内容，以及进入页面时默认展示的设置状态。
-                </p>
-                <div className="annotation-guide-generate-capability-grid">
-                    {capabilityItems.map((item) => (
-                        <article key={item.title}>
-                            <h4>{item.title}</h4>
-                            <p>{item.detail}</p>
-                        </article>
-                    ))}
-                </div>
-            </div>
-        </ManuscriptSection>
-        <ManuscriptSection title="开启方式">
-            <div className="annotation-guide-generate-section-body">
-                <div className="annotation-guide-method-grid is-vertical">
-                    {openAnnotationMethods.map((item) => (
-                        <article key={item.title}>
-                            <h4>{item.title}</h4>
+            {openAnnotationMethods.map((item, index) => (
+                <ManuscriptSection key={item.title} id={index === 0 ? 'enable-methods' : undefined} title={item.title}>
+                    <div className="annotation-guide-generate-section-body">
                             <p>{item.detail}</p>
                             <div className="annotation-guide-method-placeholder">
-                                {item.image ? (
-                                    <img src={item.image} alt={`${item.title}界面`} />
-                                ) : (
-                                    <span>截图占位</span>
-                                )}
+                                <img src={item.image} alt={`${item.title}界面`} />
                             </div>
-                        </article>
-                    ))}
-                </div>
-            </div>
-        </ManuscriptSection>
+                    </div>
+                </ManuscriptSection>
+            ))}
         </>
     );
 }
@@ -744,6 +748,7 @@ function ChapterBody({ chapter }: { chapter: Chapter }) {
     if (chapter.id === 'content-annotation') return <ContentAnnotationDemoView />;
     if (chapter.id === 'state-annotation') return <StateAnnotationDemoView />;
     if (chapter.id === 'prototype-directory') return <DirectoryGuideView chapter={chapter} />;
+    if (chapter.id === 'document-mode') return <DocumentModeView />;
     if (chapter.id === 'generate-annotation') return <EnableAnnotationPractice />;
     if (chapter.id === 'edit-comments') return <EditCommentsView />;
     if (chapter.id === 'agent-read') return <AgentReadView />;
@@ -752,13 +757,13 @@ function ChapterBody({ chapter }: { chapter: Chapter }) {
 
 export default function AnnotationGuide() {
     const { page, setPage } = useHashPage(annotationRoute);
+    const [annotationApi, setAnnotationApi] = useState<AnnotationViewerApi | null>(null);
     const activeIndex = Math.max(chapters.findIndex((chapter) => chapter.id === page), 0);
     const activeChapter = chapters[activeIndex] || chapters[0];
     const previous = chapters[activeIndex - 1] || null;
     const next = chapters[activeIndex + 1] || null;
-    const annotationSource = useMemo(() => inlineDirectoryMarkdown(annotationSourceDocument), []);
-
-    const viewerOptions = useMemo<AnnotationViewerOptions>(() => ({
+    const annotationSource = useMemo(() => inlineDirectoryDocuments(annotationSourceDocument), []);
+    const viewerOptions = useMemo<AnnotationDemoViewerOptions>(() => ({
         currentPageId: activeChapter.id,
         toolbarEdge: 'right',
         showToolbar: true,
@@ -770,7 +775,19 @@ export default function AnnotationGuide() {
                 setPage(node.route);
             }
         },
+        onTargetRoute: ({ pageId, route }) => {
+            const destination = typeof route?.route === 'string'
+                ? route.route
+                : pageId;
+            if (chapters.some((chapter) => chapter.id === destination)) {
+                setPage(destination as ChapterId);
+            }
+        },
     }), [activeChapter.id, setPage]);
+
+    useEffect(() => {
+        if (activeChapter.id === 'document-mode') openDocumentPreview(annotationApi);
+    }, [activeChapter.id, annotationApi]);
 
     return (
         <main
@@ -782,9 +799,9 @@ export default function AnnotationGuide() {
             <aside className="annotation-guide-sidebar">
                 <div className="annotation-guide-brand">
                     <p>AXHUB MAKE</p>
-                    <h1>标注演示</h1>
+                    <h1>PRD 演示</h1>
                 </div>
-                <nav className="annotation-guide-nav" aria-label="标注演示章节">
+                <nav className="annotation-guide-nav" aria-label="PRD 演示章节">
                     {chapters.map((chapter, index) => {
                         const Icon = chapter.icon;
                         return (
@@ -838,6 +855,7 @@ export default function AnnotationGuide() {
             <AnnotationViewer
                 source={annotationSource}
                 options={viewerOptions}
+                onReady={setAnnotationApi}
             />
         </main>
     );

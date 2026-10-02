@@ -231,7 +231,6 @@ export function createDefaultPreviewConfig(): PreviewConfig {
 export function resolveAdaptiveDesktopPreviewConfig(
   intentConfig: PreviewConfig,
   previewWidth: number,
-  lockedAdaptiveDesktop: boolean | null = null,
 ): PreviewConfig {
   if (
     intentConfig.previewMode !== 'single'
@@ -240,11 +239,9 @@ export function resolveAdaptiveDesktopPreviewConfig(
     return { ...intentConfig, adaptiveDesktop: false };
   }
 
-  const adaptiveDesktop = lockedAdaptiveDesktop ?? (
-    Number.isFinite(previewWidth)
+  const adaptiveDesktop = Number.isFinite(previewWidth)
     && previewWidth > 0
-    && previewWidth < ADAPTIVE_DESKTOP_ACTIVATION_WIDTH
-  );
+    && previewWidth < ADAPTIVE_DESKTOP_ACTIVATION_WIDTH;
   if (!adaptiveDesktop) {
     return { ...intentConfig, adaptiveDesktop: false };
   }
@@ -340,6 +337,7 @@ export function resolvePreviewLayout(params: {
     width: number;
     height: number;
   };
+  singleReservedWidth?: number;
   splitReservedHeight?: number;
   splitReservedWidth?: number;
 }): PreviewLayoutResult {
@@ -352,6 +350,7 @@ export function resolvePreviewLayout(params: {
     width: Math.max(0, Math.floor(params.deviceShellInset?.width ?? 0)),
     height: Math.max(0, Math.floor(params.deviceShellInset?.height ?? 0)),
   };
+  const singleReservedWidth = Math.max(0, Math.floor(params.singleReservedWidth ?? 0));
   const splitReservedHeight = Math.max(0, Math.floor(params.splitReservedHeight ?? 0));
   const splitReservedWidth = Math.max(0, Math.floor(params.splitReservedWidth ?? 0));
 
@@ -453,7 +452,7 @@ export function resolvePreviewLayout(params: {
     const metrics = createViewportMetrics(
       measuredSize.width,
       measuredSize.height,
-      containerWidth,
+      Math.max(1, containerWidth - singleReservedWidth),
       containerHeight,
       config.scaleMode,
     );

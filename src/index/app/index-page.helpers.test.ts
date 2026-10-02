@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
     buildAssistantAutoOpenPanelModeStorageKey,
     buildAssistantAutoOpenDismissedStorageKey,
+    getCommentaryVoiceVisible,
     getAssistantAutoOpenDismissed,
     getAssistantAutoOpenPanelMode,
     formatThrownError,
@@ -16,18 +17,121 @@ import {
     resolveDocRenameBaseName,
     replaceSidebarItemTitle,
     resolveMobileItemOpenUrl,
+    resolveAssistantPanelOpenTarget,
+    shouldSuppressAssistantAutoOpenForProjectChange,
     setAssistantAutoOpenDismissed,
     setAssistantAutoOpenPanelMode,
+    setCommentaryVoiceVisible,
 } from './index-page.helpers';
 
 describe('index page helpers', () => {
+    it('restores and persists the Commentary voice launcher visibility in local storage', () => {
+        const values = new Map<string, string>([
+            ['axhub-make:commentary-voice-visible', '1'],
+        ]);
+        const storage = {
+            getItem: (key: string) => values.get(key) ?? null,
+            setItem: (key: string, value: string) => {
+                values.set(key, value);
+            },
+        };
+        expect(getCommentaryVoiceVisible(storage)).toBe(true);
+
+        setCommentaryVoiceVisible(false, storage);
+        expect(values.get('axhub-make:commentary-voice-visible')).toBe('0');
+        expect(getCommentaryVoiceVisible(storage)).toBe(false);
+
+        setCommentaryVoiceVisible(true, storage);
+        expect(values.get('axhub-make:commentary-voice-visible')).toBe('1');
+    });
+
+    it('keeps the Commentary voice launcher hidden when local storage is missing or unavailable', () => {
+        const unavailableStorage = {
+            getItem: () => {
+                throw new Error('storage unavailable');
+            },
+            setItem: () => {
+                throw new Error('storage unavailable');
+            },
+        };
+        expect(getCommentaryVoiceVisible(null)).toBe(false);
+        expect(getCommentaryVoiceVisible(unavailableStorage)).toBe(false);
+        expect(() => setCommentaryVoiceVisible(true, unavailableStorage)).not.toThrow();
+    });
+
+    it('uses persistent local storage rather than browser-tab session storage by default', () => {
+        const localValues = new Map<string, string>();
+        const sessionValues = new Map<string, string>();
+        const createStorage = (values: Map<string, string>) => ({
+            getItem: (key: string) => values.get(key) ?? null,
+            setItem: (key: string, value: string) => {
+                values.set(key, value);
+            },
+        });
+
+        vi.stubGlobal('window', {
+            localStorage: createStorage(localValues),
+            sessionStorage: createStorage(sessionValues),
+        });
+
+        try {
+            setCommentaryVoiceVisible(true);
+
+            expect(localValues.get('axhub-make:commentary-voice-visible')).toBe('1');
+            expect(sessionValues.size).toBe(0);
+            expect(getCommentaryVoiceVisible()).toBe(true);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
     it('formats non-Error thrown values with useful diagnostic details', () => {
         expect(formatThrownError({ error: 'Session annotation-1 failed', status: 500 })).toBe('Session annotation-1 failed；status=500');
         expect(formatThrownError({ detail: { message: 'provider unavailable' } })).toBe('provider unavailable');
         expect(formatThrownError({})).toBe('未知错误');
     });
 
-    it('keeps assistant auto-open enabled by default and stores real closes project-wide', () => {
+    it('uses browser-tab session storage for assistant auto-open state by default', () => {
+        const sessionValues = new Map<string, string>();
+        const localValues = new Map<string, string>();
+        const createStorage = (values: Map<string, string>) => ({
+            getItem: (key: string) => values.get(key) ?? null,
+            setItem: (key: string, value: string) => {
+                values.set(key, value);
+            },
+        });
+
+        vi.stubGlobal('window', {
+            location: { origin: 'http://make.local' },
+            sessionStorage: createStorage(sessionValues),
+            localStorage: createStorage(localValues),
+        });
+
+        try {
+            const dismissedKey = buildAssistantAutoOpenDismissedStorageKey('make-project');
+            const panelModeKey = buildAssistantAutoOpenPanelModeStorageKey('make-project');
+
+            setAssistantAutoOpenDismissed(dismissedKey, true);
+            setAssistantAutoOpenPanelMode(panelModeKey, 'image-ai');
+
+            expect(sessionValues.get(dismissedKey)).toBe('1');
+            expect(sessionValues.get(panelModeKey)).toBe('image-ai');
+            expect(localValues.size).toBe(0);
+            expect(getAssistantAutoOpenDismissed(dismissedKey)).toBe(true);
+            expect(getAssistantAutoOpenPanelMode(panelModeKey)).toBe('image-ai');
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it('suppresses assistant auto-open only when switching between loaded projects', () => {
+        expect(shouldSuppressAssistantAutoOpenForProjectChange('', 'project-a', false)).toBe(false);
+        expect(shouldSuppressAssistantAutoOpenForProjectChange('project-a', 'project-a', false)).toBe(false);
+        expect(shouldSuppressAssistantAutoOpenForProjectChange('project-a', 'project-b', true)).toBe(false);
+        expect(shouldSuppressAssistantAutoOpenForProjectChange('project-a', 'project-b', false)).toBe(true);
+    });
+
+    it('keeps assistant auto-open closed by default until this browser tab opens it', () => {
         const storage = new Map<string, string>();
         const fakeStorage = {
             getItem: (key: string) => storage.get(key) ?? null,
@@ -39,19 +143,29 @@ describe('index page helpers', () => {
         const otherPrototypeKey = buildAssistantAutoOpenDismissedStorageKey('make-project', 'src/prototypes/other/index.tsx');
         const otherProjectKey = buildAssistantAutoOpenDismissedStorageKey('other-project', 'src/prototypes/beginner-guide/index.tsx');
 
-        expect(getAssistantAutoOpenDismissed(guideKey, fakeStorage)).toBe(false);
-        expect(getAssistantAutoOpenDismissed(otherProjectKey, fakeStorage)).toBe(false);
+        expect(getAssistantAutoOpenDismissed(guideKey, fakeStorage)).toBe(true);
+        expect(getAssistantAutoOpenDismissed(otherProjectKey, fakeStorage)).toBe(true);
 
         setAssistantAutoOpenDismissed(guideKey, false, fakeStorage);
 
         expect(getAssistantAutoOpenDismissed(guideKey, fakeStorage)).toBe(false);
         expect(getAssistantAutoOpenDismissed(otherPrototypeKey, fakeStorage)).toBe(false);
-        expect(getAssistantAutoOpenDismissed(otherProjectKey, fakeStorage)).toBe(false);
+        expect(getAssistantAutoOpenDismissed(otherProjectKey, fakeStorage)).toBe(true);
 
         setAssistantAutoOpenDismissed(guideKey, true, fakeStorage);
 
         expect(getAssistantAutoOpenDismissed(guideKey, fakeStorage)).toBe(true);
         expect(getAssistantAutoOpenDismissed(otherPrototypeKey, fakeStorage)).toBe(true);
+    });
+
+    it('opens the assistant in a new window on compact viewports', () => {
+        expect(resolveAssistantPanelOpenTarget(768)).toBe('window');
+        expect(resolveAssistantPanelOpenTarget(767)).toBe('window');
+    });
+
+    it('keeps the assistant embedded above the compact viewport threshold', () => {
+        expect(resolveAssistantPanelOpenTarget(769)).toBe('iframe');
+        expect(resolveAssistantPanelOpenTarget(1280)).toBe('iframe');
     });
 
     it('stores the last assistant panel mode project-wide for auto restore', () => {

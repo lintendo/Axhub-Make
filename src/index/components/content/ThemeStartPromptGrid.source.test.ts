@@ -42,8 +42,8 @@ describe('theme start prompt grid source', () => {
     expect(contentSource).toContain('截图导入');
     expect(contentSource).toContain('styles.refero.design');
     expect(cardSource).toContain('aria-label={title}');
-    expect(cardSource).toContain('aria-label="复制提示词给本地 AI 使用"');
-    expect(cardSource).toContain('<TooltipContent side="top">复制提示词给本地 AI 使用</TooltipContent>');
+    expect(cardSource).toContain('aria-label="快速执行"');
+    expect(cardSource).toContain('<TooltipContent side="top">快速执行</TooltipContent>');
     expect(source).toContain('StartPromptCard');
     expect(source).toContain('onCopyPrompt');
     expect(cardSource).toContain('disabled={selectionDisabled}');
@@ -84,12 +84,15 @@ describe('theme start prompt grid source', () => {
     const themeSource = readGridSource();
     const resourceSource = readResourceGridSource();
     const cardSource = readStartPromptCardSource();
-    const gridClassName = 'mt-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4';
-    const cardClassName = 'flex min-h-16 w-full items-center gap-3 rounded-[10px] border border-slate-200/80 bg-white/80 px-4 py-3 pr-12 text-left text-[13px] font-medium text-slate-700';
+    const cardClassName = 'flex min-h-16 w-full items-center gap-3 rounded-[10px] border border-slate-200/80 bg-white/80 px-4 py-3 pr-10 text-left text-[13px] font-medium text-slate-700';
 
-    expect(themeSource).toContain(gridClassName);
-    expect(resourceSource).toContain(gridClassName);
+    expect(themeSource).toContain("ariaLabel = '主题来源'");
+    expect(themeSource).toContain('<StartPromptGrid ariaLabel={ariaLabel}>');
+    expect(resourceSource).toContain('<StartPromptGrid ariaLabel="资源生成能力">');
+    expect(themeSource).not.toContain('sm:grid-cols-2');
+    expect(resourceSource).not.toContain('lg:grid-cols-4');
     expect(cardSource).toContain(cardClassName);
+    expect(cardSource).toContain('whitespace-nowrap leading-5');
     expect(themeSource).toContain('StartPromptCard');
     expect(resourceSource).toContain('StartPromptCard');
     expect(themeSource).not.toContain('lg:grid-cols-3');

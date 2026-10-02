@@ -24,10 +24,10 @@ describe('screenshot persistence helpers', () => {
     vi.stubGlobal('window', { location: { origin: 'http://admin.local' } });
 
     expect(deriveResourceCanvasScreenshotUrl('project-b', 'src/resources/flows/app.excalidraw')).toBe(
-      'http://admin.local/api/canvas/resources/flows/app.excalidraw/app.assets/screenshot.png?projectId=project-b',
+      'http://admin.local/api/canvas/resources/flows/app.excalidraw/asset/screenshot.png?projectId=project-b',
     );
     expect(deriveResourceCanvasScreenshotUrl('project-b', 'src/resources/flows/app.excalidraw', 'page-settings.png')).toBe(
-      'http://admin.local/api/canvas/resources/flows/app.excalidraw/app.assets/page-settings.png?projectId=project-b',
+      'http://admin.local/api/canvas/resources/flows/app.excalidraw/asset/page-settings.png?projectId=project-b',
     );
     expect(deriveResourceCanvasScreenshotUrl('project-b', 'src/resources/flows/app.excalidraw', '../settings.png')).toBeUndefined();
   });
@@ -35,8 +35,8 @@ describe('screenshot persistence helpers', () => {
   it('persists page screenshots to the current resource canvas assets folder', async () => {
     vi.stubGlobal('window', { location: { origin: 'http://admin.local' } });
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
-      screenshotUrl: '/api/canvas/resources/flows/app.excalidraw/app.assets/page-settings.png?v=123',
-      path: 'src/resources/flows/app.assets/page-settings.png',
+      screenshotUrl: '/api/canvas/resources/flows/app.excalidraw/asset/page-settings.png?v=123',
+      path: 'src/resources/.assets/flows/app.excalidraw/page-settings.png',
       width: 393,
       height: 852,
     }), {
@@ -70,8 +70,8 @@ describe('screenshot persistence helpers', () => {
       }),
     }));
     expect(result).toMatchObject({
-      screenshotUrl: 'http://admin.local/api/canvas/resources/flows/app.excalidraw/app.assets/page-settings.png?v=123&projectId=project-b',
-      path: 'src/resources/flows/app.assets/page-settings.png',
+      screenshotUrl: 'http://admin.local/api/canvas/resources/flows/app.excalidraw/asset/page-settings.png?v=123&projectId=project-b',
+      path: 'src/resources/.assets/flows/app.excalidraw/page-settings.png',
       width: 393,
       height: 852,
     });

@@ -86,7 +86,13 @@ export interface SharedNoteState {
   savedNote: string;
   draftNote: string;
   noteDirty: boolean;
-  savedNoteMeta?: { skillIds?: string[] };
+  savedNoteMeta?: {
+    skillIds?: string[];
+    commenterName?: string;
+    commenterColor?: string;
+    readOnly?: boolean;
+    externalComments?: import('../../web-editor-types').PrototypeExternalCommentEntry[];
+  };
 }
 
 export interface SharedTextState {
@@ -120,12 +126,20 @@ export interface SharedTextActions {
 
 export interface SharedNoteActions {
   canEditNote: boolean;
+  canClearCurrentElementEdits?: boolean;
   draftNote: string;
   noteDirty: boolean;
   savedNote: string;
-  savedNoteMeta?: { skillIds?: string[] };
+  savedNoteMeta?: {
+    skillIds?: string[];
+    commenterName?: string;
+    commenterColor?: string;
+    readOnly?: boolean;
+    externalComments?: import('../../web-editor-types').PrototypeExternalCommentEntry[];
+  };
   onDraftChange: (value: string) => void;
   onClearCurrentElementEdits: () => Promise<void>;
+  onDeleteExternalComment?: (commentId: string) => void | Promise<void>;
   onCancelNote: () => void;
   onConfirmNote: (options?: { skillIds?: readonly string[] }) => Promise<void>;
   onDismissSelection?: () => void;
@@ -180,7 +194,7 @@ export interface PropertyPanelViewProps
   onSelectionModeActiveChange: (active: boolean) => void;
   onTargetChange: (element: Element | null) => void;
   onRefreshNoteState: () => void;
-  onInlineTextEditingChange?: (editing: boolean) => void;
+  onInlineTextEditingChange?: (editing: boolean, element?: HTMLElement | null) => void;
   onBlockingLayerOpenChange?: (open: boolean) => void;
   toolbarMode?: CommentaryToolbarMode;
   onHostToolbarStateChange?: (state: CommentaryHostToolbarState) => void;
@@ -213,7 +227,9 @@ export interface PromptCardViewProps
   agentVisualState: 'sleeping' | 'awake';
   hideExecutionControls?: boolean;
   hideCurrentElementExecutionAction?: boolean;
+  hideClearEditsAction?: boolean;
   hideContextAppendAction?: boolean;
+  externalAnnotationMode?: boolean;
   enabledSkillIds?: readonly string[] | null;
   skillOptions?: readonly CommentarySkillOption[] | null;
   onBubbleStyleEditorOpenChange: (open: boolean) => void;
@@ -244,7 +260,7 @@ export interface PromptCardViewProps
   onAnchorRectChange: (rect: ViewportRect | null) => void;
   onPromptCardVisibleChange?: (visible: boolean) => void;
   inlineTextEditing: boolean;
-  onInlineTextEditingChange: (editing: boolean) => void;
+  onInlineTextEditingChange: (editing: boolean, element?: HTMLElement | null) => void;
 }
 
 export interface ShortcutCaptureCardProps {

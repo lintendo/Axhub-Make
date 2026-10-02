@@ -1,6 +1,6 @@
 const SKILLS_ROOT_SEGMENT = 'skills';
 const SKILLS_ROOT_PREFIX = `/${SKILLS_ROOT_SEGMENT}/`;
-const PROJECT_SKILLS_ROOTS = new Set(['.agents', '.claude']);
+const PROJECT_SKILLS_ROOTS = new Set(['.agents', '.claude', '.workbuddy']);
 
 export function normalizeSkillPath(input: string): string | null {
     if (typeof input !== 'string') return null;
@@ -70,6 +70,7 @@ export function selfCheckSkillPathNormalization(): boolean {
         ['/skills//nested///guide.md', '/skills/nested/guide.md'],
         ['.agents/skills/handle-comments/SKILL.md', '.agents/skills/handle-comments/SKILL.md'],
         ['.claude\\skills\\handle-comments\\SKILL.md', '.claude/skills/handle-comments/SKILL.md'],
+        ['.workbuddy\\skills\\handle-comments\\SKILL.md', '.workbuddy/skills/handle-comments/SKILL.md'],
     ];
 
     for (const [input, expected] of validCases) {
@@ -87,6 +88,7 @@ export function selfCheckSkillPathNormalization(): boolean {
         'skills/..',
         '.agents/skills/../escape.md',
         '.claude/skills/../../escape.md',
+        '.workbuddy/skills/../../escape.md',
         'C:/skills/file.md',
         'http://example.com/skills/file.md',
         'https://example.com/skills/file.md',
@@ -103,9 +105,11 @@ export function selfCheckSkillPathNormalization(): boolean {
         normalizeSkillSource([
             '.agents/skills/explore-options/SKILL.md',
             '.claude\\skills\\handle-comments\\SKILL.md',
+            '.workbuddy\\skills\\handle-comments\\SKILL.md',
         ].join('\n')) !== [
             '.agents/skills/explore-options/SKILL.md',
             '.claude/skills/handle-comments/SKILL.md',
+            '.workbuddy/skills/handle-comments/SKILL.md',
         ].join('\n')
     ) {
         return false;

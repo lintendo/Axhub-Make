@@ -5,7 +5,10 @@ import ts from 'typescript';
 
 import { isPathInside, resolveProjectPath, type ProjectMetadata } from './projectCore/index.ts';
 
-import { preprocessAnnotationSourceMarkdown } from '../../client/vite-plugins/annotationSourceMarkdown.ts';
+import {
+  preprocessAnnotationSourceMarkdown,
+  resolveAnnotationMarkdownPath,
+} from '../../client/vite-plugins/annotationSourceMarkdown.ts';
 import { readJsonBody, sendCorsJson, sendCorsPreflight } from './http.ts';
 
 const ANNOTATION_SOURCE_FILE_NAME = 'annotation-source.json';
@@ -32,6 +35,27 @@ type AnnotationSourceDocument = {
   markdownMap: Record<string, string>;
   assetMap: Record<string, string>;
   directory?: unknown;
+  documents?: AnnotationDocumentDirectory;
+};
+
+type AnnotationDocumentNode = {
+  type: 'folder' | 'markdown' | 'html';
+  id: string;
+  title: string;
+  markdownPath?: string;
+  htmlPath?: string;
+  children?: AnnotationDocumentNode[];
+  [key: string]: unknown;
+};
+
+type AnnotationDocumentDirectory = {
+  nodes: AnnotationDocumentNode[];
+  [key: string]: unknown;
+};
+
+type PrototypeAnnotationPage = {
+  id: string;
+  title: string;
 };
 
 type ResolveResult =
@@ -158,6 +182,7 @@ function normalizeAnnotationSource(input: unknown, prototypeId: string): Annotat
       .filter(([key]) => nodeIds.has(String(key).trim()))
       .map(([key, value]) => [key, String(value ?? '')])
     : [];
+  const documents = normalizeDocumentDirectory(record.documents);
   return {
     documentVersion: 1,
     format: 'axhub-annotation-source',
@@ -177,7 +202,67 @@ function normalizeAnnotationSource(input: unknown, prototypeId: string): Annotat
       ? Object.fromEntries(Object.entries(record.assetMap as Record<string, unknown>).map(([key, value]) => [key, String(value ?? '')]))
       : {},
     ...('directory' in record ? { directory: record.directory } : {}),
+    ...(documents ? { documents } : {}),
   };
+}
+
+function normalizeDocumentDirectory(input: unknown): AnnotationDocumentDirectory | undefined {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return undefined;
+  const record = input as Record<string, unknown>;
+  if (!Array.isArray(record.nodes)) return { nodes: [] };
+  const nodes = record.nodes.map((node) => normalizeDocumentNode(node)).filter((node): node is AnnotationDocumentNode => node !== null);
+  return { ...record, nodes };
+}
+
+function isSafeHtmlDocumentPath(value: string): boolean {
+  let decodedPath = value;
+  try {
+    decodedPath = decodeURIComponent(value);
+  } catch {
+    return false;
+  }
+  if (
+    value.includes('\0')
+    || decodedPath.includes('\0')
+    || path.isAbsolute(value)
+    || path.isAbsolute(decodedPath)
+    || /^[a-z]:[\\/]/iu.test(value)
+    || /^[a-z]:[\\/]/iu.test(decodedPath)
+    || value.includes('\\')
+    || decodedPath.includes('\\')
+  ) {
+    return false;
+  }
+  return [...value.split('/'), ...decodedPath.split('/')].every((segment) => (
+    segment !== '' && segment !== '.' && segment !== '..'
+  ));
+}
+
+function normalizeDocumentNode(input: unknown): AnnotationDocumentNode | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const record = input as Record<string, unknown>;
+  const type = record.type === 'folder' || record.type === 'markdown' || record.type === 'html' ? record.type : null;
+  const id = typeof record.id === 'string' ? record.id.trim() : '';
+  const title = typeof record.title === 'string' ? record.title.trim() : '';
+  if (!type || !id || !title) return null;
+  if (type === 'folder') {
+    return {
+      ...record,
+      type,
+      id,
+      title,
+      ...(Array.isArray(record.children)
+        ? { children: record.children.map((child) => normalizeDocumentNode(child)).filter((child): child is AnnotationDocumentNode => child !== null) }
+        : {}),
+    };
+  }
+  const pathKey = type === 'html' ? 'htmlPath' : 'markdownPath';
+  const documentPath = typeof record[pathKey] === 'string' ? record[pathKey].trim() : '';
+  if (
+    !documentPath
+    || (type === 'html' && (!/\.html?$/iu.test(documentPath) || !isSafeHtmlDocumentPath(documentPath)))
+  ) return null;
+  return { ...record, type, id, title, [pathKey]: documentPath };
 }
 
 function readAnnotationSource(resolved: Extract<ResolveResult, { ok: true }>): AnnotationSourceDocument {
@@ -430,7 +515,19 @@ function createAnnotationViewerJsx(pageId: string, indent: string): string {
     `${indent}<AnnotationViewer`,
     `${indent}  source={annotationSourceDocument as unknown as AnnotationSourceDocument}`,
     `${indent}  options={{`,
-    `${indent}    currentPageId: ${pageIdLiteral},`,
+    `${indent}    currentPageId: (() => {`,
+    `${indent}      const hashPageId = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('page');`,
+    `${indent}      const searchPageId = new URLSearchParams(window.location.search.replace(/^\\?/, '')).get('page');`,
+    `${indent}      const pageId = hashPageId || searchPageId;`,
+    `${indent}      return typeof pageId === 'string' && /^[a-z0-9-]+$/u.test(pageId)`,
+    `${indent}        ? pageId`,
+    `${indent}        : ${pageIdLiteral};`,
+    `${indent}    })(),`,
+    `${indent}    onDirectoryRoute: (node) => {`,
+    `${indent}      if (typeof node.route === 'string' && /^[a-z0-9-]+$/u.test(node.route)) {`,
+    `${indent}        window.location.hash = \`page=\${node.route}\`;`,
+    `${indent}      }`,
+    `${indent}    },`,
     `${indent}    toolbarEdge: 'right',`,
     `${indent}    showToolbar: true,`,
     `${indent}    showThemeToggle: true,`,
@@ -503,6 +600,46 @@ function createNodeId(source: AnnotationSourceDocument): string {
 function normalizePrototypePageId(value: unknown): string {
   const normalized = typeof value === 'string' ? value.trim() : '';
   return PROTOTYPE_PAGE_ID_RE.test(normalized) ? normalized : '';
+}
+
+function normalizePrototypeAnnotationPages(input: unknown): PrototypeAnnotationPage[] {
+  if (!Array.isArray(input)) return [];
+  const pages: PrototypeAnnotationPage[] = [];
+  const seenIds = new Set<string>();
+  for (const item of input) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const record = item as Record<string, unknown>;
+    const id = normalizePrototypePageId(record.id);
+    const title = typeof record.title === 'string' ? record.title.trim() : '';
+    if (!id || !title || seenIds.has(id)) continue;
+    seenIds.add(id);
+    pages.push({ id, title });
+  }
+  return pages;
+}
+
+function fillPageDirectory(
+  source: AnnotationSourceDocument,
+  pages: PrototypeAnnotationPage[],
+): AnnotationSourceDocument {
+  if ('directory' in source || pages.length <= 1) return source;
+  return {
+    ...source,
+    directory: {
+      nodes: [{
+        type: 'folder',
+        id: 'directory-pages',
+        title: '页面',
+        defaultExpanded: true,
+        children: pages.map((page) => ({
+          type: 'route',
+          id: `route-${page.id}`,
+          title: page.title,
+          route: page.id,
+        })),
+      }],
+    },
+  };
 }
 
 function nodeMatchesRequestedPageId(node: Record<string, unknown>, pageId: string): boolean {
@@ -610,6 +747,155 @@ function writeNodeMarkdown(
   return { source, nodeId };
 }
 
+function walkDocumentNodes(nodes: AnnotationDocumentNode[], callback: (node: AnnotationDocumentNode) => void): void {
+  for (const node of nodes) {
+    callback(node);
+    if (node.type === 'folder' && node.children) {
+      walkDocumentNodes(node.children, callback);
+    }
+  }
+}
+
+function normalizeDocumentFileStem(value: unknown): string {
+  const normalized = String(value ?? '')
+    .trim()
+    .replace(/\.mdx?$/iu, '')
+    .replace(/[\\/:*?"<>|\0]/gu, '')
+    .replace(/\s+/gu, '-')
+    .replace(/-+/gu, '-');
+  return normalized.replace(/^-+|-+$/gu, '') || '新文档';
+}
+
+function resolveDocumentFilePath(
+  projectRoot: string,
+  sourceFilePath: string,
+  documentPath: unknown,
+): string {
+  const resolved = resolveAnnotationMarkdownPath(projectRoot, sourceFilePath, documentPath);
+  if (resolved.ok === false) {
+    throw new Error(`Invalid document path: ${resolved.reason}`);
+  }
+  return resolved.absolutePath;
+}
+
+function cloneDocumentNodeWithoutInlineMarkdown(node: AnnotationDocumentNode): AnnotationDocumentNode {
+  const next = { ...node } as Record<string, unknown>;
+  delete next.markdown;
+  if (node.type === 'folder') {
+    next.children = (node.children || []).map(cloneDocumentNodeWithoutInlineMarkdown);
+  }
+  return next as AnnotationDocumentNode;
+}
+
+function normalizeManagedDocumentTree(
+  projectRoot: string,
+  sourceFilePath: string,
+  input: unknown,
+): AnnotationDocumentNode[] {
+  if (!Array.isArray(input)) {
+    throw new Error('Document tree must be an array');
+  }
+  const normalized = input
+    .map((node) => normalizeDocumentNode(node))
+    .filter((node): node is AnnotationDocumentNode => node !== null)
+    .map(cloneDocumentNodeWithoutInlineMarkdown);
+  const ids = new Set<string>();
+  walkDocumentNodes(normalized, (node) => {
+    if (ids.has(node.id)) throw new Error(`Duplicate document node id: ${node.id}`);
+    ids.add(node.id);
+    if (node.type === 'markdown') {
+      resolveDocumentFilePath(projectRoot, sourceFilePath, node.markdownPath);
+    } else if (node.type === 'html') {
+      resolveDocumentFilePath(projectRoot, sourceFilePath, node.htmlPath);
+    }
+  });
+  return normalized;
+}
+
+function findDocumentNodeById(nodes: AnnotationDocumentNode[], id: string): AnnotationDocumentNode | null {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    if (node.type === 'folder' && node.children) {
+      const found = findDocumentNodeById(node.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function removeDocumentNodeById(nodes: AnnotationDocumentNode[], id: string): AnnotationDocumentNode | null {
+  for (let index = 0; index < nodes.length; index += 1) {
+    if (nodes[index].id === id) return nodes.splice(index, 1)[0] || null;
+    const children = nodes[index].type === 'folder' ? nodes[index].children : undefined;
+    if (children) {
+      const removed = removeDocumentNodeById(children, id);
+      if (removed) return removed;
+    }
+  }
+  return null;
+}
+
+function insertDocumentNodeIntoFolder(nodes: AnnotationDocumentNode[], folderId: string, node: AnnotationDocumentNode): boolean {
+  for (const current of nodes) {
+    if (current.type === 'folder' && current.id === folderId) {
+      current.children = [...(current.children || []), node];
+      return true;
+    }
+    if (current.type === 'folder' && current.children && insertDocumentNodeIntoFolder(current.children, folderId, node)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function createManagedDocument(
+  source: AnnotationSourceDocument,
+  projectRoot: string,
+  resolved: Extract<ResolveResult, { ok: true }>,
+  titleInput: unknown,
+  folderIdInput: unknown,
+): AnnotationDocumentNode {
+  const title = String(titleInput ?? '').trim() || '新文档';
+  const documents = source.documents || { nodes: [] };
+  source.documents = documents;
+  const usedIds = new Set<string>();
+  const usedPaths = new Set<string>();
+  walkDocumentNodes(documents.nodes, (node) => {
+    usedIds.add(node.id);
+    if (node.type === 'markdown') usedPaths.add(String(node.markdownPath || '').trim());
+    if (node.type === 'html') usedPaths.add(String(node.htmlPath || '').trim());
+  });
+  const baseStem = normalizeDocumentFileStem(title);
+  let suffix = 0;
+  let fileName = `${baseStem}.md`;
+  while (usedPaths.has(`docs/${fileName}`) || fs.existsSync(path.join(resolved.prototypeDir, 'docs', fileName))) {
+    suffix += 1;
+    fileName = `${baseStem}-${suffix + 1}.md`;
+  }
+  let id = sanitizeNodeId(`${baseStem}-document`) || 'document';
+  let idSuffix = 1;
+  while (usedIds.has(id)) {
+    idSuffix += 1;
+    id = `${sanitizeNodeId(`${baseStem}-document`) || 'document'}-${idSuffix}`;
+  }
+  const node: AnnotationDocumentNode = {
+    type: 'markdown',
+    id,
+    title,
+    markdownPath: `docs/${fileName}`,
+    readerMode: 'split',
+  };
+  const folderId = typeof folderIdInput === 'string' ? folderIdInput.trim() : '';
+  if (folderId && !insertDocumentNodeIntoFolder(documents.nodes, folderId, node)) {
+    throw new Error('Document folder not found');
+  }
+  if (!folderId) documents.nodes.push(node);
+  const filePath = resolveDocumentFilePath(projectRoot, resolved.sourceFilePath, node.markdownPath);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `# ${title}\n`, 'utf8');
+  return node;
+}
+
 export function handlePrototypeAnnotationApi(
   req: IncomingMessage,
   res: ServerResponse,
@@ -619,7 +905,8 @@ export function handlePrototypeAnnotationApi(
   const isStatusRoute = url.pathname === '/api/prototype-annotation';
   const isEnableRoute = url.pathname === '/api/prototype-annotation/enable';
   const isNodeRoute = url.pathname === '/api/prototype-annotation/node';
-  if (!isStatusRoute && !isEnableRoute && !isNodeRoute) return false;
+  const isDocumentsRoute = url.pathname === '/api/prototype-annotation/documents';
+  if (!isStatusRoute && !isEnableRoute && !isNodeRoute && !isDocumentsRoute) return false;
 
   if (req.method === 'OPTIONS') {
     sendCorsPreflight(res);
@@ -652,7 +939,10 @@ export function handlePrototypeAnnotationApi(
           sendCorsJson(res, { error: resolved.error }, { status: resolved.status });
           return;
         }
-        const source = readAnnotationSource(resolved);
+        const pages = normalizePrototypeAnnotationPages(
+          body && typeof body === 'object' ? (body as { pages?: unknown }).pages : undefined,
+        );
+        const source = fillPageDirectory(readAnnotationSource(resolved), pages);
         writeAnnotationSource(resolved, source);
         const changedIndex = ensureAnnotationViewerIntegration(resolved, source);
         sendCorsJson(res, {
@@ -685,6 +975,69 @@ export function handlePrototypeAnnotationApi(
         });
       })
       .catch((error) => sendCorsJson(res, { error: error?.message || 'Failed to write annotation node' }, { status: 400 }));
+    return true;
+  }
+
+  if (isDocumentsRoute && req.method === 'PUT') {
+    readJsonBody(req)
+      .then((body) => {
+        const record = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+        const resolved = resolvePrototypeAnnotationPath(context.project.root, String(record.targetPath ?? ''), context.metadata);
+        if (resolved.ok === false) {
+          sendCorsJson(res, { error: resolved.error }, { status: resolved.status });
+          return;
+        }
+        const source = readAnnotationSource(resolved);
+        source.documents = source.documents || { nodes: [] };
+        const action = String(record.action || '').trim();
+        if (action === 'create') {
+          const node = createManagedDocument(source, context.project.root, resolved, record.title, record.folderId);
+          source.data.updatedAt = Date.now();
+          writeAnnotationSource(resolved, source);
+          sendCorsJson(res, {
+            ok: true,
+            action,
+            node,
+            source: readPreprocessedAnnotationSource(resolved),
+            path: resolved.projectRelativeSourcePath,
+          });
+          return;
+        }
+        if (action === 'save-tree') {
+          source.documents.nodes = normalizeManagedDocumentTree(context.project.root, resolved.sourceFilePath, record.tree);
+          source.data.updatedAt = Date.now();
+          writeAnnotationSource(resolved, source);
+          sendCorsJson(res, {
+            ok: true,
+            action,
+            source: readPreprocessedAnnotationSource(resolved),
+            path: resolved.projectRelativeSourcePath,
+          });
+          return;
+        }
+        if (action === 'delete') {
+          const nodeId = String(record.nodeId || '').trim();
+          const node = findDocumentNodeById(source.documents.nodes, nodeId);
+          if (!node || (node.type !== 'markdown' && node.type !== 'html')) {
+            throw new Error('Document not found');
+          }
+          const documentPath = node.type === 'markdown' ? node.markdownPath : node.htmlPath;
+          const filePath = resolveDocumentFilePath(context.project.root, resolved.sourceFilePath, documentPath);
+          removeDocumentNodeById(source.documents.nodes, nodeId);
+          if (fs.existsSync(filePath)) fs.rmSync(filePath, { force: true });
+          source.data.updatedAt = Date.now();
+          writeAnnotationSource(resolved, source);
+          sendCorsJson(res, {
+            ok: true,
+            action,
+            source: readPreprocessedAnnotationSource(resolved),
+            path: resolved.projectRelativeSourcePath,
+          });
+          return;
+        }
+        sendCorsJson(res, { error: 'Unsupported document action' }, { status: 400 });
+      })
+      .catch((error) => sendCorsJson(res, { error: error?.message || 'Failed to manage annotation documents' }, { status: 400 }));
     return true;
   }
 

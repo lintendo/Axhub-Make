@@ -13,6 +13,7 @@ import {
 } from './projectCore/index.ts';
 
 import { getRequestUrl, readJsonBody, sendFile, sendJson } from './http.ts';
+import { sendHtmlDocumentPreview } from './htmlDocumentPreview.ts';
 import { LocalCommandError } from './localCommand.ts';
 import { backfillMakeClientResourcePreviewLinks } from './makeClientRuntimeLinks.ts';
 import { getMakeClientDevStatus } from './makeClientProject.ts';
@@ -552,6 +553,12 @@ function isIgnoredResourceRelativePath(relativePath: string): boolean {
   return normalized.split('/').some((segment) => segment.startsWith('.'));
 }
 
+function isIgnoredProjectDocumentPath(relativePath: string): boolean {
+  const normalized = String(relativePath || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  if (!normalized) return true;
+  return normalized.split('/').some((segment) => ['.git', '.axhub'].includes(segment.toLowerCase()));
+}
+
 function normalizeDocContentRequestPath(value: string): string {
   const rawValue = String(value || '').trim().replace(/\\/g, '/');
   if (!rawValue || rawValue.includes('\0') || rawValue.startsWith('/') || path.win32.isAbsolute(rawValue) || path.posix.isAbsolute(rawValue)) {
@@ -621,13 +628,28 @@ function normalizeProjectDocumentRequestPath(value: string): string {
     return '';
   }
   const normalized = segments.join('/');
-  if (isIgnoredResourceRelativePath(normalized)) {
+  if (isIgnoredProjectDocumentPath(normalized)) {
     return '';
   }
-  if (path.extname(normalized).toLowerCase() !== '.md') {
+  if (!['.md', '.htm', '.html'].includes(path.extname(normalized).toLowerCase())) {
     return '';
   }
   return normalized;
+}
+
+function isResolvedProjectPathSafe(projectRoot: string, candidatePath: string): boolean {
+  try {
+    const realProjectRoot = fs.realpathSync.native(projectRoot);
+    let existingPath = candidatePath;
+    while (!fs.existsSync(existingPath)) {
+      const parentPath = path.dirname(existingPath);
+      if (parentPath === existingPath) return false;
+      existingPath = parentPath;
+    }
+    return isPathInside(realProjectRoot, fs.realpathSync.native(existingPath));
+  } catch {
+    return false;
+  }
 }
 
 function resolveProjectDocumentContentFile(projectRoot: string, requestedPath: string): {
@@ -639,7 +661,7 @@ function resolveProjectDocumentContentFile(projectRoot: string, requestedPath: s
     return null;
   }
   const targetPath = path.resolve(projectRoot, projectRelativePath);
-  if (!isPathInside(projectRoot, targetPath)) {
+  if (!isPathInside(projectRoot, targetPath) || !isResolvedProjectPathSafe(projectRoot, targetPath)) {
     return null;
   }
   return {
@@ -648,16 +670,39 @@ function resolveProjectDocumentContentFile(projectRoot: string, requestedPath: s
   };
 }
 
+function buildProjectDocumentPreviewResourceUrl(
+  projectId: string,
+  documentPath: string,
+  rawValue: string,
+): { value: string } {
+  const value = String(rawValue || '').trim();
+  if (!value || value.startsWith('#') || value.startsWith('?') || value.startsWith('/') || /^[a-z][a-z0-9+.-]*:/iu.test(value)) {
+    return { value: rawValue };
+  }
+  const hashIndex = value.indexOf('#');
+  const hash = hashIndex >= 0 ? value.slice(hashIndex) : '';
+  const withoutHash = hashIndex >= 0 ? value.slice(0, hashIndex) : value;
+  const queryIndex = withoutHash.indexOf('?');
+  const encodedAssetPath = queryIndex >= 0 ? withoutHash.slice(0, queryIndex) : withoutHash;
+  const query = queryIndex >= 0 ? withoutHash.slice(queryIndex + 1) : '';
+  let assetPath = encodedAssetPath;
+  try {
+    assetPath = decodeURIComponent(encodedAssetPath);
+  } catch {
+    return { value: rawValue };
+  }
+  const params = new URLSearchParams({ path: documentPath, asset: assetPath });
+  for (const [key, paramValue] of new URLSearchParams(query)) params.append(key, paramValue);
+  return { value: `/api/projects/${encodeURIComponent(projectId)}/document-asset?${params.toString()}${hash}` };
+}
+
 function normalizeProjectDocumentAssetPath(value: string): string {
   const rawValue = String(value || '').trim().replace(/\\/g, '/');
   if (!rawValue || rawValue.includes('\0') || rawValue.startsWith('/') || path.win32.isAbsolute(rawValue) || path.posix.isAbsolute(rawValue)) {
     return '';
   }
-  const segments = rawValue.split('/').filter(Boolean);
-  if (segments.length === 0 || segments.some((segment) => segment === '.' || segment === '..')) {
-    return '';
-  }
-  return segments.join('/');
+  const normalized = path.posix.normalize(rawValue).replace(/^\.\/+/, '');
+  return normalized && normalized !== '.' ? normalized : '';
 }
 
 const projectDocumentImagePlaceholderPattern = /^__ANNOTATION_IMAGE_([A-Z0-9]+(?:_[A-Z0-9]+)*)__$/u;
@@ -730,7 +775,8 @@ function resolveProjectDocumentAssetFile(projectRoot: string, requestedDocPath: 
 
   const docDir = path.dirname(doc.path);
   const targetPath = path.resolve(docDir, assetPath);
-  return isPathInside(docDir, targetPath) && isPathInside(projectRoot, targetPath)
+  return isPathInside(projectRoot, targetPath)
+    && isResolvedProjectPathSafe(projectRoot, targetPath)
     ? targetPath
     : null;
 }
@@ -1055,6 +1101,17 @@ export function handleProjectRegistryApi(
           path: doc.path,
           projectRelativePath: doc.projectRelativePath,
         }, { status: 404 });
+        return true;
+      }
+      if (sendHtmlDocumentPreview(req, res, doc.path, {
+        documentName: doc.projectRelativePath,
+        projectId,
+        rewriteRelativeUrl: (value) => buildProjectDocumentPreviewResourceUrl(
+          projectId,
+          doc.projectRelativePath,
+          value,
+        ),
+      })) {
         return true;
       }
       sendJson(res, {

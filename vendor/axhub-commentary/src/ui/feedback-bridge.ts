@@ -42,7 +42,13 @@ export interface WebEditorFeedbackBridge {
   }) => void;
 }
 
+export type WebEditorFeedbackMessage = {
+  type: 'success' | 'info' | 'warning' | 'error';
+  content: string;
+};
+
 let currentBridge: WebEditorFeedbackBridge | null = null;
+const pendingMessages: WebEditorFeedbackMessage[] = [];
 
 export function setWebEditorFeedbackBridge(bridge: WebEditorFeedbackBridge | null): void {
   currentBridge = bridge;
@@ -50,4 +56,20 @@ export function setWebEditorFeedbackBridge(bridge: WebEditorFeedbackBridge | nul
 
 export function getWebEditorFeedbackBridge(): WebEditorFeedbackBridge | null {
   return currentBridge;
+}
+
+export function sendWebEditorFeedbackMessage(message: WebEditorFeedbackMessage): void {
+  if (currentBridge) {
+    currentBridge.message(message);
+    return;
+  }
+  pendingMessages.push(message);
+}
+
+export function flushWebEditorFeedbackMessages(): void {
+  if (!currentBridge || pendingMessages.length === 0) return;
+  const pending = pendingMessages.splice(0);
+  for (const message of pending) {
+    currentBridge.message(message);
+  }
 }

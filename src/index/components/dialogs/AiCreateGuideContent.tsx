@@ -5,7 +5,7 @@ const MODEL_RECOMMENDATIONS = [
     { model: 'Gemini 3.1 Pro', feature: 'UI/UX 设计能力优秀' },
     { model: 'GPT-5.5', feature: '适合处理复杂问题和任务' },
     { model: 'Kimi K2.7', feature: '国产平替，UI/UX 设计能力优秀' },
-    { model: 'GLM-5.2', feature: '国产平替，综合能力强' },
+    { model: 'GLM-5.3', feature: '国产平替，综合能力强' },
 ];
 
 export default function AiCreateGuideContent() {

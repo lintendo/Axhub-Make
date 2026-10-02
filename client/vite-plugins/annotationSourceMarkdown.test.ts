@@ -74,6 +74,48 @@ describe('annotation source markdown preprocessing', () => {
     expect(result.watchFiles).toEqual([mdPath]);
   });
 
+  it('inlines independent documents markdownPath content', () => {
+    const projectRoot = createProjectRoot();
+    const mdPath = path.join(projectRoot, 'src/prototypes/order-review/docs/prd-independent.md');
+    fs.writeFileSync(mdPath, '# 独立文档\n\n跨页面说明', 'utf8');
+    const sourcePath = writeSource(projectRoot, {
+      documentVersion: 1,
+      format: 'axhub-annotation-source',
+      data: { version: 2, prototypeName: 'order-review', pageId: 'order-review', nodes: [], updatedAt: 1 },
+      markdownMap: {},
+      assetMap: {},
+      directory: { nodes: [] },
+      documents: {
+        nodes: [
+          {
+            type: 'folder',
+            id: 'documents',
+            title: '文档',
+            children: [
+              { type: 'markdown', id: 'independent', title: '独立文档', markdownPath: 'docs/prd-independent.md' },
+            ],
+          },
+        ],
+      },
+    });
+
+    const result = preprocessAnnotationSourceMarkdown({
+      projectRoot,
+      sourceFilePath: sourcePath,
+      source: JSON.parse(fs.readFileSync(sourcePath, 'utf8')),
+      mode: 'serve',
+    });
+
+    const node = result.source.documents.nodes[0].children[0];
+    expect(node).toMatchObject({
+      type: 'markdown',
+      markdown: '# 独立文档\n\n跨页面说明',
+      markdownPath: 'docs/prd-independent.md',
+    });
+    expect(node).not.toHaveProperty('markdownEditUrl');
+    expect(result.watchFiles).toEqual([mdPath]);
+  });
+
   it('resolves annotation image placeholders in inlined directory markdown to prototype asset URLs', () => {
     const projectRoot = createProjectRoot();
     const mdPath = path.join(projectRoot, 'src/prototypes/order-review/docs/prd-05-handoff.md');

@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import TemplateLibraryCard from './TemplateLibraryCard';
+import TemplateLibraryCard, { type TemplateLibraryCardItem } from './TemplateLibraryCard';
 import { requireProjectScope, withProjectScope } from '../../services/projectScope';
 
 type CreateDialogViewTab = 'upload' | 'onlineImport';
@@ -354,7 +354,7 @@ export default function CreateDialog({
         }
     };
 
-    const handleTemplatePreviewCardClick = useCallback((template: TemplateLibraryItem) => {
+    const handleTemplatePreviewCardClick = useCallback((template: TemplateLibraryCardItem) => {
         const previewUrl = String(template.previewUrl || '').trim();
         if (!previewUrl) {
             toast.warning('该模板暂不支持在线预览');

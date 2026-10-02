@@ -5,86 +5,42 @@ description: Use only when 用户明确要求把本地截图、设计稿或高�
 
 # Screenshot To Prototype
 
-用本地截图还原可运行原型。先完成固定 viewport 下的 1:1 绝对定位视觉稿，再转换为 React；效果优先，评审信息集中在主规格，正文使用中文并保持简洁。
+将本地截图还原为可评审 HTML，再转为 React 原型。顺序固定：结构化分析、脚本首版、立即返回、自动 AI 评审、最终 1:1 主规格、用户确认、React 实现。
 
-## 适用范围
+## 边界
 
-- 只处理用户明确要求还原的本地截图或设计稿。普通图片素材、风格参考、URL 克隆和主题提取不触发本技能。
-- 获取源图本地路径；聊天附件先落到本地。源图本身就是视觉依据，不再额外要求选择主题或创建设计规范。
-- 需要生成、编辑或派生位图素材时，使用 `ui-image-generation`；工具选择、配置读取和回退规则全部遵循该技能。截图还原只补充本地源图、bbox、裁切、修复和素材分流约束。
-- 所有素材提取、修复、高清化、设计分析都必须把用户本地图片路径作为参考图传入，不能只用文字描述生成素材。
-- 截图优先使用 Axhub Preview MCP 的 `preview_capture`；只有内置截图不支持当前内容时才换用现有浏览器截图能力。
+- 只处理用户明确要求还原的本地截图或设计稿；先取得源图本地路径。
+- 所有素材提取、修复、高清化和设计分析都必须传入本地源图，不能只用文字描述。
+- 位图生成或编辑使用 `ui-image-generation`；具体字段和素材分流见 `references/prompts.md`。
+- 不修改通用规格模板，不把整页截图贴成页面。
+- 禁止使用 `first-pass.html` 代替 `templates/prototype-spec.html` 创建 `spec.html`。
 
-## 目录
+## 产物
 
 - 主规格：`src/prototypes/<slug>/.spec/spec.html`
-- 还原映射：`src/prototypes/<slug>/.spec/reconstruction/reconstruction-manifest.json`
-- 规格样式：`src/prototypes/<slug>/.spec/reconstruction/tailwind.css`
-- 成果截图：`src/prototypes/<slug>/.spec/reconstruction/visual-check/`
+- 中间文件：`src/prototypes/<slug>/.spec/reconstruction/`
 - 最终素材：`src/prototypes/<slug>/assets/`
 - 临时数据：`.local/screenshot-to-prototype/<slug>/`
-- 生成历史：实际二次生图时复用 `src/prototypes/<slug>/.spec/generation-artifacts.json`
 
-源图摘要、候选清单、候选切图、审计报告和中间指标都放在 `.local/`。不创建额外的素材文档或独立视觉对比文档。
+## 流程
 
-## 使用主规格
+1. 读取源图、现有规格和素材；运行 `prepare-reconstruction-source.mjs` 生成源图摘要。
+2. 用 `request-vision.mjs --project-id <当前项目 ID>` 对原图做第一轮素材召回，提示词只短注“含状态栏”，不提交 OCR。视觉 API 未配置完整时由当前 Agent 输出同契约结果。
+3. 第一轮后处理文字：有 OCR 时直接用；没有时由视觉 API 单独检测一次，仍未配置则由当前 Agent 检测。用 `normalize-text-regions.mjs` 统一来源，再以 `mask-layer-recall.mjs` 无间距遮蔽第一轮矩形与文字。第二轮复用素材提示词且不提交文字结果；最后用 `finalize-layer-recall.mjs` 合并并从原图裁切。
+4. 按 `references/prompts.md` 处理素材。前景先生成本地透明候选与矩阵，再复用 `ui-image-generation/scripts/request-image.mjs --project-id <当前项目 ID>` 完整化；背景/Banner 单独清理。返回结果继续本地透明清理与审计，临时结果留在 `.local/`。
+5. AI 输出带稳定 ID 的 `elements.json`，OCR 只提供文字、位置和置信度；AI 决定文字角色、渲染方式和素材动作。
+6. 运行 `build-reconstruction-manifest.mjs` 和 `validate-reconstruction-manifest.mjs`，生成并校验 `reconstruction-manifest.json`。
+7. 运行 `render-reconstruction-review.mjs` 确定性生成 `first-pass.html`。渲染器会再次校验 Manifest，渲染阶段模型调用必须为 0。
+8. 首版生成后立即返回可访问链接：使用 `?projectId=<id>&docPath=<编码后的项目相对路径>`；标明“脚本直出、尚未 AI 评审”。不得结束当前任务，也不得等待用户确认。
+9. 随后自动进入 AI 评审：对比原图与首版，审核结构、样式、特殊字体和素材；修改结构化数据或候选后重新执行步骤 4-7。
+10. 将审核结果更新到 `spec.html`，保持源图 viewport 下的 1:1 尺寸。用 `preview_capture` 截图，并展示原图、HTML 结果和素材取舍。
+11. 最终回复提供 HTML 主规格链接：使用 `?projectId=<id>&p=<slug>&spec=1`；附待确认事项和轻量偏差说明，然后结束当前回合。
+12. 只有用户明确确认最终 HTML 主规格后，才能创建或修改 React 原型；完成后按相同 viewport 更新真实运行截图。
 
-- 遵循 `rules/requirements-alignment-guide.md`。已有 `.spec/spec.html` 时直接扩展；没有时从通用 HTML 模板创建。不要修改通用规格模板。
-- 按当前项目需要使用 `data-page-target` 和 `data-spec-page`。不规定固定页数或页面名称。
-- 规格展示源图信息、绝对定位视觉稿、最终素材及用途，并把原图与真实运行截图左右并排，形成成果快速对比。
-- 素材评审区逐项使用相同预览框左右展示候选与最终真实内容，透明素材使用棋盘格背景，并标注名称或 ID、用途/来源和输出尺寸。图片、SVG 和组件都必须实际渲染，不得只提供文字、文件名或路径。
-- 视觉稿舞台等于源图 viewport，使用 `position: relative` 和 `overflow: hidden`；元素绝对定位并保留稳定的 `data-reconstruction-id`。
-- 成果对比是普通规格内容，不建立逐元素或全局审批状态。用户有意见时按评论迭代。
-- 用户要求先看视觉稿时停在规格阶段；用户明确要求完整原型时无需等待额外确认，更新成果对比后继续 React 实现。
+## 门槛
 
-## 工作步骤
-
-1. 读取源图、现有规格、相关原型与素材。预处理结果写入本地临时目录：
-
-```bash
-node .agents/skills/screenshot-to-prototype/scripts/prepare-reconstruction-source.mjs \
-  --input <source.png> \
-  --output .local/screenshot-to-prototype/<slug>/source-summary.json
-```
-
-2. 由图片 AI 判断具体提取对象，只说明筛选规则：先按 UI 职责分流，再按视觉复杂度选择表示方式；信息与交互结构走 HTML/CSS，界面图形走 SVG，内容媒体和 HTML/CSS 难快速稳定还原的装饰视觉才进入位图候选。
-3. 位图默认按 bbox 单独裁切。只有同屏存在多个独立装饰位图且适合批量分离时，才用 `slice-asset-sheet.mjs` 或 `slice-alpha-components.mjs`；候选和 `candidate-manifest.json` 放在 `.local/`。
-4. 使用 `audit-assets.mjs` 审计候选。键色透明化只在候选需要透明背景且当前底色连续、纯净时使用，先运行 `probe-key-color.mjs`，再运行 `key-transparent-image.mjs`。
-5. 把元素 bbox、候选和选择结果整理到本地 `elements.json`，再构建并验证还原映射：
-
-```bash
-node .agents/skills/screenshot-to-prototype/scripts/build-reconstruction-manifest.mjs \
-  --source-summary .local/screenshot-to-prototype/<slug>/source-summary.json \
-  --elements .local/screenshot-to-prototype/<slug>/elements.json \
-  --output src/prototypes/<slug>/.spec/reconstruction/reconstruction-manifest.json
-
-node .agents/skills/screenshot-to-prototype/scripts/validate-reconstruction-manifest.mjs \
-  --manifest src/prototypes/<slug>/.spec/reconstruction/reconstruction-manifest.json \
-  --project-root src/prototypes/<slug> \
-  --source <source.png>
-```
-
-存在生成候选时追加 `--generation-artifacts src/prototypes/<slug>/.spec/generation-artifacts.json`。
-
-6. 在 `spec.html` 实现绝对定位视觉稿。需要 Tailwind 时运行 `compile-reconstruction-tailwind.mjs`，使用独立前缀；不使用 Tailwind CDN，不加载 Tailwind preflight。
-7. 调用 `preview_capture`，按源图 viewport、DPR 1 截取规格视觉页，输出到 `.spec/reconstruction/visual-check/render.png`。截图为空、尺寸错误或诊断异常时先修复捕获问题。
-8. 在当前 `spec.html` 增加成果快速对比区域，只引用稳定原图和 `render.png`；两张图使用相同 viewport 与比例左右并排，不创建独立对比文档。
-9. 转换为真实文本、React 组件、Grid/Flex、CSS variables、响应式约束和交互状态。React 不引用 `.local/`，也不把可编辑 UI 保留为整块截图。完成后按相同 viewport 再截图，并更新规格中的成果对比。
-
-## 素材策略
-
-- 先按 UI 职责分流，再按视觉复杂度处理，不以“看起来复杂”作为位图化依据。
-- 文本、按钮、输入框、导航、卡片、列表和表格使用 HTML/CSS；图标、Logo、进度和简单图表优先使用现有图标库或 SVG。
-- 照片、头像、商品图、插画、纹理和页面内嵌截图使用位图，默认保留 `clean-crop`；需要修复时增加 `generated-refined`。
-- 二次生图始终传入本地源图，不生成 UI 文案、控件、通用图标或数据内容；输出比例和清晰度按目标 bbox 和 DPR 确定。
-- 纯色生成背景需要透明化时使用 `generated-chroma`；连续复杂背景在其他方式效果不足时才使用 `clean-plate`。
-- `flatten-in-page` 只用于第一阶段视觉稿；最终 React 恢复文本、控件、重复结构和需要交互的数据图形。
-- 最终文件型素材直接放入原型 `assets/`，其使用位置和取舍写入主规格。
-
-## 映射
-
-`reconstruction-manifest.json` 只保存源图 hash/viewport，以及元素的 bbox、表示方式、候选、`selectedCandidateId`、`specElementId` 和 React 目标。验证器检查越界、资源缺失、生成记录、未知路线、重复元素 ID、候选审计和源图 hash。
-
-## 交付
-
-最终回复提供规格链接、原图与真实运行截图，以及轻量偏差说明。按 P0-P3 说明仍可见的问题；不另建总结文档。
+- AI 只修改结构化分析、样式和素材，不直接返回或自由编写首版 HTML。
+- 两轮召回不使用 SAM 自动扩框；OCR 是可选增强，统一文字区域只在第一轮后参与脚本遮蔽和后续语义处理。
+- Logo、标识、海报和 Banner 艺术字由视觉审核决定表示方式，不能因 OCR 成功就强制使用普通字体。
+- 未解决的文字或素材审核不能进入首版；素材路径必须位于项目目录内。
+- 需要 Tailwind 时使用 `compile-reconstruction-tailwind.mjs`；不使用 CDN，不加载 preflight。

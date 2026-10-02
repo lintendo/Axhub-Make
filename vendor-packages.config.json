@@ -1,6 +1,15 @@
 {
   "packages": [
     {
+      "packageName": "@axhub/agent-surface",
+      "sourceDir": "../../packages/agent-surface",
+      "outputDir": "vendor/agent-surface",
+      "runtimeEntry": "dist/index.js",
+      "typesEntry": "dist/index.d.ts",
+      "copy": ["dist", "package.json"],
+      "buildCommand": ["pnpm", "build"]
+    },
+    {
       "packageName": "@axhub/excalidraw",
       "sourceDir": "../../packages/excalidraw",
       "outputDir": "vendor/axhub-excalidraw",

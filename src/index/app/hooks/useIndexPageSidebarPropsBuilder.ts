@@ -9,10 +9,12 @@ import type {
     CreateDialogTab,
     AiPanelMode,
     NewSidebarGroupedProps,
+    PromptExecutionMeta,
     ResourceSection,
     SidebarTab,
 } from '../../types/index-page.types';
 import type { LocalExportCapabilities, ResourceWriteCapabilities } from '../../services/projectResources';
+import type { MakeSurfaceCapabilities } from '../makeSurface';
 
 interface UseIndexPageSidebarPropsBuilderParams {
     state: {
@@ -42,24 +44,23 @@ interface UseIndexPageSidebarPropsBuilderParams {
         sidebarTrees: any;
         webAgentPanelOpen?: boolean;
         aiPanelMode?: AiPanelMode;
+        surfaceCapabilities?: MakeSurfaceCapabilities;
         selectedDoc: ItemData | null;
         selectedResourceFolder?: any;
         selectedCanvas: any;
         selectedTheme: any;
-        prototypeStartDraftActive?: boolean;
         resourceStartDraftActive?: boolean;
         themeStartDraftActive?: boolean;
-        prototypeStartPageActive?: boolean;
     };
     deps: {
         preferredPromptClient: any;
         preferredIDE: MainIDEPreference;
         ideAvailability?: IDEAvailabilityMap;
         agentAvailability?: RuntimeAgentAvailability;
+        skipLanPreviewAuth?: boolean;
         setPreferredIDE: (ide: MainIDEPreference) => void;
         setIsDarkMode: (dark: boolean) => void;
         openSettingsDialog: (tab?: SettingsDialogInitialTab) => void;
-        setVersionCollaborationDrawerOpen: Dispatch<SetStateAction<boolean>>;
         setActiveTab: Dispatch<SetStateAction<TabType>>;
         setSidebarTab: Dispatch<SetStateAction<SidebarTab>>;
         setViewMode: Dispatch<SetStateAction<ViewMode>>;
@@ -90,6 +91,7 @@ interface UseIndexPageSidebarPropsBuilderParams {
         setInitialCreateDialogTab: Dispatch<SetStateAction<CreateDialogTab>>;
         handleTabChange: (tab: TabType) => void;
         handleMenuClick: (params: { key: string; pageId?: string | null }) => void | Promise<void>;
+        handleOpenLocalPublishDialog?: (mode: 'html' | 'realtime', targetPath?: string) => void;
         setSelectedPrototypePageId?: Dispatch<SetStateAction<string | null>>;
         handleCreatePrototypeStartDraft?: () => void;
         handleCreateResourceStartDraft?: () => void;
@@ -98,7 +100,7 @@ interface UseIndexPageSidebarPropsBuilderParams {
         handleOpenAcpWebAgent?: (targetPath?: string, provider?: AcpProvider) => void | Promise<void>;
         handleOpenImageAiPanel?: () => void | Promise<void>;
         handleOpenWebAgentInPanel?: (url: string) => boolean | void | Promise<boolean | void>;
-        onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+        onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
         onCloseAiPanel?: () => void;
         onCloseWebAgentPanel?: () => void;
         handleOpenSelectedDocInIDE: (itemOverride?: ItemData | null, kindOverride?: 'doc' | 'template') => Promise<void>;
@@ -113,7 +115,8 @@ export function useIndexPageSidebarPropsBuilder({
     deps,
 }: UseIndexPageSidebarPropsBuilderParams): NewSidebarGroupedProps {
     return useMemo(() => {
-        const prototypeStartPageActive = state.prototypeStartPageActive === true;
+        const conversationUiEnabled = state.surfaceCapabilities?.conversationUi !== false;
+        const externalOpenMenu = state.surfaceCapabilities?.externalOpenMenu !== false;
         const resetToPrototypeStartView = () => {
             deps.setActiveTab('prototypes');
             deps.setSidebarTab('prototype');
@@ -151,9 +154,9 @@ export function useIndexPageSidebarPropsBuilder({
             lanAccessAllowed: state.lanAccessAllowed,
             isDarkMode: state.isDarkMode,
             sidebarTrees: state.sidebarTrees,
-            webAgentPanelOpen: prototypeStartPageActive ? false : state.webAgentPanelOpen,
-            aiPanelMode: prototypeStartPageActive ? null : state.aiPanelMode,
-            prototypeStartPageActive: state.prototypeStartPageActive,
+            webAgentPanelOpen: conversationUiEnabled ? state.webAgentPanelOpen : false,
+            aiPanelMode: conversationUiEnabled ? state.aiPanelMode : null,
+            externalOpenMenu,
             resourceStartDraftActive: state.resourceStartDraftActive,
             themeStartDraftActive: state.themeStartDraftActive,
         },
@@ -211,6 +214,7 @@ export function useIndexPageSidebarPropsBuilder({
                 deps.setViewMode('demo');
             },
             handleMenuClick: deps.handleMenuClick,
+            onOpenLocalPublishDialog: deps.handleOpenLocalPublishDialog,
             handleDownloadItemSource: deps.resources.handleDownloadItemSource,
             handleDownloadThemeZip: deps.resources.handleDownloadThemeZip,
             handleRenameItem: deps.resources.handleRenameItem,
@@ -251,7 +255,6 @@ export function useIndexPageSidebarPropsBuilder({
             onUploadedResourceFiles: (files) => { void deps.resources.handleUploadedResourceFiles(files); },
             onCreateFolder: deps.resources.handleCreateFolder,
             onSettingsClick: (tab = 'project') => deps.openSettingsDialog(tab),
-            onVersionCollaborationClick: () => deps.setVersionCollaborationDrawerOpen(true),
             onToggleTheme: () => deps.setIsDarkMode(!state.isDarkMode),
             onTitleChange: deps.resources.handleProjectTitleChange,
             onProjectSwitch: deps.switchProject,
@@ -284,18 +287,19 @@ export function useIndexPageSidebarPropsBuilder({
             onSidebarTreePersist: deps.resources.handleSidebarTreePersist,
             handleVersionManagement: deps.resources.handleVersionManagement,
             handleOpenProjectInIDE: deps.handleOpenProjectInIDE,
-            onOpenAcpWebAgent: prototypeStartPageActive ? undefined : deps.handleOpenAcpWebAgent,
-            onOpenImageAiPanel: prototypeStartPageActive ? undefined : deps.handleOpenImageAiPanel,
-            onOpenWebAgentInPanel: deps.handleOpenWebAgentInPanel,
-            onExecutePrompt: deps.onExecutePrompt,
-            onCloseAiPanel: deps.onCloseAiPanel,
-            onCloseWebAgentPanel: deps.onCloseWebAgentPanel,
+            onOpenAcpWebAgent: conversationUiEnabled ? deps.handleOpenAcpWebAgent : undefined,
+            onOpenImageAiPanel: conversationUiEnabled ? deps.handleOpenImageAiPanel : undefined,
+            onOpenWebAgentInPanel: conversationUiEnabled ? deps.handleOpenWebAgentInPanel : undefined,
+            onExecutePrompt: conversationUiEnabled ? deps.onExecutePrompt : undefined,
+            onCloseAiPanel: conversationUiEnabled ? deps.onCloseAiPanel : undefined,
+            onCloseWebAgentPanel: conversationUiEnabled ? deps.onCloseWebAgentPanel : undefined,
             onOpenAISettings: () => deps.openSettingsDialog('ai'),
         },
         preferences: {
             preferredIDE: deps.preferredIDE,
             ideAvailability: deps.ideAvailability,
             agentAvailability: deps.agentAvailability,
+            skipLanPreviewAuth: deps.skipLanPreviewAuth === true,
             onPreferredIDEChange: deps.setPreferredIDE,
         },
     });

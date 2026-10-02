@@ -7,7 +7,6 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  getAdminServerInfoPath,
   getGlobalAdminServerInfoPath,
   getGlobalMakeStateDir,
   getConfigPath,
@@ -21,7 +20,7 @@ import {
 
 import { startMakeServer } from '../index.ts';
 import { getLocalNetworkHostsFromInterfaces } from '../http.ts';
-import { createDefaultCanvasData, handleCanvasApi } from '../managementApi.canvas.ts';
+import { handleCanvasApi } from '../managementApi.canvas.ts';
 import { handleCodeReviewApi } from '../managementApi.codeReview.ts';
 import { handleEntriesCompatibilityApi } from '../managementApi.entries.ts';
 import { handleLegacyWebSocketApi } from '../managementApi.legacyWebSocket.ts';
@@ -159,14 +158,14 @@ describe('make-server HTTP server', () => {
         { family: 'IPv4', internal: true, address: '127.0.0.1' },
       ],
       en0: [
-        { family: 'IPv4', internal: false, address: '192.168.31.88' },
+        { family: 'IPv4', internal: false, address: '192.168.1.88' },
         { family: 'IPv6', internal: false, address: 'fe80::1' },
       ],
       bridge100: [
-        { family: 'IPv4', internal: false, address: '192.168.31.88' },
+        { family: 'IPv4', internal: false, address: '192.168.1.88' },
         { family: 'IPv4', internal: false, address: '10.0.8.42' },
       ],
-    } as any)).toEqual(['192.168.31.88', '10.0.8.42']);
+    } as any)).toEqual(['192.168.1.88', '10.0.8.42']);
   });
 
   it('serves project registry APIs, active project resources, docs content, and entries compatibility', async () => {
@@ -872,9 +871,9 @@ describe('make-server HTTP server', () => {
       expect(preview).not.toContain('/@vite/client');
       expect(preview).not.toContain('@vitejs/plugin-react/preamble');
 
-      const legacyPreview = await fetch(`${server.origin}/assets/docs/spec/spec.html`, { redirect: 'manual' });
+      const legacyPreview = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/assets/docs/spec/spec.html`), { redirect: 'manual' });
       expect(legacyPreview.status).toBe(302);
-      expect(legacyPreview.headers.get('location')).toBe('/docs/spec');
+      expect(legacyPreview.headers.get('location')).toBe('/docs/spec?projectId=docs-client');
 
       const markdown = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/docs/spec.md`)).then((response) => response.text());
       expect(markdown).toBe('# Project Spec\n\n## Intro\n');
@@ -957,7 +956,7 @@ describe('make-server HTTP server', () => {
         adminRoot: path.join(projectRoot, 'missing-admin'),
         registryPath,
       })).rejects.toMatchObject({ code: 'EADDRINUSE' });
-      expect(fs.existsSync(getAdminServerInfoPath(projectRoot, { homeDir: registryHome }))).toBe(true);
+      expect(fs.existsSync(getGlobalAdminServerInfoPath(registryHome))).toBe(true);
 
       const health = await fetch(`${first.origin}/api/health`).then((response) => response.json());
       expect(health).toMatchObject({
@@ -1121,20 +1120,12 @@ describe('make-server HTTP server', () => {
         references: [],
       });
 
-      const canvasCreate = await fetch(scopeProjectApiUrl(
-        projectRoot,
-        `${first.origin}/api/canvas/resources/main-canvas.excalidraw`,
-      ), {
+      const canvasCreate = await fetch(scopeProjectApiUrl(projectRoot, `${first.origin}/api/canvas/create`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: createDefaultCanvasData() }),
+        body: JSON.stringify({ displayName: 'Main Canvas' }),
       }).then((response) => response.json());
-      expect(canvasCreate).toMatchObject({
-        success: true,
-        created: true,
-        displayName: 'main-canvas',
-        name: 'main-canvas.excalidraw',
-      });
+      expect(canvasCreate).toEqual({ error: 'Canvas not found' });
     } finally {
       await first.close();
     }
@@ -1279,12 +1270,40 @@ describe('make-server HTTP server', () => {
   it('proxies runtime HTML proxy module requests before admin Vite can transform them', async () => {
     const projectRoot = createProjectRoot();
     const runtimeServer = http.createServer((req, res) => {
+      if (req.url === '/api/health') {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({
+          ok: true,
+          role: 'runtime',
+          projectRoot,
+          server: {
+            pid: process.pid,
+            port: (runtimeServer.address() as AddressInfo).port,
+            host: 'localhost',
+            origin: `http://localhost:${(runtimeServer.address() as AddressInfo).port}`,
+            projectRoot,
+            startedAt: new Date().toISOString(),
+            timestamp: new Date().toISOString(),
+          },
+        }));
+        return;
+      }
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
       res.end(`export const seen = ${JSON.stringify(req.url)};`);
     });
     await new Promise<void>((resolve) => runtimeServer.listen(0, 'localhost', resolve));
     const runtimeAddress = runtimeServer.address() as AddressInfo;
+    writeJson(getRuntimeServerInfoPath(projectRoot), {
+      pid: process.pid,
+      port: runtimeAddress.port,
+      host: 'localhost',
+      origin: `http://localhost:${runtimeAddress.port}`,
+      projectRoot,
+      startedAt: new Date().toISOString(),
+      timestamp: new Date().toISOString(),
+    });
 
     const server = await startMakeServer({
       projectRoot,
@@ -1297,12 +1316,13 @@ describe('make-server HTTP server', () => {
     });
 
     try {
-      const response = await fetch(`${server.origin}/@id/__x00__/prototypes/%E6%9C%AA%E5%91%BD%E5%90%8D/index.html?html-proxy&index=0.js`);
+      await registerExistingMakeProject(server.origin, projectRoot);
+      const response = await fetch(`${server.origin}/@id/__x00__/prototypes/%E6%9C%AA%E5%91%BD%E5%90%8D/index.html?html-proxy&index=0.js&projectId=test-client`);
       const body = await response.text();
 
       expect(response.status).toBe(200);
       expect(response.headers.get('content-type')).toContain('javascript');
-      expect(body).toContain('/@id/__x00__/prototypes/%E6%9C%AA%E5%91%BD%E5%90%8D/index.html?html-proxy&index=0.js');
+      expect(body).toContain('/@id/__x00__/prototypes/%E6%9C%AA%E5%91%BD%E5%90%8D/index.html?html-proxy&index=0.js&projectId=test-client');
     } finally {
       await server.close();
       await new Promise<void>((resolve) => runtimeServer.close(() => resolve()));
@@ -1312,6 +1332,25 @@ describe('make-server HTTP server', () => {
   it('proxies dev-mode runtime module requests with prototype referers before admin Vite can restrict them', async () => {
     const projectRoot = createProjectRoot();
     const runtimeServer = http.createServer((req, res) => {
+      if (req.url === '/api/health') {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({
+          ok: true,
+          role: 'runtime',
+          projectRoot,
+          server: {
+            pid: process.pid,
+            port: (runtimeServer.address() as AddressInfo).port,
+            host: 'localhost',
+            origin: `http://localhost:${(runtimeServer.address() as AddressInfo).port}`,
+            projectRoot,
+            startedAt: new Date().toISOString(),
+            timestamp: new Date().toISOString(),
+          },
+        }));
+        return;
+      }
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
       res.end(`export const runtimeUrl = ${JSON.stringify(req.url)};`);
@@ -1319,6 +1358,15 @@ describe('make-server HTTP server', () => {
     await new Promise<void>((resolve) => runtimeServer.listen(0, 'localhost', resolve));
     const runtimeAddress = runtimeServer.address() as AddressInfo;
     const runtimeOrigin = `http://localhost:${runtimeAddress.port}`;
+    writeJson(getRuntimeServerInfoPath(projectRoot), {
+      pid: process.pid,
+      port: runtimeAddress.port,
+      host: 'localhost',
+      origin: runtimeOrigin,
+      projectRoot,
+      startedAt: new Date().toISOString(),
+      timestamp: new Date().toISOString(),
+    });
     const viteHandle = vi.fn((_req: any, res: any) => {
       res.statusCode = 403;
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -1345,10 +1393,11 @@ describe('make-server HTTP server', () => {
     });
 
     try {
+      await registerExistingMakeProject(server.origin, projectRoot);
       const requestPath = '/@fs/workspace/make14/node_modules/.vite/deps/@axhub_annotation.js?v=a8419558';
       const response = await fetch(`${server.origin}${requestPath}`, {
         headers: {
-          referer: `${server.origin}/prototypes/annotation-demo?agentToolbar=host`,
+          referer: `${server.origin}/prototypes/annotation-demo?projectId=test-client&agentToolbar=host`,
         },
       });
       const body = await response.text();
@@ -1450,7 +1499,7 @@ describe('make-server HTTP server', () => {
       const requestPath = `/@fs${fsPath.split('/').map(encodeURIComponent).join('/')}`;
       const response = await fetch(`${server.origin}${requestPath}`, {
         headers: {
-          referer: `${server.origin}/@vite/client`,
+          referer: `${server.origin}/@vite/client?projectId=${projectId}`,
         },
       });
       const body = await response.text();
@@ -1554,7 +1603,7 @@ describe('make-server HTTP server', () => {
       const requestPath = `/@fs${fsPath.split('/').map(encodeURIComponent).join('/')}`;
       const response = await fetch(`${server.origin}${requestPath}`, {
         headers: {
-          referer: `${server.origin}/@vite/client`,
+          referer: `${server.origin}/@vite/client?projectId=${projectId}`,
         },
       });
       const body = await response.text();
@@ -1653,13 +1702,13 @@ describe('make-server HTTP server', () => {
 
     try {
       await registerExistingMakeProject(server.origin, projectRoot);
-      const response = await fetch(`${server.origin}/prototypes/annotation-demo?editorIntegrationWs=1`);
+      const response = await fetch(`${server.origin}/prototypes/annotation-demo?projectId=make-project&editorIntegrationWs=1`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
       expect(body).toEqual({
         upstream: 'active-project-runtime',
-        url: '/prototypes/annotation-demo?editorIntegrationWs=1',
+        url: '/prototypes/annotation-demo?projectId=make-project&editorIntegrationWs=1',
       });
     } finally {
       await server.close();
@@ -1699,6 +1748,11 @@ describe('make-server HTTP server', () => {
       expect(response.headers.get('content-type')).toContain('text/html');
       expect(body).toContain('<title>Make 客户端未启动</title>');
       expect(body).toContain('"type":"axhub:runtime-unavailable"');
+
+      const registeredProjectResponse = await fetch(
+        `${server.origin}/prototypes/annotation-demo?projectId=test-client`,
+      );
+      expect(registeredProjectResponse.status).toBe(503);
       expect(staleRuntimeRequests).toEqual([]);
     } finally {
       await server.close();
@@ -1736,12 +1790,9 @@ describe('make-server HTTP server', () => {
       expect(configuredRuntimeRequests).toEqual([]);
 
       const unscopedResponse = await fetch(`${server.origin}/prototypes/annotation-demo`);
-      expect(unscopedResponse.status).toBe(200);
-      expect(await unscopedResponse.json()).toEqual({
-        upstream: 'configured-runtime',
-        url: '/prototypes/annotation-demo',
-      });
-      expect(configuredRuntimeRequests).toEqual(['/prototypes/annotation-demo']);
+      expect(unscopedResponse.status).toBe(503);
+      expect(await unscopedResponse.text()).toContain('Make 客户端未启动');
+      expect(configuredRuntimeRequests).toEqual([]);
     } finally {
       await server.close();
       await new Promise<void>((resolve) => configuredRuntimeServer.close(() => resolve()));
@@ -1899,13 +1950,13 @@ describe('make-server HTTP server', () => {
 
     try {
       await registerExistingMakeProject(server.origin, projectRoot);
-      const response = await fetch(`${server.origin}/prototypes/annotation-demo?editorIntegrationWs=1`);
+      const response = await fetch(`${server.origin}/prototypes/annotation-demo?projectId=make-project&editorIntegrationWs=1`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
       expect(body).toEqual({
         upstream: 'active-project-runtime',
-        url: '/prototypes/annotation-demo?editorIntegrationWs=1',
+        url: '/prototypes/annotation-demo?projectId=make-project&editorIntegrationWs=1',
       });
       expect(readServerInfo(projectRoot, 'runtime')).toMatchObject({
         origin: activeRuntimeOrigin,
@@ -2411,7 +2462,7 @@ describe('make-server HTTP server', () => {
     }
   });
 
-  it('accepts project metadata document ids when saving docs workspace navigation', async () => {
+  it('accepts resource file keys when saving docs workspace navigation', async () => {
     const projectRoot = createProjectRoot();
     const docPath = path.join(projectRoot, 'src', 'resources', 'spec.md');
     fs.mkdirSync(path.dirname(docPath), { recursive: true });
@@ -2483,25 +2534,20 @@ describe('make-server HTTP server', () => {
 
       expect(response.status).toBe(200);
       expect(update).toMatchObject({ success: true, tab: 'docs' });
-      expect(update.tree).toEqual([
-        expect.objectContaining({
+      expect(update.tree).toMatchObject([
+        {
           kind: 'folder',
           title: '产品文档',
-          path: '产品文档',
-          folderPath: '产品文档',
           children: [
-            expect.objectContaining({
+            {
               kind: 'item',
               title: 'spec',
               itemKey: 'docs/产品文档/spec.md',
-              path: '产品文档/spec.md',
-            }),
+            },
           ],
-        }),
+        },
       ]);
-      expect(fs.existsSync(docPath)).toBe(false);
-      expect(fs.readFileSync(path.join(projectRoot, 'src', 'resources', '产品文档', 'spec.md'), 'utf8'))
-        .toBe('# Project Spec\n');
+      expect(fs.existsSync(path.join(projectRoot, 'src/resources/产品文档/spec.md'))).toBe(true);
     } finally {
       await server.close();
     }

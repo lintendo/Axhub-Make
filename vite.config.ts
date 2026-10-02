@@ -364,6 +364,7 @@ export default defineConfig({
       ...createVendorResolveAliases(),
       ...createPackageSingletonAliases(ASSISTANT_UI_SINGLETON_PACKAGES),
       { find: /^@axhub\/excalidraw\/index\.css$/, replacement: path.resolve(__dirname, 'vendor/axhub-excalidraw/dist/prod/index.css') },
+      { find: /^@axhub\/commentary\/prompt-card-skills$/, replacement: path.resolve(__dirname, 'vendor/axhub-commentary/src/ui/runtime/prompt-card-skills.ts') },
       { find: '@ant-design/cssinjs', replacement: path.resolve(__dirname, 'node_modules/@ant-design/cssinjs') },
       { find: '@ant-design/icons', replacement: path.resolve(__dirname, 'node_modules/@ant-design/icons') },
       { find: 'antd', replacement: path.resolve(__dirname, 'node_modules/antd') },

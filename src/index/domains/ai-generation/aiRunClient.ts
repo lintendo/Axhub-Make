@@ -16,6 +16,7 @@ export interface AiRunClientRequest {
   model?: string | null;
   mode?: string | null;
   thought?: string | null;
+  permissionMode?: string | null;
   provider?: string | null;
   conversationStorePath?: string | null;
   params?: unknown;
@@ -154,6 +155,7 @@ export async function runAiStream(
       model: params.model,
       mode: params.mode,
       thought: params.thought,
+      permissionMode: params.permissionMode,
       provider: params.provider,
       conversationStorePath: params.conversationStorePath,
       params: params.params,

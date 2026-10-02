@@ -4,6 +4,7 @@ import type { CanvasItem, ItemData, SidebarTreeNode, SidebarTreeTab, TabType } f
 import {
     STORAGE_KEY_ASSISTANT_AUTO_OPEN_DISMISSED,
     STORAGE_KEY_ASSISTANT_AUTO_OPEN_PANEL_MODE,
+    STORAGE_KEY_COMMENTARY_VOICE_VISIBLE,
 } from '../constants';
 import { normalizeMarkdownResourceName } from '../utils/markdownResourcePath';
 import { buildMarkdownFileUrl, buildSpecTemplatePreviewUrl } from '../utils/markdownPreview';
@@ -90,15 +91,77 @@ export function parseDismissedStorageValue(value: string | null): boolean {
     return value === '1' || value === 'true';
 }
 
-type AssistantAutoOpenDismissedStorage = Pick<Storage, 'getItem' | 'setItem'>;
-type AssistantAutoOpenPanelMode = 'general-ai' | 'image-ai';
+export const ASSISTANT_PANEL_COMPACT_VIEWPORT_WIDTH = 768;
 
-function getLocalStorage(): AssistantAutoOpenDismissedStorage | null {
+export function resolveAssistantPanelOpenTarget(viewportWidth: number): 'iframe' | 'window' {
+    return Number.isFinite(viewportWidth) && viewportWidth <= ASSISTANT_PANEL_COMPACT_VIEWPORT_WIDTH
+        ? 'window'
+        : 'iframe';
+}
+
+export function shouldSuppressAssistantAutoOpenForProjectChange(
+    previousProjectId: string | null | undefined,
+    nextProjectId: string | null | undefined,
+    assistantVisible: boolean,
+): boolean {
+    const previousScope = String(previousProjectId || '').trim();
+    const nextScope = String(nextProjectId || '').trim();
+    return Boolean(
+        previousScope
+        && nextScope
+        && previousScope !== nextScope
+        && !assistantVisible,
+    );
+}
+
+type AssistantAutoOpenStorage = Pick<Storage, 'getItem' | 'setItem'>;
+type AssistantAutoOpenPanelMode = 'general-ai' | 'image-ai';
+type CommentaryVoiceStorage = Pick<Storage, 'getItem' | 'setItem'>;
+
+function getCommentaryVoiceStorage(): CommentaryVoiceStorage | null {
     if (typeof window === 'undefined') {
         return null;
     }
     try {
         return window.localStorage;
+    } catch {
+        return null;
+    }
+}
+
+export function getCommentaryVoiceVisible(
+    storage: CommentaryVoiceStorage | null = getCommentaryVoiceStorage(),
+): boolean {
+    if (!storage) {
+        return false;
+    }
+    try {
+        return storage.getItem(STORAGE_KEY_COMMENTARY_VOICE_VISIBLE) === '1';
+    } catch {
+        return false;
+    }
+}
+
+export function setCommentaryVoiceVisible(
+    visible: boolean,
+    storage: CommentaryVoiceStorage | null = getCommentaryVoiceStorage(),
+): void {
+    if (!storage) {
+        return;
+    }
+    try {
+        storage.setItem(STORAGE_KEY_COMMENTARY_VOICE_VISIBLE, visible ? '1' : '0');
+    } catch {
+        // Ignore storage failures in private or embedded contexts.
+    }
+}
+
+function getAssistantAutoOpenStorage(): AssistantAutoOpenStorage | null {
+    if (typeof window === 'undefined') {
+        return null;
+    }
+    try {
+        return window.sessionStorage;
     } catch {
         return null;
     }
@@ -138,7 +201,7 @@ export function buildAssistantAutoOpenPanelModeStorageKey(
 
 export function getAssistantAutoOpenDismissed(
     storageKey: string,
-    storage: AssistantAutoOpenDismissedStorage | null = getLocalStorage(),
+    storage: AssistantAutoOpenStorage | null = getAssistantAutoOpenStorage(),
 ): boolean {
     if (!storage) {
         return true;
@@ -146,7 +209,7 @@ export function getAssistantAutoOpenDismissed(
     try {
         const storedValue = storage.getItem(storageKey);
         if (storedValue === null) {
-            return false;
+            return true;
         }
         return parseDismissedStorageValue(storedValue);
     } catch {
@@ -157,7 +220,7 @@ export function getAssistantAutoOpenDismissed(
 export function setAssistantAutoOpenDismissed(
     storageKey: string,
     dismissed: boolean,
-    storage: AssistantAutoOpenDismissedStorage | null = getLocalStorage(),
+    storage: AssistantAutoOpenStorage | null = getAssistantAutoOpenStorage(),
 ) {
     if (!storage) {
         return;
@@ -171,7 +234,7 @@ export function setAssistantAutoOpenDismissed(
 
 export function getAssistantAutoOpenPanelMode(
     storageKey: string,
-    storage: AssistantAutoOpenDismissedStorage | null = getLocalStorage(),
+    storage: AssistantAutoOpenStorage | null = getAssistantAutoOpenStorage(),
 ): AssistantAutoOpenPanelMode {
     if (!storage) {
         return 'general-ai';
@@ -187,7 +250,7 @@ export function getAssistantAutoOpenPanelMode(
 export function setAssistantAutoOpenPanelMode(
     storageKey: string,
     mode: AssistantAutoOpenPanelMode,
-    storage: AssistantAutoOpenDismissedStorage | null = getLocalStorage(),
+    storage: AssistantAutoOpenStorage | null = getAssistantAutoOpenStorage(),
 ) {
     if (!storage) {
         return;

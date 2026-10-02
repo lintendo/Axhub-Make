@@ -4,6 +4,8 @@
 @source "../node_modules/@axhub/acp/dist/components/assistant-ui/image-generation-settings-dialog.mjs";
 @source "../node_modules/@axhub/acp/dist/components/assistant-ui/attachment.mjs";
 @source "../node_modules/@axhub/acp/dist/components/assistant-ui/tooltip-icon-button.mjs";
+@source "../node_modules/@axhub/acp/dist/components/assistant-ui/voice/*.mjs";
+@source "../node_modules/@axhub/acp/dist/components/assistant-ui/voice.mjs";
 @source "../node_modules/@axhub/acp/dist/components/ui/avatar.mjs";
 @source "../node_modules/@axhub/acp/dist/components/ui/button.mjs";
 @source "../node_modules/@axhub/acp/dist/components/ui/checkbox.mjs";
@@ -11,6 +13,7 @@
 @source "../node_modules/@axhub/acp/dist/components/ui/dialog.mjs";
 @source "../node_modules/@axhub/acp/dist/components/ui/input.mjs";
 @source "../node_modules/@axhub/acp/dist/components/ui/label.mjs";
+@source "../node_modules/@axhub/acp/dist/components/ui/popover.mjs";
 @source "../node_modules/@axhub/acp/dist/components/ui/switch.mjs";
 @source "../node_modules/@axhub/acp/dist/components/ui/tabs.mjs";
 @source "../node_modules/@axhub/acp/dist/components/ui/tooltip.mjs";

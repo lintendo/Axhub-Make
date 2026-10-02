@@ -22,6 +22,7 @@ import type {
     DataType,
     ImageConfig,
     ItemData,
+    AnnotationDocumentDirectoryNode,
     PromptClientPreference,
     SidebarTreeNode,
     SidebarTreeTab,
@@ -64,6 +65,12 @@ export type QuickEditSaveAction = 'save-text' | 'save-style' | 'clear-style';
 export type CreateDialogTab = 'upload' | 'onlineImport';
 export type PrototypeUploadType = 'make' | 'google_stitch' | 'axure_html' | 'figma_make' | 'v0' | 'google_aistudio';
 export type AiPanelMode = 'general-ai' | 'image-ai' | null;
+
+export interface PromptExecutionMeta {
+    scene: string;
+    targetPath?: string | null;
+    autoSend?: boolean;
+}
 
 export interface PrototypeCreateDialogOpenOptions {
     initialTab: CreateDialogTab;
@@ -122,7 +129,7 @@ export interface CreateDialogState {
 export interface CreateDialogActions {
     onClose: () => void;
     onAfterCreatePromptAction: () => void;
-    onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+    onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
     onUploadSuccess?: (result?: any) => void | Promise<void>;
 }
 
@@ -140,7 +147,7 @@ export interface ExportState {
     preferredIDE: MainIDEPreference;
     ideAvailability?: IDEAvailabilityMap;
     assistantOpen?: boolean;
-    onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+    onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
     initialReviewResult?: ReviewResult | null;
     exportAvailability: ExportAvailability;
 }
@@ -190,7 +197,7 @@ export interface NewSidebarState {
     sidebarTrees: Record<SidebarTreeTab, SidebarTreeNode[]>;
     webAgentPanelOpen?: boolean;
     aiPanelMode?: AiPanelMode;
-    prototypeStartPageActive?: boolean;
+    externalOpenMenu?: boolean;
     resourceStartDraftActive?: boolean;
     themeStartDraftActive?: boolean;
 }
@@ -214,6 +221,7 @@ export interface NewSidebarActions {
     onSelectCanvas: (item: CanvasItem) => void;
     onSelectTheme: (item: ThemeResourceItem) => void;
     handleMenuClick: (params: { key: string; pageId?: string | null }) => void;
+    onOpenLocalPublishDialog?: (mode: 'html' | 'realtime', targetPath?: string) => void;
     handleDownloadItemSource: (item: ItemData) => void;
     handleDownloadThemeZip: (item: ThemeResourceItem) => void;
     handleRenameItem: (item: ItemData, nextName: string) => void | Promise<void>;
@@ -237,8 +245,7 @@ export interface NewSidebarActions {
     handleDeleteCanvasItem: (item: ItemData) => void | Promise<void>;
     handleCopyCanvasPath: (item: ItemData) => void | Promise<void>;
     onCreateFolder: (tab: SidebarTreeTab) => Promise<{ createdFolderId: string } | null>;
-    onSettingsClick: (tab?: 'project' | 'update') => void;
-    onVersionCollaborationClick: () => void;
+    onSettingsClick: (tab?: 'project' | 'update' | 'ai' | 'network') => void;
     onToggleTheme: () => void;
     onTitleChange: (title: string) => void | Promise<void>;
     onProjectSwitch: (projectId: string) => void | Promise<void>;
@@ -269,7 +276,7 @@ export interface NewSidebarActions {
     onOpenAcpWebAgent?: (targetPath?: string, provider?: AcpProvider) => void | Promise<void>;
     onOpenImageAiPanel?: () => void | Promise<void>;
     onOpenWebAgentInPanel?: (url: string) => boolean | void | Promise<boolean | void>;
-    onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+    onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
     onCloseAiPanel?: () => void;
     onCloseWebAgentPanel?: () => void;
     onOpenAISettings?: () => void;
@@ -279,6 +286,7 @@ export interface NewSidebarPreferences {
     preferredIDE: MainIDEPreference;
     ideAvailability?: IDEAvailabilityMap;
     agentAvailability?: RuntimeAgentAvailability;
+    skipLanPreviewAuth?: boolean;
     onPreferredIDEChange?: (ide: MainIDEPreference) => void;
 }
 
@@ -341,6 +349,7 @@ export interface PresentationAreaState {
     allowLAN: boolean;
     projectAccessDeniedReason?: string;
     assistantVisible?: boolean;
+    conversationUiEnabled?: boolean;
     startServerLoading?: boolean;
     containerRef: RefObject<HTMLDivElement>;
     previewIframeRef: MutableRefObject<HTMLIFrameElement | null>;
@@ -357,6 +366,8 @@ export interface PresentationAreaState {
     contentMode?: 'preview' | 'prototype-spec' | 'doc' | 'template' | 'canvas' | 'theme' | 'data';
     docsItems?: ItemData[];
     sidebarTrees?: Partial<Record<SidebarTreeTab, SidebarTreeNode[]>>;
+    annotationDocuments?: AnnotationDocumentDirectoryNode[];
+    annotationDocumentsLoading?: boolean;
     selectedDoc?: ItemData | null;
     selectedResourceFolder?: SelectedResourceFolder | null;
     selectedCanvas?: CanvasItem | null;
@@ -376,14 +387,20 @@ export interface PresentationAreaState {
     excalidrawPropertyPanelPosition?: ExcalidrawPropertyPanelPosition;
     startServerError?: string;
     preferredPromptClient: PromptClientPreference;
+    preferredModel?: string | null;
+    canvasPromptClient?: PromptClientPreference;
+    canvasModel?: string | null;
     preferredIDE: MainIDEPreference;
     standalonePanelOpen?: boolean;
     bridgeConnected?: boolean;
     activeProjectId?: string | null;
+    prototypeVersionPopoverOpen?: boolean;
+    onOpenRemoteRepositorySettings?: () => void;
     ideAvailability?: IDEAvailabilityMap;
     agentAvailability?: RuntimeAgentAvailability;
     webAgentPanelOpen?: boolean;
     aiPanelMode?: AiPanelMode;
+    externalOpenMenu?: boolean;
     assistantApiBaseUrl?: string;
     assistantProjectPath?: string;
     prototypes?: ItemData[];
@@ -391,6 +408,11 @@ export interface PresentationAreaState {
     defaultThemeName?: string | null;
     onOpenPrototypeCreateDialog?: (options: PrototypeCreateDialogOpenOptions) => void;
     onRefreshPrototypes?: (preferredName?: string) => Promise<ItemData[]>;
+    /** Client-only Commentary voice entry supplied by the Make shell. */
+    commentaryVoiceEntry?: React.ReactNode;
+    commentaryVoiceVisible?: boolean;
+    canvasVoiceEntry?: React.ReactNode;
+    canvasVoiceVisible?: boolean;
 }
 
 export interface PresentationAreaActions {
@@ -414,6 +436,12 @@ export interface PresentationAreaActions {
     handleCheckPrototypeAnnotationEnabled: () => Promise<boolean | null>;
     handleEnablePrototypeAnnotation: () => Promise<boolean>;
     handleCopyPrototypeAnnotationPrompt: () => void | Promise<void>;
+    handleLoadPrototypeAnnotationDocuments?: () => void | Promise<void>;
+    handleCreatePrototypeAnnotationDocument?: (folderId?: string | null) => void | Promise<void>;
+    handlePrototypeAnnotationDocumentTreeChange?: (tree: AnnotationDocumentDirectoryNode[]) => void;
+    handlePersistPrototypeAnnotationDocumentTree?: (tree: AnnotationDocumentDirectoryNode[]) => void | Promise<void>;
+    handleEditPrototypeAnnotationDocument?: (node: AnnotationDocumentDirectoryNode) => void | Promise<void>;
+    handleDeletePrototypeAnnotationDocument?: (node: AnnotationDocumentDirectoryNode) => void | Promise<void>;
     handleEnableDocEdit: (mode?: SpecQuickEditMode, options?: { disableSelectionMode?: boolean; preserveSidebar?: boolean }) => void;
     handleSaveDocEdit: () => void;
     handleExitDocEdit: () => void;
@@ -449,6 +477,7 @@ export interface PresentationAreaActions {
     handlePublishCloudTarget: (target: CloudPublishTarget) => void | Promise<void>;
     handleOpenCloudPublishSettings: (target?: ConfigurableCloudPublishTarget | 'publish-settings') => void;
     handleOpenAxhubPublishDialog: () => void | Promise<void>;
+    handleOpenLocalPublishDialog?: (mode: 'html' | 'realtime', targetPath?: string) => void;
     currentPublishResourcePath: string;
     latestCloudPublishUrl: string;
     handleCopyLatestCloudPublishUrl: () => void | Promise<void>;
@@ -471,6 +500,8 @@ export interface PresentationAreaActions {
     onStartCurrentProjectServer?: () => void | Promise<void>;
     onCopyStartServerErrorPrompt?: () => void | Promise<void>;
     setElementIframeSize: (size: { width: number; height: number }) => void;
+    setPrototypeVersionPopoverOpen?: (open: boolean) => void;
+    onOpenRemoteRepositorySettings?: () => void;
     onStandalonePanelToggle?: () => void;
     setExcalidrawPropertyPanelMode?: (mode: ExcalidrawPropertyPanelMode) => void;
     setExcalidrawPropertyPanelPosition?: (position: ExcalidrawPropertyPanelPosition) => void;
@@ -482,16 +513,18 @@ export interface PresentationAreaActions {
     onOpenAcpWebAgent?: (targetPath?: string, provider?: AcpProvider) => void | Promise<void>;
     onOpenImageAiPanel?: () => void | Promise<void>;
     onOpenWebAgentInPanel?: (url: string) => boolean | void | Promise<boolean | void>;
-    onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+    onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
     onCloseAiPanel?: () => void;
     onCloseWebAgentPanel?: () => void;
     onPreferredIDEChange?: (ide: MainIDEPreference) => void;
     onOpenAISettings?: () => void;
-    onCreatePrototypeForDraftStart?: () => Promise<ItemData | null>;
+    onToggleCommentaryVoice?: () => void;
+    onToggleCanvasVoice?: () => void;
     onUploadResourceFiles?: () => void;
     onCreateResourceCanvasFile?: () => void | Promise<void>;
     onCreateDrawioResourceFile?: () => void | Promise<void>;
     onOpenDesignImport?: () => void;
+    onRefreshThemes?: () => void | Promise<void>;
     onRefreshPrototypes?: (preferredName?: string) => Promise<ItemData[]>;
     agentRunConcurrency?: number;
     onSubmitCanvasAssistantPrompt?: (request: CanvasAiGenerationRequest) => Promise<CanvasAiGenerationResult | boolean> | CanvasAiGenerationResult | boolean;

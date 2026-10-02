@@ -77,6 +77,96 @@ describe('prototype annotation API', () => {
     }
   });
 
+  it('preserves and manages the annotation-owned documents directory', async () => {
+    const projectRoot = createTempRoot('axhub-make-prototype-annotation-');
+    writePrototypeProject(projectRoot);
+    const prototypeDir = path.join(projectRoot, 'src/prototypes/home');
+    fs.mkdirSync(path.join(prototypeDir, 'docs'), { recursive: true });
+    fs.writeFileSync(path.join(prototypeDir, 'docs/existing.md'), '# Existing\n', 'utf8');
+    fs.writeFileSync(path.join(prototypeDir, 'docs/interactive.html'), '<!doctype html><main>Interactive</main>', 'utf8');
+    fs.writeFileSync(path.join(prototypeDir, 'annotation-source.json'), `${JSON.stringify({
+      documentVersion: 1,
+      format: 'axhub-annotation-source',
+      data: { version: 2, prototypeName: 'home', pageId: 'home', nodes: [], updatedAt: 1 },
+      markdownMap: {},
+      assetMap: {},
+      documents: {
+        nodes: [{
+          type: 'markdown',
+          id: 'existing',
+          title: 'Existing',
+          markdownPath: 'docs/existing.md',
+        }, {
+          type: 'html',
+          id: 'interactive',
+          title: 'Interactive',
+          htmlPath: 'docs/interactive.html',
+        }],
+      },
+    }, null, 2)}\n`, 'utf8');
+    const server = await startActivatedProjectServer(projectRoot);
+
+    try {
+      const statusResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation?targetPath=prototypes/home`));
+      const statusBody = await statusResponse.json();
+      expect(statusResponse.status).toBe(200);
+      expect(statusBody.source.documents.nodes[0]).toMatchObject({
+        id: 'existing',
+        markdownPath: 'docs/existing.md',
+        markdown: '# Existing\n',
+      });
+      expect(statusBody.source.documents.nodes[1]).toMatchObject({
+        type: 'html',
+        id: 'interactive',
+        htmlPath: 'docs/interactive.html',
+      });
+
+      const createResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/documents`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetPath: 'prototypes/home', action: 'create', title: '新增文档' }),
+      });
+      const createBody = await createResponse.json();
+      expect(createResponse.status).toBe(200);
+      expect(createBody.node).toMatchObject({
+        type: 'markdown',
+        title: '新增文档',
+        readerMode: 'split',
+      });
+      expect(createBody.node.markdownPath).toMatch(/^docs\/新增文档(?:-\d+)?\.md$/u);
+      expect(fs.existsSync(path.join(prototypeDir, createBody.node.markdownPath))).toBe(true);
+
+      const refreshedStatusResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation?targetPath=prototypes/home`));
+      const refreshedStatusBody = await refreshedStatusResponse.json();
+      expect(refreshedStatusBody.source.documents.nodes).toContainEqual(expect.objectContaining({
+        id: createBody.node.id,
+        readerMode: 'split',
+      }));
+
+      const deleteResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/documents`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetPath: 'prototypes/home', action: 'delete', nodeId: createBody.node.id }),
+      });
+      const deleteBody = await deleteResponse.json();
+      expect(deleteResponse.status).toBe(200);
+      expect(deleteBody.source.documents.nodes).toHaveLength(2);
+      expect(fs.existsSync(path.join(prototypeDir, createBody.node.markdownPath))).toBe(false);
+
+      const deleteHtmlResponse = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/documents`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetPath: 'prototypes/home', action: 'delete', nodeId: 'interactive' }),
+      });
+      const deleteHtmlBody = await deleteHtmlResponse.json();
+      expect(deleteHtmlResponse.status).toBe(200);
+      expect(deleteHtmlBody.source.documents.nodes).toHaveLength(1);
+      expect(fs.existsSync(path.join(prototypeDir, 'docs/interactive.html'))).toBe(false);
+    } finally {
+      await server.close();
+    }
+  });
+
   it('allows preview pages to preflight annotation node writes', async () => {
     const projectRoot = createTempRoot('axhub-make-prototype-annotation-');
     writePrototypeProject(projectRoot);
@@ -96,6 +186,35 @@ describe('prototype annotation API', () => {
       expect(response.headers.get('access-control-allow-origin')).toBe('*');
       expect(response.headers.get('access-control-allow-methods')).toContain('PUT');
       expect(response.headers.get('access-control-allow-headers')?.toLowerCase()).toContain('content-type');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('ignores non-HTML paths declared as HTML document nodes', async () => {
+    const projectRoot = createTempRoot('axhub-make-prototype-annotation-');
+    writePrototypeProject(projectRoot);
+    const prototypeDir = path.join(projectRoot, 'src/prototypes/home');
+    fs.writeFileSync(path.join(prototypeDir, 'annotation-source.json'), `${JSON.stringify({
+      documentVersion: 1,
+      format: 'axhub-annotation-source',
+      data: { version: 2, prototypeName: 'home', pageId: 'home', nodes: [], updatedAt: 1 },
+      markdownMap: {},
+      assetMap: {},
+      documents: {
+        nodes: [
+          { type: 'html', id: 'invalid-extension', title: 'Invalid extension', htmlPath: 'docs/not-markdown.txt' },
+          { type: 'html', id: 'unsafe', title: 'Unsafe', htmlPath: '../outside.html' },
+        ],
+      },
+    }, null, 2)}\n`, 'utf8');
+    const server = await startActivatedProjectServer(projectRoot);
+
+    try {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation?targetPath=prototypes/home`));
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      expect(body.source.documents.nodes).toEqual([]);
     } finally {
       await server.close();
     }
@@ -176,6 +295,12 @@ describe('prototype annotation API', () => {
       expect(nextIndexSource).toContain("import annotationSourceDocument from './annotation-source.json';");
       expect(nextIndexSource).toContain('<AnnotationViewer');
       expect(nextIndexSource).toContain('source={annotationSourceDocument as unknown as AnnotationSourceDocument}');
+      expect(nextIndexSource).toContain("new URLSearchParams(window.location.hash.replace(/^#/, '')).get('page')");
+      expect(nextIndexSource).toContain("new URLSearchParams(window.location.search.replace(/^\\?/, '')).get('page')");
+      expect(nextIndexSource).toContain("typeof pageId === 'string' && /^[a-z0-9-]+$/u.test(pageId)");
+      expect(nextIndexSource).toContain('onDirectoryRoute: (node) => {');
+      expect(nextIndexSource).toContain("typeof node.route === 'string' && /^[a-z0-9-]+$/u.test(node.route)");
+      expect(nextIndexSource).toContain('window.location.hash = `page=${node.route}`;');
 
       const second = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/enable`), {
         method: 'POST',
@@ -189,6 +314,122 @@ describe('prototype annotation API', () => {
         changedIndex: false,
       });
       expect(fs.readFileSync(indexPath, 'utf8')).toBe(nextIndexSource);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('creates a standard page directory from valid multi-page metadata', async () => {
+    const projectRoot = createTempRoot('axhub-make-prototype-annotation-');
+    writePrototypeProject(projectRoot);
+    const server = await startActivatedProjectServer(projectRoot);
+
+    try {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/enable`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetPath: 'prototypes/home',
+          pages: [
+            { id: 'home', title: ' 首页 ' },
+            { id: 'INVALID', title: '无效页面' },
+            { id: 'orders', title: '订单列表', group: '业务' },
+            { id: 'home', title: '重复首页' },
+            { id: 'empty-title', title: '   ' },
+          ],
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.source.directory).toEqual({
+        nodes: [{
+          type: 'folder',
+          id: 'directory-pages',
+          title: '页面',
+          defaultExpanded: true,
+          children: [
+            { type: 'route', id: 'route-home', title: '首页', route: 'home' },
+            { type: 'route', id: 'route-orders', title: '订单列表', route: 'orders' },
+          ],
+        }],
+      });
+      expect(JSON.parse(fs.readFileSync(
+        path.join(projectRoot, 'src/prototypes/home/annotation-source.json'),
+        'utf8',
+      )).directory).toEqual(body.source.directory);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it.each([
+    { label: 'missing page metadata', pages: undefined },
+    { label: 'a single valid page', pages: [{ id: 'home', title: '首页' }] },
+  ])('does not create a directory with $label', async ({ pages }) => {
+    const projectRoot = createTempRoot('axhub-make-prototype-annotation-');
+    writePrototypeProject(projectRoot);
+    const server = await startActivatedProjectServer(projectRoot);
+
+    try {
+      const response = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/enable`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetPath: 'prototypes/home',
+          ...(pages ? { pages } : {}),
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.source).not.toHaveProperty('directory');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('preserves an existing annotation directory when enabling repeatedly', async () => {
+    const projectRoot = createTempRoot('axhub-make-prototype-annotation-');
+    writePrototypeProject(projectRoot);
+    const sourcePath = path.join(projectRoot, 'src/prototypes/home/annotation-source.json');
+    const existingDirectory = {
+      nodes: [{ type: 'markdown', id: 'doc-overview', title: '说明', markdown: '# 说明' }],
+    };
+    fs.writeFileSync(sourcePath, `${JSON.stringify({
+      documentVersion: 1,
+      format: 'axhub-annotation-source',
+      data: {
+        version: 2,
+        prototypeName: 'home',
+        pageId: 'home',
+        nodes: [],
+        updatedAt: 1,
+      },
+      markdownMap: {},
+      assetMap: {},
+      directory: existingDirectory,
+    }, null, 2)}\n`, 'utf8');
+    const server = await startActivatedProjectServer(projectRoot);
+
+    try {
+      const request = () => fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/prototype-annotation/enable`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetPath: 'prototypes/home',
+          pages: [
+            { id: 'home', title: '首页' },
+            { id: 'orders', title: '订单' },
+          ],
+        }),
+      });
+      await request();
+      const response = await request();
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.source.directory).toEqual(existingDirectory);
     } finally {
       await server.close();
     }

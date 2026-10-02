@@ -9,8 +9,14 @@ import {
   resolveAssistantRuntime,
   runAssistantBootstrap,
 } from './assistantRuntime.ts';
-import { detectAgentAvailabilityAtStartup } from './agentAvailability.ts';
-import type { AgentAvailabilityInfo, AgentVersionInfo, CLIAgent } from './agentTypes.ts';
+import { createAgentAvailabilityDetector, detectAgentAvailabilityAtStartup } from './agentAvailability.ts';
+import {
+  LOCAL_APP_AGENT_VALUES,
+  type AgentAvailabilityInfo,
+  type AgentVersionInfo,
+  type CLIAgent,
+  type LocalAppAgent,
+} from './agentTypes.ts';
 import {
   getMissingCLIAgentOpenError,
   getMissingLocalAppOpenError,
@@ -19,9 +25,25 @@ import {
   normalizeLocalAppAgent,
   normalizeWebAgent,
   openCLIAgent,
+  openLocalAppApplication,
   openLocalAppAgent,
   openWebAgent,
 } from './agentOpen.ts';
+import {
+  coordinateDesktopIntegrationOpen,
+  DESKTOP_INTEGRATION_PROVIDERS,
+  normalizeDesktopIntegrationOpenAction,
+  normalizeDesktopIntegrationProvider,
+  type DesktopIntegrationProvider,
+  type DesktopIntegrationOperationResult,
+} from './desktopIntegrationOpen.ts';
+import {
+  closeMakeAgentSurfaceHost,
+  inspectMakeAgentSurfaceHost,
+  openMakeAgentProjectOnly,
+  openMakeAgentSurface,
+  openMakeAgentSurfaceProject,
+} from './agentSurfaceIntegration.ts';
 import { getRequestUrl, readJsonBody, sendJson } from './http.ts';
 import { normalizeMainIDE, openIDEPath } from './ideOpen.ts';
 import { runLocalCommand } from './localCommand.ts';
@@ -33,6 +55,9 @@ const CANVAS_PROTOTYPE_GENERATION_TIMEOUT_SECONDS = 600;
 const CANVAS_PROTOTYPE_GENERATION_SESSION_TTL_SECONDS = 30;
 const AGENT_VERSION_TIMEOUT_MS = 2_000;
 const AGENT_LATEST_VERSION_TIMEOUT_MS = 3_000;
+const TRAEWORK_PROJECT_OPEN_UNSUPPORTED_MESSAGE = 'TRAEWORK 暂不支持自动打开当前项目';
+const TRAEWORK_SURFACE_ONLY_NOTICE = 'TRAEWORK 已打开并注入 Axhub Make，但不支持自动打开目录，请在 TRAEWORK 中手动选择当前项目目录。';
+const TRAEWORK_APPLICATION_ONLY_NOTICE = 'TRAEWORK 已打开，但不支持自动打开目录，请在 TRAEWORK 中手动选择当前项目目录。';
 type AgentVersionKey =
   | 'claude'
   | 'codex'
@@ -80,6 +105,13 @@ function normalizeAgentVersionKey(value: unknown): AgentVersionKey | null {
     : null;
 }
 
+function getConfiguredCliAgentCommandPath(config: any, agent: AgentVersionKey): string | undefined {
+  const cliAgent = agent === 'claude' ? 'claudecode' : agent;
+  const commandPath = config?.toolOpenState?.[buildToolOpenStateKey('cli', cliAgent)]?.commandPath;
+  const normalized = String(commandPath || '').trim();
+  return normalized || undefined;
+}
+
 interface AssistantIdeProjectContext {
   project: {
     id: string;
@@ -123,12 +155,13 @@ function resolveConfiguredMainIDE(
   return normalizeMainIDE(config.automation.defaultIDE);
 }
 
-function withStoredCommandAvailability(
+function withStoredPathAvailability(
   availability: AgentAvailabilityInfo | undefined,
   toolOpenState: ToolOpenStateEntry | undefined,
+  pathField: 'executablePath' | 'commandPath',
 ): AgentAvailabilityInfo | undefined {
-  const storedCommandPath = String(toolOpenState?.commandPath || '').trim();
-  if (!storedCommandPath) {
+  const storedPath = String(toolOpenState?.[pathField] || '').trim();
+  if (!storedPath) {
     return availability;
   }
 
@@ -138,8 +171,216 @@ function withStoredCommandAvailability(
     confidence: availability?.confidence || 'high',
     checkedAt: availability?.checkedAt || new Date().toISOString(),
     source: availability?.source || 'tool-open-state',
-    path: storedCommandPath,
+    path: storedPath,
   };
+}
+
+interface DesktopProjectOpenContext {
+  appPath?: string;
+  toolOpenStateKey: string;
+}
+
+const DESKTOP_INTEGRATION_APP_LABELS: Record<DesktopIntegrationProvider, string> = {
+  chatgpt: 'ChatGPT',
+  cursor: 'Cursor',
+  workbuddy: 'WorkBuddy',
+  traework: 'TRAEWORK',
+};
+
+const DESKTOP_APP_PATH_ERROR_CODES = new Set([
+  'app-not-found',
+  'app-path-required',
+  'configuration-required',
+  'host-launch-failed',
+  'invalid-project-options',
+  'project-open-failed',
+]);
+
+const DESKTOP_CLIENT_CONNECTION_ERROR_CODES = new Set([
+  'cdp-start-timeout',
+  'project-renderer-timeout',
+]);
+
+export function desktopIntegrationOpenFailureMessage(
+  provider: DesktopIntegrationProvider,
+  result: { code: string; message: string },
+): string {
+  const label = DESKTOP_INTEGRATION_APP_LABELS[provider];
+  if (DESKTOP_CLIENT_CONNECTION_ERROR_CODES.has(result.code)) {
+    return `未能启动或连接到 ${label}，未检测到可用窗口。请前往左上角「设置」→「AI 设置」→「本地桌面 Agent」，检查 ${label} 的应用路径后重试。`;
+  }
+  if (!DESKTOP_APP_PATH_ERROR_CODES.has(result.code)) return result.message;
+  return `无法启动 ${label}。请前往左上角「设置」→「AI 设置」→「本地桌面 Agent」，检查 ${label} 的应用路径。`;
+}
+
+function isDesktopApplicationExecutablePath(appPath: string, platform = process.platform): boolean {
+  if (platform === 'darwin') {
+    return /\.app\/Contents\/MacOS\/[^/]+$/iu.test(appPath);
+  }
+  if (platform === 'win32') {
+    return /\.exe$/iu.test(appPath);
+  }
+  return false;
+}
+
+function assertDesktopApplicationExecutablePath(
+  provider: DesktopIntegrationProvider,
+  appPath: string | undefined,
+): void {
+  if (!appPath || isDesktopApplicationExecutablePath(appPath)) return;
+  throw new Error(desktopIntegrationOpenFailureMessage(provider, {
+    code: 'invalid-project-options',
+    message: 'Invalid desktop application path.',
+  }));
+}
+
+function resolveDesktopProjectOpenContext({
+  provider,
+  projectRoot,
+  options,
+  handlers,
+}: {
+  provider: DesktopIntegrationProvider;
+  projectRoot: string;
+  options: ManagementApiOptions;
+  handlers: AssistantIdeHandlers;
+}): DesktopProjectOpenContext {
+  const config = handlers.getServerConfigStoreForRequest(options).getConfig({ activeProjectRoot: projectRoot });
+  if (provider === 'cursor') {
+    const toolOpenStateKey = buildToolOpenStateKey('ide', 'cursor');
+    const appPath = String(config.toolOpenState?.[toolOpenStateKey]?.executablePath || '').trim() || undefined;
+    assertDesktopApplicationExecutablePath(provider, appPath);
+    return { toolOpenStateKey, appPath };
+  }
+
+  const localAppByProvider: Record<Exclude<DesktopIntegrationProvider, 'cursor'>, LocalAppAgent> = {
+    chatgpt: 'codex',
+    workbuddy: 'workbuddy',
+    traework: 'traework',
+  };
+  const localApp = localAppByProvider[provider];
+  const toolOpenStateKey = buildToolOpenStateKey('local-app', localApp);
+  const storedAvailability = withStoredPathAvailability(
+    undefined,
+    config.toolOpenState?.[toolOpenStateKey],
+    'executablePath',
+  );
+  const agentAvailability = storedAvailability
+    ?? createAgentAvailabilityDetector().detectLocalAppAgentAvailability(localApp);
+  if (agentAvailability?.status === 'missing') {
+    throw new Error(desktopIntegrationOpenFailureMessage(provider, {
+      code: 'app-not-found',
+      message: getMissingLocalAppOpenError(localApp).body.error,
+    }));
+  }
+  const appPath = agentAvailability?.path;
+  assertDesktopApplicationExecutablePath(provider, appPath);
+  return { toolOpenStateKey, appPath };
+}
+
+async function openDesktopIntegrationOperation({
+  provider,
+  mode,
+  targetPath,
+  projectRoot,
+  makeOrigin,
+  projectId,
+  projectOpenContext,
+  options,
+  handlers,
+}: {
+  provider: DesktopIntegrationProvider;
+  mode: 'integrated' | 'normal';
+  targetPath: string;
+  projectRoot: string;
+  makeOrigin: string;
+  projectId: string;
+  projectOpenContext: DesktopProjectOpenContext;
+  options: ManagementApiOptions;
+  handlers: AssistantIdeHandlers;
+}): Promise<DesktopIntegrationOperationResult> {
+  const serverConfigStore = handlers.getServerConfigStoreForRequest(options);
+  const { appPath, toolOpenStateKey } = projectOpenContext;
+  const launchLocalAiApp = serverConfigStore
+    .getConfig({ activeProjectRoot: projectRoot })
+    .automation.launchLocalAiApp !== false;
+
+  if (process.platform !== 'darwin' && process.platform !== 'win32') {
+    if (mode !== 'normal' || provider !== 'cursor') {
+      throw new Error(`${provider} project opening does not support ${process.platform}.`);
+    }
+    const existingToolOpenState = serverConfigStore
+      .getConfig({ activeProjectRoot: projectRoot })
+      .toolOpenState?.[toolOpenStateKey];
+    const legacyResult = await openIDEPath({
+      ide: 'cursor',
+      targetPath,
+      toolOpenState: existingToolOpenState,
+    });
+    serverConfigStore.saveConfig({
+      toolOpenState: {
+        [toolOpenStateKey]: {
+          executablePath: legacyResult.executablePath || appPath,
+          appPathName: legacyResult.appPathName,
+          lastOpenMode: legacyResult.openMode,
+        },
+      },
+    });
+    return { url: legacyResult.url, openInBrowser: legacyResult.openInBrowser };
+  }
+
+  if (provider === 'traework') {
+    if (mode === 'integrated') {
+      const surface = await openMakeAgentSurface({
+        provider,
+        makeOrigin,
+        projectId,
+        appPath,
+        newClient: launchLocalAiApp,
+      });
+      if (!surface.ok) throw new Error(desktopIntegrationOpenFailureMessage(provider, surface));
+    } else {
+      if (!appPath) throw new Error('TRAEWORK application path is required.');
+      await openLocalAppApplication({ applicationPath: appPath, platform: process.platform });
+    }
+    serverConfigStore.saveConfig({
+      toolOpenState: {
+        [toolOpenStateKey]: {
+          executablePath: appPath,
+          lastOpenMode: 'direct-app',
+        },
+      },
+    });
+    return {
+      noticeCode: 'project-selection-required',
+      notice: mode === 'integrated'
+        ? TRAEWORK_SURFACE_ONLY_NOTICE
+        : TRAEWORK_APPLICATION_ONLY_NOTICE,
+    };
+  }
+
+  const open = mode === 'integrated'
+    ? openMakeAgentSurfaceProject
+    : openMakeAgentProjectOnly;
+  const result = await open({
+    provider,
+    makeOrigin,
+    projectId,
+    targetPath,
+    appPath,
+    newClient: launchLocalAiApp,
+  });
+  if (!result.ok) throw new Error(desktopIntegrationOpenFailureMessage(provider, result));
+
+  serverConfigStore.saveConfig({
+    toolOpenState: {
+      [toolOpenStateKey]: {
+        executablePath: appPath,
+        lastOpenMode: result.url ? 'deeplink' : 'direct-app',
+      },
+    },
+  });
+  return { url: result.url, openInBrowser: result.openInBrowser };
 }
 
 function firstVersionLine(...outputs: unknown[]): string {
@@ -157,8 +398,10 @@ function normalizeVersionOutput(...outputs: unknown[]): string {
   return match?.[1] || line;
 }
 
-async function detectAgentVersion(agent: AgentVersionKey): Promise<AgentVersionInfo> {
-  const commands = AGENT_VERSION_COMMANDS[agent];
+async function detectAgentVersion(agent: AgentVersionKey, commandOverride?: string): Promise<AgentVersionInfo> {
+  const commands = commandOverride
+    ? [{ command: commandOverride, args: ['--version'] }]
+    : AGENT_VERSION_COMMANDS[agent];
   const checkedAt = new Date().toISOString();
   let lastError: any = null;
   let lastCommand = commands[0]?.command || agent;
@@ -261,17 +504,17 @@ async function detectAgentVersionMap(
   return result;
 }
 
-async function detectAgentVersions() {
+async function detectAgentVersions(commandOverrides: Partial<Record<AgentVersionKey, string>> = {}) {
   const [agents, latestAgents] = await Promise.all([
-    detectAgentVersionMap(detectAgentVersion),
+    detectAgentVersionMap((agent) => detectAgentVersion(agent, commandOverrides[agent])),
     detectAgentVersionMap(detectLatestAgentVersion),
   ]);
   return { agents, latestAgents };
 }
 
-async function detectSingleAgentVersions(agent: AgentVersionKey) {
+async function detectSingleAgentVersions(agent: AgentVersionKey, commandOverride?: string) {
   const [version, latestVersion] = await Promise.all([
-    detectAgentVersion(agent),
+    detectAgentVersion(agent, commandOverride),
     detectLatestAgentVersion(agent),
   ]);
   const agents: Partial<Record<AgentVersionResponseKey, AgentVersionInfo>> = {
@@ -350,6 +593,7 @@ export function handleAssistantPromptIde(
 ): boolean {
   if (
     !pathname.startsWith('/api/assistant/')
+    && pathname !== '/api/desktop-integration/open'
     && pathname !== '/api/ide/open'
     && pathname !== '/api/agent/versions'
     && pathname !== '/api/agent/cli/open'
@@ -357,6 +601,118 @@ export function handleAssistantPromptIde(
     && pathname !== '/api/agent/web/open'
   ) {
     return false;
+  }
+
+  if (pathname === '/api/desktop-integration/open' && req.method !== 'POST') {
+    sendJson(res, { error: 'Method not allowed' }, { status: 405 });
+    return true;
+  }
+
+  if (pathname === '/api/desktop-integration/open' && req.method === 'POST') {
+    readJsonBody(req).then(async (body) => {
+      const context = handlers.resolveProjectContext(req, res, options, 'explicit-required', body);
+      if (!context) return;
+
+      const provider = normalizeDesktopIntegrationProvider(body?.provider);
+      if (!provider) {
+        sendJson(res, {
+          error: `Unsupported desktop integration provider: ${String(body?.provider || '(empty)')}`,
+          code: 'DESKTOP_INTEGRATION_PROVIDER_UNSUPPORTED',
+          projectId: context.project.id,
+          supported: DESKTOP_INTEGRATION_PROVIDERS,
+        }, { status: 400 });
+        return;
+      }
+
+      const action = normalizeDesktopIntegrationOpenAction(body?.action);
+      if (!action) {
+        sendJson(res, {
+          error: `Unsupported desktop integration action: ${String(body?.action || '(empty)')}`,
+          code: 'DESKTOP_INTEGRATION_ACTION_UNSUPPORTED',
+          projectId: context.project.id,
+          supported: ['prepare', 'restart', 'normal'],
+        }, { status: 400 });
+        return;
+      }
+
+      const rawTargetPath = String(body?.path || body?.targetPath || '').trim();
+      const targetPath = rawTargetPath || context.project.root;
+      let absoluteTargetPath = '';
+      try {
+        absoluteTargetPath = resolveProjectPath(context.project.root, targetPath);
+      } catch (error: any) {
+        sendJson(res, {
+          error: error.message,
+          code: 'PATH_OUTSIDE_PROJECT',
+          projectId: context.project.id,
+        }, { status: 403 });
+        return;
+      }
+
+      const serverConfig = handlers.getServerConfigStoreForRequest(options)
+        .getConfig({ activeProjectRoot: context.project.root });
+      const injectLocalAiEntry = serverConfig.automation.injectLocalAiEntry !== false;
+      const effectiveAction = process.platform === 'darwin' || process.platform === 'win32'
+        ? injectLocalAiEntry ? action : 'normal'
+        : 'normal';
+      const makeOrigin = getRequestUrl(req).origin;
+
+      try {
+        const preferredProjectOpenContext = resolveDesktopProjectOpenContext({
+          provider,
+          projectRoot: context.project.root,
+          options,
+          handlers,
+        });
+        const supportsAgentSurfaceProjectOpen = process.platform === 'darwin' || process.platform === 'win32';
+        const initialInspection = supportsAgentSurfaceProjectOpen
+          ? await inspectMakeAgentSurfaceHost(provider, {
+              appPath: preferredProjectOpenContext.appPath,
+            })
+          : null;
+        const projectOpenContext = {
+          ...preferredProjectOpenContext,
+          appPath: preferredProjectOpenContext.appPath || initialInspection?.appPath || undefined,
+        };
+        const open = (mode: 'integrated' | 'normal') => openDesktopIntegrationOperation({
+          provider,
+          mode,
+          targetPath: absoluteTargetPath,
+          projectRoot: context.project.root,
+          makeOrigin,
+          projectId: context.project.id,
+          projectOpenContext,
+          options,
+          handlers,
+        });
+        const adapters = {
+          inspect: () => inspectMakeAgentSurfaceHost(provider, { appPath: projectOpenContext.appPath }),
+          // The combined project-and-surface call owns launching and injection.
+          launch: async () => ({ launched: true, reused: false }),
+          close: () => closeMakeAgentSurfaceHost(provider, { appPath: projectOpenContext.appPath }),
+          open,
+        };
+        const result = await coordinateDesktopIntegrationOpen({
+          provider,
+          action: effectiveAction,
+        }, adapters);
+        sendJson(res, {
+          success: true,
+          ...result,
+          projectId: context.project.id,
+        });
+      } catch (error: any) {
+        sendJson(res, {
+          error: error?.message || 'Failed to open desktop integration',
+          code: 'DESKTOP_INTEGRATION_OPEN_FAILED',
+          projectId: context.project.id,
+          provider,
+          action: effectiveAction,
+          targetPath: absoluteTargetPath,
+        }, { status: 500 });
+      }
+    }).catch((error) => sendJson(res, { error: error.message }, { status: 400 }));
+    return true;
   }
 
   if (pathname === '/api/assistant/runtime' && req.method === 'GET') {
@@ -407,7 +763,19 @@ export function handleAssistantPromptIde(
       }, { status: 400 });
       return true;
     }
-    const detectVersions = agent ? detectSingleAgentVersions(agent) : detectAgentVersions();
+    const serverConfig = handlers.getServerConfigStoreForRequest(options).getConfig({
+      activeProjectRoot: options.startupProjectRoot || options.projectRoot,
+    });
+    const commandOverrides: Partial<Record<AgentVersionKey, string>> = {};
+    for (const versionKey of ['claude', 'codex', 'opencode'] as const) {
+      const commandPath = getConfiguredCliAgentCommandPath(serverConfig, versionKey);
+      if (commandPath) {
+        commandOverrides[versionKey] = commandPath;
+      }
+    }
+    const detectVersions = agent
+      ? detectSingleAgentVersions(agent, commandOverrides[agent])
+      : detectAgentVersions(commandOverrides);
     detectVersions
       .then((result) => sendJson(res, result))
       .catch((error: any) => sendJson(res, {
@@ -529,7 +897,11 @@ export function handleAssistantPromptIde(
       const serverConfigStore = handlers.getServerConfigStoreForRequest(options);
       const config = serverConfigStore.getConfig({ activeProjectRoot: context.project.root });
       const toolOpenStateKey = buildToolOpenStateKey('cli', agent);
-      const agentAvailability = withStoredCommandAvailability(availability.cli[agent], config.toolOpenState?.[toolOpenStateKey]);
+      const agentAvailability = withStoredPathAvailability(
+        availability.cli[agent],
+        config.toolOpenState?.[toolOpenStateKey],
+        'commandPath',
+      );
       if (agentAvailability?.status === 'missing') {
         const missingAgentOpenError = getMissingCLIAgentOpenError(agent);
         sendJson(res, {
@@ -597,8 +969,19 @@ export function handleAssistantPromptIde(
           error: `Unsupported local app agent: ${rawAgent || '(empty)'}`,
           code: 'LOCAL_APP_AGENT_UNSUPPORTED',
           projectId: context.project.id,
-          supported: ['codex', 'opencode'],
+          supported: LOCAL_APP_AGENT_VALUES,
         }, { status: 400 });
+        return;
+      }
+
+      if (agent === 'traework') {
+        sendJson(res, {
+          error: TRAEWORK_PROJECT_OPEN_UNSUPPORTED_MESSAGE,
+          code: 'PROJECT_OPEN_UNSUPPORTED',
+          projectId: context.project.id,
+          agent,
+          targetPath: absoluteTargetPath,
+        }, { status: 422 });
         return;
       }
 
@@ -606,7 +989,11 @@ export function handleAssistantPromptIde(
       const serverConfigStore = handlers.getServerConfigStoreForRequest(options);
       const config = serverConfigStore.getConfig({ activeProjectRoot: context.project.root });
       const toolOpenStateKey = buildToolOpenStateKey('local-app', agent);
-      const agentAvailability = withStoredCommandAvailability(availability.localApp[agent], config.toolOpenState?.[toolOpenStateKey]);
+      const agentAvailability = withStoredPathAvailability(
+        availability.localApp[agent],
+        config.toolOpenState?.[toolOpenStateKey],
+        'executablePath',
+      );
       if (agentAvailability?.status === 'missing') {
         const missingAgentOpenError = getMissingLocalAppOpenError(agent);
         sendJson(res, {
@@ -627,7 +1014,7 @@ export function handleAssistantPromptIde(
         serverConfigStore.saveConfig({
           toolOpenState: {
             [toolOpenStateKey]: {
-              commandPath: agentAvailability?.path,
+              executablePath: agentAvailability?.path,
               lastOpenMode: result.openMode || (result.url || result.command.includes('://') ? 'deeplink' : 'direct-app'),
             },
           },
@@ -684,7 +1071,11 @@ export function handleAssistantPromptIde(
       const serverConfigStore = handlers.getServerConfigStoreForRequest(options);
       const config = serverConfigStore.getConfig({ activeProjectRoot: context.project.root });
       const toolOpenStateKey = buildToolOpenStateKey('web', agent);
-      const agentAvailability = withStoredCommandAvailability(availability.web[agent], config.toolOpenState?.[toolOpenStateKey]);
+      const agentAvailability = withStoredPathAvailability(
+        availability.web[agent],
+        config.toolOpenState?.[toolOpenStateKey],
+        'commandPath',
+      );
       if (agentAvailability?.status === 'missing') {
         const missingAgentOpenError = getMissingWebAgentOpenError(agent);
         sendJson(res, {

@@ -21,13 +21,10 @@ import {
     type EmbedSizePreset,
 } from './embedSizePreset';
 import {
+    AXHUB_EMBED_ACTIVATE_REQUESTED_EVENT,
     AXHUB_EMBED_ACTIVE_PREVIEW_CHANGED_EVENT,
     AXHUB_EMBED_EXIT_PREVIEW_EVENT,
     type ActiveEmbedPreview,
-    type EmbedPreviewExitPrompt,
-    type EmbedPreviewSessionHint,
-    resolveEmbedPreviewExitPointerDecision,
-    resolveEmbedPreviewSessionHint,
     shouldBlockCanvasWheelForActivePreview,
 } from './embedPreviewSession';
 import {
@@ -36,17 +33,11 @@ import {
     normalizeEmbedContentScale,
     updateEmbedContentScaleInElements,
 } from './embedContentScale';
-import {
-    resolveEmbedClickActivationMode,
-    type EmbedPointerIntentSnapshot,
-    type EmbedSelectionActivationMode,
-} from './embedActivationIntent';
 import CanvasNodeTitleLabel, {
     CANVAS_NODE_TITLE_LABEL_HEIGHT,
     CANVAS_NODE_TITLE_LABEL_MAX_WIDTH,
     CANVAS_NODE_TITLE_LABEL_MIN_WIDTH,
     CANVAS_NODE_TITLE_LABEL_OFFSET,
-    CANVAS_NODE_TITLE_LABEL_Z_INDEX,
 } from './CanvasNodeTitleLabel';
 import { getCanvasDirectRunAnnotationTaskRef } from '../../../domains/ai-generation/CanvasDirectRunOverlay';
 
@@ -111,11 +102,9 @@ const ACTION_GAP = 4;
 const ACTION_ICON = { width: 16, height: 16 };
 const LABEL_MAX_W = CANVAS_NODE_TITLE_LABEL_MAX_WIDTH;
 const LABEL_MIN_W = CANVAS_NODE_TITLE_LABEL_MIN_WIDTH;
-const LABEL_Z_INDEX = CANVAS_NODE_TITLE_LABEL_Z_INDEX;
 const ACTION_Z_INDEX = CANVAS_ELEMENT_OVERLAY_Z_INDEX;
 const POPOVER_Z_INDEX = CANVAS_ELEMENT_OVERLAY_Z_INDEX;
 const AXHUB_EMBED_BRAND_COLOR = '#008F5D';
-const CLICK_ACTIVATION_MOVEMENT_THRESHOLD = 5;
 const TOOLTIP_DELAY_MS = 80;
 const TOOLTIP_OFFSET = 8;
 
@@ -352,7 +341,6 @@ interface EmbedTooltipState {
 export default function EmbedFloatingToolbar({ excalidrawAPI, containerRef }: EmbedFloatingToolbarProps) {
     const [info, setInfo] = useState<SelectedEmbedInfo | null>(null);
     const [labels, setLabels] = useState<EmbedLabelInfo[]>([]);
-    const [previewSessionHint, setPreviewSessionHint] = useState<EmbedPreviewSessionHint | null>(null);
     const [hoveredBtn, setHoveredBtn] = useState<string | null>(null);
     const [tooltip, setTooltip] = useState<EmbedTooltipState | null>(null);
     const [sizePopoverOpen, setSizePopoverOpen] = useState(false);
@@ -364,19 +352,9 @@ export default function EmbedFloatingToolbar({ excalidrawAPI, containerRef }: Em
     const warnedPollErrorRef = useRef(false);
     const activePreviewElementIdRef = useRef<string | null>(null);
     const activePreviewRef = useRef<ActiveEmbedPreview | null>(null);
-    const exitPromptRef = useRef<EmbedPreviewExitPrompt | null>(null);
-    const previewSessionHintRef = useRef<EmbedPreviewSessionHint | null>(null);
-    const previewSessionHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [, setPreviewMaskRevision] = useState(0);
     const tooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const activePreviewSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const pointerIntentRef = useRef<{
-        pointerId: number;
-        startX: number;
-        startY: number;
-        selectedEmbedIdAtPointerDown: string | null;
-        moved: boolean;
-        released: boolean;
-    } | null>(null);
     const labelsRef = useRef<EmbedLabelInfo[]>([]);
     const infoRef = useRef<SelectedEmbedInfo | null>(null);
 
@@ -433,63 +411,30 @@ export default function EmbedFloatingToolbar({ excalidrawAPI, containerRef }: Em
         }, TOOLTIP_DELAY_MS);
     }, [containerRef]);
 
-    const clearExitPrompt = useCallback(() => {
-        if (previewSessionHintTimeoutRef.current) {
-            clearTimeout(previewSessionHintTimeoutRef.current);
-            previewSessionHintTimeoutRef.current = null;
-        }
-        exitPromptRef.current = null;
-        previewSessionHintRef.current = null;
-        setPreviewSessionHint(null);
-    }, []);
-
-    const showPreviewSessionHint = useCallback((hint: EmbedPreviewSessionHint) => {
-        if (previewSessionHintTimeoutRef.current) {
-            clearTimeout(previewSessionHintTimeoutRef.current);
-            previewSessionHintTimeoutRef.current = null;
-        }
-        if (hint.kind === 'exit-confirm') {
-            exitPromptRef.current = {
-                elementId: hint.elementId,
-                expiresAt: hint.expiresAt,
-            };
-        } else {
-            exitPromptRef.current = null;
-        }
-        previewSessionHintRef.current = hint;
-        setPreviewSessionHint(hint);
-        previewSessionHintTimeoutRef.current = setTimeout(() => {
-            setPreviewSessionHint((currentHint) => {
-                if (currentHint === hint) {
-                    previewSessionHintRef.current = null;
-                    return null;
-                }
-                return currentHint;
-            });
-            if (exitPromptRef.current?.elementId === hint.elementId && exitPromptRef.current.expiresAt === hint.expiresAt) {
-                clearExitPrompt();
-            }
-        }, Math.max(0, hint.expiresAt - Date.now()));
-    }, [clearExitPrompt]);
-
     const dispatchExitPreview = useCallback((elementId: string) => {
         window.dispatchEvent(new CustomEvent(AXHUB_EMBED_EXIT_PREVIEW_EVENT, {
-            detail: { elementId, reason: 'confirmed-outside-click' },
+            detail: { elementId, reason: 'outside-mask' },
         }));
         activePreviewElementIdRef.current = null;
         activePreviewRef.current = null;
-        clearExitPrompt();
-    }, [clearExitPrompt]);
-
-    const isTargetWithinEmbedUi = useCallback((target: EventTarget | null): boolean => {
-        return target instanceof Element && Boolean(target.closest('[data-axhub-embed-ui="true"]'));
+        setPreviewMaskRevision((revision) => revision + 1);
     }, []);
 
     const isTargetWithinActivePreviewFrame = useCallback((target: EventTarget | null): boolean => {
         const activePreview = activePreviewRef.current;
         if (!activePreview || !(target instanceof Element)) return false;
         const iframe = target.closest('iframe[data-axhub-embed-id]');
-        return iframe instanceof HTMLIFrameElement && iframe.dataset.axhubEmbedId === activePreview.elementId;
+        if (iframe instanceof HTMLIFrameElement && iframe.dataset.axhubEmbedId === activePreview.elementId) {
+            return true;
+        }
+
+        const embedContainer = target.closest('.excalidraw__embeddable-container');
+        if (!embedContainer) return false;
+        const rect = embedContainer.getBoundingClientRect();
+        return Math.abs(rect.left - activePreview.screenX) < 2
+            && Math.abs(rect.top - activePreview.screenY) < 2
+            && Math.abs(rect.width - activePreview.screenWidth) < 2
+            && Math.abs(rect.height - activePreview.screenHeight) < 2;
     }, []);
 
     const syncActivePreviewRect = useCallback((elementId: string | null | undefined): ActiveEmbedPreview | null => {
@@ -533,93 +478,31 @@ export default function EmbedFloatingToolbar({ excalidrawAPI, containerRef }: Em
         return preview;
     }, [containerRef]);
 
-    const resolveSelectionActivationMode = useCallback((
-        currentSelectedId: string | null,
-        previousSelectedId: string | null,
-        pointerIntent: EmbedPointerIntentSnapshot | null | undefined,
-    ): EmbedSelectionActivationMode => resolveEmbedClickActivationMode({
-        currentSelectedId,
-        previousSelectedId,
-        pointerIntent,
-    }), []);
-
     useEffect(() => {
         const container = containerRef.current;
         if (!container) return;
 
-        const handlePointerDown = (event: PointerEvent) => {
+        const handleDoubleClick = (event: MouseEvent) => {
             if (event.button !== 0) return;
-            const activePreview = syncActivePreviewRect(
-                activePreviewElementIdRef.current ?? activePreviewRef.current?.elementId ?? null,
-            ) ?? activePreviewRef.current;
-            if (activePreview) {
-                const decision = resolveEmbedPreviewExitPointerDecision({
-                    activePreview,
-                    currentPrompt: exitPromptRef.current,
-                    clientX: event.clientX,
-                    clientY: event.clientY,
-                    now: Date.now(),
-                    targetWithinEmbedUi: isTargetWithinEmbedUi(event.target),
-                });
+            const selectedEmbed = infoRef.current;
+            if (!selectedEmbed || selectedEmbed.viewMode !== 'preview' || !selectedEmbed.previewable) return;
 
-                if (decision.action === 'prompt' && decision.nextPrompt) {
-                    if (decision.shouldPreventCanvasEvent) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        event.stopImmediatePropagation();
-                    }
-                    showPreviewSessionHint(resolveEmbedPreviewSessionHint({
-                        kind: 'exit-confirm',
-                        elementId: decision.nextPrompt.elementId,
-                        now: Date.now(),
-                    }));
-                    syncActivePreviewRect(activePreview.elementId);
-                    return;
-                }
+            const withinSelectedEmbed = event.clientX >= selectedEmbed.screenX
+                && event.clientX <= selectedEmbed.screenX + selectedEmbed.screenWidth
+                && event.clientY >= selectedEmbed.screenY
+                && event.clientY <= selectedEmbed.screenY + selectedEmbed.screenHeight;
+            if (!withinSelectedEmbed) return;
 
-                if (decision.action === 'exit') {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    event.stopImmediatePropagation();
-                    dispatchExitPreview(activePreview.elementId);
-                    return;
-                }
-            }
-
-            pointerIntentRef.current = {
-                pointerId: event.pointerId,
-                startX: event.clientX,
-                startY: event.clientY,
-                selectedEmbedIdAtPointerDown: prevSelectedEmbedIdRef.current,
-                moved: false,
-                released: false,
-            };
-        };
-        const handlePointerMove = (event: PointerEvent) => {
-            const pointerIntent = pointerIntentRef.current;
-            if (!pointerIntent || pointerIntent.pointerId !== event.pointerId) return;
-
-            if (
-                Math.abs(event.clientX - pointerIntent.startX) > CLICK_ACTIVATION_MOVEMENT_THRESHOLD
-                || Math.abs(event.clientY - pointerIntent.startY) > CLICK_ACTIVATION_MOVEMENT_THRESHOLD
-            ) {
-                pointerIntent.moved = true;
-            }
-        };
-        const clearPointerIntent = (event: PointerEvent, cancelled = false) => {
-            const pointerIntent = pointerIntentRef.current;
-            if (pointerIntent && pointerIntent.pointerId === event.pointerId) {
-                pointerIntent.released = true;
-                if (cancelled) pointerIntent.moved = true;
-                window.setTimeout(() => {
-                    if (pointerIntentRef.current === pointerIntent) {
-                        pointerIntentRef.current = null;
-                    }
-                }, 100);
-            }
+            window.dispatchEvent(new CustomEvent(AXHUB_EMBED_ACTIVATE_REQUESTED_EVENT, {
+                detail: { elementId: selectedEmbed.elementId },
+            }));
+            dispatchEmbedSelectionChanged(selectedEmbed.elementId, true, 'activate', selectedEmbed);
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
         };
 
-        container.addEventListener('pointerdown', handlePointerDown, true);
+        container.addEventListener('dblclick', handleDoubleClick, true);
         const handleWheel = (event: WheelEvent) => {
             const activePreview = syncActivePreviewRect(
                 activePreviewElementIdRef.current ?? activePreviewRef.current?.elementId ?? null,
@@ -636,27 +519,15 @@ export default function EmbedFloatingToolbar({ excalidrawAPI, containerRef }: Em
             event.stopImmediatePropagation();
         };
         container.addEventListener('wheel', handleWheel, { capture: true, passive: false });
-        window.addEventListener('pointermove', handlePointerMove, true);
-        const handlePointerUp = (event: PointerEvent) => clearPointerIntent(event);
-        const handlePointerCancel = (event: PointerEvent) => clearPointerIntent(event, true);
-
-        window.addEventListener('pointerup', handlePointerUp, true);
-        window.addEventListener('pointercancel', handlePointerCancel, true);
 
         return () => {
-            container.removeEventListener('pointerdown', handlePointerDown, true);
+            container.removeEventListener('dblclick', handleDoubleClick, true);
             container.removeEventListener('wheel', handleWheel, true);
-            window.removeEventListener('pointermove', handlePointerMove, true);
-            window.removeEventListener('pointerup', handlePointerUp, true);
-            window.removeEventListener('pointercancel', handlePointerCancel, true);
-            pointerIntentRef.current = null;
         };
     }, [
         containerRef,
-        dispatchExitPreview,
+        dispatchEmbedSelectionChanged,
         isTargetWithinActivePreviewFrame,
-        isTargetWithinEmbedUi,
-        showPreviewSessionHint,
         syncActivePreviewRect,
     ]);
 
@@ -668,43 +539,30 @@ export default function EmbedFloatingToolbar({ excalidrawAPI, containerRef }: Em
 
             if (detail.active) {
                 activePreviewElementIdRef.current = elementId;
-                clearExitPrompt();
-                showPreviewSessionHint(resolveEmbedPreviewSessionHint({
-                    kind: 'entered',
-                    elementId,
-                    now: Date.now(),
-                }));
                 if (activePreviewSyncRef.current) {
                     clearTimeout(activePreviewSyncRef.current);
                 }
                 activePreviewSyncRef.current = setTimeout(() => {
                     syncActivePreviewRect(elementId);
+                    setPreviewMaskRevision((revision) => revision + 1);
                     activePreviewSyncRef.current = null;
                 }, 0);
+                setPreviewMaskRevision((revision) => revision + 1);
                 return;
             }
 
             if (activePreviewElementIdRef.current === elementId) {
                 activePreviewElementIdRef.current = null;
                 activePreviewRef.current = null;
-            }
-            if (
-                exitPromptRef.current?.elementId === elementId
-                || previewSessionHintRef.current?.elementId === elementId
-            ) {
-                clearExitPrompt();
+                setPreviewMaskRevision((revision) => revision + 1);
             }
         };
 
         window.addEventListener(AXHUB_EMBED_ACTIVE_PREVIEW_CHANGED_EVENT, handler);
         return () => window.removeEventListener(AXHUB_EMBED_ACTIVE_PREVIEW_CHANGED_EVENT, handler);
-    }, [clearExitPrompt, showPreviewSessionHint, syncActivePreviewRect]);
+    }, [syncActivePreviewRect]);
 
     useEffect(() => () => {
-        if (previewSessionHintTimeoutRef.current) {
-            clearTimeout(previewSessionHintTimeoutRef.current);
-            previewSessionHintTimeoutRef.current = null;
-        }
         if (tooltipTimeoutRef.current) {
             clearTimeout(tooltipTimeoutRef.current);
             tooltipTimeoutRef.current = null;
@@ -848,7 +706,6 @@ export default function EmbedFloatingToolbar({ excalidrawAPI, containerRef }: Em
                 /* ── Dispatch selection-change events for embed lifecycle ── */
                 const currentSelectedId = selectedEmbed?.elementId ?? null;
                 const prevId = prevSelectedEmbedIdRef.current;
-                const pointerIntent = pointerIntentRef.current;
                 if (currentSelectedId !== prevId) {
                     // Deselected previous
                     if (prevId) {
@@ -856,16 +713,9 @@ export default function EmbedFloatingToolbar({ excalidrawAPI, containerRef }: Em
                     }
                     // Selected new
                     if (currentSelectedId) {
-                        const activationMode = resolveSelectionActivationMode(currentSelectedId, prevId, pointerIntent);
-                        dispatchEmbedSelectionChanged(currentSelectedId, true, activationMode, selectedEmbed);
+                        dispatchEmbedSelectionChanged(currentSelectedId, true, 'select-only', selectedEmbed);
                     }
                     prevSelectedEmbedIdRef.current = currentSelectedId;
-                } else if (currentSelectedId) {
-                    const activationMode = resolveSelectionActivationMode(currentSelectedId, prevId, pointerIntent);
-                    if (activationMode === 'activate') {
-                        dispatchEmbedSelectionChanged(currentSelectedId, true, activationMode, selectedEmbed);
-                        pointerIntentRef.current = null;
-                    }
                 }
             } catch (error) {
                 if (!warnedPollErrorRef.current) {
@@ -886,7 +736,7 @@ export default function EmbedFloatingToolbar({ excalidrawAPI, containerRef }: Em
                 prevSelectedEmbedIdRef.current = null;
             }
         };
-    }, [excalidrawAPI, containerRef, dispatchEmbedSelectionChanged, resolveSelectionActivationMode]);
+    }, [excalidrawAPI, containerRef, dispatchEmbedSelectionChanged]);
 
     /* ── Apply one-time size preset ───────────────────────────────── */
     const applySizePreset = useCallback((preset: EmbedSizePreset) => {
@@ -1017,10 +867,14 @@ export default function EmbedFloatingToolbar({ excalidrawAPI, containerRef }: Em
         });
         excalidrawAPI.updateScene({ elements: updated as any });
         setSizePopoverOpen(false);
-        if (targetMode === 'preview') {
-            dispatchEmbedSelectionChanged(info.elementId, true, 'activate');
-        }
-    }, [clearTooltip, excalidrawAPI, info, containerRef, dispatchEmbedSelectionChanged]);
+    }, [clearTooltip, excalidrawAPI, info, containerRef]);
+
+    const handlePreviewMaskExit = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const elementId = activePreviewElementIdRef.current ?? activePreviewRef.current?.elementId;
+        if (elementId) dispatchExitPreview(elementId);
+    }, [dispatchExitPreview]);
 
     /* ── Close size popover when selection changes ──────────────── */
     useEffect(() => {
@@ -1041,9 +895,47 @@ export default function EmbedFloatingToolbar({ excalidrawAPI, containerRef }: Em
 
     /* ── Render ──────────────────────────────────────────────────── */
     const containerRect = containerRef.current?.getBoundingClientRect();
+    const activePreview = activePreviewRef.current;
+    const previewRect = activePreview && containerRect ? {
+        left: Math.max(0, activePreview.screenX - containerRect.left),
+        top: Math.max(0, activePreview.screenY - containerRect.top),
+        right: Math.min(containerRect.width, activePreview.screenX - containerRect.left + activePreview.screenWidth),
+        bottom: Math.min(containerRect.height, activePreview.screenY - containerRect.top + activePreview.screenHeight),
+    } : null;
 
     return (
         <>
+            {activePreviewRef.current && containerRect && previewRect ? (
+                <div
+                    aria-hidden="true"
+                    style={{
+                        position: 'absolute',
+                        inset: 0,
+                        zIndex: ACTION_Z_INDEX,
+                        pointerEvents: 'none',
+                    }}
+                >
+                    {[
+                        { top: 0, left: 0, right: 0, height: previewRect.top },
+                        { top: previewRect.bottom, left: 0, right: 0, bottom: 0 },
+                        { top: previewRect.top, left: 0, width: previewRect.left, height: Math.max(0, previewRect.bottom - previewRect.top) },
+                        { top: previewRect.top, left: previewRect.right, right: 0, height: Math.max(0, previewRect.bottom - previewRect.top) },
+                    ].map((style, index) => (
+                        <div
+                            key={`preview-mask-${index}`}
+                            role="presentation"
+                            onPointerDown={handlePreviewMaskExit}
+                            style={{
+                                position: 'absolute',
+                                ...style,
+                                pointerEvents: 'auto',
+                                background: 'transparent',
+                            }}
+                        />
+                    ))}
+                </div>
+            ) : null}
+
             {/* ── Node title labels (always visible for all embeddables) ── */}
             {containerRect && labels.filter((label) => label.viewMode !== 'link').map((label) => {
                 const left = label.screenX - containerRect.left;
@@ -1385,34 +1277,6 @@ export default function EmbedFloatingToolbar({ excalidrawAPI, containerRef }: Em
                 </div>
             ) : null}
 
-            {previewSessionHint ? (
-                <div
-                    style={{
-                        position: 'absolute',
-                        left: '50%',
-                        top: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        minHeight: 36,
-                        maxWidth: 'min(360px, calc(100% - 32px))',
-                        zIndex: POPOVER_Z_INDEX,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '0 14px',
-                        borderRadius: 6,
-                        background: 'rgba(15, 23, 42, 0.92)',
-                        color: '#f8fafc',
-                        fontSize: 14,
-                        fontWeight: 600,
-                        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.22)',
-                        pointerEvents: 'none',
-                        userSelect: 'none',
-                    }}
-                    data-axhub-embed-ui="true"
-                >
-                    {previewSessionHint.message}
-                </div>
-            ) : null}
         </>
     );
 }

@@ -30,6 +30,13 @@ interface CreateSidebarFolderResponse extends SidebarTreeResponse {
     createdFolderId: string;
 }
 
+interface EnsureSidebarFolderResponse extends SidebarTreeResponse {
+    success: boolean;
+    folder: SidebarTreeNode;
+    absolutePath: string;
+    created: boolean;
+}
+
 interface OpenResourceInSystemResponse {
     success: boolean;
     type?: 'docs' | 'themes';
@@ -94,6 +101,15 @@ export const sidebarApi = {
             body: JSON.stringify({}),
         });
         return parseJsonResponse<CreateSidebarFolderResponse>(response, '新建文件夹失败');
+    },
+
+    async ensureSidebarFolder(folderPath: string, scope: ProjectScope): Promise<EnsureSidebarFolderResponse> {
+        const response = await fetch(withProjectScope(`${WORKSPACE_API_ROUTES.navigationFolders}?tab=docs`, scope), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folderPath }),
+        });
+        return parseJsonResponse<EnsureSidebarFolderResponse>(response, '准备图片保存文件夹失败');
     },
 
     async openResourceInSystem(

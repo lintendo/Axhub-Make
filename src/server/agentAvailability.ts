@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { spawnSync as nodeSpawnSync } from 'node:child_process';
 
 import {
@@ -16,6 +17,10 @@ import {
   type RuntimeAgentAvailability,
   type WebAgent,
 } from './agentTypes.ts';
+import {
+  getHostAdapter,
+  type HostId,
+} from '../../vendor/agent-surface/dist/index.js';
 
 type SpawnSyncLike = (
   command: string,
@@ -47,9 +52,18 @@ const WEB_AGENT_COMMANDS: Record<WebAgent, string[]> = {
   acp: ['npx'],
 };
 
-const LOCAL_APP_AGENT_COMMANDS: Record<LocalAppAgent, string[]> = {
-  codex: ['codex'],
-  opencode: ['opencode'],
+const AGENT_SURFACE_HOSTS: Partial<Record<LocalAppAgent, HostId>> = {
+  codex: 'codex',
+  workbuddy: 'workbuddy',
+  traework: 'traework',
+  trae: 'trae',
+};
+
+const MAKE_LOCAL_APP_PATHS: Partial<Record<LocalAppAgent, Record<'darwin' | 'win32', string[]>>> = {
+  opencode: {
+    darwin: ['/Applications/OpenCode.app/Contents/MacOS/OpenCode'],
+    win32: ['%LOCALAPPDATA%/Programs/OpenCode/OpenCode.exe'],
+  },
 };
 
 function toText(value: unknown): string {
@@ -113,6 +127,28 @@ function resolveCommandPath(
   return null;
 }
 
+function expandApplicationPath(candidate: string, platform: NodeJS.Platform): string {
+  if (platform === 'win32') {
+    return candidate
+      .replace(/^%LOCALAPPDATA%/u, process.env.LOCALAPPDATA || '%LOCALAPPDATA%')
+      .replace(/^%APPDATA%/u, process.env.APPDATA || '%APPDATA%');
+  }
+  return candidate;
+}
+
+function resolveApplicationPath(
+  agent: LocalAppAgent,
+  platform: NodeJS.Platform,
+): string | null {
+  if (platform !== 'darwin' && platform !== 'win32') return null;
+  const host = AGENT_SURFACE_HOSTS[agent];
+  if (host) return getHostAdapter(host).resolveApplicationPath(platform) || null;
+
+  const knownCandidates = (MAKE_LOCAL_APP_PATHS[agent]?.[platform] || [])
+    .map((candidate) => expandApplicationPath(candidate, platform));
+  return knownCandidates.find((candidate) => fs.existsSync(candidate)) || null;
+}
+
 export function createAgentAvailabilityDetector(options: AgentAvailabilityDetectorOptions = {}) {
   const platform = options.platform ?? process.platform;
   const spawnSync = options.spawnSync ?? nodeSpawnSync;
@@ -158,9 +194,19 @@ export function createAgentAvailabilityDetector(options: AgentAvailabilityDetect
       : detectCommands(WEB_AGENT_COMMANDS[agent] || [], 'web-agent', WEB_AGENT_APP_NAMES[agent])
   );
 
-  const detectLocalAppAgentAvailability = (agent: LocalAppAgent): AgentAvailabilityInfo => (
-    detectCommands(LOCAL_APP_AGENT_COMMANDS[agent] || [], 'local-app-agent', LOCAL_APP_AGENT_APP_NAMES[agent])
-  );
+  const detectLocalAppAgentAvailability = (agent: LocalAppAgent): AgentAvailabilityInfo => {
+    const applicationPath = resolveApplicationPath(agent, platform);
+    if (applicationPath) {
+      return createInfo('installed', 'high', getCheckedAt(), {
+        source: 'local-app-agent-application',
+        path: applicationPath,
+      });
+    }
+    return createInfo('missing', 'high', getCheckedAt(), {
+      source: 'local-app-agent-application',
+      reason: `${LOCAL_APP_AGENT_APP_NAMES[agent]} application not found`,
+    });
+  };
 
   const detectAllCLIAgentAvailability = (): AgentAvailabilityMap<CLIAgent> => (
     Object.fromEntries(

@@ -375,20 +375,20 @@ describe('CanvasGenerationComposer message extraction', () => {
     ]);
   });
 
-  it('limits ACP selector providers to Claude Code, Codex, OpenCode, plus the user default provider', async () => {
+  it('uses the complete ACP provider registry for selector defaults', async () => {
     const { resolveCanvasAcpSelectorDefaults } = await loadMessageExtraction();
 
     expect(resolveCanvasAcpSelectorDefaults('acp:codex')).toEqual({
       defaultProvider: 'codex',
-      providerOptions: ['claude', 'codex', 'opencode'],
+      providerOptions: ['claude', 'codex', 'opencode', 'cursor', 'qoder', 'codebuddy', 'reasonix', 'grok-build'],
     });
     expect(resolveCanvasAcpSelectorDefaults('acp:gemini')).toEqual({
       defaultProvider: 'codex',
-      providerOptions: ['claude', 'codex', 'opencode'],
+      providerOptions: ['claude', 'codex', 'opencode', 'cursor', 'qoder', 'codebuddy', 'reasonix', 'grok-build'],
     });
     expect(resolveCanvasAcpSelectorDefaults('acp:grok-build')).toEqual({
       defaultProvider: 'grok-build',
-      providerOptions: ['claude', 'codex', 'opencode', 'grok-build'],
+      providerOptions: ['claude', 'codex', 'opencode', 'cursor', 'qoder', 'codebuddy', 'reasonix', 'grok-build'],
     });
   });
 
@@ -448,12 +448,15 @@ describe('CanvasGenerationComposer message extraction', () => {
     })).toBe(false);
   });
 
-  it('falls back to fixed ACP provider options when the runtime context omits providerOptions', async () => {
+  it('falls back to the complete ACP provider registry when the runtime context omits providerOptions', async () => {
     const { resolveCanvasAcpRuntimeProviderOptions } = await loadMessageExtraction();
 
-    expect(resolveCanvasAcpRuntimeProviderOptions(undefined, 'codex')).toEqual(['claude', 'codex', 'opencode']);
-    expect(resolveCanvasAcpRuntimeProviderOptions(undefined, 'gemini' as any)).toEqual(['claude', 'codex', 'opencode']);
-    expect(resolveCanvasAcpRuntimeProviderOptions(undefined, 'grok-build')).toEqual(['claude', 'codex', 'opencode', 'grok-build']);
+    expect(resolveCanvasAcpRuntimeProviderOptions(undefined, 'codex')).toEqual(['claude', 'codex', 'opencode', 'cursor', 'qoder', 'codebuddy', 'reasonix', 'grok-build']);
+    expect(resolveCanvasAcpRuntimeProviderOptions(undefined, 'gemini' as any)).toEqual(['claude', 'codex', 'opencode', 'cursor', 'qoder', 'codebuddy', 'reasonix', 'grok-build']);
+    expect(resolveCanvasAcpRuntimeProviderOptions(undefined, 'grok-build')).toEqual(['claude', 'codex', 'opencode', 'cursor', 'qoder', 'codebuddy', 'reasonix', 'grok-build']);
+    expect(resolveCanvasAcpRuntimeProviderOptions(['codex'], 'codex')).toEqual([
+      'claude', 'codex', 'opencode', 'cursor', 'qoder', 'codebuddy', 'reasonix', 'grok-build',
+    ]);
   });
 
   it('builds project resource context from selected files and folders without expanding folders', async () => {

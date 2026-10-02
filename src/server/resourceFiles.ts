@@ -51,12 +51,51 @@ export function normalizeResourceRelativePath(value: unknown): string {
   return normalized;
 }
 
+export function normalizeResourceAssetRelativePath(value: unknown): string {
+  const raw = String(value || '').trim().replace(/\\/g, '/');
+  if (!raw || raw.includes('\0') || raw.startsWith('/') || path.win32.isAbsolute(raw) || path.posix.isAbsolute(raw)) {
+    return '';
+  }
+  const withoutResourcesPrefix = raw.replace(/^src\/resources\/+/u, '');
+  const normalized = path.posix.normalize(withoutResourcesPrefix).replace(/^\.\/+/u, '').replace(/\/+$/u, '');
+  if (!normalized || normalized === '.') {
+    return '';
+  }
+  const segments = normalized.split('/');
+  if (
+    segments[0] !== '.assets'
+    || segments.length < 2
+    || segments.some((segment, index) => !segment || segment === '.' || segment === '..' || (index > 0 && segment.startsWith('.')))
+  ) {
+    return '';
+  }
+  return normalized;
+}
+
 export function isIgnoredResourceRelativePath(relativePath: string): boolean {
   const normalized = String(relativePath || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
   if (!normalized) return true;
   const lower = normalized.toLowerCase();
   if (lower === 'readme' || lower === 'readme.md') return true;
   return normalized.split('/').some((segment) => segment.startsWith('.'));
+}
+
+export function isResourceAssetSidecarDirectoryName(name: string): boolean {
+  return String(name || '').endsWith('.assets');
+}
+
+export function getResourceAssetRelativePath(resourcePath: unknown): string {
+  const relativePath = normalizeResourceRelativePath(resourcePath);
+  return relativePath ? `.assets/${relativePath}` : '';
+}
+
+export function getResourceAssetDirectory(resourcesDir: string, resourcePath: unknown): string | null {
+  const assetRelativePath = getResourceAssetRelativePath(resourcePath);
+  if (!assetRelativePath) {
+    return null;
+  }
+  const assetDirectory = path.resolve(resourcesDir, ...assetRelativePath.split('/'));
+  return isPathInside(resourcesDir, assetDirectory) ? assetDirectory : null;
 }
 
 export function getResourceFileExt(fileName: string): string {
@@ -117,11 +156,8 @@ export function scanResourceFiles(projectRoot: string): ResourceFile[] {
       const relativePath = path.relative(resourcesDir, fullPath).split(path.sep).join('/');
       if (isIgnoredResourceRelativePath(relativePath)) continue;
       if (entry.isDirectory()) {
-        if (entry.name.endsWith('.assets')) {
-          const htmlSibling = path.join(dir, `${entry.name.slice(0, -'.assets'.length)}.html`);
-          if (fs.existsSync(htmlSibling) && fs.statSync(htmlSibling).isFile()) {
-            continue;
-          }
+        if (isResourceAssetSidecarDirectoryName(entry.name)) {
+          continue;
         }
         walk(fullPath);
         continue;
@@ -164,13 +200,19 @@ export function scanResourceFiles(projectRoot: string): ResourceFile[] {
   return files.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-export function resolveResourceFilePath(projectRoot: string, resourcePath: unknown): {
+export function resolveResourceFilePath(projectRoot: string, resourcePath: unknown, options?: {
+  allowAssetPath?: boolean;
+}): {
   relativePath: string;
   absolutePath: string;
   resourcesDir: string;
 } | null {
-  const relativePath = normalizeResourceRelativePath(resourcePath);
-  if (!relativePath || isIgnoredResourceRelativePath(relativePath)) {
+  const standardRelativePath = normalizeResourceRelativePath(resourcePath);
+  const assetRelativePath = options?.allowAssetPath
+    ? normalizeResourceAssetRelativePath(resourcePath)
+    : '';
+  const relativePath = standardRelativePath || assetRelativePath;
+  if (!relativePath || (!assetRelativePath && isIgnoredResourceRelativePath(relativePath))) {
     return null;
   }
   const resourcesDir = getResourcesDir(projectRoot);

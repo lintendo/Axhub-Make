@@ -1,4 +1,4 @@
 interface:
   display_name: "图片转原型"
-  short_description: "将明确提供的本地截图或设计稿还原为 client 可运行原型，并做真实截图回归"
-  default_prompt: "使用 $screenshot-to-prototype 将这张截图或设计稿还原为当前 client 的可运行原型。"
+  short_description: "脚本生成首版 HTML 并立即返回，自动视觉评审后完成 1:1 原型"
+  default_prompt: "使用 $screenshot-to-prototype 还原这张截图或设计稿；脚本生成首版 HTML 后立即给我链接，并在同一任务中自动继续视觉评审。最终提供 1:1 HTML 主规格，等我明确确认后再转换为当前 client 的 React 可运行原型。"

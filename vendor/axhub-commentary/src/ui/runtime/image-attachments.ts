@@ -52,6 +52,7 @@ export async function createPromptImageAttachment(
     mimeType,
     size: Number(blob.size ?? 0),
     createdAt: Date.now(),
+    source: 'user',
   };
 }
 
@@ -125,6 +126,44 @@ export function mergePromptImageAttachments(
     acceptedCount: accepted.length,
     droppedCount: Math.max(0, incoming.length - accepted.length),
   };
+}
+
+export function isTargetScreenshotImage(
+  image: Pick<PromptImageAttachment, 'source'>,
+): boolean {
+  return image.source === 'target-screenshot';
+}
+
+export function splitPromptImageAttachments(
+  images: readonly PromptImageAttachment[],
+): {
+  userImages: PromptImageAttachment[];
+  targetScreenshot: PromptImageAttachment | null;
+} {
+  const userImages: PromptImageAttachment[] = [];
+  let targetScreenshot: PromptImageAttachment | null = null;
+
+  for (const image of images) {
+    if (isTargetScreenshotImage(image)) {
+      targetScreenshot = image;
+    } else {
+      userImages.push(image);
+    }
+  }
+
+  return { userImages, targetScreenshot };
+}
+
+export function replaceUserPromptImageAttachments(
+  existing: readonly PromptImageAttachment[],
+  nextUserImages: readonly PromptImageAttachment[],
+  maxCount = MAX_PROMPT_IMAGE_ATTACHMENTS,
+): PromptImageAttachment[] {
+  const { targetScreenshot } = splitPromptImageAttachments(existing);
+  const userImages = nextUserImages
+    .filter((image) => !isTargetScreenshotImage(image))
+    .slice(0, maxCount);
+  return targetScreenshot ? [...userImages, targetScreenshot] : userImages;
 }
 
 export function buildPromptImageAttachmentSignature(

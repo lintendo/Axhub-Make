@@ -13,8 +13,9 @@ import {
   ExportOutlined,
   FileTextOutlined,
   FormatPainterOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
-import { Dropdown, Input, Popconfirm } from 'antd';
+import { Dropdown, Input, Popconfirm, Tooltip } from 'antd';
 import { computePromptCardPosition } from '../prompt-card-position';
 import {
   getDesignToolExportActionState,
@@ -60,6 +61,8 @@ import type { BreadcrumbsHandle, PromptCardSize, PromptCardViewProps } from './t
 import { formatModifierShortcutLabel } from '../../core/editor/comment-shortcut-settings';
 import { createElementLocator, locateElement } from '../../core/locator';
 import type { ElementLocator } from '../../web-editor-types';
+import { resolveCspNonce } from '../csp-nonce';
+import { groupExternalCommentsByAuthor } from '../../external-comments';
 
 function normalizePromptStyleSummaryLine(line: string): string {
   return line.replace(/^样式\s+/u, '').trim();
@@ -135,18 +138,25 @@ function shouldRestorePromptPrimaryFocusFromTarget(target: EventTarget | null): 
 }
 
 const ANNOTATION_GENERATION_PLACEHOLDER = '输入给 AI 的标注需求，说明生成要求';
+const EXTERNAL_REVIEW_PLACEHOLDER = '填写你的评审建议';
 
-function resolvePromptCardNotePlaceholder(isAnnotationSession: boolean): string {
-  return isAnnotationSession
-    ? ANNOTATION_GENERATION_PLACEHOLDER
-    : '输入给 AI 的需求，/ 选择技能';
+function isExternalAuthorNetworkIdentifier(value: string): boolean {
+  return /^(?:\d{1,3}\.){3}\d{1,3}$/u.test(value.trim()) || value.includes(':');
+}
+
+function resolvePromptCardNotePlaceholder(
+  isAnnotationSession: boolean,
+  externalAnnotationMode: boolean,
+): string {
+  if (isAnnotationSession && externalAnnotationMode) return EXTERNAL_REVIEW_PLACEHOLDER;
+  if (isAnnotationSession) return ANNOTATION_GENERATION_PLACEHOLDER;
+  return '输入给 AI 的需求，/ 选择技能';
 }
 
 const ANNOTATION_PANEL_NODE_ID_ATTR = 'data-axhub-annotation-panel-node-id';
 const ANNOTATION_MARKER_NODE_ID_ATTR = 'data-axhub-annotation-node-id';
 
-const ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE =
-  '无法准确定位标注位置，该标注需要由 AI 生成';
+const ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE = '无法准确定位标注位置，该标注需要由 AI 生成';
 const ANNOTATION_MARKDOWN_PLACEHOLDER =
   '输入需求标注，支持 Markdown 格式。输入后即可创建标注节点。建议由 AI 创建标注，定位会更准确。';
 const DOCUMENT_SOURCE_MARKDOWN_PLACEHOLDER =
@@ -157,6 +167,20 @@ const annotationEditorShellStyle: React.CSSProperties = {
   flexDirection: 'column',
   gap: 4,
   padding: 0,
+};
+const externalCommentsToolStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 0,
+  marginBottom: 8,
+  padding: '8px 10px 2px',
+  maxHeight: 280,
+  overflowX: 'hidden',
+  overflowY: 'auto',
+  overscrollBehavior: 'contain',
+  borderLeft: `3px solid ${EDITOR_CHROME.accent}`,
+  borderRadius: 6,
+  background: 'rgba(0, 143, 93, 0.07)',
 };
 const annotationEditorInputStyle: React.CSSProperties = {
   overflow: 'hidden',
@@ -193,9 +217,7 @@ export function getAnnotationManualEditLocatorState(
   getCreateBlockReason?: (element: Element | null) => string | undefined,
   resolveAnnotationTarget?: (element: Element | null) => Element | null,
 ): { disabled: boolean; message: string } {
-  const annotationTarget = resolveAnnotationTarget
-    ? resolveAnnotationTarget(element)
-    : element;
+  const annotationTarget = resolveAnnotationTarget ? resolveAnnotationTarget(element) : element;
   if (!annotationTarget) {
     return { disabled: true, message: ANNOTATION_MANUAL_EDIT_DISABLED_MESSAGE };
   }
@@ -363,7 +385,10 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
       getExportSelectionToDesignToolBlockReason,
       hideExecutionControls = false,
       hideCurrentElementExecutionAction = false,
+      hideClearEditsAction = false,
+      canClearCurrentElementEdits = true,
       hideContextAppendAction = false,
+      externalAnnotationMode = false,
       enabledSkillIds,
       skillOptions,
       onHoverSelectionSuppressedChange,
@@ -389,6 +414,7 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
       noteDirty,
       onDraftChange,
       onClearCurrentElementEdits,
+      onDeleteExternalComment,
       onConfirmNote,
       onDismissSelection,
       annotationEnabled,
@@ -415,6 +441,8 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
     const [refreshKey, setRefreshKey] = React.useState(0);
     const [selectedSkills, setSelectedSkills] = React.useState<PromptCardSkill[]>([]);
     const [promptDismissed, setPromptDismissed] = React.useState(false);
+    const [externalCommentsToolOpen, setExternalCommentsToolOpen] = React.useState(true);
+    const [hoveredExternalCommentId, setHoveredExternalCommentId] = React.useState<string | null>(null);
     const [annotationEditorOpen, setAnnotationEditorOpen] = React.useState(
       () => readAnnotationInputModePreference() === 'edit',
     );
@@ -424,6 +452,18 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
     }, []);
     const [runningElementToolId, setRunningElementToolId] = React.useState<string | null>(null);
     const [elementToolError, setElementToolError] = React.useState('');
+    const externalComments = React.useMemo(
+      () => savedNoteMeta?.externalComments ?? [],
+      [savedNoteMeta?.externalComments, refreshKey],
+    );
+    const externalCommentGroups = React.useMemo(
+      () => groupExternalCommentsByAuthor(externalComments),
+      [externalComments, refreshKey],
+    );
+    const externalCommentEntries = React.useMemo(
+      () => externalCommentGroups.flatMap((group) => group.comments.map((comment) => ({ group, comment }))),
+      [externalCommentGroups],
+    );
     const elementTools = options.getElementTools?.(currentTarget) ?? [];
     const hasElementTools = elementTools.length > 0;
     const skillTrigger = React.useMemo(() => findPromptCardSkillTrigger(draftNote), [draftNote]);
@@ -450,19 +490,19 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
 
     React.useEffect(() => {
       setSelectedSkills(
-        deserializePromptCardSkillSelection(
-          savedNoteMeta,
-          enabledSkillIds,
-          skillOptions ?? [],
-        ),
+        deserializePromptCardSkillSelection(savedNoteMeta, enabledSkillIds, skillOptions ?? []),
       );
       setRunningElementToolId(null);
       setElementToolError('');
     }, [enabledSkillIds, savedNoteMeta, currentTarget, skillOptions]);
 
-    React.useEffect(() => {
+    React.useLayoutEffect(() => {
       setPromptDismissed(false);
     }, [currentTarget]);
+
+    React.useLayoutEffect(() => {
+      setExternalCommentsToolOpen(true);
+    }, [currentTarget, externalAnnotationMode]);
 
     React.useEffect(() => {
       if (isAnnotationSession && bubbleStyleEditorOpen) {
@@ -487,8 +527,8 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
         refresh() {
           setRefreshKey((value) => value + 1);
         },
-        enterInlineTextEdit() {
-          onInlineTextEditingChange(true);
+        enterInlineTextEdit(element?: HTMLElement | null) {
+          onInlineTextEditingChange(true, element);
         },
       }),
       [onAnchorRectChange, onInlineTextEditingChange, onTargetChange],
@@ -716,7 +756,14 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
     }, [onPromptCardVisibleChange]);
 
     React.useEffect(() => {
-      if (!promptVisible || !currentTarget || toolMinimized || uiMode !== 'bubble-card' || inlineTextEditing) return;
+      if (
+        !promptVisible ||
+        !currentTarget ||
+        toolMinimized ||
+        uiMode !== 'bubble-card' ||
+        inlineTextEditing
+      )
+        return;
       if (!isMobileDevice()) {
         return ensurePromptPrimaryFocus();
       }
@@ -950,7 +997,8 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
       currentAgentTask,
       options.externalEditingStatusDescription,
     );
-    const currentTaskErrorMessage = currentAgentTask?.status === 'error'
+    const currentTaskErrorMessage =
+      currentAgentTask?.status === 'error'
         ? buildPromptCardTaskErrorMessage({
             currentTaskDescription,
             sessionId: currentAgentTask.sessionId,
@@ -982,12 +1030,10 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
       hasReusableConversation,
     });
 
-    React.useEffect(() => {
-      if (!sendingCurrentElementPrompt) return;
-      if (currentTaskRunning && currentTaskSessionReady) {
-        setSendingCurrentElementPrompt(false);
-      }
-    }, [currentTaskRunning, currentTaskSessionReady, sendingCurrentElementPrompt]);
+    React.useLayoutEffect(() => {
+      if (!currentElementPromptAction.dismissBubble) return;
+      setPromptDismissed(true);
+    }, [currentElementPromptAction.dismissBubble]);
 
     React.useEffect(() => {
       if (!promptVisible || uiMode !== 'bubble-card' || !currentTaskTerminal) return;
@@ -1045,11 +1091,7 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
           currentTarget,
           onConfirmText,
           onConfirmNote: onConfirmNoteWithSelectedSkills,
-          onDismissSelection,
           onSendCurrentElementPromptToAgent,
-          onDispatched: () => {
-            setSendingCurrentElementPrompt(false);
-          },
         });
         if (sent) {
           clearSelectedSkills();
@@ -1064,7 +1106,6 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
       currentTarget,
       onConfirmNoteWithSelectedSkills,
       onConfirmText,
-      onDismissSelection,
       onSendCurrentElementPromptToAgent,
       selectedSkills,
       wakeAgentForCurrentElementAction,
@@ -1115,14 +1156,18 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
     const showPromptTextInput = false;
     const isCurrentAnnotationPanelTarget = isAnnotationPanelTarget(currentTarget);
     const showAnnotationMarkdownEditorButton = Boolean(
-      annotationEnabled && canEditAnnotationMarkdown && currentTarget,
+      options.showAnnotationMarkdownEditor !== false &&
+        annotationEnabled &&
+        canEditAnnotationMarkdown &&
+        currentTarget,
+    );
+    const annotationMarkdownEditorOpen = Boolean(
+      annotationEditorOpen && showAnnotationMarkdownEditorButton,
     );
     const showAnnotationDocumentEditButton = Boolean(currentTarget && annotationDocumentEditUrl);
-    const showNoteComposer = !annotationEditorOpen && !bubbleStyleEditorOpen;
+    const showNoteComposer = !annotationMarkdownEditorOpen && !bubbleStyleEditorOpen;
     const showAnnotationMarkdownEditor = Boolean(
-      annotationEditorOpen
-      && showAnnotationMarkdownEditorButton
-      && !bubbleStyleEditorOpen
+      annotationMarkdownEditorOpen && !bubbleStyleEditorOpen,
     );
     const annotationModeLabel = annotationEditorOpen ? '编辑' : '生成';
     const annotationManualEditLocatorState = showAnnotationMarkdownEditor
@@ -1162,8 +1207,11 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
       ? '添加到 AI 对话'
       : `添加到 AI 对话${agentSelectionShortcutHint}`;
     const showContextAppendExecutionControls = !hideExecutionControls;
-    const showPromptCardExecutionActions = !isAnnotationSession || !annotationEditorOpen;
-    const notePlaceholder = resolvePromptCardNotePlaceholder(isAnnotationSession);
+    const showPromptCardExecutionActions = !isAnnotationSession || !annotationMarkdownEditorOpen;
+    const notePlaceholder = resolvePromptCardNotePlaceholder(
+      isAnnotationSession,
+      externalAnnotationMode,
+    );
     const promptCardCloseActionTitle = resolvePromptCardCloseActionTitle(
       globalThis.navigator?.platform,
     );
@@ -1197,9 +1245,7 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
         data-we-selection-lock-root="true"
         style={{
           ...promptCardStyle,
-          width: isAnnotationSession
-            ? ANNOTATION_EDITOR_PROMPT_CARD_WIDTH
-            : promptCardStyle.width,
+          width: isAnnotationSession ? ANNOTATION_EDITOR_PROMPT_CARD_WIDTH : promptCardStyle.width,
           left: promptPosition.left,
           top: promptPosition.top,
           visibility: promptVisible ? 'visible' : 'hidden',
@@ -1221,7 +1267,7 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
           onHoverSelectionSuppressedChange(false);
         }}
       >
-        <style>
+        <style nonce={resolveCspNonce()}>
           {`
             .we-runtime-prompt-card__textarea,
             .we-runtime-prompt-card__textarea:disabled,
@@ -1382,7 +1428,19 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
                 </span>
               );
             })}
-            {propertyPanelEnabled && styleDesignEnabled && !hasElementTools &&
+            {!isAnnotationSession && !externalAnnotationMode && externalCommentGroups.length > 0 ? (
+              <span data-we-external-comments-tool-toggle="true">
+                <IconActionButton
+                  title={externalCommentsToolOpen ? '关闭外部批注' : '打开外部批注'}
+                  icon={<MessageOutlined />}
+                  tone="dark"
+                  onClick={() => setExternalCommentsToolOpen((open) => !open)}
+                />
+              </span>
+            ) : null}
+            {propertyPanelEnabled &&
+            styleDesignEnabled &&
+            !hasElementTools &&
             !isAnnotationSession &&
             !textCommentMode &&
             !isCurrentAnnotationPanelTarget ? (
@@ -1447,16 +1505,18 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
                   }}
                 />
               ) : null}
-              <IconActionButton
-                title="清空批注"
-                icon={<ClearOutlined />}
-                tone="dark"
-                disabled={!currentTarget}
-                onClick={() => {
-                  clearSelectedSkills();
-                  void onClearCurrentElementEdits();
-                }}
-              />
+              {!hideClearEditsAction && canClearCurrentElementEdits ? (
+                <IconActionButton
+                  title="清空批注"
+                  icon={<ClearOutlined />}
+                  tone="dark"
+                  disabled={!currentTarget}
+                  onClick={() => {
+                    clearSelectedSkills();
+                    void onClearCurrentElementEdits();
+                  }}
+                />
+              ) : null}
             </div>
           ) : null}
           <div
@@ -1477,45 +1537,190 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
             />
           </div>
         </div>
-        {elementToolError ? (
-          <div
-            role="alert"
-            style={{
-              padding: '6px 10px',
-              borderRadius: 8,
-              background: 'rgba(255, 77, 79, 0.12)',
-              color: EDITOR_CHROME.textDanger,
-              fontSize: 11,
-              lineHeight: 1.45,
-              overflowWrap: 'anywhere',
-            }}
-          >
-            {elementToolError.slice(0, 240)}
-          </div>
-        ) : null}
         <div
-          ref={noteComposerRef}
-          onFocusCapture={(event) => {
-            if (inlineTextEditing) return;
-            if (!shouldRestorePromptPrimaryFocusFromTarget(event.target)) return;
-            window.requestAnimationFrame(() => {
-              ensurePromptPrimaryFocus(3);
-            });
-          }}
-          onPointerDownCapture={(event) => {
-            if (inlineTextEditing) return;
-            if (!shouldRestorePromptPrimaryFocusFromTarget(event.target)) return;
-            window.requestAnimationFrame(() => {
-              ensurePromptPrimaryFocus(3);
-            });
-          }}
+          data-we-prompt-card-content-scroll="true"
           style={{
             display: 'flex',
+            flex: '1 1 auto',
             flexDirection: 'column',
-            gap: 8,
-            pointerEvents: inlineTextEditing ? 'none' : 'auto',
+            minHeight: 0,
+            overflowX: 'hidden',
+            overflowY: 'auto',
           }}
         >
+          {!isAnnotationSession && !externalAnnotationMode && externalCommentsToolOpen && externalCommentGroups.length > 0 ? (
+            <section
+              data-we-external-comments-tool="true"
+              aria-label="外部批注"
+              style={externalCommentsToolStyle}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  paddingBottom: 6,
+                  color: EDITOR_CHROME.textSecondary,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  lineHeight: '16px',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                  }}
+                >
+                  <MessageOutlined />
+                  <span>外部批注</span>
+                  <span style={{ color: EDITOR_CHROME.textMuted, fontWeight: 400 }}>
+                    {externalComments.length}
+                  </span>
+                </div>
+              </div>
+              {externalCommentEntries.map(({ group, comment }, entryIndex) => (
+                <div
+                  key={comment.id}
+                  data-we-external-comments-entry={comment.id}
+                  data-we-external-comments-author={group.authorId}
+                  onMouseEnter={() => setHoveredExternalCommentId(comment.id)}
+                  onMouseLeave={() => setHoveredExternalCommentId(null)}
+                  style={{
+                    display: 'flex',
+                    position: 'relative',
+                    alignItems: 'flex-start',
+                    padding: '8px 0',
+                    borderTop: `1px solid ${EDITOR_CHROME.border}`,
+                    ...(entryIndex === externalCommentEntries.length - 1
+                      ? { paddingBottom: 7 }
+                      : {}),
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      data-we-external-comments-author-label="true"
+                      data-we-external-comments-author-kind={
+                        isExternalAuthorNetworkIdentifier(group.authorName) ? 'network' : 'display'
+                      }
+                      style={{
+                        marginBottom: 2,
+                        paddingRight: onDeleteExternalComment ? 20 : 0,
+                        color: EDITOR_CHROME.textMuted,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        lineHeight: '14px',
+                        letterSpacing: 0,
+                        ...(isExternalAuthorNetworkIdentifier(group.authorName)
+                          ? { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }
+                          : {}),
+                        overflowWrap: 'anywhere',
+                      }}
+                    >
+                      评审者 · {group.authorName}
+                    </div>
+                    <div
+                      style={{
+                        color: EDITOR_CHROME.textPrimary,
+                        fontSize: 11,
+                        lineHeight: 1.55,
+                        overflowWrap: 'anywhere',
+                        whiteSpace: 'pre-wrap',
+                      }}
+                    >
+                      {comment.content}
+                    </div>
+                  </div>
+                  {onDeleteExternalComment ? (
+                    <IconActionButton
+                      title="删除这条外部批注"
+                      icon={<DeleteOutlined />}
+                      tone="dark"
+                      onClick={() => {
+                        void onDeleteExternalComment(comment.id);
+                      }}
+                      style={{
+                        width: 16,
+                        minWidth: 16,
+                        height: 16,
+                        fontSize: 12,
+                        position: 'absolute',
+                        top: 7,
+                        right: 0,
+                        background: 'transparent',
+                        opacity: hoveredExternalCommentId === comment.id ? 1 : 0,
+                        pointerEvents: hoveredExternalCommentId === comment.id ? 'auto' : 'none',
+                        transition: 'opacity 160ms ease',
+                      }}
+                    />
+                  ) : null}
+                </div>
+              ))}
+            </section>
+          ) : null}
+          {elementToolError ? (
+            <div
+              role="alert"
+              style={{
+                padding: '6px 10px',
+                borderRadius: 8,
+                background: 'rgba(255, 77, 79, 0.12)',
+                color: EDITOR_CHROME.textDanger,
+                fontSize: 11,
+                lineHeight: 1.45,
+                overflowWrap: 'anywhere',
+              }}
+            >
+              {elementToolError.slice(0, 240)}
+            </div>
+          ) : null}
+          {savedNoteMeta?.commenterName ? (
+            <div
+              data-we-prompt-card-commenter="true"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 6,
+                padding: '5px 8px',
+                borderLeft: `3px solid ${savedNoteMeta.commenterColor || EDITOR_CHROME.accent}`,
+                borderRadius: 4,
+                background: EDITOR_CHROME.surfaceMuted,
+                color: EDITOR_CHROME.textSecondary,
+                fontSize: 11,
+                lineHeight: 1.35,
+              }}
+            >
+              <span style={{ color: EDITOR_CHROME.textMuted }}>批注者</span>
+              <span style={{ color: savedNoteMeta.commenterColor || EDITOR_CHROME.textPrimary, fontWeight: 600 }}>
+                {savedNoteMeta.commenterName}
+              </span>
+            </div>
+          ) : null}
+          <div
+            ref={noteComposerRef}
+            onFocusCapture={(event) => {
+              if (inlineTextEditing) return;
+              if (!shouldRestorePromptPrimaryFocusFromTarget(event.target)) return;
+              window.requestAnimationFrame(() => {
+                ensurePromptPrimaryFocus(3);
+              });
+            }}
+            onPointerDownCapture={(event) => {
+              if (inlineTextEditing) return;
+              if (!shouldRestorePromptPrimaryFocusFromTarget(event.target)) return;
+              window.requestAnimationFrame(() => {
+                ensurePromptPrimaryFocus(3);
+              });
+            }}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              pointerEvents: inlineTextEditing ? 'none' : 'auto',
+            }}
+          >
           {showPromptTextInput ? (
             <div ref={textComposerRef}>
               <Input
@@ -1574,7 +1779,12 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
                     style={{
                       display: 'flex',
                       flexDirection: 'column',
-                      maxHeight: 'calc(100vh - 24px)',
+                      alignItems: 'stretch',
+                      gap: 8,
+                      padding: 10,
+                      width: 'min(420px, calc(100vw - 24px))',
+                      maxWidth: 'calc(100vw - 24px)',
+                      maxHeight: 'min(420px, calc(100vh - 120px))',
                       overflowX: 'hidden',
                       overflowY: 'auto',
                       borderRadius: 10,
@@ -1589,61 +1799,97 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
                     onPointerLeave={() => {
                       onHoverSelectionSuppressedChange(false);
                     }}
-                  >
-                    {filteredSkills.map((skill) => {
-                      const selected = selectedSkills.some(
-                        (selectedSkill) => selectedSkill.id === skill.id,
-                      );
-                      return (
-                        <button
-                          key={skill.id}
-                          type="button"
-                          disabled={selected}
+                    >
+                      <div
+                        data-we-prompt-card-skill-menu-header="true"
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 2,
+                        }}
+                      >
+                        <span
                           style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'flex-start',
-                            gap: 2,
-                            border: 0,
-                            background: selected
-                              ? EDITOR_CHROME.surfaceInteractive
-                              : 'transparent',
-                            color: selected ? EDITOR_CHROME.textMuted : EDITOR_CHROME.textPrimary,
-                            padding: '8px 10px',
-                            textAlign: 'left',
-                            cursor: selected ? 'default' : 'pointer',
-                          }}
-                          onMouseDown={(event) => {
-                            event.preventDefault();
-                          }}
-                          onClick={() => {
-                            if (!selected) {
-                              handleSkillSelect(skill);
-                            }
+                            color: EDITOR_CHROME.textPrimary,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            lineHeight: 1.35,
                           }}
                         >
-                          <span
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 600,
-                              lineHeight: 1.35,
-                            }}
-                          >
-                            {skill.label}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              lineHeight: 1.35,
-                              color: EDITOR_CHROME.textMuted,
-                            }}
-                          >
-                            {skill.description}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          选择处理方式
+                        </span>
+                        <span
+                          style={{
+                            color: EDITOR_CHROME.textMuted,
+                            fontSize: 11,
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          点击标签应用，悬停查看详细说明
+                        </span>
+                      </div>
+                      <div
+                        data-we-prompt-card-skill-options="true"
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        {filteredSkills.map((skill) => {
+                          const selected = selectedSkills.some(
+                            (selectedSkill) => selectedSkill.id === skill.id,
+                          );
+                          return (
+                            <Tooltip
+                              key={skill.id}
+                              title={skill.description}
+                              placement="topLeft"
+                              mouseEnterDelay={0.15}
+                              getPopupContainer={resolveRuntimePopupContainer}
+                            >
+                              <button
+                                type="button"
+                                data-we-prompt-card-skill-tooltip="true"
+                                disabled={selected}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  minHeight: 30,
+                                  border: `1px solid ${
+                                    selected ? EDITOR_CHROME.borderStrong : EDITOR_CHROME.border
+                                  }`,
+                                  borderRadius: 999,
+                                  background: selected
+                                    ? EDITOR_CHROME.surfaceInteractive
+                                    : 'transparent',
+                                  color: selected
+                                    ? EDITOR_CHROME.textMuted
+                                    : EDITOR_CHROME.textPrimary,
+                                  padding: '6px 10px',
+                                  fontSize: 12,
+                                  lineHeight: 1.2,
+                                  whiteSpace: 'nowrap',
+                                  cursor: selected ? 'default' : 'pointer',
+                                }}
+                                onMouseDown={(event) => {
+                                  event.preventDefault();
+                                }}
+                                onClick={() => {
+                                  if (!selected) {
+                                    handleSkillSelect(skill);
+                                  }
+                                }}
+                              >
+                                {skill.label}
+                              </button>
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    </div>
                 )}
               >
                 <div
@@ -1757,6 +2003,7 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
               </Dropdown>
               <PromptImageStrip
                 images={images}
+                readOnly={Boolean(savedNoteMeta?.readOnly)}
                 onRemoveImage={(imageId) => {
                   void onRemoveImage(imageId);
                 }}
@@ -1764,10 +2011,7 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
             </>
           ) : null}
           {showAnnotationMarkdownEditor ? (
-            <div
-              data-we-prompt-primary-focus-exempt="true"
-              style={annotationEditorShellStyle}
-            >
+            <div data-we-prompt-primary-focus-exempt="true" style={annotationEditorShellStyle}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span
                   style={{
@@ -1838,9 +2082,11 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
               transactionManager={transactionManager}
               tokensService={tokensService}
               refreshKey={refreshKey}
+              disabled={currentTaskRunning}
               onRefreshRequest={() => {
                 setRefreshKey((value) => value + 1);
               }}
+              onDeleteElement={options.onDeleteCurrentElement}
             />
           ) : null}
           {!isAnnotationSession && !bubbleStyleEditorOpen && styleSummaryLines.length > 0 ? (
@@ -1972,6 +2218,7 @@ export const PromptCardView = React.forwardRef<BreadcrumbsHandle, PromptCardView
             </div>
           ) : null}
         </div>
+      </div>
       </div>
     );
 

@@ -135,6 +135,11 @@ export function createLocalActionsService(options: {
     const hasTransactionChanges = Boolean(
       meta?.changeKinds.some((kind) => kind === 'text' || kind === 'style' || kind === 'class'),
     );
+    const deleteElementAnnotationLinks = meta
+      ? Array.from(options.state.deleteElementAnnotationsByTransactionId.values())
+        .filter((link) => link.parentElementKey === meta.elementKey && link.active)
+        .reverse()
+      : [];
 
     if (!hasNote && !hasImages && !hasRecordedChanges && !hasStaleDirtyMarker) {
       options.feedback.toast('info', '当前项没有可清空的待修改内容。');
@@ -147,6 +152,27 @@ export function createLocalActionsService(options: {
 
     if (hasTweakChanges) {
       await options.changes.revertRecordedTweakForElement(element);
+    }
+
+    if (deleteElementAnnotationLinks.length > 0) {
+      const restoreDeletedElement = options.state.transactionManager?.restoreDeletedElement;
+      if (!restoreDeletedElement) {
+        await options.feedback.alert({
+          title: '还原元素',
+          content: '当前无法还原已删除的元素，请使用 Cmd/Ctrl + Z 后再试。',
+          confirmText: '知道了',
+        });
+        return false;
+      }
+      for (const link of deleteElementAnnotationLinks) {
+        if (restoreDeletedElement(link.transactionId)) continue;
+        await options.feedback.alert({
+          title: '还原元素',
+          content: '已删除元素的原位置失效，暂时无法还原。',
+          confirmText: '知道了',
+        });
+        return false;
+      }
     }
 
     if (hasTransactionChanges && meta) {

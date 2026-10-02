@@ -1,0 +1,578 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Draw.io YAML Specification",
+  "description": "Schema for the draw.io skill YAML specification format. Validates diagram structure including nodes, edges, modules, and meta configuration.",
+  "type": "object",
+  "properties": {
+    "meta": {
+      "type": "object",
+      "description": "Diagram-level configuration",
+      "properties": {
+        "theme": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Theme name (e.g. tech-blue, academic, nature, dark, high-contrast)"
+        },
+        "layout": {
+          "type": "string",
+          "enum": [
+            "horizontal",
+            "vertical",
+            "hierarchical",
+            "star",
+            "mesh"
+          ],
+          "description": "Layout direction or topology intent for automatic positioning"
+        },
+        "routing": {
+          "type": "string",
+          "enum": [
+            "orthogonal",
+            "rounded"
+          ],
+          "description": "Connector routing style"
+        },
+        "profile": {
+          "type": "string",
+          "enum": [
+            "default",
+            "academic-paper",
+            "engineering-review"
+          ],
+          "description": "Workflow profile that enables domain-specific validation and defaults"
+        },
+        "figureType": {
+          "type": "string",
+          "enum": [
+            "architecture",
+            "roadmap",
+            "workflow"
+          ],
+          "description": "Academic figure intent used for paper-mode guidance and validation"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "generated",
+            "replicated",
+            "edited"
+          ],
+          "description": "How this spec was produced"
+        },
+        "canvas": {
+          "type": "string",
+          "description": "Canvas size (e.g. auto, 800x600, 1200x800)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Diagram title"
+        },
+        "description": {
+          "type": "string",
+          "description": "Diagram description"
+        },
+        "legend": {
+          "type": "string",
+          "description": "Optional legend summary used by academic-paper validation"
+        },
+        "grid": {
+          "type": "object",
+          "properties": {
+            "size": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "snap": {
+              "type": "boolean"
+            }
+          }
+        },
+        "replication": {
+          "type": "object",
+          "description": "Optional metadata for image-driven redraws and source-palette preservation",
+          "properties": {
+            "colorMode": {
+              "type": "string",
+              "enum": [
+                "preserve-original",
+                "theme-first"
+              ],
+              "description": "Whether to preserve extracted source colors or normalize them to the selected theme"
+            },
+            "background": {
+              "type": "string",
+              "description": "Detected source background color"
+            },
+            "palette": {
+              "type": "array",
+              "description": "Detected flat colors from the source image",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "hex": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "appliesTo": {
+                    "type": "string",
+                    "enum": [
+                      "canvas",
+                      "nodes",
+                      "edges",
+                      "modules",
+                      "mixed"
+                    ]
+                  },
+                  "confidence": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "confidenceNotes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Freeform notes about low-confidence color extraction or normalization decisions"
+            }
+          }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "description": "Diagram nodes/elements",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+            "description": "Unique node identifier"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Display label"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "service",
+              "database",
+              "decision",
+              "terminal",
+              "queue",
+              "user",
+              "document",
+              "formula",
+              "text",
+              "cloud",
+              "process",
+              "input",
+              "output",
+              "loss",
+              "feature",
+              "conv",
+              "pool",
+              "embed",
+              "temporal",
+              "attention",
+              "gate",
+              "norm",
+              "graph",
+              "matrix",
+              "operator",
+              "tensor3d",
+              "router",
+              "switch",
+              "firewall",
+              "server",
+              "load_balancer",
+              "subnet",
+              "internet",
+              "ap"
+            ],
+            "description": "Semantic type for automatic shape selection"
+          },
+          "module": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+            "description": "Parent module ID"
+          },
+          "size": {
+            "type": "string",
+            "enum": [
+              "small",
+              "medium",
+              "large",
+              "xl"
+            ],
+            "description": "Size preset"
+          },
+          "icon": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9._-]*$",
+            "description": "Icon identifier (e.g. aws.lambda, gcp.compute)"
+          },
+          "network": {
+            "type": "object",
+            "description": "Optional network-specific node metadata",
+            "properties": {
+              "device": {
+                "type": "string",
+                "pattern": "^[a-zA-Z][a-zA-Z0-9._-]*$"
+              },
+              "role": {
+                "type": "string"
+              },
+              "vendor": {
+                "type": "string"
+              },
+              "zone": {
+                "type": "string"
+              },
+              "ip": {
+                "type": "string"
+              },
+              "cidr": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "position": {
+            "type": "object",
+            "description": "Manual position override",
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          },
+          "style": {
+            "type": "object",
+            "description": "Style overrides (fillColor, strokeColor, etc.)",
+            "properties": {
+              "fillColor": {
+                "type": "string"
+              },
+              "strokeColor": {
+                "type": "string"
+              },
+              "strokeWidth": {
+                "type": "number",
+                "minimum": 0
+              },
+              "fontColor": {
+                "type": "string"
+              },
+              "fontSize": {
+                "type": "number",
+                "minimum": 1
+              },
+              "fontWeight": {
+                "type": "number"
+              },
+              "fontFamily": {
+                "type": "string"
+              },
+              "fontStyle": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 7
+              },
+              "italic": {
+                "type": "boolean"
+              },
+              "bold": {
+                "type": "boolean"
+              },
+              "align": {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right"
+                ]
+              },
+              "verticalAlign": {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "middle",
+                  "bottom"
+                ]
+              },
+              "spacingLeft": {
+                "type": "number"
+              },
+              "spacingRight": {
+                "type": "number"
+              },
+              "spacingTop": {
+                "type": "number"
+              },
+              "spacingBottom": {
+                "type": "number"
+              }
+            }
+          },
+          "bounds": {
+            "type": "object",
+            "description": "Explicit top-left bounds for high-fidelity replication of text boxes and annotations",
+            "required": [
+              "x",
+              "y",
+              "width",
+              "height"
+            ],
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "width": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "height": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "description": "Connections between nodes",
+      "items": {
+        "type": "object",
+        "required": [
+          "from",
+          "to"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+            "description": "Source node ID"
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+            "description": "Target node ID"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "data",
+              "optional",
+              "dependency",
+              "bidirectional"
+            ],
+            "description": "Connector semantic type"
+          },
+          "label": {
+            "type": "string",
+            "description": "Edge label text"
+          },
+          "labelPosition": {
+            "type": "string",
+            "enum": [
+              "start",
+              "center",
+              "end"
+            ],
+            "description": "Label position along edge"
+          },
+          "bidirectional": {
+            "type": "boolean",
+            "description": "Two-way connection flag"
+          },
+          "srcInterface": {
+            "type": "string",
+            "description": "Source interface label for network links"
+          },
+          "dstInterface": {
+            "type": "string",
+            "description": "Target interface label for network links"
+          },
+          "ip": {
+            "type": "string",
+            "description": "IP address or subnet label for the link"
+          },
+          "vlan": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "description": "VLAN identifier for the link"
+          },
+          "bandwidth": {
+            "type": "string",
+            "description": "Bandwidth/capacity label for the link"
+          },
+          "linkType": {
+            "type": "string",
+            "description": "Link media or semantic category (e.g. trunk, access, fiber)"
+          },
+          "style": {
+            "type": "object",
+            "description": "Style overrides for this edge",
+            "properties": {
+              "strokeColor": {
+                "type": "string"
+              },
+              "strokeWidth": {
+                "type": "number",
+                "minimum": 0
+              },
+              "dashed": {
+                "type": "boolean"
+              },
+              "dashPattern": {
+                "type": "string"
+              },
+              "endArrow": {
+                "type": "string"
+              },
+              "exitX": {
+                "type": "number"
+              },
+              "exitY": {
+                "type": "number"
+              },
+              "exitDx": {
+                "type": "number"
+              },
+              "exitDy": {
+                "type": "number"
+              },
+              "entryX": {
+                "type": "number"
+              },
+              "entryY": {
+                "type": "number"
+              },
+              "entryDx": {
+                "type": "number"
+              },
+              "entryDy": {
+                "type": "number"
+              },
+              "fontSize": {
+                "type": "number",
+                "minimum": 1
+              },
+              "fontColor": {
+                "type": "string"
+              }
+            }
+          },
+          "waypoints": {
+            "type": "array",
+            "description": "Optional explicit routing waypoints for orthogonal edges",
+            "items": {
+              "type": "object",
+              "required": [
+                "x",
+                "y"
+              ],
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "labelOffset": {
+            "type": "object",
+            "description": "Explicit draw.io edge-label offset from the label anchor, in pixels",
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "modules": {
+      "type": "array",
+      "description": "Container groups for organizing nodes",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+            "description": "Unique module identifier"
+          },
+          "label": {
+            "type": "string",
+            "description": "Module display name"
+          },
+          "color": {
+            "type": "string",
+            "description": "Fill color or theme token (e.g. $primary)"
+          },
+          "style": {
+            "type": "object",
+            "description": "Style overrides for this module"
+          }
+        }
+      }
+    }
+  }
+}

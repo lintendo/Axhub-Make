@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { QUICK_EDIT_RUNTIME_SCRIPT } from '../quickEditRuntimeApi';
+import { QUICK_EDIT_RUNTIME_SCRIPT } from '../quickEditRuntimeApi.ts';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -393,6 +393,38 @@ describe('quick edit runtime script', () => {
     expect(documentStub.addEventListener).not.toHaveBeenCalledWith('input', expect.any(Function), true);
   });
 
+  it('exits legacy selection when the host toolbar closes element selection', () => {
+    const { documentStub, appendedElements, emit, windowStub } = createRuntimeHarness();
+    const element: any = {
+      nodeType: 1,
+      tagName: 'DIV',
+      textContent: '订单履约率',
+      children: [],
+      closest: vi.fn(() => null),
+      matches: vi.fn(() => false),
+      getBoundingClientRect: vi.fn(() => ({ left: 10, top: 20, width: 120, height: 32 })),
+    };
+    documentStub.elementFromPoint.mockReturnValue(element);
+
+    windowStub.axhub.quickEdit.enter({ projectId: 'project-1', resourceId: 'overview' });
+    emit('document:pointermove', { clientX: 15, clientY: 25 });
+
+    const overlay = appendedElements.at(-1);
+    expect(overlay?.style.display).toBe('block');
+
+    emit('window:message', {
+      data: {
+        type: 'AXHUB_PROTOTYPE_EDITOR_HOST_TOOLBAR_ACTION',
+        action: { type: 'toggle-selection-mode', active: false },
+      },
+    });
+
+    expect(documentStub.removeEventListener).toHaveBeenCalledWith('pointermove', expect.any(Function), true);
+    expect(documentStub.removeEventListener).toHaveBeenCalledWith('click', expect.any(Function), true);
+    expect(overlay?.style.display).toBe('none');
+    expect(documentStub.documentElement.dataset.axhubQuickEdit).toBeUndefined();
+  });
+
   it('returns a Figma clipboard payload for copy-to-figma export requests without writing from the iframe', async () => {
     const capturedDocument = { root: { id: 'root' } };
     const captureDocumentForFigmaNew = vi.fn(async () => capturedDocument);
@@ -597,6 +629,7 @@ describe('quick edit runtime script', () => {
           format: 'jpeg',
           quality: 0.92,
           maxBytes: 8 * 1024 * 1024,
+          scope: 'viewport',
         },
       },
     });
@@ -611,6 +644,7 @@ describe('quick edit runtime script', () => {
       format: 'jpeg',
       quality: 0.92,
       maxBytes: 8 * 1024 * 1024,
+      scope: 'viewport',
     });
     expect(messages.at(-1)).toEqual({
       targetOrigin: '*',
@@ -678,6 +712,32 @@ describe('quick edit runtime script', () => {
     expect(appendedElements).toHaveLength(1);
     expect(appendedElements[0].getAttribute('data-axhub-quick-edit-ignore')).toBe('1');
     expect(appendedElements[0].textContent).toContain('Render exploded');
+    expect(appendedElements[0].textContent).toContain('/src/prototypes/home/index.tsx:12:8');
+  });
+
+  it('replays early runtime errors after installing the full handlers', () => {
+    const stopEarlyCapture = vi.fn();
+    const earlyCaptureState = {
+      queue: [{
+        eventType: 'error',
+        error: new Error('Queued module failure'),
+        message: 'Queued module failure',
+        filename: '/src/prototypes/home/index.tsx',
+        lineno: 12,
+        colno: 8,
+        target: null,
+      }],
+      stop: stopEarlyCapture,
+    };
+
+    const { appendedElements } = createRuntimeHarness({
+      __AXHUB_EARLY_RUNTIME_ERROR_CAPTURE__: earlyCaptureState,
+    });
+
+    expect(stopEarlyCapture).toHaveBeenCalledTimes(1);
+    expect(earlyCaptureState.queue).toHaveLength(0);
+    expect(appendedElements).toHaveLength(1);
+    expect(appendedElements[0].textContent).toContain('Queued module failure');
     expect(appendedElements[0].textContent).toContain('/src/prototypes/home/index.tsx:12:8');
   });
 

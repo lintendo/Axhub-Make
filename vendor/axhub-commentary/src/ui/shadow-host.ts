@@ -18,6 +18,7 @@ import {
 } from '../constants';
 import { isMobileDevice } from '../utils/mobile-detect';
 import { Disposer } from '../utils/disposables';
+import { resolveCspNonce } from './csp-nonce';
 
 // =============================================================================
 // Types
@@ -58,7 +59,7 @@ export interface ShadowHostManager {
 
 const SHADOW_HOST_FOCUS_TRAP_SELECTORS = [
   '.ant-modal-wrap',
-  '[role="dialog"][aria-modal="true"]',
+  '[role="dialog"]',
   '[aria-modal="true"]',
   'dialog[open]',
 ].join(', ');
@@ -68,9 +69,71 @@ function getDefaultMountPoint(): HTMLElement {
 }
 
 export function resolveShadowHostMountContainer(anchorElement: Element | null): HTMLElement | null {
-  if (!(anchorElement instanceof Element) || !anchorElement.isConnected) return null;
-  const container = anchorElement.closest(SHADOW_HOST_FOCUS_TRAP_SELECTORS);
-  return container instanceof HTMLElement ? container : null;
+  if (typeof document === 'undefined' || typeof Element === 'undefined') return null;
+
+  if (anchorElement instanceof Element && anchorElement.isConnected) {
+    const container = anchorElement.closest(SHADOW_HOST_FOCUS_TRAP_SELECTORS);
+    if (container instanceof HTMLElement && isOpenFocusTrapContainer(container)) {
+      return container;
+    }
+  }
+
+  // A dialog can open after the selected page element was chosen. In that case
+  // the anchor is outside the dialog, but the page's focus/pointer trap still
+  // applies to the commentary UI. Follow the active dialog until it closes.
+  return findOpenFocusTrapContainer();
+}
+
+function isOpenFocusTrapContainer(element: Element): boolean {
+  if (!element.isConnected) return false;
+  if (element.matches('dialog') && !element.hasAttribute('open')) return false;
+  if (element.getAttribute('data-state') === 'closed') return false;
+  if (element.getAttribute('aria-hidden') === 'true') return false;
+
+  try {
+    const style = typeof window !== 'undefined' ? window.getComputedStyle(element) : null;
+    if (!style) return true;
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+  } catch {
+    // Some test DOMs do not provide computed styles. The structural checks
+    // above are still enough to avoid closed dialog containers.
+  }
+
+  return true;
+}
+
+function findOpenFocusTrapContainer(): HTMLElement | null {
+  if (typeof document === 'undefined') return null;
+
+  let activeContainer: HTMLElement | null = null;
+  try {
+    // DOM order is a useful fallback for modal stacks: the most recently
+    // mounted dialog is normally the topmost one.
+    const candidates = document.querySelectorAll(SHADOW_HOST_FOCUS_TRAP_SELECTORS);
+    for (const candidate of candidates) {
+      if (candidate instanceof HTMLElement && isOpenFocusTrapContainer(candidate)) {
+        activeContainer = candidate;
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return activeContainer;
+}
+
+function mutationTouchesFocusTrap(record: MutationRecord): boolean {
+  if (record.type === 'attributes') {
+    return record.target instanceof Element && record.target.matches(SHADOW_HOST_FOCUS_TRAP_SELECTORS);
+  }
+  if (record.type !== 'childList') return false;
+
+  const nodes = [record.target, ...Array.from(record.addedNodes), ...Array.from(record.removedNodes)];
+  return nodes.some((node) => {
+    if (!(node instanceof Element)) return false;
+    return node.matches(SHADOW_HOST_FOCUS_TRAP_SELECTORS)
+      || node.querySelector(SHADOW_HOST_FOCUS_TRAP_SELECTORS) !== null;
+  });
 }
 
 // =============================================================================
@@ -79,7 +142,10 @@ export function resolveShadowHostMountContainer(anchorElement: Element | null): 
 
 const SHADOW_HOST_STYLES = /* css */ `
   :host {
-    all: initial;
+    /* Keep the component boundary explicit even when the host is mounted in a
+     * page that has a global reset (for example universal/body rules). The inline
+     * reset below wins over document-level author rules on the host itself. */
+    all: initial !important;
 
     /* Shared overlay tokens */
     --we-surface-bg: #0a0a0a;
@@ -679,6 +745,8 @@ export function mountShadowHost(_options: ShadowHostOptions = {}): ShadowHostMan
   const disposer = new Disposer();
   let elements: ShadowHostElements | null = null;
   let currentMountParent: HTMLElement | null = null;
+  let currentAnchorElement: Element | null = null;
+  let mountSyncQueued = false;
 
   // Clean up any existing host (from crash/reload)
   const existing = document.getElementById(WEB_EDITOR_V2_HOST_ID);
@@ -699,7 +767,11 @@ export function mountShadowHost(_options: ShadowHostOptions = {}): ShadowHostMan
   host.classList.add('data-fullscreen-prevent-event-capture');
   host.setAttribute('data-mcp-web-editor', 'v2');
 
-  // Apply host styles with !important to resist page CSS
+  // Reset inherited/page-level styles before applying the positioning contract.
+  // Shadow DOM blocks selectors from crossing the boundary, but inherited
+  // values and rules targeting the host element itself still apply otherwise.
+  setImportantStyle(host, 'all', 'initial');
+  setImportantStyle(host, 'display', 'block');
   setImportantStyle(host, 'position', 'fixed');
   setImportantStyle(host, 'inset', '0');
   setImportantStyle(host, 'z-index', String(WEB_EDITOR_V2_Z_INDEX));
@@ -720,6 +792,8 @@ export function mountShadowHost(_options: ShadowHostOptions = {}): ShadowHostMan
 
   // Add styles
   const styleEl = document.createElement('style');
+  const cspNonce = resolveCspNonce(document);
+  if (cspNonce) styleEl.nonce = cspNonce;
   styleEl.textContent = SHADOW_HOST_STYLES;
   shadowRoot.append(styleEl);
 
@@ -743,11 +817,53 @@ export function mountShadowHost(_options: ShadowHostOptions = {}): ShadowHostMan
     currentMountParent = nextMountParent;
   };
 
+  const scheduleMountSync = (): void => {
+    if (mountSyncQueued) return;
+    mountSyncQueued = true;
+    Promise.resolve().then(() => {
+      mountSyncQueued = false;
+      if (disposer.isDisposed) return;
+      ensureMountedAt(currentAnchorElement);
+    });
+  };
+
   // Mount to the document root by default. When a selection lives inside a
-  // focus-trapping dialog (for example Ant Design Modal), the interaction
-  // layer will move this host under that container.
+  // focus-trapping dialog (for example Ant Design Modal or Radix Dialog), the
+  // interaction layer and dialog observer will move this host under it.
   ensureMountedAt(null);
   disposer.add(() => host.remove());
+
+  // Radix and similar dialog primitives apply `pointer-events: none` to the
+  // page while a modal is open. Observe Portal/attribute changes so an already
+  // visible commentary panel follows the newly opened dialog as well; waiting
+  // for a new page selection would leave the panel visible but unfocusable.
+  if (typeof MutationObserver !== 'undefined') {
+    const mutationRoot = document.body ?? document.documentElement;
+    if (mutationRoot) {
+      disposer.observeMutation(
+        mutationRoot,
+        (records) => {
+          const shouldSync = records.some(mutationTouchesFocusTrap);
+          if (shouldSync) scheduleMountSync();
+        },
+        {
+          subtree: true,
+          childList: true,
+          attributes: true,
+          attributeFilter: [
+            'aria-hidden',
+            'aria-modal',
+            'class',
+            'data-open',
+            'data-state',
+            'hidden',
+            'open',
+            'style',
+          ],
+        },
+      );
+    }
+  }
 
   elements = { host, shadowRoot, overlayRoot, uiRoot };
 
@@ -815,6 +931,9 @@ export function mountShadowHost(_options: ShadowHostOptions = {}): ShadowHostMan
   return {
     getElements: () => elements,
     setMountContainer: (anchorElement) => {
+      currentAnchorElement = anchorElement instanceof Element && anchorElement.isConnected
+        ? anchorElement
+        : null;
       ensureMountedAt(anchorElement);
     },
     isOverlayElement,

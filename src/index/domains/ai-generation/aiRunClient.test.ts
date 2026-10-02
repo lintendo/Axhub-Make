@@ -219,6 +219,31 @@ describe('AI run client', () => {
     });
   });
 
+  it('passes an explicit permission mode without adding MCP servers', async () => {
+    globalThis.fetch = vi.fn(async () => new Response(
+      sseEvent('run.completed', {
+        status: 'done',
+        output: 'ok',
+        artifacts: [],
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      },
+    )) as any;
+
+    await runAiStream({
+      projectId: 'project-b',
+      scene: 'direct',
+      prompt: '直接更新画布文件',
+      permissionMode: 'bypassPermissions',
+    });
+
+    const requestBody = JSON.parse((globalThis.fetch as any).mock.calls[0][1].body);
+    expect(requestBody.permissionMode).toBe('bypassPermissions');
+    expect(requestBody.mcpServers).toBeUndefined();
+  });
+
   it('passes the configured agent run concurrency to the AI runs API', async () => {
     globalThis.fetch = vi.fn(async () => new Response(
       sseEvent('run.completed', {

@@ -11,6 +11,7 @@ const agentSkillRoot = path.join(appRoot, '.agents/skills/screenshot-to-prototyp
 const claudeSkillRoot = path.join(appRoot, '.claude/skills/screenshot-to-prototype');
 const skillRelativeFiles = [
   'SKILL.md',
+  'agents/openai.yaml',
   'references/prompts.md',
   'scripts/build-reconstruction-manifest.mjs',
   'scripts/compile-reconstruction-tailwind.mjs',
@@ -18,7 +19,13 @@ const skillRelativeFiles = [
   'scripts/prepare-reconstruction-source.mjs',
   'scripts/probe-key-color.mjs',
   'scripts/png-utils.mjs',
+  'scripts/remove-background-rembg.mjs',
+  'scripts/render-reconstruction-review.mjs',
   'scripts/slice-alpha-components.mjs',
+  'scripts/request-vision.mjs',
+  'scripts/normalize-text-regions.mjs',
+  'scripts/mask-layer-recall.mjs',
+  'scripts/finalize-layer-recall.mjs',
   'scripts/slice-asset-sheet.mjs',
   'scripts/audit-assets.mjs',
   'scripts/validate-reconstruction-manifest.mjs',
@@ -106,6 +113,24 @@ function createFixtureSheet(filePath: string) {
 }
 
 describe('screenshot-to-prototype skill', () => {
+  it('keeps the main workflow concise and returns first-pass HTML before automatic review', () => {
+    const skillSource = readSkillFile(agentSkillRoot, 'SKILL.md');
+    const wordCount = skillSource.trim().split(/\s+/u).length;
+    expect(wordCount).toBeLessThanOrEqual(320);
+    expect(skillSource).toContain('具体字段和素材分流见 `references/prompts.md`');
+
+    const firstPassIndex = skillSource.indexOf('首版生成后立即返回可访问链接');
+    const continueIndex = skillSource.indexOf('不得结束当前任务，也不得等待用户确认');
+    const autoReviewIndex = skillSource.indexOf('随后自动进入 AI 评审');
+    const finalSpecIndex = skillSource.indexOf('最终回复提供 HTML 主规格链接');
+    expect(firstPassIndex).toBeGreaterThan(-1);
+    expect(continueIndex).toBeGreaterThan(firstPassIndex);
+    expect(autoReviewIndex).toBeGreaterThan(continueIndex);
+    expect(finalSpecIndex).toBeGreaterThan(autoReviewIndex);
+    expect(skillSource).toContain('使用 `?projectId=<id>&docPath=<编码后的项目相对路径>`');
+    expect(skillSource).toContain('使用 `?projectId=<id>&p=<slug>&spec=1`');
+  });
+
   it('ships matching default skills for agent harnesses with narrow triggers and relative paths', () => {
     for (const relativePath of skillRelativeFiles) {
       expect(fs.existsSync(path.join(agentSkillRoot, relativePath)), `${relativePath} missing in .agents`).toBe(true);
@@ -118,6 +143,7 @@ describe('screenshot-to-prototype skill', () => {
     }
 
     const skillSource = readSkillFile(agentSkillRoot, 'SKILL.md');
+    const openAiPrompt = readSkillFile(agentSkillRoot, 'agents/openai.yaml');
     const promptsSource = readSkillFile(agentSkillRoot, 'references/prompts.md');
     const combinedMarkdown = `${skillSource}\n${promptsSource}`;
     const combinedSkillFiles = skillRelativeFiles.map((relativePath) => readSkillFile(agentSkillRoot, relativePath)).join('\n');
@@ -129,64 +155,59 @@ describe('screenshot-to-prototype skill', () => {
     expect(frontmatter).toContain('$screenshot-to-prototype');
     expect(frontmatter).toContain('Use only when 用户明确要求把本地截图、设计稿或高保真界面图还原成 Axhub Make client 可运行原型');
     expect(frontmatter).toContain('仅提供图片作为素材、参考图、需求图或风格上下文时不要使用');
+    expect(openAiPrompt).toContain('脚本生成首版 HTML 后立即给我链接');
+    expect(openAiPrompt).toContain('在同一任务中自动继续视觉评审');
+    expect(openAiPrompt).toContain('等我明确确认后再转换为当前 client 的 React 可运行原型');
     expect(frontmatter).not.toMatch(/URL cloning|theme extraction|general UI image generation|ordinary prototype creation/iu);
     expect(frontmatter).not.toMatch(/截图或本地图片|转换为|做网页|生成图片|提取主题|参考 URL/u);
     expect(frontmatter).not.toMatch(/还原.*复刻|复刻.*还原|截图或本地图片/u);
 
-    expect(combinedMarkdown).toContain('源图本地路径');
-    expect(combinedMarkdown).toContain('所有素材提取、修复、高清化、设计分析都必须把用户本地图片路径作为参考图传入');
-    expect(combinedMarkdown).toContain('不能只用文字描述生成素材');
-    expect(skillSource).toContain('需要生成、编辑或派生位图素材时，使用 `ui-image-generation`');
-    expect(skillSource).toContain('工具选择、配置读取和回退规则全部遵循该技能');
-    expect(combinedMarkdown).not.toMatch(/系统 `imagegen`|内部图片生成 MCP|Agent 图片配置|生成通道/u);
-    expect(combinedMarkdown).toContain('由图片 AI 判断具体提取对象');
-    expect(combinedMarkdown).toContain('只说明筛选规则');
-    expect(combinedMarkdown).not.toContain('AGENTS.md');
-    expect(combinedMarkdown).toContain('src/prototypes/<slug>/assets/');
-    expect(combinedMarkdown).toContain('.local/screenshot-to-prototype/<slug>/');
-    expect(combinedMarkdown).toContain('reconstruction-manifest.json');
-    expect(combinedMarkdown).toContain('data-page-target');
-    expect(combinedMarkdown).toContain('data-spec-page');
-    expect(combinedMarkdown).toContain('不要修改通用规格模板');
-    expect(combinedMarkdown).toContain('先完成固定 viewport 下的 1:1 绝对定位视觉稿');
-    expect(combinedMarkdown).toContain('preview_capture');
-    expect(combinedMarkdown).toContain('.spec/reconstruction/visual-check/');
-    expect(combinedMarkdown).toContain('原图与真实运行截图左右并排');
-    expect(skillSource).toContain('素材评审区逐项使用相同预览框左右展示候选与最终真实内容');
-    expect(skillSource).toContain('透明素材使用棋盘格背景');
-    expect(skillSource).toContain('图片、SVG 和组件都必须实际渲染');
-    expect(skillSource).toContain('不得只提供文字、文件名或路径');
-    expect(combinedMarkdown).toContain('完整原型时无需等待额外确认');
-    expect(combinedMarkdown).toContain('clean-crop');
-    expect(combinedMarkdown).toContain('generated-refined');
-    expect(combinedMarkdown).toContain('generated-chroma');
-    expect(combinedMarkdown).toContain('不加载 Tailwind preflight');
-    expect(combinedMarkdown).toContain('不使用 Tailwind CDN');
-    expect(skillSource).toContain('先按 UI 职责分流，再按视觉复杂度');
-    expect(skillSource).toContain('文本、按钮、输入框、导航、卡片、列表和表格');
-    expect(skillSource).toContain('图标、Logo、进度和简单图表');
-    expect(skillSource).toContain('照片、头像、商品图、插画、纹理和页面内嵌截图');
-    expect(skillSource).toContain('`flatten-in-page` 只用于第一阶段视觉稿');
-    expect(combinedMarkdown).toContain('按 bbox 单独裁切');
-    expect(combinedMarkdown).toContain('多个独立装饰位图');
-    expect(combinedMarkdown).toContain('键色透明化只在');
-    expect(combinedMarkdown).toContain('不生成 UI 文案、控件、通用图标或数据内容');
-    expect(combinedMarkdown).toContain('目标 bbox 和 DPR');
+    expect(skillSource).toContain('源图本地路径');
+    expect(skillSource).toContain('不能只用文字描述');
+    expect(skillSource).toContain('`ui-image-generation`');
+    expect(skillSource).toContain('src/prototypes/<slug>/.spec/spec.html');
+    expect(skillSource).toContain('src/prototypes/<slug>/assets/');
+    expect(skillSource).toContain('.local/screenshot-to-prototype/<slug>/');
+    expect(skillSource).toContain('reconstruction-manifest.json');
+    expect(skillSource).toContain('render-reconstruction-review.mjs');
+    expect(skillSource).toContain('request-vision.mjs');
+    expect(skillSource).toContain('normalize-text-regions.mjs');
+    expect(skillSource).toContain('mask-layer-recall.mjs');
+    expect(skillSource).toContain('finalize-layer-recall.mjs');
+    expect(skillSource).toContain('含状态栏');
+    expect(promptsSource).toContain('（含状态栏）');
+    expect(promptsSource).toContain('第二轮不得提交 OCR');
+    expect(skillSource).toContain('OCR 是可选增强');
+    expect(promptsSource).toContain('text-regions.json');
+    expect(promptsSource).toContain('`ocr`、`vision-api` 或 `current-agent`');
+    expect(promptsSource).toContain('不能进入其他素材框或其他文字框');
+    expect(skillSource).toContain('preview_capture');
+    expect(skillSource).toContain('源图 viewport 下的 1:1 尺寸');
+    expect(skillSource).toContain('只有用户明确确认最终 HTML 主规格后');
+    expect(skillSource).toContain('不使用 CDN，不加载 preflight');
+    expect(readSkillFile(agentSkillRoot, 'scripts/render-reconstruction-review.mjs')).toContain('[--generation-artifacts <json>]');
+
     expect(promptsSource).toContain('## UI 元素分流');
-    expect(promptsSource).toContain('## 批量候选素材（条件触发）');
-    expect(promptsSource).not.toContain('## Banner/封面高清化');
-    expect(combinedMarkdown).toContain('轻量偏差说明');
-    expect(combinedMarkdown).toContain('HTML/CSS 难快速稳定还原');
-    expect(combinedMarkdown).toContain('中文');
-    expect(promptsSource).not.toContain('such as icons, logos, avatars');
-    expect(combinedMarkdown).toContain('交互状态');
-    expect(combinedMarkdown).toContain('SVG');
+    expect(promptsSource).toContain('## 文字角色与素材审核');
+    expect(promptsSource).toContain('brand-text');
+    expect(promptsSource).toContain('display-text');
+    expect(promptsSource).toContain('decorative-text');
+    expect(promptsSource).toContain('preserve-in-image');
+    expect(promptsSource).toContain('semantic-only');
+    expect(promptsSource).toContain('## 完整候选素材矩阵');
+    expect(promptsSource).toContain('preserve');
+    expect(promptsSource).toContain('existing-alpha');
+    expect(promptsSource).toContain('known-key');
+    expect(promptsSource).toContain('complex-remove');
+    expect(promptsSource).toContain('不得二选一');
+    expect(promptsSource).toContain('两种候选都进入主规格');
+    expect(skillSource).not.toContain('birefnet-general');
+    expect(skillSource).not.toContain('generated-chroma');
+    expect(skillSource).not.toContain('candidate-manifest.json');
+    expect(combinedMarkdown).not.toContain('flatten-in-page');
     expect(combinedMarkdown).not.toMatch(/\bHard rule\b|\bInput:\b|\bPrompt:\b|\bWorkflow\b|\bAsset Naming\b|\bIcon Strategy\b/u);
     expect(combinedMarkdown).not.toMatch(/\/Users\/|[A-Za-z]:\\|apps\/axhub-make|Axhub Runtime|Mac|macOS/u);
-    expect(skillSource).toContain('## 适用范围');
-    expect(skillSource).not.toContain('## 退出规则');
-    expect(skillSource).not.toContain('必须停止');
-    expect(combinedSkillFiles).not.toMatch(/asset-manifest\.json|comparison\.html|visual-comparison-template|build-visual-comparison|compare-reconstruction|reviewStatus|needs-review|\bapproved\b|pixelmatch|diff\.png|comparison-metrics|SnapDiff|FigEdit/iu);
+    expect(combinedSkillFiles).not.toMatch(/asset-manifest\.json|comparison\.html|visual-comparison-template|build-visual-comparison|compare-reconstruction|pixelmatch|diff\.png|comparison-metrics|SnapDiff|FigEdit/iu);
     expect(combinedMarkdown).not.toMatch(/Source \/ Render \/ Overlay \/ Diff|\bDiff\b|diff\.png|comparison-metrics|pixelmatch/iu);
 
     const packageJson = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8'));

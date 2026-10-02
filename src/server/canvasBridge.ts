@@ -15,7 +15,11 @@ import type { Duplex } from 'node:stream';
 import type { IncomingMessage } from 'node:http';
 
 import { isPathInside } from './projectCore/index.ts';
-import { normalizeResourceRelativePath, resolveResourceFilePath } from './resourceFiles.ts';
+import {
+  normalizeResourceAssetRelativePath,
+  normalizeResourceRelativePath,
+  resolveResourceFilePath,
+} from './resourceFiles.ts';
 
 // ---------------------------------------------------------------------------
 // Protocol types
@@ -255,7 +259,7 @@ function normalizeResourceCanvasName(canvasName: string): string | null {
   const normalized = raw
     .replace(/^src\/resources\//u, '')
     .replace(/^resources\//u, '');
-  const resourcePath = normalizeResourceRelativePath(normalized);
+  const resourcePath = normalizeResourceRelativePath(normalized) || normalizeResourceAssetRelativePath(normalized);
   if (!resourcePath || path.extname(resourcePath).toLowerCase() !== '.excalidraw') {
     return null;
   }
@@ -648,7 +652,7 @@ export class CanvasBridgeHub {
       return null;
     }
     const resourcePath = normalizedCanvasName.replace(/^resources\//u, '');
-    const resolved = resolveResourceFilePath(this.projectRoot, resourcePath);
+    const resolved = resolveResourceFilePath(this.projectRoot, resourcePath, { allowAssetPath: true });
     if (
       !resolved
       || path.extname(resolved.relativePath).toLowerCase() !== '.excalidraw'

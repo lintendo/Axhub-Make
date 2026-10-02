@@ -4,6 +4,7 @@ export interface EmbedPointerIntentSnapshot {
     selectedEmbedIdAtPointerDown: string | null;
     moved: boolean;
     released: boolean;
+    activationRequested: boolean;
 }
 
 export function resolveEmbedClickActivationMode(options: {
@@ -16,6 +17,7 @@ export function resolveEmbedClickActivationMode(options: {
         && options.currentSelectedId === options.previousSelectedId
         && options.pointerIntent?.released
         && !options.pointerIntent.moved
+        && options.pointerIntent.activationRequested
         && options.pointerIntent.selectedEmbedIdAtPointerDown === options.currentSelectedId
     ) {
         return 'activate';

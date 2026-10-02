@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocked = vi.hoisted(() => ({
   createCommentary: vi.fn(),
   getGlobalCommentaryTweakProtocol: vi.fn(),
+  resolveCommentaryElementIdentity: vi.fn(),
   subscribeAcpRuntimeStatuses: vi.fn(),
 }));
 
 vi.mock('@axhub/commentary', () => ({
   createCommentary: mocked.createCommentary,
   getGlobalCommentaryTweakProtocol: mocked.getGlobalCommentaryTweakProtocol,
+  resolveCommentaryElementIdentity: mocked.resolveCommentaryElementIdentity,
   subscribeAcpRuntimeStatuses: mocked.subscribeAcpRuntimeStatuses,
 }));
 
@@ -20,16 +22,41 @@ import {
   buildInternalPrototypeCommentPageScope,
   createWebEditorV2Controller,
   createPrototypeCommentsPersistenceAdapter,
+  addMockExternalComments,
+  stripMockExternalComments,
   readHostToolbarModeFromSearch,
   resolveHostResourceContextFromLocation,
   withTemporaryStyleHackComment,
 } from './webEditorV2Integration';
+import { readPublishedCommenterToken } from './publishedCommenter';
+
+function normalizeMakeServerRequestUrl(input: string): string {
+  return input.replace(/^https?:\/\/localhost:53817/u, '');
+}
 
 beforeEach(() => {
   mocked.createCommentary.mockReset();
   mocked.getGlobalCommentaryTweakProtocol.mockReset();
+  mocked.resolveCommentaryElementIdentity.mockReset();
   mocked.subscribeAcpRuntimeStatuses.mockReset();
   vi.unstubAllGlobals();
+});
+
+describe('published commenter identity', () => {
+  it('keeps a stable high-entropy token per published share', () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => values.set(key, value),
+      },
+    });
+
+    const first = readPublishedCommenterToken('share-one');
+    expect(readPublishedCommenterToken('share-one')).toBe(first);
+    expect(readPublishedCommenterToken('share-two')).not.toBe(first);
+    expect(first).toMatch(/^[a-z0-9_-]{32,160}$/iu);
+  });
 });
 
 describe('temporary prototype style hack comment', () => {
@@ -43,7 +70,283 @@ describe('temporary prototype style hack comment', () => {
   });
 });
 
+describe('canonical prototype comments adapter', () => {
+  it('injects development-only external comment examples and strips them before write', () => {
+    const document = {
+      schemaVersion: 3,
+      kind: 'prototype-edit-comments' as const,
+      resource: { id: 'home', targetPath: 'prototypes/home', filePath: '' },
+      comments: [{ id: 'comment-1', elementKey: 'inventory-card', state: 'idle' as const, locator: { selectors: [] } }],
+      images: [],
+    };
+
+    const mocked = addMockExternalComments(document);
+    expect(mocked?.comments[0]?.externalComments).toHaveLength(3);
+    expect(new Set(mocked?.comments[0]?.externalComments?.map((comment) => comment.authorName)).size).toBe(3);
+    expect(stripMockExternalComments(mocked)?.comments[0]?.externalComments).toBeUndefined();
+  });
+
+  it('keeps mock external comments read-only to the development preview', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        exists: true,
+        document: {
+          schemaVersion: 3,
+          kind: 'prototype-edit-comments',
+          resource: { id: 'home', targetPath: 'prototypes/home', filePath: '' },
+          comments: [{ id: 'comment-1', state: 'idle', locator: { selectors: [] } }],
+          images: [],
+        },
+      }),
+    })) as typeof fetch;
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = createPrototypeCommentsPersistenceAdapter({
+      getProjectId: () => 'project-a',
+      getMakeServerOrigin: () => 'http://localhost:53817',
+      getMockExternalCommentsEnabled: () => true,
+    });
+    const scope = {
+      targetPath: 'prototypes/home',
+      storageScope: 'prototypes/home',
+      prototypeId: 'home',
+      filePath: 'src/prototypes/home/index.tsx',
+      resource: null,
+    };
+
+    const document = await adapter.read(scope);
+    expect(document?.comments[0]?.externalComments).toHaveLength(3);
+    await adapter.write(scope, document!, 'changes');
+
+    const putCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
+    expect(String(putCall?.[1]?.body)).not.toContain('__axhub_mock_external__');
+  });
+
+  it('keeps a published reviewer\'s own comments editable in the published runtime', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        exists: true,
+        document: {
+          schemaVersion: 3,
+          kind: 'prototype-edit-comments',
+          resource: { id: 'home', targetPath: 'prototypes/home', filePath: '' },
+          comments: [{
+            id: 'owned-review-1',
+            elementKey: 'inventory-card',
+            externalComments: [{
+              id: 'external-review-1',
+              authorId: 'reviewer-id',
+              authorName: 'Alice',
+              content: '本人评审建议',
+              createdAt: 1,
+            }],
+            state: 'idle',
+            locator: { selectors: [] },
+          }],
+          images: [{
+            id: 'owned-image-1',
+            commentId: 'owned-review-1',
+            name: 'review.png',
+            data: 'data:image/png;base64,YQ==',
+            mimeType: 'image/png',
+            size: 1,
+            createdAt: 1,
+          }],
+        },
+      }),
+    })) as typeof fetch;
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = createPrototypeCommentsPersistenceAdapter({
+      getProjectId: () => 'project-a',
+      getMakeServerOrigin: () => 'http://localhost:53817',
+      getPublishedShareId: () => 'share-comments',
+      getPublishedCommenterToken: () => 'reviewer-token-0000000000000000000000000003',
+    });
+
+    const document = await adapter.read({
+      targetPath: 'prototypes/home',
+      storageScope: 'prototypes/home',
+      prototypeId: 'home',
+      filePath: 'src/prototypes/home/index.tsx',
+      resource: null,
+    });
+
+    expect(document?.comments[0]).toEqual(expect.objectContaining({ id: 'owned-review-1' }));
+    expect(document?.comments[0]).toEqual(expect.objectContaining({ comment: '本人评审建议' }));
+    expect(document?.comments[0]?.externalComments).toHaveLength(1);
+    expect(document?.images[0]).toEqual(expect.objectContaining({ id: 'owned-image-1' }));
+  });
+
+  it('writes the canonical document without dropping nested external records', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true }),
+    })) as typeof fetch;
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = createPrototypeCommentsPersistenceAdapter({
+      getProjectId: () => 'project-a',
+      getMakeServerOrigin: () => 'http://localhost:53817',
+    });
+
+    await adapter.write({
+      targetPath: 'prototypes/home',
+      storageScope: 'prototypes/home',
+      prototypeId: 'home',
+      filePath: 'src/prototypes/home/index.tsx',
+      resource: null,
+    }, {
+      schemaVersion: 3,
+      kind: 'prototype-edit-comments',
+      resource: { id: 'home', targetPath: 'prototypes/home', filePath: '' },
+      comments: [
+        {
+          id: 'author-1',
+          comment: '作者自己的记录',
+          state: 'idle',
+          locator: { selectors: [] },
+        },
+        {
+          id: 'external-1',
+          externalComments: [{
+            id: 'external-note-1', authorId: 'reviewer', authorName: 'Alice', content: '外部批注', createdAt: 1,
+          }],
+          state: 'idle',
+          locator: { selectors: [] },
+        },
+      ],
+      images: [],
+    }, 'changes');
+
+    const putCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT');
+    expect(JSON.parse(String(putCall?.[1]?.body)).document.comments)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ id: 'author-1' }), expect.objectContaining({ id: 'external-1' })]));
+  });
+
+});
+
 describe('createWebEditorV2Controller launch options', () => {
+  it('exposes bounded page voice operations without changing their serializable results', async () => {
+    const targets = {
+      selected: {
+        targetRef: 'page.1.1',
+        label: 'button',
+        textExcerpt: '提交',
+        tagName: 'button',
+        role: 'button',
+        path: 'body > main > button',
+        childCount: 0,
+      },
+      hovered: null,
+      preferred: {
+        targetRef: 'page.1.1',
+        label: 'button',
+        textExcerpt: '提交',
+        tagName: 'button',
+        role: 'button',
+        path: 'body > main > button',
+        childCount: 0,
+      },
+    };
+    const searchResult = { elements: [targets.selected], nextCursor: null };
+    const structureResult = { elements: [targets.selected], nextCursor: 'page.1.20' };
+    const activationResult = { activated: true as const, targetRef: 'page.1.1' };
+    const commentResult = {
+      applied: true as const,
+      targetRef: 'page.1.1',
+      commentId: 'comment-42',
+      target: targets.selected,
+    };
+    const unsubscribe = vi.fn();
+    const editor = {
+      start: vi.fn(),
+      stop: vi.fn(),
+      destroy: vi.fn(),
+      getState: vi.fn(() => ({ active: false, version: 2 as const })),
+      getStatus: vi.fn(() => ({ active: false, undoCount: 0, redoCount: 0 })),
+      acknowledgeSavedTextChanges: vi.fn(),
+      acknowledgeSavedStyleChanges: vi.fn(),
+      getHostToolbarState: vi.fn(),
+      subscribeHostToolbarState: vi.fn(() => () => undefined),
+      runHostToolbarAction: vi.fn(async () => true),
+      getVoiceTargets: vi.fn(() => targets),
+      subscribeVoiceTargets: vi.fn((listener: (value: typeof targets) => void) => {
+        listener(targets);
+        return unsubscribe;
+      }),
+      findVoiceElements: vi.fn(() => searchResult),
+      getVoiceElementStructure: vi.fn(() => structureResult),
+      activateVoiceElement: vi.fn(async () => activationResult),
+      createVoiceComment: vi.fn(async () => commentResult),
+    };
+    mocked.createCommentary.mockReturnValue(editor);
+    vi.stubGlobal('window', {
+      location: {
+        search: '',
+        pathname: '/prototypes/home',
+        href: 'http://localhost:51720/prototypes/home',
+        protocol: 'http:',
+        hostname: 'localhost',
+      },
+      confirm: vi.fn(() => true),
+      alert: vi.fn(),
+    });
+
+    const controller = createWebEditorV2Controller();
+    await controller.enable();
+    const listener = vi.fn();
+
+    expect(structuredClone(controller.getVoiceTargets())).toEqual(targets);
+    expect(structuredClone(controller.findVoiceElements({ text: '提交', limit: 10 }))).toEqual(searchResult);
+    expect(structuredClone(controller.getVoiceElementStructure({ depth: 2, limit: 20 }))).toEqual(structureResult);
+    await expect(controller.activateVoiceElement('page.1.1')).resolves.toEqual(activationResult);
+    await expect(controller.createVoiceComment('page.1.1', '按钮需要更明确', {
+      anchorPlacement: 'target',
+    })).resolves.toEqual(commentResult);
+    const stopListening = controller.subscribeVoiceTargets(listener);
+
+    expect(listener).toHaveBeenCalledWith(targets);
+    expect(editor.findVoiceElements).toHaveBeenCalledWith({ text: '提交', limit: 10 });
+    expect(editor.getVoiceElementStructure).toHaveBeenCalledWith({ depth: 2, limit: 20 });
+    expect(editor.activateVoiceElement).toHaveBeenCalledWith('page.1.1');
+    expect(editor.createVoiceComment).toHaveBeenCalledWith('page.1.1', '按钮需要更明确', {
+      anchorPlacement: 'target',
+    });
+    stopListening();
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not override the persisted target screenshot preference at launch', async () => {
+    mocked.createCommentary.mockImplementation(() => ({
+      start: vi.fn(),
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: false, version: 2 })),
+      getStatus: vi.fn(() => ({ active: false, undoCount: 0, redoCount: 0 })),
+      acknowledgeSavedTextChanges: vi.fn(),
+      acknowledgeSavedStyleChanges: vi.fn(),
+      getHostToolbarState: vi.fn(),
+      subscribeHostToolbarState: vi.fn(() => () => undefined),
+      runHostToolbarAction: vi.fn(async () => true),
+      destroy: vi.fn(),
+    }));
+    vi.stubGlobal('window', {
+      location: {
+        search: '',
+        pathname: '/prototypes/home',
+        href: 'http://localhost:51720/prototypes/home',
+        protocol: 'http:',
+        hostname: 'localhost',
+      },
+      confirm: vi.fn(() => true),
+      alert: vi.fn(),
+    });
+
+    await createWebEditorV2Controller().enable();
+    expect(mocked.createCommentary.mock.calls[0]?.[0]?.ui).not.toHaveProperty(
+      'captureTargetScreenshot',
+    );
+  });
+
   it('ignores enable-time Agent bridge and editor integration options before creating the editor', async () => {
     const start = vi.fn();
     const stop = vi.fn();
@@ -135,6 +438,204 @@ describe('createWebEditorV2Controller launch options', () => {
     );
   });
 
+  it('resets a reused controller to the ordinary design profile after leaving annotation mode', async () => {
+    const createEditor = () => ({
+      start: vi.fn(),
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: false, version: 2 })),
+      getStatus: vi.fn(() => ({ active: false, undoCount: 0, redoCount: 0 })),
+      acknowledgeSavedTextChanges: vi.fn(),
+      acknowledgeSavedStyleChanges: vi.fn(),
+      getHostToolbarState: vi.fn(),
+      subscribeHostToolbarState: vi.fn(() => () => undefined),
+      runHostToolbarAction: vi.fn(async () => true),
+      destroy: vi.fn(),
+    });
+    mocked.createCommentary.mockImplementation(createEditor);
+
+    vi.stubGlobal('window', {
+      location: {
+        search: '',
+        pathname: '/prototypes/home',
+        href: 'http://localhost:51720/prototypes/home',
+        protocol: 'http:',
+        hostname: 'localhost',
+      },
+      confirm: vi.fn(() => true),
+      alert: vi.fn(),
+    });
+
+    const controller = createWebEditorV2Controller();
+    await controller.enable({ interactionProfile: 'annotation' });
+    await controller.disable();
+    await controller.enable();
+    await controller.disable();
+    await controller.enable({ interactionProfile: 'annotation' });
+
+    expect(mocked.createCommentary).toHaveBeenCalledTimes(3);
+    expect(mocked.createCommentary.mock.calls[0]?.[0]).toMatchObject({
+      interactionProfile: 'annotation',
+    });
+    expect(mocked.createCommentary.mock.calls[1]?.[0]).not.toHaveProperty('interactionProfile');
+    expect(mocked.createCommentary.mock.calls[2]?.[0]).toMatchObject({
+      interactionProfile: 'annotation',
+    });
+  });
+
+  it('uses the full inline toolbar for a published annotation session', async () => {
+    const commenterNameStorage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    };
+    mocked.createCommentary.mockReturnValue({
+      start: vi.fn(),
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: false, version: 2 })),
+      getStatus: vi.fn(() => ({ active: false, undoCount: 0, redoCount: 0 })),
+      acknowledgeSavedTextChanges: vi.fn(),
+      acknowledgeSavedStyleChanges: vi.fn(),
+      getHostToolbarState: vi.fn(),
+      subscribeHostToolbarState: vi.fn(() => () => undefined),
+      runHostToolbarAction: vi.fn(async () => true),
+      destroy: vi.fn(),
+    });
+    vi.stubGlobal('window', {
+      location: {
+        search: '?annotationSession=1&publishedShareId=share-comments',
+        pathname: '/prototypes/home',
+        href: 'http://localhost:51720/prototypes/home?annotationSession=1&publishedShareId=share-comments',
+        protocol: 'http:',
+        hostname: 'localhost',
+      },
+      parent: {},
+      localStorage: commenterNameStorage,
+      confirm: vi.fn(() => true),
+      alert: vi.fn(),
+    });
+
+    const controller = createWebEditorV2Controller();
+    await controller.enable();
+
+    expect(mocked.createCommentary.mock.calls[0]?.[0]).toMatchObject({
+      interactionProfile: 'annotation',
+      ui: {
+        externalAnnotationMode: true,
+        hideClearEditsAction: false,
+        initialSelectionModeActive: false,
+        showCopyPromptAction: false,
+        hideExecutionControls: true,
+        hideCurrentElementExecutionAction: true,
+        commenterName: '',
+        onCommenterNameChange: expect.any(Function),
+      },
+    });
+    expect(mocked.createCommentary.mock.calls[0]?.[0]?.ui).not.toHaveProperty('compactToolbar');
+    expect(mocked.createCommentary.mock.calls[0]?.[0]?.ui).not.toHaveProperty('hideToolbarCloseAction');
+    expect(mocked.createCommentary.mock.calls[0]?.[0]?.ui).not.toHaveProperty('toolbarMode');
+    expect(mocked.createCommentary.mock.calls[0]?.[0]?.ui?.onEnableAnnotation).toBeUndefined();
+    expect(mocked.createCommentary.mock.calls[0]?.[0]?.ui?.getAnnotationEnableAvailable?.()).toBe(false);
+    expect(mocked.createCommentary.mock.calls[0]?.[0]?.host).toMatchObject({
+      showAnnotationMarkdownEditor: false,
+    });
+    expect(mocked.createCommentary.mock.calls[0]?.[0]?.ui?.onHostToolbarAction).toBeUndefined();
+    expect(mocked.createCommentary.mock.calls[0]?.[0]?.ui?.onRequestFullExit).toBeUndefined();
+    expect(mocked.createCommentary.mock.calls[0]?.[0]?.ui).not.toHaveProperty('toolbarExtraContent');
+
+    await mocked.createCommentary.mock.calls[0]?.[0]?.ui?.onCommenterNameChange?.('Alice');
+    expect(commenterNameStorage.setItem).toHaveBeenCalledWith(
+      'axhub:published-commenter:share-comments',
+      'Alice',
+    );
+  });
+
+  it('keeps execution controls for regular annotation sessions', async () => {
+    mocked.createCommentary.mockReturnValue({
+      start: vi.fn(),
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: false, version: 2 })),
+      getStatus: vi.fn(() => ({ active: false, undoCount: 0, redoCount: 0 })),
+      acknowledgeSavedTextChanges: vi.fn(),
+      acknowledgeSavedStyleChanges: vi.fn(),
+      getHostToolbarState: vi.fn(),
+      subscribeHostToolbarState: vi.fn(() => () => undefined),
+      runHostToolbarAction: vi.fn(async () => true),
+      destroy: vi.fn(),
+    });
+    vi.stubGlobal('window', {
+      location: {
+        search: '',
+        pathname: '/prototypes/home',
+        href: 'http://localhost:51720/prototypes/home',
+        protocol: 'http:',
+        hostname: 'localhost',
+      },
+      confirm: vi.fn(() => true),
+      alert: vi.fn(),
+    });
+
+    const controller = createWebEditorV2Controller();
+    await controller.enable({ interactionProfile: 'annotation' } as never);
+
+    expect(mocked.createCommentary.mock.calls[0]?.[0]?.ui).toMatchObject({
+      showCopyPromptAction: true,
+    });
+    expect(mocked.createCommentary.mock.calls[0]?.[0]?.ui).not.toHaveProperty(
+      'externalAnnotationMode',
+    );
+    expect(mocked.createCommentary.mock.calls[0]?.[0]?.ui).not.toMatchObject({
+      hideExecutionControls: true,
+      hideCurrentElementExecutionAction: true,
+    });
+  });
+
+  it('keeps annotation editing hidden for quick comments but visible for PRD annotation sessions', async () => {
+    const createEditorApi = () => ({
+      start: vi.fn(),
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: false, version: 2 })),
+      getStatus: vi.fn(() => ({ active: false, undoCount: 0, redoCount: 0 })),
+      acknowledgeSavedTextChanges: vi.fn(),
+      acknowledgeSavedStyleChanges: vi.fn(),
+      getHostToolbarState: vi.fn(),
+      subscribeHostToolbarState: vi.fn(() => () => undefined),
+      runHostToolbarAction: vi.fn(async () => true),
+      destroy: vi.fn(),
+    });
+    const quickCommentEditor = createEditorApi();
+    const annotationEditor = createEditorApi();
+    mocked.createCommentary
+      .mockReturnValueOnce(quickCommentEditor)
+      .mockReturnValueOnce(annotationEditor);
+
+    vi.stubGlobal('window', {
+      location: {
+        search: '',
+        pathname: '/prototypes/home',
+        href: 'http://localhost:51720/prototypes/home',
+        protocol: 'http:',
+        hostname: 'localhost',
+      },
+      confirm: vi.fn(() => true),
+      alert: vi.fn(),
+    });
+
+    const controller = createWebEditorV2Controller();
+    await controller.enable({ interactionProfile: 'design' } as never);
+    controller.disable();
+    await controller.enable({ interactionProfile: 'annotation' } as never);
+
+    expect(mocked.createCommentary.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      interactionProfile: 'design',
+      host: expect.objectContaining({ showAnnotationMarkdownEditor: false }),
+    }));
+    expect(mocked.createCommentary.mock.calls[1]?.[0]).toEqual(expect.objectContaining({
+      interactionProfile: 'annotation',
+      host: expect.objectContaining({ showAnnotationMarkdownEditor: true }),
+    }));
+    expect(quickCommentEditor.destroy).toHaveBeenCalledTimes(1);
+  });
+
   it('does not fetch runtime fallback for ignored AI bridge options', async () => {
     const start = vi.fn();
     const stop = vi.fn();
@@ -222,7 +723,7 @@ describe('createWebEditorV2Controller launch options', () => {
 
     const controller = createWebEditorV2Controller();
     await controller.enable({
-      annotationApiBaseUrl: 'http://localhost:53817',
+      makeServerOrigin: 'http://localhost:53817',
       annotationProjectId: 'project-a',
     });
     const transport = mocked.createCommentary.mock.calls[0]?.[0]?.host?.conversationTaskTransport;
@@ -282,6 +783,42 @@ describe('resolveHostResourceContextFromLocation', () => {
         group: 'prototypes',
         name: 'ref-dashboard',
         commentPageScope: '/prototypes/ref-dashboard',
+      },
+    });
+  });
+
+  it('extracts reusable host resource context from theme urls', () => {
+    expect(
+      resolveHostResourceContextFromLocation(
+        '/themes/brand-system',
+        'http://localhost:51720/themes/brand-system?editor=webEditorV2',
+      ),
+    ).toEqual({
+      kind: 'prototype-entry',
+      id: 'themes/brand-system',
+      path: 'themes/brand-system',
+      url: 'http://localhost:51720/themes/brand-system?editor=webEditorV2',
+      meta: {
+        group: 'themes',
+        name: 'brand-system',
+        commentPageScope: '/themes/brand-system',
+      },
+    });
+  });
+
+  it('decodes nested prototype resource paths without truncating their target directory', () => {
+    expect(
+      resolveHostResourceContextFromLocation(
+        '/prototypes/team/%E6%9C%AA%E5%91%BD%E5%90%8D',
+        'http://localhost:51720/prototypes/team/%E6%9C%AA%E5%91%BD%E5%90%8D',
+      ),
+    ).toMatchObject({
+      kind: 'prototype-entry',
+      id: 'prototypes/team/未命名',
+      path: 'prototypes/team/未命名',
+      meta: {
+        group: 'prototypes',
+        name: 'team/未命名',
       },
     });
   });
@@ -529,7 +1066,9 @@ describe('createWebEditorV2Controller', () => {
       json: async () => ({ health: { status: 'ready' } }),
     })) as typeof fetch);
 
-    const controller = createWebEditorV2Controller();
+    const controller = createWebEditorV2Controller({
+      host: { showAnnotationMarkdownEditor: true },
+    });
     await controller.enable();
 
     expect(mocked.createCommentary).toHaveBeenCalledTimes(1);
@@ -548,6 +1087,7 @@ describe('createWebEditorV2Controller', () => {
         },
         host: expect.objectContaining({
           buildCopyPrompt: expect.any(Function),
+          showAnnotationMarkdownEditor: false,
           canEditAnnotationMarkdown: expect.any(Function),
           getCreateAnnotationBlockReason: expect.any(Function),
           getAnnotationDocumentEditUrl: expect.any(Function),
@@ -694,6 +1234,85 @@ describe('createWebEditorV2Controller', () => {
     );
   });
 
+  it('applies document source updates from the host without reloading the preview', async () => {
+    const start = vi.fn();
+    const refresh = vi.fn();
+    const replaceSource = vi.fn(async () => undefined);
+    const parentWindow = {};
+    const listeners = new Map<string, EventListener>();
+    const source = {
+      documentVersion: 1,
+      format: 'axhub-annotation-source',
+      data: {
+        version: 2,
+        prototypeName: 'home',
+        pageId: 'home',
+        nodes: [],
+        updatedAt: 2,
+      },
+      markdownMap: {},
+      assetMap: {},
+      documents: {
+        nodes: [{ type: 'markdown', id: 'new-doc', title: '新文档', markdownPath: 'docs/new-doc.md' }],
+      },
+    };
+
+    mocked.createCommentary.mockReturnValue({
+      start,
+      stop: vi.fn(),
+      refresh,
+      getState: vi.fn(() => ({ active: true, version: 2 })),
+      getStatus: vi.fn(() => ({ active: true, undoCount: 0, redoCount: 0 })),
+      acknowledgeSavedTextChanges: vi.fn(),
+      acknowledgeSavedStyleChanges: vi.fn(),
+    });
+    vi.stubGlobal('window', {
+      parent: parentWindow,
+      location: {
+        origin: 'http://localhost:51720',
+        search: '',
+        pathname: '/prototypes/home',
+        href: 'http://localhost:51720/prototypes/home',
+        protocol: 'http:',
+        hostname: 'localhost',
+      },
+      __AXHUB_ANNOTATION_RUNTIME__: { replaceSource, refresh },
+      addEventListener: vi.fn((type: string, listener: EventListener) => {
+        listeners.set(type, listener);
+      }),
+      removeEventListener: vi.fn(),
+      setTimeout: vi.fn((callback: () => void) => {
+        callback();
+        return 1;
+      }),
+      clearTimeout: vi.fn(),
+      confirm: vi.fn(() => true),
+      alert: vi.fn(),
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ enabled: true, source }),
+    })) as typeof fetch);
+
+    const controller = createWebEditorV2Controller({ makeServerOrigin: 'http://localhost:53817' } as any);
+    await controller.enable();
+
+    listeners.get('message')?.({
+      source: parentWindow,
+      data: {
+        type: 'AXHUB_ANNOTATION_RUNTIME_SOURCE_REPLACE',
+        source,
+      },
+    } as MessageEvent);
+
+    await vi.waitFor(() => {
+      expect(replaceSource).toHaveBeenCalledWith(source);
+    });
+    expect(refresh).toHaveBeenCalled();
+
+    controller.disable();
+  });
+
   it('reads an updated mounted source page when the API does not provide a source', async () => {
     const start = vi.fn();
     const location = {
@@ -769,24 +1388,7 @@ describe('createWebEditorV2Controller', () => {
         updatedAt: 1,
       },
     });
-    let annotationStatusRequests = 0;
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url === '/__axhub/make-server/status') {
-        return { ok: false, json: async () => ({}) };
-      }
-      if (url.startsWith('/api/prototype-annotation?')) {
-        annotationStatusRequests += 1;
-        if (annotationStatusRequests === 1) {
-          return {
-            ok: true,
-            json: async () => ({ enabled: true, source: createSource('merchant-dashboard') }),
-          };
-        }
-        throw new Error('status unavailable');
-      }
-      throw new Error(`Unexpected request: ${url}`);
-    });
+    const fetchMock = vi.fn();
 
     mocked.createCommentary.mockReturnValue({
       start,
@@ -818,19 +1420,16 @@ describe('createWebEditorV2Controller', () => {
 
     await controller.enable({ annotationProjectId: 'make-project' });
 
-    expect(annotationStatusRequests).toBe(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(host.getCreateAnnotationBlockReason?.({} as Element)).toBeUndefined();
   });
 
   it('uses prototype comment file adapter for host persistence', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input) === '/__axhub/make-server/status') {
-        return {
-          ok: false,
-          json: async () => ({}),
-        };
+      if (String(input).startsWith('http://localhost:53817/api/local-publishing/latest?')) {
+        return { ok: true, json: async () => ({ realtime: null }) };
       }
-      if (String(input).startsWith('/api/prototype-comments?') && init?.method !== 'PUT') {
+      if (String(input).startsWith('http://localhost:53817/api/prototype-comments?') && init?.method !== 'PUT') {
         return {
           ok: true,
           json: async () => ({
@@ -858,6 +1457,7 @@ describe('createWebEditorV2Controller', () => {
 
     const adapter = createPrototypeCommentsPersistenceAdapter({
       getProjectId: () => 'project-a',
+      getMakeServerOrigin: () => 'http://localhost:53817',
     });
     const scope = {
       targetPath: 'prototypes/home',
@@ -893,27 +1493,17 @@ describe('createWebEditorV2Controller', () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      '/__axhub/make-server/status',
+      'http://localhost:53817/api/prototype-comments?targetPath=prototypes%2Fhome&hydrateImages=1&projectId=project-a',
       { method: 'GET' },
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      '/api/prototype-comments?targetPath=prototypes%2Fhome&hydrateImages=1&projectId=project-a',
-      { method: 'GET' },
-    );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
-      '/__axhub/make-server/status',
-      { method: 'GET' },
-    );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
-      '/api/prototype-comments?targetPath=prototypes%2Fhome&projectId=project-a',
+      'http://localhost:53817/api/prototype-comments?targetPath=prototypes%2Fhome&projectId=project-a',
       expect.objectContaining({
         method: 'PUT',
       }),
     );
-    const putInit = fetchMock.mock.calls[3]?.[1];
+    const putInit = fetchMock.mock.calls[1]?.[1];
     expect(JSON.parse(String(putInit?.body))).toEqual({
       document: expect.objectContaining({
         kind: 'prototype-edit-comments',
@@ -923,15 +1513,72 @@ describe('createWebEditorV2Controller', () => {
     });
   });
 
+  it('attaches published share context to comment persistence requests', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ exists: false, document: null }),
+    })) as typeof fetch;
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = createPrototypeCommentsPersistenceAdapter({
+      getProjectId: () => 'project-a',
+      getMakeServerOrigin: () => 'http://localhost:53817',
+      getPublishedShareId: () => 'share-comments',
+      getPublishedCommenterToken: () => 'reviewer-token-0000000000000000000000000001',
+    });
+    await adapter.read({
+      targetPath: 'prototypes/home',
+      storageScope: 'prototypes/home',
+      prototypeId: 'home',
+      filePath: 'src/prototypes/home/index.tsx',
+      resource: null,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:53817/api/prototype-comments?targetPath=prototypes%2Fhome&hydrateImages=1&projectId=project-a&publishedShareId=share-comments',
+      {
+        method: 'GET',
+        headers: {
+          'X-Axhub-Published-Commenter': 'reviewer-token-0000000000000000000000000001',
+        },
+      },
+    );
+  });
+
+  it('attaches the visitor commenter name without storing it in the share manifest', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ exists: false, document: null }),
+    })) as typeof fetch;
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = createPrototypeCommentsPersistenceAdapter({
+      getProjectId: () => 'project-a',
+      getMakeServerOrigin: () => 'http://localhost:53817',
+      getPublishedShareId: () => 'share-comments',
+      getPublishedCommenterName: () => 'Bob',
+      getPublishedCommenterToken: () => 'reviewer-token-0000000000000000000000000002',
+    });
+    await adapter.read({
+      targetPath: 'prototypes/home',
+      storageScope: 'prototypes/home',
+      prototypeId: 'home',
+      filePath: 'src/prototypes/home/index.tsx',
+      resource: null,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:53817/api/prototype-comments?targetPath=prototypes%2Fhome&hydrateImages=1&projectId=project-a&publishedShareId=share-comments&commenterName=Bob',
+      {
+        method: 'GET',
+        headers: {
+          'X-Axhub-Published-Commenter': 'reviewer-token-0000000000000000000000000002',
+        },
+      },
+    );
+  });
+
   it('surfaces rejected prototype comment writes to the persistence runtime', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input) === '/__axhub/make-server/status') {
-        return {
-          ok: false,
-          json: async () => ({}),
-        };
-      }
-      if (String(input).startsWith('/api/prototype-comments?') && init?.method === 'PUT') {
+      if (String(input).startsWith('http://localhost:53817/api/prototype-comments?') && init?.method === 'PUT') {
         return {
           ok: false,
           status: 409,
@@ -945,7 +1592,9 @@ describe('createWebEditorV2Controller', () => {
       };
     }) as typeof fetch;
     vi.stubGlobal('fetch', fetchMock);
-    const adapter = createPrototypeCommentsPersistenceAdapter();
+    const adapter = createPrototypeCommentsPersistenceAdapter({
+      getMakeServerOrigin: () => 'http://localhost:53817',
+    });
 
     await expect(adapter.write({
       targetPath: 'prototypes/home',
@@ -965,14 +1614,8 @@ describe('createWebEditorV2Controller', () => {
   it('sends prototype comment persistence requests to the Make server origin when the preview runs on another port', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url === '/__axhub/make-server/status') {
-        return {
-          ok: true,
-          json: async () => ({
-            ready: true,
-            adminOrigin: 'http://localhost:53817',
-          }),
-        };
+      if (url.startsWith('http://localhost:53817/api/local-publishing/latest?')) {
+        return { ok: true, json: async () => ({ realtime: null }) };
       }
       if (url.startsWith('http://localhost:53817/api/prototype-comments?') && init?.method !== 'PUT') {
         return {
@@ -1003,7 +1646,10 @@ describe('createWebEditorV2Controller', () => {
     }) as typeof fetch;
     vi.stubGlobal('fetch', fetchMock);
 
-    const adapter = createPrototypeCommentsPersistenceAdapter();
+    const adapter = createPrototypeCommentsPersistenceAdapter({
+      getProjectId: () => 'project-a',
+      getMakeServerOrigin: () => 'http://localhost:53817',
+    });
     const scope = {
       targetPath: 'prototypes/home',
       storageScope: 'prototypes/home',
@@ -1025,19 +1671,47 @@ describe('createWebEditorV2Controller', () => {
       images: [],
     }, 'changes');
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/__axhub/make-server/status', { method: 'GET' });
     expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      'http://localhost:53817/api/prototype-comments?targetPath=prototypes%2Fhome&hydrateImages=1',
+      1,
+      'http://localhost:53817/api/prototype-comments?targetPath=prototypes%2Fhome&hydrateImages=1&projectId=project-a',
       { method: 'GET' },
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
-      'http://localhost:53817/api/prototype-comments?targetPath=prototypes%2Fhome',
+      2,
+      'http://localhost:53817/api/prototype-comments?targetPath=prototypes%2Fhome&projectId=project-a',
       expect.objectContaining({
         method: 'PUT',
       }),
     );
+    expect(fetchMock).not.toHaveBeenCalledWith('/__axhub/make-server/status', expect.anything());
+  });
+
+  it('fails closed without a host-injected Make server origin', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = createPrototypeCommentsPersistenceAdapter({
+      getProjectId: () => 'project-a',
+    });
+    const scope = {
+      targetPath: 'prototypes/home',
+      storageScope: 'prototypes/home',
+      prototypeId: 'home',
+      filePath: 'src/prototypes/home/index.tsx',
+      resource: null,
+    };
+    const document = {
+      schemaVersion: 2 as const,
+      kind: 'prototype-edit-comments' as const,
+      resource: { id: 'home', targetPath: 'prototypes/home', filePath: '' },
+      comments: [],
+      images: [],
+    };
+
+    await expect(adapter.read(scope)).resolves.toBeNull();
+    await expect(adapter.write(scope, document, 'changes')).rejects.toThrow(
+      'Make server origin is unavailable; standalone previews do not support comments.',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('does not fetch assistant runtime defaults for editor bridge setup', async () => {
@@ -1095,13 +1769,7 @@ describe('createWebEditorV2Controller', () => {
     const reload = vi.fn();
     const confirm = vi.fn(() => false);
     const fetchMock = vi.fn(async (input: string) => {
-      if (input === '/__axhub/make-server/status') {
-        return {
-          ok: false,
-          json: async () => ({}),
-        };
-      }
-      if (input === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
+      if (input === 'http://localhost:53817/api/prototype-annotation?targetPath=prototypes%2Fhome') {
         return {
           ok: true,
           json: async () => ({ enabled: false, source: null }),
@@ -1169,19 +1837,13 @@ describe('createWebEditorV2Controller', () => {
       assetMap: {},
     };
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === '/__axhub/make-server/status') {
-        return {
-          ok: false,
-          json: async () => ({}),
-        };
-      }
-      if (input === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
+      if (input === 'http://localhost:53817/api/prototype-annotation?targetPath=prototypes%2Fhome') {
         return {
           ok: true,
           json: async () => ({ enabled: false, source: null }),
         };
       }
-      if (input === '/api/prototype-annotation/enable' && init?.method === 'POST') {
+      if (input === 'http://localhost:53817/api/prototype-annotation/enable' && init?.method === 'POST') {
         return {
           ok: true,
           json: async () => ({ enabled: true, changedIndex: true, source }),
@@ -1219,7 +1881,7 @@ describe('createWebEditorV2Controller', () => {
     vi.stubGlobal('fetch', fetchMock as typeof fetch);
 
     const controller = createWebEditorV2Controller();
-    await controller.enable();
+    await controller.enable({ makeServerOrigin: 'http://localhost:53817' });
     const ui = mocked.createCommentary.mock.calls[0]?.[0]?.ui;
     const host = mocked.createCommentary.mock.calls[0]?.[0]?.host;
 
@@ -1317,7 +1979,7 @@ describe('createWebEditorV2Controller', () => {
     const controller = createWebEditorV2Controller();
     await controller.enable({
       toolbarMode: 'host',
-      annotationApiBaseUrl: 'http://localhost:53817',
+      makeServerOrigin: 'http://localhost:53817',
       annotationProjectId: 'make-2-2',
     } as any);
     const ui = mocked.createCommentary.mock.calls[0]?.[0]?.ui;
@@ -1367,13 +2029,8 @@ describe('createWebEditorV2Controller', () => {
       assetMap: {},
     };
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === '/__axhub/make-server/status') {
-        return {
-          ok: false,
-          json: async () => ({}),
-        };
-      }
-      if (input === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
+      const url = normalizeMakeServerRequestUrl(input);
+      if (url === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
         return {
           ok: true,
           json: async () => ({ enabled: true, source }),
@@ -1509,13 +2166,7 @@ describe('createWebEditorV2Controller', () => {
   it('treats an already mounted annotation runtime as enabled for host toolbar state', async () => {
     const start = vi.fn();
     const fetchMock = vi.fn(async (input: string) => {
-      if (input === '/__axhub/make-server/status') {
-        return {
-          ok: false,
-          json: async () => ({}),
-        };
-      }
-      if (input === '/api/prototype-annotation?targetPath=prototypes%2Fannotation-demo') {
+      if (input === 'http://localhost:53817/api/prototype-annotation?targetPath=prototypes%2Fannotation-demo') {
         return {
           ok: true,
           json: async () => ({ enabled: false, source: null }),
@@ -1564,13 +2215,7 @@ describe('createWebEditorV2Controller', () => {
   it('reads local annotation markdown from the mounted runtime source when the API source is unavailable', async () => {
     const start = vi.fn();
     const fetchMock = vi.fn(async (input: string) => {
-      if (input === '/__axhub/make-server/status') {
-        return {
-          ok: false,
-          json: async () => ({}),
-        };
-      }
-      if (input === '/api/prototype-annotation?targetPath=prototypes%2Fannotation-demo') {
+      if (input === 'http://localhost:53817/api/prototype-annotation?targetPath=prototypes%2Fannotation-demo') {
         return {
           ok: true,
           json: async () => ({ enabled: false, source: null }),
@@ -1807,7 +2452,13 @@ describe('createWebEditorV2Controller', () => {
       }),
       closest: vi.fn(() => null),
       parentElement: null,
+      getRootNode: vi.fn(() => queryRoot),
     } as unknown as Element;
+    const queryRoot = {
+      querySelectorAll: vi.fn((selector: string) => (
+        selector === '.annotation-guide-hero' || selector === 'section' ? [element] : []
+      )),
+    };
 
     const controller = createWebEditorV2Controller();
     await controller.enable({ toolbarMode: 'host' });
@@ -1997,6 +2648,17 @@ describe('createWebEditorV2Controller', () => {
           },
         ],
       },
+      documents: {
+        nodes: [
+          {
+            type: 'markdown',
+            id: 'prd',
+            title: 'Global PRD',
+            markdownPath: 'docs/global-prd.md',
+            markdown: '# Global PRD',
+          },
+        ],
+      },
     };
 
     mocked.createCommentary.mockReturnValue({
@@ -2021,10 +2683,8 @@ describe('createWebEditorV2Controller', () => {
       alert: vi.fn(),
     });
     vi.stubGlobal('fetch', vi.fn(async (input: string) => {
-      if (input === '/__axhub/make-server/status') {
-        return { ok: false, json: async () => ({}) };
-      }
-      if (input === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
+      const url = input.replace('http://localhost:53817', '');
+      if (url === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
         return { ok: true, json: async () => ({ enabled: true, source }) };
       }
       throw new Error(`Unexpected fetch: ${input}`);
@@ -2032,7 +2692,7 @@ describe('createWebEditorV2Controller', () => {
 
     const controller = createWebEditorV2Controller();
 
-    await controller.enable();
+    await controller.enable({ makeServerOrigin: 'http://localhost:53817' });
     const host = mocked.createCommentary.mock.calls[0]?.[0]?.host;
     const directoryMarkdownBlock = {
       getAttribute: vi.fn((name: string) => (
@@ -2076,16 +2736,31 @@ describe('createWebEditorV2Controller', () => {
           : null
       )),
     } as unknown as Element & { closest: ReturnType<typeof vi.fn> };
+    const documentsMarkdownBlock = {
+      getAttribute: vi.fn((name: string) => {
+        if (name === 'data-axhub-annotation-directory-markdown-id') return 'prd';
+        if (name === 'data-axhub-annotation-directory-markdown-source') return 'documents';
+        return null;
+      }),
+      closest: vi.fn((selector: string) => (
+        selector === '[data-axhub-annotation-directory-markdown-block="true"]'
+          ? documentsMarkdownBlock
+          : null
+      )),
+    } as unknown as Element & { closest: ReturnType<typeof vi.fn> };
 
     expect(host.getAnnotationDocumentEditUrl(directoryMarkdownBlock)).toBe(
-      '/?docPath=src%2Fprototypes%2Fhome%2Fdocs%2Fprd.md',
+      'http://localhost:53817/?docPath=src%2Fprototypes%2Fhome%2Fdocs%2Fprd.md',
     );
     expect(host.getAnnotationDocumentEditUrl(nestedDirectoryMarkdownChild)).toBe(
-      '/?docPath=src%2Fprototypes%2Fhome%2Fdocs%2Fnested%2Fprd.md',
+      'http://localhost:53817/?docPath=src%2Fprototypes%2Fhome%2Fdocs%2Fnested%2Fprd.md',
     );
     expect(host.getAnnotationDocumentEditUrl(directoryMarkdownRoot)).toBe('');
     expect(host.getAnnotationDocumentEditUrl(plainAnnotationTarget)).toBe('');
     expect(host.getAnnotationDocumentEditUrl(unsafeDirectoryMarkdownBlock)).toBe('');
+    expect(host.getAnnotationDocumentEditUrl(documentsMarkdownBlock)).toBe(
+      'http://localhost:53817/?docPath=src%2Fprototypes%2Fhome%2Fdocs%2Fglobal-prd.md',
+    );
     controller.disable();
 
     expect(start).toHaveBeenCalledTimes(1);
@@ -2153,7 +2828,7 @@ describe('createWebEditorV2Controller', () => {
     const controller = createWebEditorV2Controller();
 
     await controller.enable({
-      annotationApiBaseUrl: 'http://localhost:53817',
+      makeServerOrigin: 'http://localhost:53817',
       annotationProjectId: 'make-4',
     } as any);
     const host = mocked.createCommentary.mock.calls[0]?.[0]?.host;
@@ -2257,10 +2932,8 @@ describe('createWebEditorV2Controller', () => {
     });
     vi.stubGlobal('BroadcastChannel', MockBroadcastChannel as unknown as typeof BroadcastChannel);
     vi.stubGlobal('fetch', vi.fn(async (input: string) => {
-      if (input === '/__axhub/make-server/status') {
-        return { ok: false, json: async () => ({}) };
-      }
-      if (input === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
+      const url = input.replace('http://localhost:53817', '');
+      if (url === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
         statusCallCount += 1;
         return {
           ok: true,
@@ -2275,7 +2948,7 @@ describe('createWebEditorV2Controller', () => {
 
     const controller = createWebEditorV2Controller();
 
-    await controller.enable();
+    await controller.enable({ makeServerOrigin: 'http://localhost:53817' });
     await messageHandlers[0]?.({
       data: {
         type: 'markdown-file-saved',
@@ -2320,19 +2993,14 @@ describe('createWebEditorV2Controller', () => {
       assetMap: {},
     };
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === '/__axhub/make-server/status') {
-        return {
-          ok: false,
-          json: async () => ({}),
-        };
-      }
-      if (input === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
+      const url = normalizeMakeServerRequestUrl(input);
+      if (url === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
         return {
           ok: true,
           json: async () => ({ enabled: true, source: nextSource }),
         };
       }
-      if (input === '/api/prototype-annotation/node' && init?.method === 'PUT') {
+      if (url === '/api/prototype-annotation/node' && init?.method === 'PUT') {
         return {
           ok: true,
           json: async () => ({ source: nextSource }),
@@ -2374,14 +3042,14 @@ describe('createWebEditorV2Controller', () => {
     } as unknown as Element;
 
     const controller = createWebEditorV2Controller();
-    await controller.enable();
+    await controller.enable({ makeServerOrigin: 'http://localhost:53817' });
     const host = mocked.createCommentary.mock.calls[0]?.[0]?.host;
 
     expect(host.canEditAnnotationMarkdown(element)).toBe(true);
     await expect(host.onAnnotationMarkdownChange(element, '新的标注')).resolves.toBeUndefined();
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/prototype-annotation/node',
+      'http://localhost:53817/api/prototype-annotation/node',
       expect.objectContaining({
         method: 'PUT',
         body: expect.stringContaining('"markdown":"新的标注"'),
@@ -2411,19 +3079,14 @@ describe('createWebEditorV2Controller', () => {
       assetMap: {},
     };
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === '/__axhub/make-server/status') {
-        return {
-          ok: false,
-          json: async () => ({}),
-        };
-      }
-      if (input === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
+      const url = normalizeMakeServerRequestUrl(input);
+      if (url === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
         return {
           ok: true,
           json: async () => ({ enabled: true, source: nextSource }),
         };
       }
-      if (input === '/api/prototype-annotation/node' && init?.method === 'PUT') {
+      if (url === '/api/prototype-annotation/node' && init?.method === 'PUT') {
         return {
           ok: true,
           json: async () => ({ source: nextSource }),
@@ -2469,13 +3132,13 @@ describe('createWebEditorV2Controller', () => {
     } as unknown as Element;
 
     const controller = createWebEditorV2Controller();
-    await controller.enable();
+    await controller.enable({ makeServerOrigin: 'http://localhost:53817' });
     const host = mocked.createCommentary.mock.calls[0]?.[0]?.host;
 
     await expect(host.onDeleteAnnotationNode(element)).resolves.toBeUndefined();
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/prototype-annotation/node',
+      'http://localhost:53817/api/prototype-annotation/node',
       expect.objectContaining({
         method: 'PUT',
         body: expect.stringContaining('"markdown":""'),
@@ -2525,19 +3188,14 @@ describe('createWebEditorV2Controller', () => {
       markdownMap: {},
     };
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === '/__axhub/make-server/status') {
-        return {
-          ok: false,
-          json: async () => ({}),
-        };
-      }
-      if (input === '/api/prototype-annotation?targetPath=prototypes%2Fannotation-demo') {
+      const url = normalizeMakeServerRequestUrl(input);
+      if (url === '/api/prototype-annotation?targetPath=prototypes%2Fannotation-demo') {
         return {
           ok: true,
           json: async () => ({ enabled: true, source: mountedSource }),
         };
       }
-      if (input === '/api/prototype-annotation/node' && init?.method === 'PUT') {
+      if (url === '/api/prototype-annotation/node' && init?.method === 'PUT') {
         requestBody = JSON.parse(String(init.body));
         return {
           ok: true,
@@ -2581,10 +3239,20 @@ describe('createWebEditorV2Controller', () => {
       }),
       closest: vi.fn(() => null),
       parentElement: null,
+      getRootNode: vi.fn(() => queryRoot),
     } as unknown as Element;
+    const queryRoot = {
+      querySelectorAll: vi.fn((selector: string) => (
+        selector === '[data-annotation-id="agent-read-skill"]'
+        || selector === '.annotation-guide-agent-read'
+        || selector === 'div'
+          ? [element]
+          : []
+      )),
+    };
 
     const controller = createWebEditorV2Controller();
-    await controller.enable({ toolbarMode: 'host' });
+    await controller.enable({ toolbarMode: 'host', makeServerOrigin: 'http://localhost:53817' });
     const host = mocked.createCommentary.mock.calls[0]?.[0]?.host;
 
     await expect(host.onDeleteAnnotationNode(element)).resolves.toBeUndefined();
@@ -2626,19 +3294,14 @@ describe('createWebEditorV2Controller', () => {
       assetMap: {},
     };
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === '/__axhub/make-server/status') {
-        return {
-          ok: false,
-          json: async () => ({}),
-        };
-      }
-      if (input === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
+      const url = normalizeMakeServerRequestUrl(input);
+      if (url === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
         return {
           ok: true,
           json: async () => ({ enabled: true, source: nextSource }),
         };
       }
-      if (input === '/api/prototype-annotation/node' && init?.method === 'PUT') {
+      if (url === '/api/prototype-annotation/node' && init?.method === 'PUT') {
         return {
           ok: true,
           json: async () => ({ source: nextSource }),
@@ -2683,7 +3346,7 @@ describe('createWebEditorV2Controller', () => {
     } as unknown as Element;
 
     const controller = createWebEditorV2Controller();
-    await controller.enable();
+    await controller.enable({ makeServerOrigin: 'http://localhost:53817' });
     const host = mocked.createCommentary.mock.calls[0]?.[0]?.host;
 
     await expect(host.onAnnotationMarkdownChange(element, '新的标注')).resolves.toBeUndefined();
@@ -2727,19 +3390,14 @@ describe('createWebEditorV2Controller', () => {
       assetMap: {},
     };
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === '/__axhub/make-server/status') {
-        return {
-          ok: false,
-          json: async () => ({}),
-        };
-      }
-      if (input === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
+      const url = normalizeMakeServerRequestUrl(input);
+      if (url === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
         return {
           ok: true,
           json: async () => ({ enabled: true, source: nextSource }),
         };
       }
-      if (input === '/api/prototype-annotation/node' && init?.method === 'PUT') {
+      if (url === '/api/prototype-annotation/node' && init?.method === 'PUT') {
         return {
           ok: true,
           json: async () => ({ source: nextSource }),
@@ -2785,7 +3443,7 @@ describe('createWebEditorV2Controller', () => {
     } as unknown as Element;
 
     const controller = createWebEditorV2Controller();
-    await controller.enable();
+    await controller.enable({ makeServerOrigin: 'http://localhost:53817' });
     const host = mocked.createCommentary.mock.calls[0]?.[0]?.host;
 
     let writeSettled = false;
@@ -2841,19 +3499,14 @@ describe('createWebEditorV2Controller', () => {
       assetMap: {},
     };
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === '/__axhub/make-server/status') {
-        return {
-          ok: false,
-          json: async () => ({}),
-        };
-      }
-      if (input === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
+      const url = normalizeMakeServerRequestUrl(input);
+      if (url === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
         return {
           ok: true,
           json: async () => ({ enabled: true, source: nextSource }),
         };
       }
-      if (input === '/api/prototype-annotation/node' && init?.method === 'PUT') {
+      if (url === '/api/prototype-annotation/node' && init?.method === 'PUT') {
         return {
           ok: true,
           json: async () => ({ source: nextSource }),
@@ -2899,7 +3552,7 @@ describe('createWebEditorV2Controller', () => {
     } as unknown as Element;
 
     const controller = createWebEditorV2Controller();
-    await controller.enable();
+    await controller.enable({ makeServerOrigin: 'http://localhost:53817' });
     const host = mocked.createCommentary.mock.calls[0]?.[0]?.host;
 
     const writePromise = host.onAnnotationMarkdownChange(element, '新的标注');
@@ -2916,23 +3569,43 @@ describe('createWebEditorV2Controller', () => {
     expect(start).toHaveBeenCalledTimes(1);
   });
 
-  it('writes a structural selector fallback when creating local annotation nodes from repeated classes', async () => {
+  it('persists only selector candidates that uniquely resolve to the selected annotation element', async () => {
     const start = vi.fn();
     let requestBody: Record<string, unknown> | null = null;
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === '/__axhub/make-server/status') {
-        return {
-          ok: false,
-          json: async () => ({}),
-        };
-      }
-      if (input === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
+      const url = normalizeMakeServerRequestUrl(input);
+      if (url === '/api/prototype-annotation?targetPath=prototypes%2Fhome') {
         return {
           ok: true,
-          json: async () => ({ enabled: true, source: null }),
+          json: async () => ({
+            enabled: true,
+            source: {
+              documentVersion: 1,
+              format: 'axhub-annotation-source',
+              data: {
+                version: 2,
+                prototypeName: 'home',
+                pageId: 'home',
+                nodes: [
+                  {
+                    id: 'first-manuscript',
+                    locator: {
+                      selectors: [
+                        '.annotation-guide-manuscript',
+                        'div > main > article > section:nth-of-type(1)',
+                      ],
+                    },
+                  },
+                ],
+                updatedAt: 1,
+              },
+              markdownMap: { 'first-manuscript': '第一条标注' },
+              assetMap: {},
+            },
+          }),
         };
       }
-      if (input === '/api/prototype-annotation/node' && init?.method === 'PUT') {
+      if (url === '/api/prototype-annotation/node' && init?.method === 'PUT') {
         requestBody = JSON.parse(String(init.body));
         return {
           ok: true,
@@ -3010,10 +3683,24 @@ describe('createWebEditorV2Controller', () => {
     const target = {
       id: '',
       tagName: 'SECTION',
-      getAttribute: vi.fn((name: string) => (name === 'class' ? 'annotation-guide-manuscript' : null)),
+      getAttribute: vi.fn((name: string) => {
+        if (name === 'class') return 'annotation-guide-manuscript selected-manuscript';
+        if (name === 'data-annotation-id') return 'manuscript-2';
+        return null;
+      }),
       closest: vi.fn(() => null),
       parentElement: article,
       children: [] as unknown[],
+      getRootNode: vi.fn(() => queryRoot),
+    };
+    const queryRoot = {
+      querySelectorAll: vi.fn((selector: string) => {
+        if (selector === '.annotation-guide-manuscript') return [firstSection, target];
+        if (selector === '.selected-manuscript') return [target];
+        if (selector === '[data-annotation-id="manuscript-2"]') return [target];
+        if (selector === 'div > main > article > section:nth-of-type(2)') return [target];
+        return [];
+      }),
     };
     body.children = [root];
     root.children = [main];
@@ -3021,14 +3708,16 @@ describe('createWebEditorV2Controller', () => {
     article.children = [firstSection, target];
 
     const controller = createWebEditorV2Controller();
-    await controller.enable();
+    await controller.enable({ makeServerOrigin: 'http://localhost:53817' });
     const host = mocked.createCommentary.mock.calls[0]?.[0]?.host;
 
     await expect(host.onAnnotationMarkdownChange(target as unknown as Element, '新的标注')).resolves.toBeUndefined();
 
+    expect(requestBody).not.toHaveProperty('nodeId');
     expect(requestBody?.locator).toMatchObject({
       selectors: [
-        '.annotation-guide-manuscript',
+        '[data-annotation-id="manuscript-2"]',
+        '.selected-manuscript',
         'div > main > article > section:nth-of-type(2)',
       ],
     });
@@ -3102,7 +3791,13 @@ describe('createWebEditorV2Controller', () => {
       getAttribute: vi.fn((name: string) => (name === 'data-axhub-annotation-panel-node-id' ? null : '')),
       closest: vi.fn(() => null),
       parentElement: null,
+      getRootNode: vi.fn(() => queryRoot),
     } as unknown as Element;
+    const queryRoot = {
+      querySelectorAll: vi.fn((selector: string) => (
+        selector === '#purpose' || selector === 'section' ? [element] : []
+      )),
+    };
 
     const controller = createWebEditorV2Controller();
     await controller.enable({ toolbarMode: 'host' });
@@ -3253,6 +3948,7 @@ describe('createWebEditorV2Controller', () => {
         skillInstallSource: [
           '.agents/skills/explore-options/SKILL.md',
           '.claude\\skills\\handle-comments\\SKILL.md',
+          '.workbuddy\\skills\\handle-comments\\SKILL.md',
         ].join('\n'),
       },
     });
@@ -3272,6 +3968,7 @@ describe('createWebEditorV2Controller', () => {
           skillInstallSource: [
             '.agents/skills/explore-options/SKILL.md',
             '.claude/skills/handle-comments/SKILL.md',
+            '.workbuddy/skills/handle-comments/SKILL.md',
           ].join('\n'),
         },
       }),
@@ -3325,6 +4022,54 @@ describe('createWebEditorV2Controller', () => {
       visible: true,
     });
     await expect(controller.runHostToolbarAction({ type: 'wake-agent' })).resolves.toBe(true);
+  });
+
+  it('clears completed comments directly for programmatic host cleanup', async () => {
+    const runHostToolbarAction = vi.fn(async () => false);
+    const clearAllEdits = vi.fn(async () => undefined);
+
+    mocked.createCommentary.mockReturnValue({
+      start: vi.fn(),
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: false, version: 2 })),
+      getStatus: vi.fn(() => ({ active: false, undoCount: 0, redoCount: 0 })),
+      runHostToolbarAction,
+      clearAllEdits,
+      acknowledgeSavedTextChanges: vi.fn(),
+      acknowledgeSavedStyleChanges: vi.fn(),
+    });
+
+    vi.stubGlobal('window', {
+      location: {
+        search: '?agentToolbar=host',
+        pathname: '/prototypes/home',
+        href: 'http://localhost:51720/prototypes/home?agentToolbar=host',
+        protocol: 'http:',
+        hostname: 'localhost',
+      },
+      confirm: vi.fn(() => true),
+      alert: vi.fn(),
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ health: { status: 'ready' } }),
+    })) as typeof fetch);
+
+    const controller = createWebEditorV2Controller();
+    await controller.enable();
+
+    await expect(controller.runHostToolbarAction({
+      type: 'clear-edits',
+      skipConfirm: true,
+      scope: 'page',
+      target: 'completed',
+    })).resolves.toBe(true);
+    expect(clearAllEdits).toHaveBeenCalledWith({
+      skipConfirm: true,
+      scope: 'page',
+      target: 'completed',
+    });
+    expect(runHostToolbarAction).not.toHaveBeenCalled();
   });
 
   it('forwards host toolbar mode from direct dev-template enable options', async () => {
@@ -3706,11 +4451,13 @@ describe('createWebEditorV2Controller', () => {
       acknowledgeSavedStyleChanges,
     });
 
+    const reload = vi.fn();
     vi.stubGlobal('window', {
       location: {
         search: '',
         pathname: '/prototypes/home',
         href: 'http://localhost:51720/prototypes/home',
+        reload,
       },
       confirm: vi.fn(() => true),
       alert: vi.fn(),
@@ -3725,13 +4472,13 @@ describe('createWebEditorV2Controller', () => {
       if (input === '/api/text-replace/count') {
         return {
           ok: true,
-          json: async () => ({ count: 1 }),
+          json: async () => ({ totalCount: 1 }),
         };
       }
       if (input === '/api/text-replace/replace') {
         return {
           ok: true,
-          json: async () => ({ success: true, changedFiles: 1 }),
+          json: async () => ({ success: true, changedFiles: 1, totalCount: 1 }),
         };
       }
       if (input === '/api/hack-css/save') {
@@ -3760,11 +4507,12 @@ describe('createWebEditorV2Controller', () => {
 
     expect(start).toHaveBeenCalledTimes(1);
     expect(stop).toHaveBeenCalledTimes(1);
-    expect(getEditedSnapshot).toHaveBeenCalledTimes(3);
+    expect(getEditedSnapshot).toHaveBeenCalledTimes(9);
     expect(getTextChanges).toHaveBeenCalledTimes(1);
     expect(getStyleChanges).toHaveBeenCalledTimes(1);
     expect(acknowledgeSavedTextChanges).toHaveBeenCalledTimes(1);
     expect(acknowledgeSavedStyleChanges).toHaveBeenCalledTimes(2);
+    expect(reload).toHaveBeenCalledTimes(2);
     const hackSaveCall = fetchMock.mock.calls.find(([input]) => input === '/api/hack-css/save');
     const hackSaveBody = JSON.parse(String(hackSaveCall?.[1]?.body ?? '{}'));
     expect(hackSaveBody.content).toContain('AXHUB TEMPORARY STYLE HACK');
@@ -3775,6 +4523,129 @@ describe('createWebEditorV2Controller', () => {
       undoCount: 2,
       redoCount: 1,
     });
+  });
+
+  it('separates source text save preparation, preflight, and commit side effects', async () => {
+    const acknowledgeSavedTextChanges = vi.fn();
+    mocked.createCommentary.mockReturnValue({
+      start: vi.fn(),
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: true, version: 2 })),
+      getStatus: vi.fn(() => ({ active: true, undoCount: 0, redoCount: 0 })),
+      getEditedSnapshot: vi.fn(() => ({
+        resource: { kind: 'prototype-entry', path: 'prototypes/home' },
+        selectedElement: null,
+        modifiedElements: [],
+        textChanges: [{ before: '旧标题', after: '新标题' }],
+        styleChanges: { cssText: '' },
+      })),
+      getTextChanges: vi.fn(() => [{ before: '旧标题', after: '新标题' }]),
+      getStyleChanges: vi.fn(() => ({ cssText: '' })),
+      acknowledgeSavedTextChanges,
+      acknowledgeSavedStyleChanges: vi.fn(),
+    });
+
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal('window', {
+      location: {
+        search: '',
+        pathname: '/prototypes/home',
+        href: 'http://localhost:51720/prototypes/home',
+      },
+      confirm,
+      alert: vi.fn(),
+    });
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === '/api/text-replace/count') {
+        return { ok: true, json: async () => ({ totalCount: 3 }) };
+      }
+      if (input === '/api/text-replace/replace') {
+        return {
+          ok: true,
+          json: async () => ({ success: true, changedFiles: 2, totalCount: 3 }),
+        };
+      }
+      throw new Error(`Unexpected fetch: ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock as typeof fetch);
+
+    const controller = createWebEditorV2Controller();
+    const draft = await controller.prepareQuickEditSave('save-text');
+
+    expect(draft).toEqual({
+      kind: 'source-text',
+      action: 'save-text',
+      resource: {
+        engine: 'source',
+        projectId: '',
+        path: 'prototypes/home',
+      },
+      replacements: [{ before: '旧标题', after: '新标题' }],
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(confirm).not.toHaveBeenCalled();
+    expect(acknowledgeSavedTextChanges).not.toHaveBeenCalled();
+
+    const preflight = await controller.preflightQuickEditSave(draft!);
+    expect(preflight).toEqual({ action: 'save-text', changeCount: 1, affectedCount: 3 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(confirm).not.toHaveBeenCalled();
+
+    const result = await controller.commitQuickEditSave(draft!);
+    expect(result).toMatchObject({ changed: true, changedCount: 3, changedFiles: 2 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(acknowledgeSavedTextChanges).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops text saving when replacement counting is unavailable', async () => {
+    const acknowledgeSavedTextChanges = vi.fn();
+    mocked.createCommentary.mockReturnValue({
+      start: vi.fn(),
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: true, version: 2 })),
+      getStatus: vi.fn(() => ({ active: true, undoCount: 0, redoCount: 0 })),
+      getEditedSnapshot: vi.fn(() => ({
+        resource: { kind: 'prototype-entry', path: 'prototypes/home' },
+        selectedElement: null,
+        modifiedElements: [],
+        textChanges: [{ before: '旧标题', after: '新标题' }],
+        styleChanges: { cssText: '' },
+      })),
+      getTextChanges: vi.fn(() => [{ before: '旧标题', after: '新标题' }]),
+      getStyleChanges: vi.fn(() => ({ cssText: '' })),
+      acknowledgeSavedTextChanges,
+      acknowledgeSavedStyleChanges: vi.fn(),
+    });
+
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal('window', {
+      location: {
+        search: '',
+        pathname: '/prototypes/home',
+        href: 'http://localhost:51720/prototypes/home',
+      },
+      confirm,
+      alert: vi.fn(),
+    });
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === '/api/text-replace/count') {
+        return {
+          ok: false,
+          status: 404,
+          json: async () => ({ error: '文本保存接口不可用' }),
+        };
+      }
+      throw new Error(`Unexpected fetch: ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock as typeof fetch);
+
+    const controller = createWebEditorV2Controller();
+
+    await expect(controller.saveTextChanges()).rejects.toThrow('文本保存接口不可用');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(acknowledgeSavedTextChanges).not.toHaveBeenCalled();
   });
 
   it('does not acknowledge local text changes when save is cancelled', async () => {
@@ -3818,7 +4689,7 @@ describe('createWebEditorV2Controller', () => {
       if (input === '/api/text-replace/count') {
         return {
           ok: true,
-          json: async () => ({ count: 1 }),
+          json: async () => ({ totalCount: 1 }),
         };
       }
       throw new Error(`Unexpected fetch: ${input}`);
@@ -3876,7 +4747,7 @@ describe('createWebEditorV2Controller', () => {
         return { ok: true, json: async () => ({ totalCount: 1 }) };
       }
       if (input === '/api/text-replace/replace') {
-        return { ok: true, json: async () => ({ success: true, changedFiles: 1 }) };
+        return { ok: true, json: async () => ({ success: true, changedFiles: 1, totalCount: 1 }) };
       }
       throw new Error(`Unexpected fetch: ${input}`);
     });
@@ -3950,7 +4821,7 @@ describe('createWebEditorV2Controller', () => {
         return { ok: true, json: async () => ({ totalCount: 1 }) };
       }
       if (input === '/api/text-replace/replace') {
-        return { ok: true, json: async () => ({ success: true, changedFiles: 1 }) };
+        return { ok: true, json: async () => ({ success: true, changedFiles: 1, totalCount: 1 }) };
       }
       throw new Error(`Unexpected fetch: ${input}`);
     });
@@ -4016,7 +4887,7 @@ describe('createWebEditorV2Controller', () => {
       if (input === '/api/text-replace/count') {
         return {
           ok: true,
-          json: async () => ({ count: 1 }),
+          json: async () => ({ totalCount: 1 }),
         };
       }
       if (input === '/api/text-replace/replace') {
@@ -4033,6 +4904,56 @@ describe('createWebEditorV2Controller', () => {
     await expect(controller.saveTextChanges()).rejects.toThrow('保存文本失败');
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(acknowledgeSavedTextChanges).not.toHaveBeenCalled();
+  });
+
+  it('does not acknowledge local text changes when the source changed after counting', async () => {
+    const acknowledgeSavedTextChanges = vi.fn();
+
+    mocked.createCommentary.mockReturnValue({
+      start: vi.fn(),
+      stop: vi.fn(),
+      getState: vi.fn(() => ({ active: true, version: 2 })),
+      getStatus: vi.fn(() => ({ active: true, undoCount: 0, redoCount: 0 })),
+      getEditedSnapshot: vi.fn(() => ({
+        resource: { kind: 'prototype-entry', path: 'prototypes/home' },
+        selectedElement: null,
+        modifiedElements: [],
+        textChanges: [{ before: '旧标题', after: '新标题' }],
+        styleChanges: { cssText: '' },
+      })),
+      getTextChanges: vi.fn(() => [{ before: '旧标题', after: '新标题' }]),
+      getStyleChanges: vi.fn(() => ({ cssText: '' })),
+      acknowledgeSavedTextChanges,
+      acknowledgeSavedStyleChanges: vi.fn(),
+    });
+
+    vi.stubGlobal('window', {
+      location: {
+        search: '',
+        pathname: '/prototypes/home',
+        href: 'http://localhost:51720/prototypes/home',
+      },
+      confirm: vi.fn(() => true),
+      alert: vi.fn(),
+    });
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === '/api/text-replace/count') {
+        return { ok: true, json: async () => ({ totalCount: 1 }) };
+      }
+      if (input === '/api/text-replace/replace') {
+        return {
+          ok: true,
+          json: async () => ({ success: true, changedFiles: 0, totalCount: 0 }),
+        };
+      }
+      throw new Error(`Unexpected fetch: ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock as typeof fetch);
+
+    const controller = createWebEditorV2Controller();
+
+    await expect(controller.saveTextChanges()).rejects.toThrow('原文本已发生变化');
     expect(acknowledgeSavedTextChanges).not.toHaveBeenCalled();
   });
 

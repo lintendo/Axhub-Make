@@ -1,13 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { ChevronDown, CircleHelp, Copy, ExternalLink, FileIcon, Globe, ImageIcon, LayoutDashboard, Monitor, Network, PencilRuler, Play, Rocket, SlidersHorizontal, Smartphone, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
-import { Segmented } from 'antd';
 import { ItemData, CanvasItem, SidebarTreeNode, SidebarTreeTab, TabType, ViewMode, type PromptClientPreference } from '../../types';
 import type { DataTableResourceItem, ThemeResourceItem } from '../../domains/resources/resource.types';
 import DeviceShell from '../DeviceShell';
 import { cn } from '@/lib/utils';
-import { resolveAcpPromptClientProvider } from '@/common/acpModelConfig';
-import { normalizePromptClientPreference } from '@/common/promptExecution';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -25,14 +22,14 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import HomeDataTable from './HomeDataTable';
+import JsonDocumentPreview, { isJsonDocumentResource } from './JsonDocumentPreview';
 import CanvasFloatingToolbar from './CanvasFloatingToolbar';
-import OpenInDropdown from '../sidebar/OpenInDropdown';
 import TemplateLibraryCard, { type TemplateLibraryCardItem } from '../dialogs/TemplateLibraryCard';
 import PromptActionButton from '../PromptActionButton';
 import type { IDEAvailabilityMap, MainIDEPreference } from '../../../common/ide';
 import type { RuntimeAgentAvailability } from '../../../common/agent';
 import type { AcpProvider } from '@/common/assistant-context/types';
-import type { PrototypeCreateDialogOpenOptions, SelectedResourceFolder } from '../../types/index-page.types';
+import type { PromptExecutionMeta, PrototypeCreateDialogOpenOptions, SelectedResourceFolder } from '../../types/index-page.types';
 import type {
     MultiPageColumns,
     PreviewConfig,
@@ -52,47 +49,17 @@ import { resolveCanvasFilePath } from './canvasFilePath';
 import { injectPreviewIframeScrollbarStyle } from './previewIframeScrollbar';
 import ResourceFolderPreview from './ResourceFolderPreview';
 import MultiPagePreviewCanvas from './MultiPagePreviewCanvas';
-import { CanvasGenerationDisplayComposer } from '../../domains/shared/CanvasGenerationComposer';
-import type { CanvasAiScene, CanvasPromptOptimizationRequest } from '../../domains/shared/CanvasGenerationComposer';
-import { createCanvasGenerationComposerDraftStorageKey } from '../../domains/shared/canvasGenerationComposerDraft';
-import {
-    createPrototypePlaceholderSettingsStorageKey,
-    getPrototypePlaceholderSettingsStorage,
-    readPrototypePlaceholderSettings,
-    writePrototypePlaceholderSettings,
-} from './prototypePlaceholderSettingsStorage';
 import type { CanvasAiGenerationRequest, CanvasAiGenerationResult } from '../../domains/ai-generation/CanvasAiGenerationTool';
 import type { AssistantImageAttachmentPayload } from '../../domains/assistant/assistantContextPayload';
-import type { CanvasLocalContextRef } from '../../domains/ai-image/canvasReferenceImages';
 import type { AiImageTaskParams } from '../../domains/ai-image/aiImageStore';
 import {
     NO_PROTOTYPE_THEME_VALUE,
     resolvePrototypeGenerationInitialThemeName,
-    resolvePrototypeGenerationSyncedThemeName,
 } from '../../domains/prototype-generation/prototypeGenerationThemeSelection';
 import { PrototypeThemeSearchSelect } from '../../domains/prototype-generation/PrototypeThemeSearchSelect';
-import {
-    appendCanvasAiPrototypeStartSystemPrompt,
-    getCanvasAiStartPlaceholders,
-    getCanvasAiStartSystemPrompt,
-    getCanvasAiSceneDefinition,
-    pickCanvasAiStartPlaceholder,
-    stripCanvasUpdateInstruction,
-} from '../../domains/ai-generation/canvasAiSceneRegistry';
-import {
-    appendCanvasGenerationFinalGuide,
-    appendDocumentStartPromptSettings,
-    appendImageStartPromptSettings,
-    appendPrototypeStartPromptSettings,
-    type CanvasDocumentFormat,
-    type CanvasGenerationFinalGuide,
-    type CanvasDocumentPromptSettings,
-} from '../../domains/ai-generation/canvasGenerationPromptSettings';
-import { optimizeCanvasPrompt } from '../../domains/ai-generation/canvasPromptOptimization';
-import { apiService } from '../../services/index.api';
+import type { CanvasDocumentFormat } from '../../domains/ai-generation/canvasGenerationPromptSettings';
 import { requireProjectScope, withProjectScope } from '../../services/projectScope';
 import {
-    documentTemplatesApi,
     filterCompatibleDocumentTemplates,
     isDocumentTemplateCompatibleWithFormat,
     type DocumentTemplateOption,
@@ -106,10 +73,12 @@ import { ResourceStartPromptGrid, type ResourceStartPromptCard } from './Resourc
 import { applyResourceStartImageSize } from './resourceStartPromptSelection';
 import { ThemeStartPromptGrid, type ThemeStartPromptCard } from './ThemeStartPromptGrid';
 import { buildStartGuidePrompt } from './startGuidePrompt';
+import { useProgressiveLibraryItems } from '../../hooks/useProgressiveLibraryItems';
 
 const ExcalidrawCanvas = React.lazy(() => lazyWithRetry(() => import('./ExcalidrawCanvas')));
 
 const PREVIEW_DEVICE_SHELL_INSET = { width: 32, height: 32 } as const;
+const SCALED_PREVIEW_HORIZONTAL_GAP = 8;
 const SPLIT_PREVIEW_HEADER_HEIGHT = 40;
 const SPLIT_PREVIEW_HORIZONTAL_INSET = 44;
 const UNSPECIFIED_START_SETTING_VALUE = '__unspecified__';
@@ -244,29 +213,52 @@ const DOCUMENT_HTML_VISUAL_SPEC_OPTIONS = [
 const IMAGE_START_COUNT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
 const PLACEHOLDER_TEMPLATE_LIBRARY_CACHE_KEY = 'axhub:placeholder-template-library:v1';
 const PLACEHOLDER_TEMPLATE_LIBRARY_CACHE_TTL_MS = 2 * 60 * 60 * 1000;
-const PLACEHOLDER_TEMPLATE_CASE_LIMIT = 9;
+const THEME_CATALOG_CACHE_KEY = 'axhub:start-guide-theme-catalogs:v1';
 type StartGuideKind = 'prototype' | 'resource' | 'design';
-const START_GUIDE_SCENES = {
-    prototype: ['page'],
-    resource: ['document', 'design'],
-    design: ['design'],
-} as const satisfies Record<StartGuideKind, readonly CanvasAiScene[]>;
-const START_GUIDE_DEFAULT_SCENE = {
-    prototype: 'page',
-    resource: 'document',
-    design: 'design',
-} as const satisfies Record<StartGuideKind, CanvasAiScene>;
-const START_GUIDE_SOURCE = {
-    prototype: 'placeholder-start',
-    resource: 'resource-start',
-    design: 'theme-start',
-} as const satisfies Record<StartGuideKind, CanvasAiGenerationRequest['source']>;
-const START_GUIDE_SETTINGS_STORAGE_KEY_SUFFIX = {
-    prototype: 'placeholder-start-settings',
-    resource: 'resource-start-settings',
-    design: 'theme-start-settings',
-} as const satisfies Record<StartGuideKind, string>;
-
+const PROTOTYPE_START_PROMPT_CARDS = [
+    {
+        id: 'prd-to-prototype',
+        title: '根据 PRD 生成原型',
+        prompt: '根据我提供的 PRD 生成原型，梳理页面和主要流程。',
+        icon: FileIcon,
+    },
+    {
+        id: 'design-to-prototype',
+        title: '根据设计图还原原型',
+        prompt: '根据我提供的 Figma 链接或设计稿 PNG 还原原型；PNG 请使用 $screenshot-to-prototype。',
+        icon: ImageIcon,
+    },
+    {
+        id: 'axure-reference-prototype',
+        title: '参考 Axure 生成原型',
+        prompt: '请参考我提供的 Axure 原型（在线链接或本地导出的 HTML 文件）生成当前项目的可运行原型。先使用 extract-axure-data 技能（https://github.com/lintendo/Axhub-Skills/tree/main/skills/extract-axure-data）理解原型中的页面结构、核心流程、交互、标注、字段和状态，再结合当前项目的设计规范规划并实现页面；信息不足处请标注待确认。',
+        icon: FileIcon,
+    },
+    {
+        id: 'flow-to-page',
+        title: '根据流程图生成页面',
+        prompt: '先生成售后申请流程图，再生成申请和进度页面原型。',
+        icon: Network,
+    },
+    {
+        id: 'crm-admin',
+        title: '生成 CRM 管理后台',
+        prompt: '生成 CRM 管理后台原型，包含客户列表、详情和新增客户。',
+        icon: LayoutDashboard,
+    },
+    {
+        id: 'fitness-home',
+        title: '运动记录 APP 首页',
+        prompt: '生成运动记录 APP 首页原型，包含今日数据、运动入口和历史记录。',
+        icon: Smartphone,
+    },
+    {
+        id: 'apple-smart-home',
+        title: 'Apple 风格智能家居',
+        prompt: '参照项目内 Apple 主题规范，生成智能家居控制 App 原型，包含家庭概览、设备快捷控制和房间切换。',
+        icon: PencilRuler,
+    },
+] as const satisfies readonly ThemeStartPromptCard[];
 const RESOURCE_START_PROMPT_CARDS = [
     {
         id: 'city-roaming-app-design',
@@ -441,7 +433,152 @@ function normalizeTemplateCases(value: unknown): TemplateLibraryCardItem[] {
                     : {}),
             } satisfies TemplateLibraryCardItem;
         })
-        .filter((item): item is TemplateLibraryCardItem => Boolean(item));
+        .filter((item): item is NonNullable<typeof item> => item !== null);
+}
+
+type ThemeCatalogPlatform = 'desktop' | 'mobile';
+const THEME_CATALOG_PLATFORMS: ThemeCatalogPlatform[] = ['desktop', 'mobile'];
+
+interface ThemeCatalogState {
+    projectId: string;
+    items: TemplateLibraryCardItem[];
+    total: number;
+    stale: boolean;
+    loaded: boolean;
+    loading: boolean;
+    error: string;
+}
+
+interface ThemeCatalogCacheEntry {
+    cachedAt: number;
+    items: TemplateLibraryCardItem[];
+    total: number;
+    stale: boolean;
+}
+
+type ThemeCatalogCache = Partial<Record<ThemeCatalogPlatform, ThemeCatalogCacheEntry>>;
+
+function createEmptyThemeCatalogState(): ThemeCatalogState {
+    return {
+        projectId: '',
+        items: [],
+        total: 0,
+        stale: false,
+        loaded: false,
+        loading: false,
+        error: '',
+    };
+}
+
+function formatThemePlatformLabel(label: string, catalog: ThemeCatalogState, projectId?: string | null): string {
+    return catalog.loaded && catalog.projectId === projectId ? `${label}（${catalog.total}）` : label;
+}
+
+function normalizeThemeCatalogCases(value: unknown): TemplateLibraryCardItem[] {
+    if (!Array.isArray(value)) return [];
+    return value
+        .map((item) => {
+            if (!item || typeof item !== 'object') return null;
+            const record = item as Record<string, unknown>;
+            const id = typeof record.id === 'string' ? record.id.trim() : '';
+            const title = typeof record.title === 'string' ? record.title.trim() : '';
+            const slug = typeof record.slug === 'string' ? record.slug.trim() : '';
+            const platform = record.platform === 'desktop' || record.platform === 'mobile'
+                ? record.platform
+                : null;
+            const description = typeof record.description === 'string' ? record.description.trim() : '';
+            const previewUrl = typeof record.previewUrl === 'string' ? record.previewUrl.trim() : '';
+            const coverUrl = typeof record.coverUrl === 'string' ? record.coverUrl.trim() : '';
+            if (!id || !title || !slug || !platform || !description || !previewUrl) return null;
+            return {
+                id,
+                title,
+                slug,
+                platform,
+                metaLabel: platform === 'desktop' ? 'PC 端' : '移动端',
+                ...(coverUrl ? { coverUrl } : {}),
+                description,
+                previewUrl,
+                canDirectImport: record.canDirectImport === true,
+                ...(typeof record.directImportDisabledReason === 'string' && record.directImportDisabledReason.trim()
+                    ? { directImportDisabledReason: record.directImportDisabledReason.trim() }
+                    : {}),
+            } satisfies TemplateLibraryCardItem;
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null);
+}
+
+function readThemeCatalogCache(): ThemeCatalogCache {
+    if (typeof window === 'undefined') return {};
+    try {
+        const raw = window.localStorage.getItem(THEME_CATALOG_CACHE_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw) as Partial<Record<ThemeCatalogPlatform, Partial<ThemeCatalogCacheEntry>>>;
+        return THEME_CATALOG_PLATFORMS.reduce<ThemeCatalogCache>((cache, platform) => {
+            const entry = parsed[platform];
+            const cachedAt = typeof entry?.cachedAt === 'number' ? entry.cachedAt : 0;
+            const items = normalizeThemeCatalogCases(entry?.items)
+                .filter((item) => item.platform === platform);
+            const parsedTotal = Number(entry?.total);
+            const total = Number.isInteger(parsedTotal) && parsedTotal >= items.length
+                ? parsedTotal
+                : items.length;
+            if (cachedAt && (items.length > 0 || total === 0)) {
+                cache[platform] = {
+                    cachedAt,
+                    items,
+                    total,
+                    stale: entry?.stale === true,
+                };
+            }
+            return cache;
+        }, {});
+    } catch {
+        return {};
+    }
+}
+
+function writeThemeCatalogCacheEntry(
+    platform: ThemeCatalogPlatform,
+    catalog: Pick<ThemeCatalogState, 'items' | 'total' | 'stale'>,
+    now = Date.now(),
+): void {
+    if (typeof window === 'undefined') return;
+    try {
+        window.localStorage.setItem(THEME_CATALOG_CACHE_KEY, JSON.stringify({
+            ...readThemeCatalogCache(),
+            [platform]: {
+                cachedAt: now,
+                items: catalog.items,
+                total: catalog.total,
+                stale: catalog.stale,
+            },
+        } satisfies ThemeCatalogCache));
+    } catch {
+        // The start guide can still load the remote catalog when browser storage is unavailable.
+    }
+}
+
+function createThemeCatalogStatesFromCache(projectId?: string | null): Record<ThemeCatalogPlatform, ThemeCatalogState> {
+    const cache = readThemeCatalogCache();
+    return THEME_CATALOG_PLATFORMS.reduce<Record<ThemeCatalogPlatform, ThemeCatalogState>>((states, platform) => {
+        const entry = cache[platform];
+        states[platform] = projectId && entry
+            ? {
+                projectId,
+                items: entry.items,
+                total: entry.total,
+                stale: entry.stale,
+                loaded: true,
+                loading: false,
+                error: '',
+            }
+            : createEmptyThemeCatalogState();
+        return states;
+    }, {
+        desktop: createEmptyThemeCatalogState(),
+        mobile: createEmptyThemeCatalogState(),
+    });
 }
 
 function readPlaceholderTemplateLibraryCache(): PlaceholderTemplateLibraryCache | null {
@@ -516,7 +653,7 @@ const IMAGE_START_FIELD_HINTS = {
 
 const DOCUMENT_START_FIELD_HINTS = {
     format: 'Markdown 更轻量；HTML 文档有更好的视觉效果，但会消耗更多 token；Drawio 图表支持更丰富的图形和在线编辑，也会消耗更多 token。',
-    template: '可以在资源的 templates 目录下设置文档模板；HTML 支持 Markdown 和 HTML 模板，Markdown 仅支持 Markdown 模板。',
+    template: '可以在项目设置中预览和编辑文档模板；HTML 支持 Markdown 和 HTML 模板，Markdown 仅支持 Markdown 模板。',
     visualSpec: 'HTML 文档可选择视觉规范技能，让排版更接近对应模板风格。',
     prdPlanning: '需要整理产品资料、反推现状、划分新增范围，或不确定最终需要几篇 PRD 时开启；需求和目标文档已经明确时关闭。',
 } as const;
@@ -608,7 +745,6 @@ interface ContentAreaProps {
     elementIframeSize: { width: number; height: number };
     setElementIframeSize: (size: { width: number; height: number }) => void;
     viewMode: ViewMode;
-    setViewMode?: (mode: ViewMode) => void;
     onEnterSelectedPrototypePreview?: () => void;
     contentMode?: 'preview' | 'prototype-spec' | 'doc' | 'template' | 'canvas' | 'theme' | 'data';
     docsItems?: ItemData[];
@@ -638,6 +774,7 @@ interface ContentAreaProps {
     excalidrawPropertyPanelPosition?: ExcalidrawPropertyPanelPosition;
     setExcalidrawPropertyPanelPosition?: (position: ExcalidrawPropertyPanelPosition) => void;
     bridgeConnected?: boolean;
+    conversationUiEnabled?: boolean;
     assistantVisible?: boolean;
     onToggleAssistant?: () => void;
     onAddToContext?: (elements: CanvasElementContextInfo[]) => void;
@@ -653,11 +790,12 @@ interface ContentAreaProps {
     agentAvailability?: RuntimeAgentAvailability;
     webAgentPanelOpen?: boolean;
     aiPanelMode?: 'general-ai' | 'image-ai' | null;
+    externalOpenMenu?: boolean;
     onOpenProjectInIDE?: (ideOverride?: MainIDEPreference, targetPath?: string) => boolean | Promise<boolean>;
     onOpenAcpWebAgent?: (targetPath?: string, provider?: AcpProvider) => void | Promise<void>;
     onOpenImageAiPanel?: () => void | Promise<void>;
     onOpenWebAgentInPanel?: (url: string) => boolean | void | Promise<boolean | void>;
-    onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+    onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
     onCloseAiPanel?: () => void;
     onCloseWebAgentPanel?: () => void;
     onPreferredIDEChange?: (ide: MainIDEPreference) => void;
@@ -665,6 +803,9 @@ interface ContentAreaProps {
     assistantApiBaseUrl?: string;
     assistantProjectPath?: string;
     preferredPromptClient?: PromptClientPreference;
+    preferredModel?: string | null;
+    canvasPromptClient?: PromptClientPreference;
+    canvasModel?: string | null;
     prototypes?: ItemData[];
     themes?: ThemeResourceItem[];
     defaultThemeName?: string | null;
@@ -672,11 +813,11 @@ interface ContentAreaProps {
     prototypeStartDraftActive?: boolean;
     resourceStartDraftActive?: boolean;
     themeStartDraftActive?: boolean;
-    onCreatePrototypeForDraftStart?: () => Promise<ItemData | null>;
     onUploadResourceFiles?: () => void;
     onCreateResourceCanvasFile?: () => void | Promise<void>;
     onCreateDrawioResourceFile?: () => void | Promise<void>;
     onOpenDesignImport?: () => void;
+    onRefreshThemes?: () => void | Promise<void>;
     onRefreshPrototypes?: (preferredName?: string) => Promise<ItemData[]>;
     agentRunConcurrency?: number;
     onSubmitCanvasAssistantPrompt?: (request: CanvasAiGenerationRequest) => Promise<CanvasAiGenerationResult | boolean> | CanvasAiGenerationResult | boolean;
@@ -1317,44 +1458,34 @@ function StartGuide({
     item,
     draftActive = false,
     activeProjectId,
-    assistantProjectPath,
     preferredIDE,
     preferredPromptClient,
     ideAvailability,
-    agentAvailability,
     assistantVisible,
     aiPanelMode,
-    onOpenProjectInIDE,
-    onPreferredIDEChange,
     onExecutePrompt,
-    onOpenAISettings,
     themes,
     defaultThemeName,
     onOpenPrototypeCreateDialog,
     onRefreshPrototypes,
-    onSubmitPrototypeStartRequest,
     onUploadResourceFiles,
     onCreateResourceCanvasFile,
     onCreateDrawioResourceFile,
-    onOpenDesignImport,
-    sidebarTrees,
-    docsItems,
-    prototypes,
+    onRefreshThemes,
 }: {
     kind: StartGuideKind;
     item: ItemData;
     draftActive?: boolean;
     activeProjectId?: string | null;
-    assistantProjectPath?: string;
     preferredIDE?: MainIDEPreference;
     preferredPromptClient?: PromptClientPreference;
+    assistantProjectPath?: string;
+    preferredModel?: string | null;
     ideAvailability?: IDEAvailabilityMap;
-    agentAvailability?: RuntimeAgentAvailability;
+    conversationUiEnabled?: boolean;
     assistantVisible?: boolean;
     aiPanelMode?: 'general-ai' | 'image-ai' | null;
-    onOpenProjectInIDE?: (ideOverride?: MainIDEPreference, targetPath?: string) => boolean | Promise<boolean>;
-    onPreferredIDEChange?: (ide: MainIDEPreference) => void;
-    onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+    onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
     onOpenAISettings?: () => void;
     sidebarTrees?: Partial<Record<SidebarTreeTab, SidebarTreeNode[]>>;
     docsItems?: ItemData[];
@@ -1363,71 +1494,52 @@ function StartGuide({
     defaultThemeName?: string | null;
     onOpenPrototypeCreateDialog?: (options: PrototypeCreateDialogOpenOptions) => void;
     onRefreshPrototypes?: (preferredName?: string) => Promise<ItemData[]>;
-    onSubmitPrototypeStartRequest?: (request: CanvasAiGenerationRequest) => boolean | Promise<boolean>;
     onUploadResourceFiles?: () => void;
     onCreateResourceCanvasFile?: () => void | Promise<void>;
     onCreateDrawioResourceFile?: () => void | Promise<void>;
-    onOpenDesignImport?: () => void;
+    onRefreshThemes?: () => void | Promise<void>;
 }) {
-    const availableScenes = START_GUIDE_SCENES[kind];
-    const [activeScene, setActiveScene] = useState<CanvasAiScene>(() => START_GUIDE_DEFAULT_SCENE[kind]);
-    const startSource = START_GUIDE_SOURCE[kind];
-    const shouldShowSceneSwitcher = availableScenes.length > 1;
     const shouldShowPrototypeActions = kind === 'prototype';
     const shouldShowResourceActions = kind === 'resource';
-    const shouldShowDesignImportAction = kind === 'design';
-    const shouldShowTopActions = shouldShowPrototypeActions || shouldShowResourceActions || shouldShowDesignImportAction;
+    const shouldShowTopActions = shouldShowPrototypeActions || shouldShowResourceActions;
     const shouldShowPrototypeCases = kind === 'prototype';
-    const shouldUseImageStartSettings = activeScene === 'design' && kind !== 'design';
-    const activeSceneDefinition = getCanvasAiSceneDefinition(activeScene);
-    const activeStartPlaceholders = getCanvasAiStartPlaceholders(kind, activeScene);
-    const activeStartSystemPrompt = getCanvasAiStartSystemPrompt(kind, activeScene);
-    const [placeholder, setPlaceholder] = useState(() => pickCanvasAiStartPlaceholder(kind, activeScene));
-    const [prototypeGenerationCount, setPrototypeGenerationCount] = useState<number | undefined>(undefined);
-    const [prototypeNeedsRequirementsAnalysis, setPrototypeNeedsRequirementsAnalysis] = useState(false);
-    const [imageStartParams, setImageStartParams] = useState<ImageStartParams>(DEFAULT_IMAGE_START_PARAMS);
-    const [documentFormat, setDocumentFormat] = useState<CanvasDocumentFormat | ''>('');
-    const [documentHtmlVisualSpec, setDocumentHtmlVisualSpec] = useState<HtmlVisualSpecSkillId | ''>('');
-    const [documentUsePrdPlanning, setDocumentUsePrdPlanning] = useState(false);
-    const [documentTemplates, setDocumentTemplates] = useState<DocumentTemplateOption[]>([]);
-    const [documentTemplatesLoading, setDocumentTemplatesLoading] = useState(false);
-    const [documentTemplateError, setDocumentTemplateError] = useState('');
-    const [selectedDocumentTemplateName, setSelectedDocumentTemplateName] = useState('');
+    const shouldShowThemeCases = kind === 'design';
     const [templateCases, setTemplateCases] = useState<TemplateLibraryCardItem[]>([]);
     const [templateCasesLoading, setTemplateCasesLoading] = useState(false);
     const [templateCasesError, setTemplateCasesError] = useState('');
     const [templateImportingId, setTemplateImportingId] = useState('');
-    const [selectedThemeName, setSelectedThemeName] = useState(() => resolvePrototypeGenerationInitialThemeName(themes, defaultThemeName));
-    const placeholderDropZoneRef = useRef<HTMLDivElement | null>(null);
-    const previousDefaultThemeNameRef = useRef(defaultThemeName);
-    const userSelectedThemeRef = useRef(false);
-    const restoredPlaceholderSettingsKeyRef = useRef<string | null>(null);
-    const skipPlaceholderSettingsWriteKeyRef = useRef<string | null>(null);
+    const {
+        visibleItems: visibleTemplateCases,
+        hasMore: hasMoreTemplateCases,
+        loadMoreRef: templateCasesLoadMoreRef,
+    } = useProgressiveLibraryItems(templateCases, activeProjectId);
+    const [themeImportingId, setThemeImportingId] = useState('');
+    const [themePlatform, setThemePlatform] = useState<ThemeCatalogPlatform>('desktop');
+    const [themeCatalogs, setThemeCatalogs] = useState<Record<ThemeCatalogPlatform, ThemeCatalogState>>(
+        () => createThemeCatalogStatesFromCache(activeProjectId),
+    );
+    const [themeReloadToken, setThemeReloadToken] = useState(0);
+    const [themeProgressiveLoadArmed, setThemeProgressiveLoadArmed] = useState(false);
+    const activeThemeCatalog = themeCatalogs[themePlatform].projectId === activeProjectId
+        ? themeCatalogs[themePlatform]
+        : createEmptyThemeCatalogState();
+    const {
+        visibleItems: visibleThemeCases,
+        hasMore: hasMoreThemeCases,
+        loadMoreRef: themeCasesLoadMoreRef,
+    } = useProgressiveLibraryItems(
+        activeThemeCatalog.items,
+        `${activeProjectId || ''}:${themePlatform}`,
+        themeProgressiveLoadArmed,
+    );
+    const selectedThemeName = resolvePrototypeGenerationInitialThemeName(themes, defaultThemeName);
     const prototypeIndexPath = resolvePrototypeIndexFilePath(item);
-    const prototypeLocalContextRef = useMemo<CanvasLocalContextRef>(() => ({
-        resourceType: 'prototype',
-        resourceId: item.name,
-        title: item.displayName || item.name,
-        paths: [prototypeIndexPath],
-    }), [item.displayName, item.name, prototypeIndexPath]);
-    const placeholderStartComposerDraftStorageKey = useMemo(() => (
-        createCanvasGenerationComposerDraftStorageKey([
-            assistantProjectPath || activeProjectId || '',
-            item.name,
-            prototypeIndexPath,
-            startSource,
-            activeScene,
-        ])
-    ), [activeProjectId, activeScene, assistantProjectPath, item.name, prototypeIndexPath, startSource]);
-    const placeholderStartSettingsStorageKey = useMemo(() => (
-        createPrototypePlaceholderSettingsStorageKey([
-            assistantProjectPath || activeProjectId || '',
-            item.name,
-            prototypeIndexPath,
-            START_GUIDE_SETTINGS_STORAGE_KEY_SUFFIX[kind],
-        ])
-    ), [activeProjectId, assistantProjectPath, item.name, kind, prototypeIndexPath]);
-    const shouldShowInlineAppList = kind === 'prototype' && Boolean(onOpenProjectInIDE);
+    const activePrototypePromptCards = useMemo(
+        () => kind === 'prototype'
+            ? PROTOTYPE_START_PROMPT_CARDS.filter((card) => card.title.trim() && card.prompt.trim())
+            : [],
+        [kind],
+    );
     const activeResourcePromptCards = useMemo(
         () => kind === 'resource'
             ? RESOURCE_START_PROMPT_CARDS.filter((card) => card.title.trim() && card.prompt.trim())
@@ -1443,97 +1555,55 @@ function StartGuide({
     const selectedTheme = useMemo(() => (
         themes?.find((theme) => theme.name === selectedThemeName) || null
     ), [selectedThemeName, themes]);
-    const themeLabel = selectedTheme?.displayName || selectedTheme?.name || '无设计系统';
     const effectiveImageStartParams = useMemo<ImageStartParams>(() => ({
-        ...imageStartParams,
+        ...DEFAULT_IMAGE_START_PARAMS,
         themeName: selectedThemeName === NO_PROTOTYPE_THEME_VALUE ? '' : selectedTheme?.name || '',
-        disable_prompt_optimization: imageStartParams.disable_prompt_optimization === true || selectedThemeName !== NO_PROTOTYPE_THEME_VALUE,
-        background: imageStartParams.output_format === 'png' ? imageStartParams.background : 'auto',
-    }), [imageStartParams, selectedTheme?.name, selectedThemeName]);
-    const resolveDocumentStartSettings = (): CanvasDocumentPromptSettings | undefined => {
-        const selectedHtmlVisualSpecOption = documentFormat === 'html' && documentHtmlVisualSpec
-            ? DOCUMENT_HTML_VISUAL_SPEC_OPTIONS.find((option) => option.value === documentHtmlVisualSpec)
-            : null;
-        const compatibleTemplateName = selectedDocumentTemplateName
-            && isDocumentTemplateCompatibleWithFormat(selectedDocumentTemplateName, documentFormat)
-            ? selectedDocumentTemplateName
-            : '';
-        const nextDocumentStartSettings: CanvasDocumentPromptSettings = {
-            ...(documentFormat ? { format: documentFormat } : {}),
-            ...(selectedHtmlVisualSpecOption ? {
-                htmlVisualSpec: {
-                    label: selectedHtmlVisualSpecOption.label,
-                    description: selectedHtmlVisualSpecOption.description,
-                    themeInstruction: selectedHtmlVisualSpecOption.themeInstruction,
-                    skillName: selectedHtmlVisualSpecOption.skillName,
-                    githubUrl: selectedHtmlVisualSpecOption.githubUrl,
-                },
-            } : {}),
-            ...(compatibleTemplateName ? { templateName: compatibleTemplateName } : {}),
-            ...(documentUsePrdPlanning ? { usePrdPlanning: true } : {}),
-        };
-        return Object.keys(nextDocumentStartSettings).length
-            ? nextDocumentStartSettings
-            : undefined;
-    };
-    const buildDocumentStartSettings = (): CanvasDocumentPromptSettings | undefined => {
-        if (activeScene !== 'document') return undefined;
-        return resolveDocumentStartSettings();
-    };
-    const buildPrototypeStartSettings = () => ({
-        count: prototypeGenerationCount,
-        themeName: selectedThemeName === NO_PROTOTYPE_THEME_VALUE ? '' : selectedTheme?.name || '',
-        needsRequirementsAnalysis: prototypeNeedsRequirementsAnalysis,
-    });
-    const buildPlaceholderStartPrompt = (prompt: string, finalGuide: CanvasGenerationFinalGuide) => {
-        const startSystemPrompt = finalGuide === 'update-canvas'
-            ? activeStartSystemPrompt
-            : stripCanvasUpdateInstruction(activeStartSystemPrompt);
-        const promptWithStartSystemPrompt = appendCanvasAiPrototypeStartSystemPrompt(prompt, startSystemPrompt);
-        const prototypeStartSettings = buildPrototypeStartSettings();
-        const documentStartSettings = buildDocumentStartSettings();
-        const promptWithSceneSettings = activeScene === 'page'
-            ? appendPrototypeStartPromptSettings({
-                prompt: promptWithStartSystemPrompt,
-                settings: prototypeStartSettings,
-            })
-            : shouldUseImageStartSettings
-                ? appendImageStartPromptSettings({
-                    prompt: promptWithStartSystemPrompt,
-                    settings: effectiveImageStartParams,
-                })
-                : activeScene === 'document'
-                    ? appendDocumentStartPromptSettings({
-                        prompt: promptWithStartSystemPrompt,
-                        settings: documentStartSettings || {},
-                    })
-                    : promptWithStartSystemPrompt;
-        return {
-            prompt: appendCanvasGenerationFinalGuide({
-                prompt: promptWithSceneSettings,
-                finalGuide,
-            }),
-            documentStartSettings,
-        };
-    };
-    const copyPlaceholderStartPrompt = useCallback((prompt: string) => {
-        const trimmedPrompt = prompt.trim();
-        if (!trimmedPrompt) return '';
-        return buildPlaceholderStartPrompt(trimmedPrompt, 'local-ai-acknowledgement').prompt;
-    }, [buildPlaceholderStartPrompt]);
+        disable_prompt_optimization: selectedThemeName !== NO_PROTOTYPE_THEME_VALUE,
+        background: 'auto',
+    }), [selectedTheme?.name, selectedThemeName]);
     const copyStartCardPrompt = async (prompt: string) => {
         try {
             await copyToClipboard(prompt);
-            toast.success('提示词已复制到剪贴板');
+            toast.success('提示词已复制，请交给本地 AI 使用');
         } catch (error) {
             toast.error(error instanceof Error ? error.message : '复制提示词失败');
         }
+    };
+    const handleThemePlatformChange = (platform: ThemeCatalogPlatform) => {
+        if (platform === themePlatform) return;
+        setThemeProgressiveLoadArmed(false);
+        setThemePlatform(platform);
+    };
+    const copyPrototypeStartCardPrompt = async (card: ThemeStartPromptCard) => {
+        const prompt = buildStartGuidePrompt({
+            kind: 'prototype',
+            scene: 'page',
+            prompt: card.prompt,
+            settings: undefined,
+            finalGuide: 'local-ai-acknowledgement',
+        });
+        await copyStartCardPrompt(prompt);
+    };
+    const executePrototypeStartCardPrompt = async (card: ThemeStartPromptCard) => {
+        if (!onExecutePrompt) return;
+        const prompt = buildStartGuidePrompt({
+            kind: 'prototype',
+            scene: 'page',
+            prompt: card.prompt,
+            settings: undefined,
+            finalGuide: 'local-ai-acknowledgement',
+        });
+        const executed = await onExecutePrompt(prompt, {
+            scene: 'start-guide-prototype-page',
+            targetPath: draftActive ? null : prototypeIndexPath,
+            autoSend: false,
+        });
+        if (executed === false) throw new Error('AI 侧栏未能打开');
     };
     const copyResourceStartCardPrompt = async (card: ResourceStartPromptCard) => {
         const settings = card.scene === 'design'
             ? card.imageSize ? applyResourceStartImageSize(effectiveImageStartParams, card.imageSize) : effectiveImageStartParams
             : {
-                ...(resolveDocumentStartSettings() || {}),
                 ...(card.prdPlanning ? {
                     usePrdPlanning: card.prdPlanning === 'enable',
                 } : {}),
@@ -1547,6 +1617,27 @@ function StartGuide({
         });
         await copyStartCardPrompt(prompt);
     };
+    const executeResourceStartCardPrompt = async (card: ResourceStartPromptCard) => {
+        if (!onExecutePrompt) return;
+        const settings = card.scene === 'design'
+            ? card.imageSize ? applyResourceStartImageSize(effectiveImageStartParams, card.imageSize) : effectiveImageStartParams
+            : {
+                ...(card.prdPlanning ? { usePrdPlanning: card.prdPlanning === 'enable' } : {}),
+            };
+        const prompt = buildStartGuidePrompt({
+            kind,
+            scene: card.scene,
+            prompt: card.prompt,
+            settings,
+            finalGuide: 'local-ai-acknowledgement',
+        });
+        const executed = await onExecutePrompt(prompt, {
+            scene: `start-guide-${kind}-${card.scene}`,
+            targetPath: kind === 'prototype' ? prototypeIndexPath : null,
+            autoSend: false,
+        });
+        if (executed === false) throw new Error('AI 侧栏未能打开');
+    };
     const copyThemeStartCardPrompt = async (card: ThemeStartPromptCard) => {
         const prompt = buildStartGuidePrompt({
             kind,
@@ -1557,151 +1648,22 @@ function StartGuide({
         });
         await copyStartCardPrompt(prompt);
     };
-    const optimizePlaceholderStartPrompt = async (request: CanvasPromptOptimizationRequest) => {
-        if (!resolveAcpPromptClientProvider(normalizePromptClientPreference(preferredPromptClient))) {
-            toast.warning('请先在 AI 设置中选择本地 AI Agent');
-            throw { action: 'open-ai-settings' };
-        }
-        return optimizeCanvasPrompt({
-            projectId: requireProjectScope(activeProjectId).projectId,
-            prompt: request.prompt,
-            scene: activeScene,
-            sceneSettings: shouldUseImageStartSettings ? effectiveImageStartParams : activeScene === 'document' ? buildDocumentStartSettings() : activeScene === 'page' ? buildPrototypeStartSettings() : undefined,
-            canvasFilePath: kind === 'prototype' ? prototypeIndexPath : undefined,
-            workspacePath: assistantProjectPath,
-            contextBundle: request.contextBundle,
-            attachments: request.attachments,
-            provider: request.provider,
-            model: request.model,
-            mode: request.mode,
-            thought: request.thought,
+    const executeThemeStartCardPrompt = async (card: ThemeStartPromptCard) => {
+        if (!onExecutePrompt) return;
+        const prompt = buildStartGuidePrompt({
+            kind,
+            scene: 'design',
+            prompt: card.prompt,
+            settings: undefined,
+            finalGuide: 'local-ai-acknowledgement',
         });
+        const executed = await onExecutePrompt(prompt, {
+            scene: 'start-guide-design',
+            targetPath: null,
+            autoSend: false,
+        });
+        if (executed === false) throw new Error('AI 侧栏未能打开');
     };
-    useEffect(() => {
-        if ((availableScenes as readonly CanvasAiScene[]).includes(activeScene)) return;
-        setActiveScene(START_GUIDE_DEFAULT_SCENE[kind]);
-    }, [activeScene, availableScenes, kind]);
-
-    useEffect(() => {
-        setPlaceholder(pickCanvasAiStartPlaceholder(kind, activeScene));
-    }, [activeScene, kind]);
-
-    useEffect(() => {
-        const storage = getPrototypePlaceholderSettingsStorage();
-        const saved = readPrototypePlaceholderSettings(storage, placeholderStartSettingsStorageKey);
-        restoredPlaceholderSettingsKeyRef.current = placeholderStartSettingsStorageKey;
-        skipPlaceholderSettingsWriteKeyRef.current = placeholderStartSettingsStorageKey;
-        setPrototypeGenerationCount(saved.prototypeGenerationCount ?? undefined);
-        setPrototypeNeedsRequirementsAnalysis(saved.prototypeNeedsRequirementsAnalysis ?? false);
-        setImageStartParams({
-            ...DEFAULT_IMAGE_START_PARAMS,
-            ...saved.imageStartParams,
-        });
-        setDocumentFormat(saved.documentFormat ?? '');
-        setDocumentHtmlVisualSpec((saved.documentHtmlVisualSpec || '') as HtmlVisualSpecSkillId | '');
-        setDocumentUsePrdPlanning(saved.documentUsePrdPlanning ?? false);
-        setSelectedDocumentTemplateName(saved.selectedDocumentTemplateName || '');
-        if (saved.selectedThemeName) {
-            userSelectedThemeRef.current = true;
-            setSelectedThemeName(saved.selectedThemeName);
-        } else {
-            userSelectedThemeRef.current = false;
-            previousDefaultThemeNameRef.current = defaultThemeName;
-            setSelectedThemeName(resolvePrototypeGenerationInitialThemeName(themes, defaultThemeName));
-        }
-    }, [defaultThemeName, placeholderStartSettingsStorageKey, themes]);
-
-    useEffect(() => {
-        if (restoredPlaceholderSettingsKeyRef.current !== placeholderStartSettingsStorageKey) return;
-        if (skipPlaceholderSettingsWriteKeyRef.current === placeholderStartSettingsStorageKey) {
-            skipPlaceholderSettingsWriteKeyRef.current = null;
-            return;
-        }
-        writePrototypePlaceholderSettings(
-            getPrototypePlaceholderSettingsStorage(),
-            placeholderStartSettingsStorageKey,
-            {
-                prototypeGenerationCount,
-                prototypeNeedsRequirementsAnalysis,
-                selectedThemeName,
-                imageStartParams,
-                documentFormat,
-                documentHtmlVisualSpec,
-                documentUsePrdPlanning,
-                selectedDocumentTemplateName,
-            },
-        );
-    }, [
-        documentFormat,
-        documentHtmlVisualSpec,
-        documentUsePrdPlanning,
-        imageStartParams,
-        placeholderStartSettingsStorageKey,
-        prototypeGenerationCount,
-        prototypeNeedsRequirementsAnalysis,
-        selectedDocumentTemplateName,
-        selectedThemeName,
-    ]);
-
-    useEffect(() => {
-        let cancelled = false;
-        if (!activeProjectId) {
-            setDocumentTemplates([]);
-            setSelectedDocumentTemplateName('');
-            setDocumentTemplatesLoading(false);
-            return () => {
-                cancelled = true;
-            };
-        }
-        setDocumentTemplatesLoading(true);
-        setDocumentTemplateError('');
-        documentTemplatesApi.list({ projectId: activeProjectId })
-            .then((templates) => {
-                if (cancelled) return;
-                setDocumentTemplates(templates);
-                setDocumentTemplateError('');
-                setSelectedDocumentTemplateName((current) => (
-                    current && templates.some((template) => template.name === current) ? current : ''
-                ));
-            })
-            .catch((error: any) => {
-                if (cancelled) return;
-                setDocumentTemplates([]);
-                setSelectedDocumentTemplateName('');
-                setDocumentTemplateError(error?.message || '文档模板读取失败');
-            })
-            .finally(() => {
-                if (!cancelled) {
-                    setDocumentTemplatesLoading(false);
-                }
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [activeProjectId]);
-
-    useEffect(() => {
-        setSelectedDocumentTemplateName((current) => (
-            current
-                && documentTemplates.some((template) => template.name === current)
-                && isDocumentTemplateCompatibleWithFormat(current, documentFormat)
-                ? current
-                : ''
-        ));
-    }, [documentFormat, documentTemplates]);
-
-    useEffect(() => {
-        const previousDefaultThemeName = previousDefaultThemeNameRef.current;
-        setSelectedThemeName((current) => resolvePrototypeGenerationSyncedThemeName({
-            currentThemeName: current,
-            defaultThemeName,
-            previousDefaultThemeName,
-            themes,
-            userSelectedTheme: userSelectedThemeRef.current,
-        }));
-        previousDefaultThemeNameRef.current = defaultThemeName;
-    }, [defaultThemeName, themes]);
 
     useEffect(() => {
         let cancelled = false;
@@ -1722,7 +1684,7 @@ function StartGuide({
 
         const cached = readPlaceholderTemplateLibraryCache();
         if (cached) {
-            setTemplateCases(cached.templates.slice(0, PLACEHOLDER_TEMPLATE_CASE_LIMIT));
+            setTemplateCases(cached.templates);
         }
         if (isPlaceholderTemplateLibraryCacheFresh(cached)) {
             return () => {
@@ -1741,7 +1703,7 @@ function StartGuide({
                 const templates = normalizeTemplateCases(result?.templates);
                 if (cancelled) return;
                 writePlaceholderTemplateLibraryCache(templates);
-                setTemplateCases(templates.slice(0, PLACEHOLDER_TEMPLATE_CASE_LIMIT));
+                setTemplateCases(templates);
                 setTemplateCasesError('');
             })
             .catch((error: any) => {
@@ -1761,11 +1723,82 @@ function StartGuide({
         };
     }, [activeProjectId, shouldShowPrototypeCases]);
 
+    useEffect(() => {
+        setThemeProgressiveLoadArmed(false);
+    }, [activeProjectId, shouldShowThemeCases, themePlatform]);
+
+    useEffect(() => {
+        if (!shouldShowThemeCases || !activeProjectId) return;
+
+        let cancelled = false;
+        const requestedProjectId = activeProjectId;
+        const cachedCatalogs = createThemeCatalogStatesFromCache(requestedProjectId);
+        setThemeCatalogs(THEME_CATALOG_PLATFORMS.reduce<Record<ThemeCatalogPlatform, ThemeCatalogState>>((states, platform) => {
+            const cached = cachedCatalogs[platform];
+            states[platform] = {
+                ...cached,
+                projectId: requestedProjectId,
+                loading: !cached.loaded,
+                error: '',
+            };
+            return states;
+        }, {
+            desktop: createEmptyThemeCatalogState(),
+            mobile: createEmptyThemeCatalogState(),
+        }));
+
+        THEME_CATALOG_PLATFORMS.forEach((requestedPlatform) => {
+            fetch(withProjectScope(`/api/theme-library?platform=${requestedPlatform}`, requireProjectScope(requestedProjectId)))
+                .then(async (response) => {
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok || result?.ok === false) {
+                        throw new Error(result?.error || '主题模板库读取失败');
+                    }
+                    const items = normalizeThemeCatalogCases(result?.designSystems);
+                    const resultTotal = Number(result?.total);
+                    const total = Number.isInteger(resultTotal) && resultTotal >= items.length ? resultTotal : items.length;
+                    const nextCatalog = {
+                        items,
+                        total,
+                        stale: result?.stale === true,
+                    };
+                    writeThemeCatalogCacheEntry(requestedPlatform, nextCatalog);
+                    if (cancelled) return;
+                    setThemeCatalogs((current) => current[requestedPlatform].projectId === requestedProjectId ? ({
+                        ...current,
+                        [requestedPlatform]: {
+                            projectId: requestedProjectId,
+                            ...nextCatalog,
+                            loaded: true,
+                            loading: false,
+                            error: '',
+                        },
+                    }) : current);
+                })
+                .catch((error: any) => {
+                    if (cancelled) return;
+                    setThemeCatalogs((current) => current[requestedPlatform].projectId === requestedProjectId ? ({
+                        ...current,
+                        [requestedPlatform]: {
+                            ...current[requestedPlatform],
+                            stale: current[requestedPlatform].loaded,
+                            loading: false,
+                            error: error?.message || '主题模板加载失败',
+                        },
+                    }) : current);
+                });
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [activeProjectId, shouldShowThemeCases, themeReloadToken]);
+
     const toPromptTemplateItem = (template: TemplateLibraryCardItem): TemplateLibraryPromptItem => ({
         id: template.id,
         title: template.title,
         slug: template.slug || template.id,
-        sourcePath: template.sourcePath,
+        sourcePath: template.sourcePath || '',
         ...(template.sourceUrl ? { sourceUrl: template.sourceUrl } : {}),
         coverPath: template.coverPath || '',
         description: template.description,
@@ -1853,8 +1886,68 @@ function StartGuide({
         );
     };
 
+    const handlePreviewThemeCase = (theme: TemplateLibraryCardItem) => {
+        const previewUrl = String(theme.previewUrl || '').trim();
+        if (!previewUrl) {
+            toast.warning('该主题暂不支持在线预览');
+            return;
+        }
+        window.open(previewUrl, '_blank', 'noopener,noreferrer');
+    };
+
+    const handleDirectThemeImport = async (theme: TemplateLibraryCardItem) => {
+        if (!theme.canDirectImport) {
+            toast.warning(theme.directImportDisabledReason || '该主题暂不支持导入');
+            return;
+        }
+        setThemeImportingId(theme.id);
+        try {
+            const response = await fetch(withProjectScope('/api/theme-library/import', requireProjectScope(activeProjectId)), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ themeId: theme.id, platform: theme.platform }),
+            });
+            const result = await response.json();
+            if (!response.ok || !result?.success) {
+                throw new Error(result?.error || '导入失败');
+            }
+            toast.success('设计系统已导入');
+            void onRefreshThemes?.();
+        } catch (error: any) {
+            toast.error(getUserFriendlyUploadErrorMessage(error, '导入失败，请稍后重试'));
+        } finally {
+            setThemeImportingId('');
+        }
+    };
+
+    const renderThemeCaseCard = (theme: TemplateLibraryCardItem) => {
+        const importing = themeImportingId === theme.id;
+        const disabledReason = theme.directImportDisabledReason || (!theme.canDirectImport ? '导入不可用' : '');
+        const directDisabled = Boolean(disabledReason) || !theme.canDirectImport || Boolean(themeImportingId);
+        const directImportTooltip = disabledReason
+            || (themeImportingId && !importing ? '已有主题正在导入，请稍候' : '');
+        return (
+            <TemplateLibraryCard
+                key={theme.id}
+                template={theme}
+                compact
+                importing={importing}
+                directImportDisabled={directDisabled}
+                directImportTooltip={directImportTooltip}
+                directImportLabel="导入"
+                onPreview={handlePreviewThemeCase}
+                onDirectImport={(theme) => void handleDirectThemeImport(theme)}
+            />
+        );
+    };
+
     return (
-        <div ref={placeholderDropZoneRef} className="relative h-full w-full overflow-auto bg-[#f7f9fb] px-6 py-10 text-center">
+        <div
+            className="ax-start-guide relative h-full w-full overflow-auto bg-[#f7f9fb] px-6 py-10 text-center"
+            onScroll={() => {
+                if (shouldShowThemeCases) setThemeProgressiveLoadArmed(true);
+            }}
+        >
             <div className="flex min-h-[76vh] w-full items-center justify-center">
                 <div className="flex min-h-full w-full max-w-[960px] flex-col items-center justify-center">
                     {shouldShowTopActions ? (
@@ -1937,162 +2030,55 @@ function StartGuide({
                                         </Tooltip>
                                     </>
                                 ) : null}
-                                {shouldShowDesignImportAction ? (
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
-                                                onClick={onOpenDesignImport}
-                                            >
-                                                <UploadCloud className="h-3.5 w-3.5" />
-                                                导入设计规范
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="top">导入设计规范</TooltipContent>
-                                    </Tooltip>
-                                ) : null}
                             </TooltipProvider>
                         </div>
                     ) : null}
                     <div className="w-full">
-                        <h1 className="text-[28px] font-semibold leading-tight text-slate-950 sm:text-[34px]">
+                        <h1 className="ax-start-guide-title font-semibold leading-tight text-slate-950">
                             我们先从哪里开始呢?
                         </h1>
-                        {shouldShowSceneSwitcher ? (
-                            <div className="mt-5 flex justify-center">
-                                <Segmented
-                                    value={activeScene}
-                                    options={availableScenes.map((scene) => ({ label: getCanvasAiSceneDefinition(scene).label, value: scene }))}
-                                    onChange={(value) => setActiveScene(value as CanvasAiScene)}
-                                />
-                            </div>
-                        ) : null}
                     </div>
 
-                    <div className="mt-8 w-full">
-                        <CanvasGenerationDisplayComposer
-                            projectId={activeProjectId || ''}
-                            placeholder={placeholder || activeStartPlaceholders[0] || activeSceneDefinition.placeholders[0] || '描述你想创建的内容'}
-                            ariaLabel="原型起始页 AI 输入"
-                            preferredPromptClient={preferredPromptClient}
-                            showSelectors
-                            disableEditingWithoutConfiguredAgent
-                            workspacePath={assistantProjectPath}
-                            draftStorageKey={placeholderStartComposerDraftStorageKey}
-                            renderPromptCards={kind === 'resource' ? ({ disabled, selectPrompt }) => (
-                                <ResourceStartPromptGrid
-                                    cards={activeResourcePromptCards}
-                                    activeScene={activeScene}
-                                    disabled={disabled}
-                                    selectPrompt={selectPrompt}
-                                    onCopyPrompt={copyResourceStartCardPrompt}
-                                    onSceneChange={setActiveScene}
-                                    onImageSizeChange={(size) => {
-                                        setImageStartParams((current) => applyResourceStartImageSize(current, size));
-                                    }}
-                                    onPrdPlanningChange={setDocumentUsePrdPlanning}
-                                />
-                            ) : kind === 'design' ? ({ disabled, selectPrompt }) => (
-                                <ThemeStartPromptGrid
-                                    cards={activeThemePromptCards}
-                                    disabled={disabled}
-                                    selectPrompt={selectPrompt}
-                                    onCopyPrompt={copyThemeStartCardPrompt}
-                                />
-                            ) : undefined}
-                            onOpenAISettings={onOpenAISettings}
-                            projectResourceTrees={{
-                                prototypes: sidebarTrees?.prototypes || [],
-                                docs: sidebarTrees?.docs || [],
-                                themes: sidebarTrees?.themes || [],
-                            }}
-                            projectResourceItems={{
-                                prototypes: prototypes || [],
-                                docs: docsItems || [],
-                                themes: themes || [],
-                            }}
-                            externalFileDropTargetRef={placeholderDropZoneRef}
-                            onOptimizePrompt={optimizePlaceholderStartPrompt}
-                            onCopyPrompt={({ prompt }) => copyPlaceholderStartPrompt(prompt)}
-                            onSubmit={async (prompt, selection) => {
-                                const { prompt: submittedPrompt, documentStartSettings } = buildPlaceholderStartPrompt(prompt, 'none');
-                                return onSubmitPrototypeStartRequest?.({
-                                    scene: activeScene,
-                                    prompt: submittedPrompt,
-                                    source: startSource,
-                                    sceneSettings: shouldUseImageStartSettings ? effectiveImageStartParams : activeScene === 'document' ? documentStartSettings : undefined,
-                                    provider: selection?.provider,
-                                    model: selection?.model,
-                                    mode: selection?.mode,
-                                    thought: selection?.thought,
-                                    contextBundle: selection?.contextBundle,
-                                    attachments: selection?.attachments,
-                                    localContextRefs: kind !== 'prototype' || activeScene === 'page' ? [] : [prototypeLocalContextRef],
-                                });
-                            }}
-                            postSelectorActions={() =>
-                                activeScene === 'page' ? (
-                                    <PrototypeStartSettingsPopover
-                                        count={prototypeGenerationCount}
-                                        selectedThemeName={selectedThemeName}
-                                        themeLabel={themeLabel}
-                                        themes={themes}
-                                        needsRequirementsAnalysis={prototypeNeedsRequirementsAnalysis}
-                                        onCountChange={setPrototypeGenerationCount}
-                                        onThemeChange={(themeName) => {
-                                            userSelectedThemeRef.current = true;
-                                            setSelectedThemeName(themeName);
-                                        }}
-                                        onNeedsRequirementsAnalysisChange={setPrototypeNeedsRequirementsAnalysis}
-                                    />
-                                ) : shouldUseImageStartSettings ? (
-                                    <ImageStartSettingsPopover
-                                        params={imageStartParams}
-                                        selectedThemeName={selectedThemeName}
-                                        themeLabel={themeLabel}
-                                        themes={themes}
-                                        onParamsChange={setImageStartParams}
-                                        onThemeChange={(themeName) => {
-                                            userSelectedThemeRef.current = true;
-                                            setSelectedThemeName(themeName);
-                                        }}
-                                    />
-                                ) : activeScene === 'document' ? (
-                                    <DocumentStartSettingsPopover
-                                        format={documentFormat}
-                                        htmlVisualSpec={documentHtmlVisualSpec}
-                                        selectedTemplateName={selectedDocumentTemplateName}
-                                        templates={documentTemplates}
-                                        templatesLoading={documentTemplatesLoading}
-                                        templateError={documentTemplateError}
-                                        usePrdPlanning={documentUsePrdPlanning}
-                                        onFormatChange={setDocumentFormat}
-                                        onHtmlVisualSpecChange={setDocumentHtmlVisualSpec}
-                                        onTemplateChange={setSelectedDocumentTemplateName}
-                                        onUsePrdPlanningChange={setDocumentUsePrdPlanning}
-                                    />
-                                ) : null
-                            }
-                        />
-                    </div>
-
-                    {shouldShowInlineAppList ? (
-                        <div className="w-full pt-24">
-                            <OpenInDropdown
-                                variant="inline-app-list"
-                                handleOpenProjectInIDE={onOpenProjectInIDE!}
-                                preferredIDE={preferredIDE ?? null}
-                                activeProjectId={activeProjectId}
-                                targetPath={draftActive ? null : prototypeIndexPath}
-                                ideAvailability={ideAvailability}
-                                agentAvailability={agentAvailability}
-                                onPreferredIDEChange={onPreferredIDEChange}
+                    {kind === 'prototype' ? (
+                        <div className="w-full">
+                            <ThemeStartPromptGrid
+                                cards={activePrototypePromptCards}
+                                ariaLabel="原型生成能力"
+                                disabled={false}
+                                copyOnSelect
+                                selectPrompt={() => undefined}
+                                onCopyPrompt={copyPrototypeStartCardPrompt}
+                                onExecutePrompt={executePrototypeStartCardPrompt}
+                            />
+                        </div>
+                    ) : kind === 'resource' ? (
+                        <div className="w-full">
+                            <ResourceStartPromptGrid
+                                cards={activeResourcePromptCards}
+                                activeScene="document"
+                                disabled={false}
+                                copyOnSelect
+                                selectPrompt={() => undefined}
+                                onCopyPrompt={copyResourceStartCardPrompt}
+                                onExecutePrompt={executeResourceStartCardPrompt}
+                                onSceneChange={() => undefined}
+                                onImageSizeChange={() => undefined}
+                                onPrdPlanningChange={() => undefined}
+                            />
+                        </div>
+                    ) : kind === 'design' ? (
+                        <div className="w-full">
+                            <ThemeStartPromptGrid
+                                cards={activeThemePromptCards}
+                                disabled={false}
+                                copyOnSelect
+                                selectPrompt={() => undefined}
+                                onCopyPrompt={copyThemeStartCardPrompt}
+                                onExecutePrompt={executeThemeStartCardPrompt}
                             />
                         </div>
                     ) : null}
+
                 </div>
             </div>
             {shouldShowPrototypeCases ? (
@@ -2104,31 +2090,69 @@ function StartGuide({
                                 <span className="text-[12px] text-slate-500">加载中...</span>
                             ) : null}
                         </div>
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 cursor-pointer gap-1.5 px-2 text-xs text-slate-600 hover:bg-white hover:text-slate-950"
-                                        onClick={() => onOpenPrototypeCreateDialog?.({ initialTab: 'onlineImport', targetPrototypeName: draftActive ? undefined : item.name })}
-                                    >
-                                        <ExternalLink className="h-3.5 w-3.5" />
-                                        更多模板
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">打开在线模板库</TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
                     </div>
                     {templateCases.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {templateCases.map(renderTemplateCaseCard)}
-                        </div>
+                        <>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                {visibleTemplateCases.map(renderTemplateCaseCard)}
+                            </div>
+                            {hasMoreTemplateCases ? (
+                                <div
+                                    ref={templateCasesLoadMoreRef}
+                                    aria-label="继续加载原型模板"
+                                    className="h-1 w-full"
+                                />
+                            ) : null}
+                        </>
                     ) : templateCasesError ? (
                         <div className="rounded-md border border-dashed bg-white/70 p-4 text-center text-[12px] text-slate-500">
                             暂时无法加载原型案例
+                        </div>
+                    ) : null}
+                </div>
+            ) : null}
+            {shouldShowThemeCases ? (
+                <div className="mx-auto w-full max-w-[1080px] pt-8 text-left">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-sm font-semibold text-slate-900">主题模板</h2>
+                            {activeThemeCatalog.loading ? (
+                                <span className="text-[12px] text-slate-500">加载中...</span>
+                            ) : null}
+                            {activeThemeCatalog.stale ? (
+                                <span className="text-[12px] text-amber-600">正在使用已缓存目录</span>
+                            ) : null}
+                        </div>
+                        <div className="inline-flex rounded-md bg-slate-200/70 p-0.5" aria-label="主题平台分类">
+                            <button type="button" className={cn('rounded px-3 py-1 text-[12px] transition', themePlatform === 'desktop' ? 'bg-white font-medium text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800')} aria-pressed={themePlatform === 'desktop'} onClick={() => handleThemePlatformChange('desktop')}>{formatThemePlatformLabel('PC 端', themeCatalogs.desktop, activeProjectId)}</button>
+                            <button type="button" className={cn('rounded px-3 py-1 text-[12px] transition', themePlatform === 'mobile' ? 'bg-white font-medium text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800')} aria-pressed={themePlatform === 'mobile'} onClick={() => handleThemePlatformChange('mobile')}>{formatThemePlatformLabel('移动端', themeCatalogs.mobile, activeProjectId)}</button>
+                        </div>
+                    </div>
+                    {activeThemeCatalog.items.length > 0 ? (
+                        <>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                {visibleThemeCases.map(renderThemeCaseCard)}
+                            </div>
+                            {hasMoreThemeCases ? (
+                                <div
+                                    ref={themeCasesLoadMoreRef}
+                                    aria-label="继续加载主题模板"
+                                    className="h-1 w-full"
+                                />
+                            ) : null}
+                        </>
+                    ) : activeThemeCatalog.error ? (
+                        <div className="rounded-md border border-dashed bg-white/70 p-4 text-center text-[12px] text-slate-500">
+                            <div>暂时无法加载主题模板</div>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="mt-2 h-7 px-2 text-xs"
+                                onClick={() => setThemeReloadToken((current) => current + 1)}
+                            >
+                                重试
+                            </Button>
                         </div>
                     ) : null}
                 </div>
@@ -2166,7 +2190,6 @@ export default function ContentArea({
     elementIframeSize: _elementIframeSize,
     setElementIframeSize: _setElementIframeSize,
     viewMode,
-    setViewMode,
     contentMode = 'preview',
     docsItems = [],
     sidebarTrees,
@@ -2195,6 +2218,7 @@ export default function ContentArea({
     excalidrawPropertyPanelPosition,
     setExcalidrawPropertyPanelPosition,
     bridgeConnected,
+    conversationUiEnabled = true,
     assistantVisible,
     onAddToContext,
     onAnnotationsChange,
@@ -2208,6 +2232,7 @@ export default function ContentArea({
     agentAvailability,
     webAgentPanelOpen,
     aiPanelMode,
+    externalOpenMenu = true,
     onOpenProjectInIDE,
     onOpenAcpWebAgent,
     onOpenImageAiPanel,
@@ -2218,6 +2243,9 @@ export default function ContentArea({
     onOpenAISettings,
     assistantProjectPath,
     preferredPromptClient,
+    preferredModel,
+    canvasPromptClient,
+    canvasModel,
     prototypes,
     themes,
     defaultThemeName,
@@ -2225,11 +2253,10 @@ export default function ContentArea({
     prototypeStartDraftActive,
     resourceStartDraftActive,
     themeStartDraftActive,
-    onCreatePrototypeForDraftStart,
     onUploadResourceFiles,
     onCreateResourceCanvasFile,
     onCreateDrawioResourceFile,
-    onOpenDesignImport,
+    onRefreshThemes,
     onRefreshPrototypes,
     agentRunConcurrency,
     onSubmitCanvasAssistantPrompt,
@@ -2288,56 +2315,6 @@ export default function ContentArea({
     const selectedResourceCanvasFilePath = selectedResourceCanvas
         ? resolveCanvasFilePath(selectedResourceCanvas, selectedResourceCanvas.name)
         : '';
-    const handleSubmitPrototypeStartRequest = async (request: CanvasAiGenerationRequest) => {
-        if (!resolveAcpPromptClientProvider(normalizePromptClientPreference(preferredPromptClient))) {
-            onOpenAISettings?.();
-            toast.warning('请先在 AI 设置中选择本地 AI Agent');
-            return false;
-        }
-        const submitCanvasAssistantPrompt = async (submittedRequest: CanvasAiGenerationRequest): Promise<boolean> => {
-            const result = await onSubmitCanvasAssistantPrompt?.(submittedRequest);
-            return result === true || (typeof result === 'object' && result?.ok === true);
-        };
-
-        if (request.source === 'resource-start' || request.source === 'theme-start') {
-            return submitCanvasAssistantPrompt(request);
-        }
-
-        const draftCreatedItem = prototypeStartDraftActive && !selectedItem
-            ? await onCreatePrototypeForDraftStart?.()
-            : null;
-        const startItem = draftCreatedItem || selectedItem;
-        if (!startItem) {
-            toast.error('创建原型失败');
-            return false;
-        }
-        const startPrototypeIndexPath = resolvePrototypeIndexFilePath(startItem);
-        const startPrototypeLocalContextRef: CanvasLocalContextRef = {
-            resourceType: 'prototype',
-            resourceId: startItem.name,
-            title: startItem.displayName || startItem.name,
-            paths: [startPrototypeIndexPath],
-        };
-        const submittedRequest: CanvasAiGenerationRequest = {
-            ...request,
-            createdPrototype: startItem,
-            canvasFilePath: request.canvasFilePath,
-            localContextRefs: request.scene === 'page' ? request.localContextRefs || [] : [startPrototypeLocalContextRef],
-        };
-
-        if (request.scene === 'page' && startItem?.name) {
-            await apiService.startPlaceholderPrototypeGeneration(startItem.name, requireProjectScope(activeProjectId));
-            const refreshedPrototypes = await onRefreshPrototypes?.(startItem.name);
-            const refreshedStartItem = refreshedPrototypes?.find((item) => item.name === startItem.name);
-            if (refreshedStartItem) {
-                submittedRequest.createdPrototype = refreshedStartItem;
-            }
-            setViewMode?.('demo');
-            return submitCanvasAssistantPrompt(submittedRequest);
-        }
-        setViewMode?.('canvas');
-        return submitCanvasAssistantPrompt(submittedRequest);
-    };
     const selectedPrototypeRuntimeUnavailable = viewMode === 'demo'
         && Boolean(selectedItem)
         && selectedItem?.previewDisabled !== true
@@ -2424,10 +2401,25 @@ export default function ContentArea({
             window.removeEventListener('resize', updateSize);
         };
     }, [
+        assistantVisible,
         containerRef,
         handlePreviewContainerSizeChange,
         previewConfig.previewMode,
         previewConfig.singlePreset,
+    ]);
+
+    useEffect(() => {
+        const node = containerRef.current;
+        if (!node) return;
+
+        // A resized preview can retain the previous horizontal scroll offset and
+        // make the prototype appear clipped on the left after returning to desktop.
+        node.scrollLeft = 0;
+    }, [
+        containerRef,
+        previewConfig.previewMode,
+        previewConfig.singlePreset,
+        previewContainerSize.width,
     ]);
 
     const previewLayout = useMemo(() => resolvePreviewLayout({
@@ -2437,6 +2429,7 @@ export default function ContentArea({
         actualSingleContentSize: measuredSingleContentSize,
         actualSplitContentSizes: measuredSplitContentSizes,
         deviceShellInset: PREVIEW_DEVICE_SHELL_INSET,
+        singleReservedWidth: SCALED_PREVIEW_HORIZONTAL_GAP * 2,
         splitReservedHeight: SPLIT_PREVIEW_HEADER_HEIGHT,
         splitReservedWidth: SPLIT_PREVIEW_HORIZONTAL_INSET,
     }), [
@@ -2754,20 +2747,18 @@ export default function ContentArea({
                     activeProjectId={activeProjectId}
                     preferredIDE={preferredIDE}
                     preferredPromptClient={preferredPromptClient}
+                    preferredModel={preferredModel}
                     ideAvailability={ideAvailability}
-                    agentAvailability={agentAvailability}
+                    conversationUiEnabled={conversationUiEnabled}
                     assistantVisible={assistantVisible}
                     aiPanelMode={aiPanelMode}
                     assistantProjectPath={assistantProjectPath}
-                    onOpenProjectInIDE={onOpenProjectInIDE}
-                    onPreferredIDEChange={onPreferredIDEChange}
                     onExecutePrompt={onExecutePrompt}
                     themes={themes}
                     sidebarTrees={sidebarTrees}
                     docsItems={docsItems}
                     prototypes={prototypes}
                     defaultThemeName={defaultThemeName}
-                    onSubmitPrototypeStartRequest={handleSubmitPrototypeStartRequest}
                     onUploadResourceFiles={onUploadResourceFiles}
                     onCreateResourceCanvasFile={onCreateResourceCanvasFile}
                     onCreateDrawioResourceFile={onCreateDrawioResourceFile}
@@ -2816,6 +2807,16 @@ export default function ContentArea({
             selectedMarkdownItem.filePath,
             selectedMarkdownItem.absoluteFilePath,
         ];
+
+        if (isJsonDocumentResource(selectedMarkdownItem)) {
+            return (
+                <JsonDocumentPreview
+                    item={selectedMarkdownItem}
+                    projectId={activeProjectId || ''}
+                />
+            );
+        }
+
         const markdownIframeUrl = resolveMarkdownPreviewIframeUrl(
             selectedMarkdownItem,
             contentMode === 'template' ? 'template' : 'doc',
@@ -2928,21 +2929,19 @@ export default function ContentArea({
                     activeProjectId={activeProjectId}
                     preferredIDE={preferredIDE}
                     preferredPromptClient={preferredPromptClient}
+                    preferredModel={preferredModel}
                     ideAvailability={ideAvailability}
-                    agentAvailability={agentAvailability}
+                    conversationUiEnabled={conversationUiEnabled}
                     assistantVisible={assistantVisible}
                     aiPanelMode={aiPanelMode}
                     assistantProjectPath={assistantProjectPath}
-                    onOpenProjectInIDE={onOpenProjectInIDE}
-                    onPreferredIDEChange={onPreferredIDEChange}
                     onExecutePrompt={onExecutePrompt}
                     themes={themes}
                     sidebarTrees={sidebarTrees}
                     docsItems={docsItems}
                     prototypes={prototypes}
                     defaultThemeName={defaultThemeName}
-                    onSubmitPrototypeStartRequest={handleSubmitPrototypeStartRequest}
-                    onOpenDesignImport={onOpenDesignImport}
+                    onRefreshThemes={onRefreshThemes}
                     onOpenAISettings={onOpenAISettings}
                 />
             );
@@ -3059,8 +3058,8 @@ export default function ContentArea({
                             onCloseWebAgentPanel={onCloseWebAgentPanel}
                             onPreferredIDEChange={onPreferredIDEChange}
                             onOpenAISettings={onOpenAISettings}
-                            assistantProjectPath={assistantProjectPath}
-                            preferredPromptClient={preferredPromptClient}
+                            preferredPromptClient={canvasPromptClient}
+                            preferredModel={canvasModel}
                             prototypes={prototypes}
                             themes={themes}
                             projectResourceTrees={{
@@ -3101,13 +3100,12 @@ export default function ContentArea({
                         activeProjectId={activeProjectId}
                         preferredIDE={preferredIDE}
                         preferredPromptClient={preferredPromptClient}
+                        preferredModel={preferredModel}
                         ideAvailability={ideAvailability}
-                        agentAvailability={agentAvailability}
+                        conversationUiEnabled={conversationUiEnabled}
                         assistantVisible={assistantVisible}
                         aiPanelMode={aiPanelMode}
                         assistantProjectPath={assistantProjectPath}
-                        onOpenProjectInIDE={onOpenProjectInIDE}
-                        onPreferredIDEChange={onPreferredIDEChange}
                         onExecutePrompt={onExecutePrompt}
                         themes={themes}
                         sidebarTrees={sidebarTrees}
@@ -3116,7 +3114,6 @@ export default function ContentArea({
                         defaultThemeName={defaultThemeName}
                         onOpenPrototypeCreateDialog={onOpenPrototypeCreateDialog}
                         onRefreshPrototypes={onRefreshPrototypes}
-                        onSubmitPrototypeStartRequest={handleSubmitPrototypeStartRequest}
                         onOpenAISettings={onOpenAISettings}
                     />
                 ) : viewMode === 'canvas' ? (
@@ -3232,7 +3229,7 @@ export default function ContentArea({
                             title={selectedItem.displayName}
                         />
                     ) : previewLayout.single.kind === 'custom' ? (
-                        <div className="flex h-full w-full items-start justify-center pt-4">
+                        <div className="flex h-full w-full items-start justify-center px-2 pt-4">
                             <div
                                 className="overflow-hidden border bg-background shadow-sm"
                                 style={{
@@ -3281,13 +3278,12 @@ export default function ContentArea({
                     activeProjectId={activeProjectId}
                     preferredIDE={preferredIDE}
                     preferredPromptClient={preferredPromptClient}
+                    preferredModel={preferredModel}
                     ideAvailability={ideAvailability}
-                    agentAvailability={agentAvailability}
+                    conversationUiEnabled={conversationUiEnabled}
                     assistantVisible={assistantVisible}
                     aiPanelMode={aiPanelMode}
                     assistantProjectPath={assistantProjectPath}
-                    onOpenProjectInIDE={onOpenProjectInIDE}
-                    onPreferredIDEChange={onPreferredIDEChange}
                     onExecutePrompt={onExecutePrompt}
                     themes={themes}
                     sidebarTrees={sidebarTrees}
@@ -3296,7 +3292,6 @@ export default function ContentArea({
                     defaultThemeName={defaultThemeName}
                     onOpenPrototypeCreateDialog={onOpenPrototypeCreateDialog}
                     onRefreshPrototypes={onRefreshPrototypes}
-                    onSubmitPrototypeStartRequest={handleSubmitPrototypeStartRequest}
                     onOpenAISettings={onOpenAISettings}
                 />
             ) : (

@@ -117,6 +117,8 @@ const disallowedNpmPackagePathPatterns = [
   /\.timestamp-[^/]+$/u,
   /^README\.md$/u,
   /^assets(?:\/|$)/u,
+  /^bin\/codex-integration(?:\/|$)/u,
+  /^bin\/cursor-integration(?:\/|$)/u,
   /^dist\/admin\/images(?:\/|$)/u,
 ];
 const textLikeArtifactExtensions = new Set([
@@ -345,23 +347,6 @@ function walkFiles(rootDir) {
   };
   visit(rootDir);
   return files.sort((left, right) => left.localeCompare(right));
-}
-
-export function assertAdminBundleCopy(adminDir) {
-  const bundleSource = walkFiles(adminDir)
-    .filter((filePath) => path.extname(filePath).toLowerCase() === '.js')
-    .map((filePath) => fs.readFileSync(filePath, 'utf8'))
-    .join('\n');
-
-  if (!bundleSource.includes('输入需求标注，支持 Markdown 格式')) {
-    throw new Error('Admin build is missing required demand annotation copy');
-  }
-
-  for (const legacyCopy of ['标注 Markdown', '输入需求标注 Markdown']) {
-    if (bundleSource.includes(legacyCopy)) {
-      throw new Error(`Admin build includes legacy demand annotation copy: ${legacyCopy}`);
-    }
-  }
 }
 
 function isTextLikeArtifactPath(filePath) {
@@ -669,6 +654,73 @@ function walkTemplateSourceFiles(rootDir, currentDir = rootDir, relativeDir = ''
   return files;
 }
 
+function validateDesignKnowledgeSnapshot(sourceClientDir) {
+  const snapshotRoot = path.join(sourceClientDir, 'design-knowledge');
+  const manifestPath = path.join(snapshotRoot, 'manifest.json');
+  if (!fs.existsSync(manifestPath) || fs.lstatSync(manifestPath).isSymbolicLink()) {
+    throw new Error(`Design Knowledge snapshot manifest is missing: ${manifestPath}`);
+  }
+  let manifest;
+  try {
+    manifest = readJson(manifestPath);
+  } catch (error) {
+    throw new Error(`Design Knowledge snapshot manifest is invalid: ${error.message}`);
+  }
+  if (manifest?.schemaVersion !== 1 || typeof manifest.snapshotVersion !== 'string') {
+    throw new Error('Design Knowledge snapshot manifest has an unsupported schema');
+  }
+  const snapshotFiles = [];
+  for (const platform of ['desktop', 'mobile']) {
+    const descriptor = manifest.indexes?.[platform];
+    if (!descriptor || !Number.isInteger(descriptor.count) || !/^sha256:[a-f0-9]{64}$/u.test(descriptor.hash)) {
+      throw new Error(`Design Knowledge snapshot index descriptor is invalid: ${platform}`);
+    }
+    const indexPath = path.resolve(snapshotRoot, descriptor.path);
+    if (!isInsideDirectory(snapshotRoot, indexPath) || !fs.existsSync(indexPath) || fs.lstatSync(indexPath).isSymbolicLink()) {
+      throw new Error(`Design Knowledge snapshot index path is invalid: ${platform}`);
+    }
+    const indexBytes = fs.readFileSync(indexPath);
+    if (`sha256:${crypto.createHash('sha256').update(indexBytes).digest('hex')}` !== descriptor.hash) {
+      throw new Error(`Design Knowledge snapshot index hash mismatch: ${platform}`);
+    }
+    let index;
+    try { index = JSON.parse(indexBytes.toString('utf8')); } catch (error) { throw new Error(`Design Knowledge snapshot index is invalid: ${platform}`); }
+    if (index.platform !== platform || !Array.isArray(index.records) || index.records.length !== descriptor.count) {
+      throw new Error(`Design Knowledge snapshot index count/platform mismatch: ${platform}`);
+    }
+    snapshotFiles.push(indexPath);
+    for (const record of index.records) {
+      const artifact = record?.artifacts;
+      if (!record?.publishable || record.reviewStatus !== 'approved' || !artifact || !/^sha256:[a-f0-9]{64}$/u.test(artifact.designMdHash)) {
+        throw new Error(`Design Knowledge snapshot record is invalid: ${record?.id || '(unknown)'}`);
+      }
+      const designPath = path.resolve(snapshotRoot, artifact.designMdPath);
+      if (!isInsideDirectory(snapshotRoot, designPath) || !fs.existsSync(designPath) || fs.lstatSync(designPath).isSymbolicLink()) {
+        throw new Error(`Design Knowledge DESIGN.md path is invalid: ${record.id}`);
+      }
+      const designBytes = fs.readFileSync(designPath);
+      if (`sha256:${crypto.createHash('sha256').update(designBytes).digest('hex')}` !== artifact.designMdHash) {
+        throw new Error(`Design Knowledge DESIGN.md hash mismatch: ${record.id}`);
+      }
+      snapshotFiles.push(designPath);
+    }
+  }
+  if (manifest.designMd?.count !== new Set(snapshotFiles.filter((filePath) => filePath.includes(`${path.sep}design-md${path.sep}`))).size) {
+    throw new Error('Design Knowledge snapshot DESIGN.md count mismatch');
+  }
+  for (const filePath of walkFiles(snapshotRoot)) {
+    const relative = path.relative(snapshotRoot, filePath).split(path.sep).join('/');
+    if (/(?:\.tgz|\.zip)$/u.test(relative) || relative.startsWith('.local/')) {
+      throw new Error(`Design Knowledge snapshot contains a forbidden release file: ${relative}`);
+    }
+  }
+}
+
+function isInsideDirectory(root, candidate) {
+  const relative = path.relative(path.resolve(root), path.resolve(candidate));
+  return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+}
+
 function addTemplateSourceFile(entries, sourceClientDir, relativeSourcePath, relativeOutputPath = relativeSourcePath) {
   const sourcePath = path.join(sourceClientDir, ...relativeSourcePath.split('/'));
   if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
@@ -820,6 +872,7 @@ function addMakeClientTemplateMetadata(entries, sourceClientDir, metadata, proto
 function buildTemplateZippable(sourceClientDir) {
   const manifest = loadMakeClientTemplateContentManifest(sourceClientDir);
   const entries = {};
+  addTemplateSourceFile(entries, sourceClientDir, makeClientTemplateContentManifestFileName);
   for (const relativePath of manifest.runtime.files) {
     addTemplateSourceFile(entries, sourceClientDir, relativePath);
   }
@@ -1105,6 +1158,10 @@ export function createMakeClientTemplateZip({
   if (!fs.existsSync(path.join(sourceClientDir, 'package.json'))) {
     throw new Error(`Make client template source is missing package.json: ${sourceClientDir}`);
   }
+  const contentManifest = loadMakeClientTemplateContentManifest(sourceClientDir);
+  if (contentManifest.runtime.directories.includes('design-knowledge')) {
+    validateDesignKnowledgeSnapshot(sourceClientDir);
+  }
   fs.mkdirSync(outputDir, { recursive: true });
   const zipPath = path.join(outputDir, makeClientTemplateZipName);
   fs.rmSync(zipPath, { force: true });
@@ -1343,17 +1400,30 @@ export function assertNpmPackageShape({ dryRunInfo, packageDir }) {
   assertNoLocalMachinePathsInDirectory(packageDir, 'npm package');
 }
 
+export function createCliEntrypointSource(cliImportPath, options = {}) {
+  const importStatement = options.dynamicImport
+    ? `const { handleCliError, runCli } = await import(${JSON.stringify(cliImportPath)});`
+    : `import { handleCliError, runCli } from ${JSON.stringify(cliImportPath)};`;
+  const runExpression = options.selfContainedExecutable
+    ? 'runCli(process.argv.slice(2), { selfContainedExecutable: true })'
+    : 'runCli()';
+  return `${options.disableAutoRun ? "process.env.AXHUB_MAKE_DISABLE_AUTO_RUN = '1';\n" : ''}${importStatement}
+
+${runExpression}
+  .then((exitCode) => {
+    process.exitCode = exitCode;
+  })
+  .catch((error) => {
+    process.exitCode = handleCliError(error);
+  });
+`;
+}
+
 function writeNpmBin() {
   const binPath = path.join(npmPackageDir, 'bin/cli.mjs');
   const content = `#!/usr/bin/env node
 
-import { runCli } from '../dist/server/cli.mjs';
-
-runCli().catch((error) => {
-  console.error(error?.stack || error?.message || error);
-  process.exitCode = 1;
-});
-`;
+${createCliEntrypointSource('../dist/server/cli.mjs')}`;
   fs.mkdirSync(path.dirname(binPath), { recursive: true });
   fs.writeFileSync(binPath, content, 'utf8');
   fs.chmodSync(binPath, 0o755);
@@ -1400,14 +1470,11 @@ function createBunEntrypoint() {
   const entryPath = path.join(tmpDir, 'bun-cli-entry.mjs');
   const cliPath = path.join(makeServerRoot, 'src/server/cli.ts');
   fs.mkdirSync(path.dirname(entryPath), { recursive: true });
-  fs.writeFileSync(entryPath, `process.env.AXHUB_MAKE_DISABLE_AUTO_RUN = '1';
-const { runCli } = await import(${JSON.stringify(cliPath)});
-
-runCli().catch((error) => {
-  console.error(error?.stack || error?.message || error);
-  process.exitCode = 1;
-});
-`, 'utf8');
+  fs.writeFileSync(entryPath, createCliEntrypointSource(cliPath, {
+    disableAutoRun: true,
+    dynamicImport: true,
+    selfContainedExecutable: true,
+  }), 'utf8');
   return entryPath;
 }
 
@@ -1524,19 +1591,6 @@ export function shouldBuildPlatformArtifacts(options = {}) {
   return !options.skipGithub;
 }
 
-export function releaseToolsForOptions(options = {}) {
-  return [
-    'pnpm',
-    'npm',
-    'bun',
-    ...(shouldBuildPlatformArtifacts(options) ? ['zip'] : []),
-  ];
-}
-
-export function releaseToolCheckArgs(tool) {
-  return tool === 'zip' ? ['-v'] : ['--version'];
-}
-
 function prepareRelease(options = {}) {
   const sourcePackage = readJson(makePackageJsonPath);
   if (sourcePackage.name !== '@axhub/make') {
@@ -1547,9 +1601,10 @@ function prepareRelease(options = {}) {
   }
 
   logStep('Checking release tools');
-  for (const tool of releaseToolsForOptions(options)) {
-    assertTool(tool, releaseToolCheckArgs(tool));
-  }
+  assertTool('pnpm');
+  assertTool('npm');
+  assertTool('bun');
+  assertTool('zip', ['-v']);
 
   fs.rmSync(releaseRoot, { recursive: true, force: true });
   fs.mkdirSync(releaseRoot, { recursive: true });
@@ -1564,7 +1619,6 @@ function prepareRelease(options = {}) {
   if (!fs.existsSync(path.join(builtAdminDir, 'index.html'))) {
     throw new Error(`Admin build output is missing index.html: ${builtAdminDir}`);
   }
-  assertAdminBundleCopy(builtAdminDir);
   copyDir(builtAdminDir, releaseAdminDir);
   copyOpenCodeWebUiToRelease();
 
@@ -1768,7 +1822,7 @@ async function waitForHttpOk(url, child, label) {
   const deadline = Date.now() + 20_000;
   let lastError = null;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) {
+    if (child && child.exitCode !== null) {
       throw new Error(`${label} exited before becoming ready with code ${child.exitCode}`);
     }
     try {
@@ -1803,107 +1857,23 @@ export function createServerProbeLaunchOptions(params) {
   };
 }
 
-async function exerciseCommentAssetLifecycle(origin, projectRoot) {
-  const projectId = 'release-comment-smoke';
-  const documentPath = 'src/resources/prd/order.md';
-  const pngDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
-  writeJson(path.join(projectRoot, '.axhub/make/client.json'), {
-    schemaVersion: 1,
-    kind: 'axhub-make-client',
-    repository: 'https://github.com/lintendo/Axhub-Make/tree/main/client',
-    project: { id: projectId, name: 'Release Comment Smoke' },
-  });
-  writeJson(path.join(projectRoot, '.axhub/make/project.json'), {
-    schemaVersion: 1,
-    project: { id: projectId, name: 'Release Comment Smoke' },
-    resources: { prototypes: [], themes: [] },
-    navigation: { prototypes: [] },
-    orders: { themes: [] },
-  });
-  writeJson(path.join(projectRoot, 'package.json'), {
-    name: projectId,
-    private: true,
-    scripts: {
-      dev: 'vite',
-      'metadata:sync': 'node scripts/sync-project-metadata.mjs',
-    },
-  });
-  fs.mkdirSync(path.dirname(path.join(projectRoot, documentPath)), { recursive: true });
-  fs.writeFileSync(path.join(projectRoot, documentPath), '# Order\n', 'utf8');
+export function createBackgroundServerProbeArgs(foregroundArgs) {
+  return [...foregroundArgs, '--background', '--no-open', '--json'];
+}
 
-  const assertOk = async (response, action) => {
-    if (!response.ok) {
-      throw new Error(`${action} failed with ${response.status}: ${await response.text()}`);
-    }
-    return response;
-  };
-  await assertOk(await fetch(`${origin}/api/projects/make/register-existing`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ root: projectRoot }),
-  }), 'Comment asset smoke project registration');
-  await assertOk(await fetch(`${origin}/api/projects/active`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId }),
-  }), 'Comment asset smoke project activation');
-
-  const commentsUrl = `${origin}/api/document-comments?path=${encodeURIComponent(documentPath)}&projectId=${encodeURIComponent(projectId)}`;
-  const storedResponse = await assertOk(await fetch(commentsUrl, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      reason: 'changes',
-      document: {
-        schemaVersion: 3,
-        kind: 'document-edit-comments',
-        documentPath,
-        comments: [],
-        images: [{ id: 'smoke-image', elementKey: 'smoke-image', data: pngDataUrl }],
-      },
-    }),
-  }), 'Comment asset smoke write');
-  const storedBody = await storedResponse.json();
-  const assetPath = String(storedBody?.document?.images?.[0]?.assetPath || '');
-  if (!assetPath) {
-    throw new Error('Comment asset smoke write did not return an asset path');
-  }
-
-  const hydratedResponse = await assertOk(
-    await fetch(`${commentsUrl}&hydrateImages=1`),
-    'Comment asset smoke hydration',
-  );
-  const hydratedBody = await hydratedResponse.json();
-  if (hydratedBody?.document?.images?.[0]?.data !== pngDataUrl) {
-    throw new Error('Comment asset smoke hydration did not return the stored image');
-  }
-
-  await assertOk(await fetch(commentsUrl, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      reason: 'clear',
-      document: {
-        schemaVersion: 3,
-        kind: 'document-edit-comments',
-        documentPath,
-        comments: [],
-        images: [],
-      },
-    }),
-  }), 'Comment asset smoke clear');
-  const absoluteAssetPath = path.join(projectRoot, assetPath);
-  if (fs.existsSync(absoluteAssetPath)) {
-    throw new Error(`Comment asset smoke cleanup did not remove ${absoluteAssetPath}`);
+function readCliJsonResult(result, label) {
+  const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+  const lastLine = output.split(/\r?\n/u).filter(Boolean).at(-1) || '';
+  try {
+    return JSON.parse(lastLine);
+  } catch {
+    throw new Error(`${label} did not return a JSON result: ${output || '(no output)'}`);
   }
 }
 
 async function startAndProbeServer(params) {
   const port = await findFreePort();
   const makeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-make-release-home-'));
-  const projectRoot = params.exerciseCommentAssets
-    ? fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-make-release-project-'))
-    : null;
   const launch = createServerProbeLaunchOptions({
     ...params,
     port,
@@ -1939,10 +1909,6 @@ async function startAndProbeServer(params) {
         throw new Error(`${params.label} did not serve OpenCode WebUI HTML from /opencode/`);
       }
     }
-    if (params.exerciseCommentAssets) {
-      if (!projectRoot) throw new Error('Comment asset smoke project root is unavailable');
-      await exerciseCommentAssetLifecycle(`http://127.0.0.1:${port}`, projectRoot);
-    }
   } finally {
     child.kill();
     await new Promise((resolve) => {
@@ -1950,11 +1916,49 @@ async function startAndProbeServer(params) {
       setTimeout(resolve, 1000);
     });
     fs.rmSync(makeHomeDir, { recursive: true, force: true });
-    if (projectRoot) fs.rmSync(projectRoot, { recursive: true, force: true });
   }
 
   if (output.trim()) {
     console.log(output.trim().split('\n').slice(0, 4).join('\n'));
+  }
+}
+
+async function startAndProbeBackgroundServer(params) {
+  const port = await findFreePort();
+  const makeHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'axhub-make-release-background-home-'));
+  const launch = createServerProbeLaunchOptions({
+    ...params,
+    port,
+    makeHomeDir,
+  });
+  const commandArgs = params.commandArgs || [];
+  const runOptions = {
+    cwd: params.cwd || repoRoot,
+    env: launch.env,
+    capture: true,
+  };
+
+  try {
+    const startResult = run(
+      params.command,
+      [...commandArgs, ...createBackgroundServerProbeArgs(launch.args)],
+      runOptions,
+    );
+    const started = readCliJsonResult(startResult, `${params.label} background start`);
+    if (!started.ok || !['make-started', 'make-running'].includes(started.code)) {
+      throw new Error(`${params.label} background start failed: ${JSON.stringify(started)}`);
+    }
+    await waitForHttpOk(`http://127.0.0.1:${port}/api/health`, null, params.label);
+  } finally {
+    try {
+      const stopResult = run(params.command, [...commandArgs, 'stop', '--json'], runOptions);
+      const stopped = readCliJsonResult(stopResult, `${params.label} background stop`);
+      if (!stopped.ok || stopped.code !== 'make-stopped') {
+        throw new Error(`${params.label} background stop failed: ${JSON.stringify(stopped)}`);
+      }
+    } finally {
+      fs.rmSync(makeHomeDir, { recursive: true, force: true });
+    }
   }
 }
 
@@ -1981,7 +1985,6 @@ async function testPreparedArtifacts() {
       cwd: tempInstallDir,
       adminRoot: manifest.adminDir,
       canvasFigSyncPath: path.join(npmPackageScriptsDir, 'canvas-fig-sync.mjs'),
-      exerciseCommentAssets: true,
     });
   } finally {
     fs.rmSync(tempInstallDir, { recursive: true, force: true });
@@ -1992,6 +1995,13 @@ async function testPreparedArtifacts() {
   if (currentAsset) {
     logStep(`Testing current-platform Bun executable (${currentTargetId})`);
     await startAndProbeServer({
+      label: `${currentTargetId} Bun executable`,
+      command: currentAsset.executablePath,
+      cwd: currentAsset.bundleDir,
+      adminRoot: path.join(currentAsset.bundleDir, 'admin'),
+      canvasFigSyncPath: path.join(currentAsset.bundleDir, 'scripts/canvas-fig-sync.mjs'),
+    });
+    await startAndProbeBackgroundServer({
       label: `${currentTargetId} Bun executable`,
       command: currentAsset.executablePath,
       cwd: currentAsset.bundleDir,

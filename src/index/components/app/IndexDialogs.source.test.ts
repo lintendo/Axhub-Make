@@ -37,24 +37,57 @@ describe('IndexDialogs source', () => {
         expect(source).toContain('onPublished={axhubPublishDialog.onPublished}');
     });
 
+    it('hosts LAN publishing through a dedicated dialog', () => {
+        const source = readIndexDialogsSource();
+
+        expect(source).toContain("const LocalPublishDialog = React.lazy(() => import('../dialogs/LocalPublishDialog'));");
+        expect(source).toContain('localPublishDialog: {');
+        expect(source).toContain('{localPublishDialog.open ? (');
+        expect(source).toContain('<LocalPublishDialog');
+        expect(source).toContain('mode={localPublishDialog.mode}');
+        expect(source).toContain('previewUrl={localPublishDialog.previewUrl}');
+        expect(source).toContain('onOpenChange={localPublishDialog.onOpenChange}');
+        expect(source).not.toContain('onOpenNetworkSettings={localPublishDialog.onOpenNetworkSettings}');
+    });
+
     it('passes saved cloud publishing config back to the page state', () => {
         const source = readIndexDialogsSource();
 
-        expect(source).toContain("import type { AxhubPublishResponse, CloudPublishingConfigResponse, MakeClientUpdateStatus, ReviewResult }");
+        expect(source).toContain('AxhubPublishResponse,');
+        expect(source).toContain('CloudPublishingConfigResponse,');
         expect(source).toContain('onSaved?: (config: CloudPublishingConfigResponse) => void;');
         expect(source).toContain('onSaved={cloudPublishSettingsDialog.onSaved}');
     });
 
-    it('hosts workspace version collaboration through a dedicated lazy drawer', () => {
+    it('hosts remote repository settings through a focused lazy dialog', () => {
         const source = readIndexDialogsSource();
 
-        expect(source).toContain("const WorkspaceVersionCollaborationDrawer = React.lazy(() => import('../WorkspaceVersionCollaborationDrawer'));");
-        expect(source).toContain('versionCollaborationDrawerOpen: boolean;');
-        expect(source).toContain('setVersionCollaborationDrawerOpen: (open: boolean) => void;');
-        expect(source).toContain('{versionCollaborationDrawerOpen ? (');
-        expect(source).toContain('<WorkspaceVersionCollaborationDrawer');
-        expect(source).toContain('open={versionCollaborationDrawerOpen}');
-        expect(source).toContain('onOpenChange={setVersionCollaborationDrawerOpen}');
+        expect(source).toContain("const RemoteRepositorySettingsDialog = React.lazy(() => import('../RemoteRepositorySettingsDialog'));");
+        expect(source).toContain('remoteRepositorySettingsOpen: boolean;');
+        expect(source).toContain('setRemoteRepositorySettingsOpen: (open: boolean) => void;');
+        expect(source).toContain('{remoteRepositorySettingsOpen ? (');
+        expect(source).toContain('<RemoteRepositorySettingsDialog');
+        expect(source).toContain('open={remoteRepositorySettingsOpen}');
+        expect(source).toContain('onOpenChange={setRemoteRepositorySettingsOpen}');
+    });
+
+    it('hosts AI and network settings as separate drawers', () => {
+        const source = readIndexDialogsSource();
+
+        expect(source).toContain('networkSettingsDialogOpen: boolean;');
+        expect(source).toContain('setNetworkSettingsDialogOpen: (open: boolean) => void;');
+        expect(source).toContain('{networkSettingsDialogOpen ? (');
+        expect(source).toContain('standalone="network"');
+        expect(source).not.toContain('WorkspaceVersionCollaborationDrawer');
+    });
+
+    it('keeps the prototype manager lazy entry separate from the project collaboration drawer', () => {
+        const source = readIndexDialogsSource();
+
+        expect(source).toContain("const VersionManager = React.lazy(() => import('../VersionManager'));");
+        expect(source).toContain('<VersionManager');
+        expect(source).toContain('item={currentVersionItem}');
+        expect(source).toContain('onOpenRemoteRepositorySettings={() => setRemoteRepositorySettingsOpen(true)}');
     });
 
     it('passes make client update reminder and availability changes back to the page', () => {
@@ -63,14 +96,20 @@ describe('IndexDialogs source', () => {
         expect(source).toContain('makeClientUpdateReminderVisible: boolean;');
         expect(source).toContain('onMakeClientUpdateReminderSeen: () => void;');
         expect(source).toContain('onMakeClientUpdateAvailabilityChange: (status: MakeClientUpdateStatus | null) => void;');
-        expect(source).toContain('onOpenVersionCollaborationFromSettings: () => void;');
+        expect(source).not.toContain('onOpenVersionCollaborationFromSettings');
         expect(source).toContain('makeClientUpdateReminderVisible,');
         expect(source).toContain('onMakeClientUpdateReminderSeen,');
-        expect(source).toContain('onOpenVersionCollaborationFromSettings,');
+        expect(source).toContain('remoteRepositorySettingsOpen,');
         expect(source).toContain('makeClientUpdateReminderVisible={makeClientUpdateReminderVisible}');
         expect(source).toContain('onMakeClientUpdateReminderSeen={onMakeClientUpdateReminderSeen}');
-        expect(source).toContain('onOpenVersionCollaboration={onOpenVersionCollaborationFromSettings}');
+        expect(source).not.toContain('onOpenVersionCollaboration=');
         expect(source).toContain('onMakeClientUpdateAvailabilityChange,');
         expect(source).toContain('onMakeClientUpdateAvailabilityChange={onMakeClientUpdateAvailabilityChange}');
+    });
+
+    it('forwards the requested voice settings section into the existing settings dialog', () => {
+        const source = readIndexDialogsSource();
+
+        expect(source).toContain('initialVoiceSection={settingsDialogAIContext?.voiceSection}');
     });
 });

@@ -1,6 +1,6 @@
 import React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import { App as AntApp, Button, Input, message, Modal } from 'antd';
+import { App as AntApp, Button, Input, Modal } from 'antd';
 import type {
   AlertDialogOptions,
   ConfirmDialogResult,
@@ -8,7 +8,10 @@ import type {
   EditorFeedbackService,
   PromptDialogOptions,
 } from './contracts';
-import { getWebEditorFeedbackBridge } from '../../ui/feedback-bridge';
+import {
+  getWebEditorFeedbackBridge,
+  sendWebEditorFeedbackMessage,
+} from '../../ui/feedback-bridge';
 
 type PromptDialogContentHandle = {
   getValue: () => string;
@@ -105,10 +108,7 @@ function resolveDialogContainer(uiRoot: HTMLElement | null): HTMLElement {
   if (uiRoot) {
     return uiRoot;
   }
-  if (typeof document !== 'undefined') {
-    return document.body;
-  }
-  throw new Error('No dialog container available');
+  throw new Error('No isolated dialog container available');
 }
 
 function showPromptModal(
@@ -150,6 +150,7 @@ function showPromptModal(
           maskClosable: true,
           destroyOnHidden: true,
           zIndex: 2147483647,
+          getContainer: () => container,
           cancelButtonProps: options.cancelText ? undefined : { style: { display: 'none' } },
           onOk: async () => {
             const nextValue = contentRef.current?.getValue() ?? options.defaultValue ?? '';
@@ -336,22 +337,12 @@ export function createFeedbackService(options: {
   function toast(type: 'success' | 'info' | 'warning' | 'error', content: string): void {
     if (typeof window === 'undefined') return;
     try {
-      const uiRoot = options.getUiRoot();
       const bridge = getWebEditorFeedbackBridge();
-      if (uiRoot && bridge) {
-        bridge.message({
-          type,
-          content,
-        });
-        return;
+      if (bridge) {
+        bridge.message({ type, content });
+      } else {
+        sendWebEditorFeedbackMessage({ type, content });
       }
-
-      if (uiRoot) {
-        message.config({
-          getContainer: () => uiRoot,
-        });
-      }
-      void message.open({ type, content });
     } catch {
       // Best-effort only.
     }

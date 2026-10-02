@@ -170,14 +170,15 @@
 
 .ax-canvas-start-launcher {
   display: inline-flex;
-  width: 30px;
-  height: 30px;
+  height: 34px;
   align-items: center;
   justify-content: center;
+  gap: 2px;
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-md, 6px);
   background: hsl(var(--background));
   color: hsl(var(--foreground));
+  padding: 2px;
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
   transition: background-color 150ms ease, box-shadow 150ms ease;
 }
@@ -185,6 +186,76 @@
 .ax-canvas-start-launcher:hover {
   background: hsl(var(--accent));
   box-shadow: 0 2px 6px rgb(0 0 0 / 0.12);
+}
+
+.ax-canvas-start-launcher__action {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.ax-canvas-start-launcher__action:hover:not(:disabled) {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.ax-canvas-start-launcher__action:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.ax-canvas-start-launcher__error {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  display: flex;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid hsl(var(--destructive) / 0.4);
+  border-radius: var(--radius-md, 6px);
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  padding: 8px 8px 8px 10px;
+  font-size: 12px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.14);
+}
+
+.ax-canvas-start-launcher__error-message {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.ax-canvas-start-launcher__error-close {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+}
+
+.ax-canvas-start-launcher__error-close:hover {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
 }
 
 .ax-canvas-start-composer {

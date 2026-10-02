@@ -33,6 +33,7 @@ export const WEB_EDITOR_V2_Z_INDEX = 2147483647;
 
 /** Default panel width */
 export const WEB_EDITOR_V2_PANEL_WIDTH = 320;
+export const WEB_EDITOR_V2_SELECTION_LINE_WIDTH = 2;
 
 // =============================================================================
 // Colors (Design System)

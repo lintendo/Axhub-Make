@@ -12,6 +12,7 @@ import { getRequestUrl, readJsonBody, sendFile, sendJson } from './http.ts';
 import { sendHtmlDocumentPreview } from './htmlDocumentPreview.ts';
 import type { ManagementApiOptions } from './managementApi.ts';
 import { openPathInSystem } from './managementApi.workspace.ts';
+import { getResourceAssetDirectory } from './resourceFiles.ts';
 import { sendUnsupportedFilePreview } from './unsupportedFilePreview.ts';
 
 interface DocsProjectContext {
@@ -709,8 +710,30 @@ export function handleProjectDocsApi(
         }
         const ext = path.extname(docPath) || '.md';
         const nextPath = createUniqueFilePath(path.dirname(docPath), nextBaseName, ext);
+        const previousResourcePath = path.relative(docsDir, docPath).split(path.sep).join('/');
         fs.renameSync(docPath, nextPath);
         const nextResourcePath = path.relative(docsDir, nextPath).split(path.sep).join('/');
+        const previousAssetDirectory = getResourceAssetDirectory(docsDir, previousResourcePath);
+        const nextAssetDirectory = getResourceAssetDirectory(docsDir, nextResourcePath);
+        if (
+          previousAssetDirectory
+          && nextAssetDirectory
+          && previousAssetDirectory !== nextAssetDirectory
+          && fs.existsSync(previousAssetDirectory)
+        ) {
+          if (fs.existsSync(nextAssetDirectory)) {
+            fs.renameSync(nextPath, docPath);
+            sendJson(res, { error: 'Resource asset directory already exists' }, { status: 409 });
+            return;
+          }
+          try {
+            fs.mkdirSync(path.dirname(nextAssetDirectory), { recursive: true });
+            fs.renameSync(previousAssetDirectory, nextAssetDirectory);
+          } catch (error) {
+            fs.renameSync(nextPath, docPath);
+            throw error;
+          }
+        }
         const nextName = getResourceFileBaseName(nextResourcePath);
         sendJson(res, {
           success: true,

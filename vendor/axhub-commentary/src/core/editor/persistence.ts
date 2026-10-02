@@ -1,9 +1,11 @@
 import type {
   ElementLocator,
+  CommentaryAnnotationSaveStatus,
   CommentaryClearEditsScope,
   CommentaryClearEditsTarget,
   CommentaryHostResource,
   PrototypeEditCommentEntry,
+  PrototypeExternalCommentEntry,
   PrototypeEditCommentImageEntry,
   PrototypeEditCommentTombstone,
   PrototypeEditCommentStatus,
@@ -15,6 +17,7 @@ import type {
 } from '../../web-editor-types';
 import { locateElement, locatorKey } from '../locator';
 import { generateFullElementLabel, generateStableElementKey } from '../element-key';
+import { resolveCommentaryElementIdentity } from '../element-identity';
 import {
   DEFAULT_COMMENT_SHORTCUT_SETTINGS,
   sanitizeCommentShortcutSettings,
@@ -80,6 +83,14 @@ type CachedChangeEntry = {
   updatedAt?: number | null;
   message?: string | null;
   code?: string | null;
+  voiceCreateOperationId?: string;
+  voiceElementKey?: string;
+  voiceTargetRef?: string;
+  voiceTarget?: import('../../web-editor-types').CommentaryPageElementSummary;
+  anchorPlacement?: 'target';
+  author?: string | null;
+  externalComments?: PrototypeExternalCommentEntry[];
+  readOnly?: boolean;
 };
 
 type PrototypeCommentEntryDocumentShape = PrototypeEditCommentEntry;
@@ -187,6 +198,7 @@ export function createPersistenceService(options: {
   commentPersistenceMode?: 'local' | 'adapter-only';
   interactionProfile?: 'design' | 'text-comment';
   getInteractionProfile?: () => 'design' | 'text-comment';
+  onSaveStatusChange?: (status: CommentaryAnnotationSaveStatus) => void;
 }): EditorPersistenceService {
   const { state, changes } = options;
   const getResourceContext = options.getResourceContext ?? (() => null);
@@ -201,8 +213,61 @@ export function createPersistenceService(options: {
   let currentAdapterDocument: PrototypeEditCommentsDocument | null = null;
   let lastAdapterDocument: PrototypeEditCommentsDocument | null = null;
   let preserveMissingCurrentScopeRecordsOnNextWrite = false;
+  let saveStatus: CommentaryAnnotationSaveStatus = 'saved';
+  let pendingAdapterWriteCount = 0;
+  let adapterWriteSequence = 0;
+  let latestSettledAdapterWriteSequence = 0;
+  let latestSettledAdapterWriteSucceeded = true;
   const commentStateByCommentId = new Map<string, PrototypeEditCommentState>();
   const clearedCommentIds = new Set<string>();
+
+  function setSaveStatus(nextStatus: CommentaryAnnotationSaveStatus): void {
+    if (saveStatus === nextStatus) return;
+    saveStatus = nextStatus;
+    try {
+      options.onSaveStatusChange?.(nextStatus);
+    } catch {
+      // Persistence state observers must never break the actual write.
+    }
+  }
+
+  function beginAdapterWrite(): number {
+    pendingAdapterWriteCount += 1;
+    adapterWriteSequence += 1;
+    setSaveStatus('saving');
+    return adapterWriteSequence;
+  }
+
+  function finishAdapterWrite(sequence: number, succeeded: boolean): void {
+    pendingAdapterWriteCount = Math.max(0, pendingAdapterWriteCount - 1);
+    if (sequence >= latestSettledAdapterWriteSequence) {
+      latestSettledAdapterWriteSequence = sequence;
+      latestSettledAdapterWriteSucceeded = succeeded;
+    }
+    if (pendingAdapterWriteCount > 0) {
+      setSaveStatus('saving');
+      return;
+    }
+    setSaveStatus(latestSettledAdapterWriteSucceeded ? 'saved' : 'unsaved');
+  }
+
+  function getSaveStatus(): CommentaryAnnotationSaveStatus {
+    return saveStatus;
+  }
+
+  async function enqueueTrackedAdapterWrite(
+    scope: PrototypeEditCommentsPersistenceScope,
+    write: () => void | Promise<void>,
+  ): Promise<void> {
+    const writeSequence = beginAdapterWrite();
+    try {
+      await enqueueAdapterWrite(scope, write);
+      finishAdapterWrite(writeSequence, true);
+    } catch (error) {
+      finishAdapterWrite(writeSequence, false);
+      throw error;
+    }
+  }
 
   function readResourceMetaString(key: string): string {
     try {
@@ -518,7 +583,11 @@ export function createPersistenceService(options: {
     textChange?: unknown;
     styleChanges?: unknown;
     tweak?: unknown;
+    externalComments?: unknown;
   } | null | undefined): boolean {
+    if (Array.isArray(record?.externalComments) && record.externalComments.length > 0) {
+      return true;
+    }
     const textChange = record?.textChange as { before?: unknown; after?: unknown } | null | undefined;
     if (
       textChange &&
@@ -643,7 +712,7 @@ export function createPersistenceService(options: {
   }
 
   function buildDocumentImages(): PrototypeEditCommentImageEntry[] {
-    return Array.from(state.editMetaByKey.values()).flatMap((meta) =>
+    return Array.from(state.editMetaByKey.values()).filter((meta) => !meta.readOnly).flatMap((meta) =>
       meta.images.map((image) => {
         const commentId = ensureElementEditCommentId(meta);
         return withCurrentPageScope({
@@ -653,6 +722,7 @@ export function createPersistenceService(options: {
           mimeType: image.mimeType,
           size: image.size,
           createdAt: image.createdAt,
+          ...(image.source ? { source: image.source } : {}),
           ...(image.data ? { data: image.data } : {}),
           ...('assetPath' in image && typeof image.assetPath === 'string'
             ? { assetPath: image.assetPath }
@@ -663,12 +733,14 @@ export function createPersistenceService(options: {
   }
 
   function cacheEntryToCommentEntry(entry: CachedChangeEntry): PrototypeCommentEntryDocumentShape {
-    const { note, commentId, elementKey: _elementKey, ...rest } = entry;
+    const { note, commentId, ...rest } = entry;
     return {
       ...rest,
+      elementKey: entry.elementKey,
       id: normalizeCommentId(commentId),
       state: isPrototypeEditCommentStatus(entry.state) ? entry.state : 'idle',
       ...(note ? { comment: note } : {}),
+      ...(Array.isArray(entry.externalComments) ? { externalComments: entry.externalComments.map((comment) => ({ ...comment })) } : {}),
     };
   }
 
@@ -678,6 +750,7 @@ export function createPersistenceService(options: {
       ...(rest as CachedChangeEntry),
       commentId: id,
       ...(comment ? { note: comment } : {}),
+      ...(Array.isArray(entry.externalComments) ? { externalComments: entry.externalComments.map((comment) => ({ ...comment })) } : {}),
     };
   }
 
@@ -693,6 +766,15 @@ export function createPersistenceService(options: {
       ? 'document-edit-comments' as const
       : 'prototype-edit-comments' as const;
     if (reason === 'clear' && clearScope === 'prototype' && clearTarget === 'all') {
+      const preservedExternalComments = (lastAdapterDocument?.comments ?? []).map((entry) => ({
+        ...entry,
+        comment: undefined,
+        textChange: undefined,
+        styleChanges: undefined,
+        tweak: undefined,
+        skillIds: undefined,
+      })).filter((entry) => (entry.externalComments?.length ?? 0) > 0);
+      const preservedExternalCommentIds = new Set(preservedExternalComments.map((entry) => entry.id));
       return {
         schemaVersion: 3,
         kind: documentKind,
@@ -701,14 +783,19 @@ export function createPersistenceService(options: {
           targetPath: scope.targetPath,
           filePath: scope.filePath || `src/${scope.targetPath}/.spec/prototype-comments.json`,
         },
-        comments: [],
-        images: [],
+        comments: preservedExternalComments,
+        images: (lastAdapterDocument?.images ?? []).filter((image) => preservedExternalCommentIds.has(image.commentId)),
       };
     }
     const currentPageScope = resolveCurrentPageScope();
-    const currentComments = entries.map((entry) =>
-      withCurrentPageScope(cacheEntryToCommentEntry(entry)),
-    ).filter((entry) => Boolean(normalizeCommentId(entry.id)));
+    const previousCommentsById = new Map(
+      (lastAdapterDocument?.comments ?? []).map((entry) => [normalizeCommentId(entry.id), entry]),
+    );
+    const currentComments = entries.map((entry) => {
+      const current = withCurrentPageScope(cacheEntryToCommentEntry(entry));
+      const previous = previousCommentsById.get(normalizeCommentId(current.id));
+      return previous ? { ...previous, ...current } : current;
+    }).filter((entry) => Boolean(normalizeCommentId(entry.id)));
     const currentImages = buildDocumentImages();
     const currentCommentIds = new Set(currentComments.map((entry) => entry.id));
     const currentImageIds = new Set(currentImages.map((image) => image.id));
@@ -859,7 +946,7 @@ export function createPersistenceService(options: {
     if (!document) return;
     lastAdapterDocument = document;
     preserveMissingCurrentScopeRecordsOnNextWrite = false;
-    await enqueueAdapterWrite(
+    await enqueueTrackedAdapterWrite(
       scope,
       () => persistenceAdapter.write(scope, document, reason),
     );
@@ -883,6 +970,7 @@ export function createPersistenceService(options: {
     state.processedEditTimestampsByKey.clear();
     state.selectionAnchor = null;
     state.selectedElement = null;
+    state.initialSelectionElement = null;
     commentStateByCommentId.clear();
   }
 
@@ -1221,13 +1309,15 @@ export function createPersistenceService(options: {
     return commentId ? commentStateByCommentId.get(commentId)?.state ?? null : null;
   }
 
-  function resetCompletedCommentStateForElement(elementKey: WebEditorElementKey): void {
+  function resetTerminalCommentStateForElement(elementKey: WebEditorElementKey): boolean {
     const normalizedElementKey = normalizeElementRecordKey(elementKey);
-    if (!normalizedElementKey) return;
+    if (!normalizedElementKey) return false;
     const meta = state.editMetaByKey.get(normalizedElementKey);
     const commentId = normalizeCommentId(meta?.commentId);
-    if (!commentId || commentStateByCommentId.get(commentId)?.state !== 'completed') return;
+    const commentState = commentId ? commentStateByCommentId.get(commentId)?.state : null;
+    if (commentState !== 'completed' && commentState !== 'error') return false;
     recordCommentTaskState(normalizedElementKey, 'idle');
+    return true;
   }
 
   async function waitForPendingWrites(): Promise<void> {
@@ -1308,7 +1398,7 @@ export function createPersistenceService(options: {
     commentStateByCommentId.set(commentId, normalizeCommentState(nextComment));
     lastAdapterDocument = nextDocument;
     currentAdapterDocument = nextDocument;
-    await enqueueAdapterWrite(
+    await enqueueTrackedAdapterWrite(
       scope,
       () => persistenceAdapter.write(scope, nextDocument, 'state'),
     );
@@ -1345,7 +1435,8 @@ export function createPersistenceService(options: {
     const tm = state.transactionManager;
     if (!tm) {
       return Array.from(state.editMetaByKey.values())
-        .filter((meta) => meta.note || (meta.skillIds?.length ?? 0) > 0 || meta.anchor)
+        .filter((meta) => (!meta.readOnly || (meta.externalComments?.length ?? 0) > 0)
+          && (meta.note || (meta.skillIds?.length ?? 0) > 0 || meta.anchor || (meta.externalComments?.length ?? 0) > 0))
         .map((meta) => ({
           commentId: ensureElementEditCommentId(meta),
           elementKey: meta.elementKey,
@@ -1359,6 +1450,14 @@ export function createPersistenceService(options: {
                 dirtySince: meta.dirtySince,
               }
             : null,
+          voiceCreateOperationId: meta.voiceCreateOperationId,
+          voiceElementKey: meta.voiceElementKey,
+          voiceTargetRef: meta.voiceTargetRef,
+          voiceTarget: meta.voiceTarget,
+          anchorPlacement: meta.anchorPlacement,
+          author: meta.author,
+          externalComments: meta.externalComments?.map((comment) => ({ ...comment })),
+          readOnly: meta.readOnly,
         }));
     }
 
@@ -1472,6 +1571,7 @@ export function createPersistenceService(options: {
         );
       }
       if (meta) entry.commentId = ensureElementEditCommentId(meta);
+      if (meta?.readOnly && !(meta.externalComments?.length ?? 0)) continue;
       if (meta?.elementKey) entry.elementKey = meta.elementKey;
       if (meta?.label) entry.label = meta.label;
       if ((meta?.tweakSummaryLines?.length ?? 0) > 0) {
@@ -1483,6 +1583,9 @@ export function createPersistenceService(options: {
       }
       if (meta?.note) entry.note = meta.note;
       if ((meta?.skillIds?.length ?? 0) > 0) entry.skillIds = meta?.skillIds?.slice();
+      if ((meta?.externalComments?.length ?? 0) > 0) {
+        entry.externalComments = meta?.externalComments?.map((comment) => ({ ...comment }));
+      }
       if (meta?.anchor) {
         entry.marker = {
           ...meta.anchor,
@@ -1490,7 +1593,7 @@ export function createPersistenceService(options: {
         };
       }
 
-      if (!entry.textChange && !entry.styleChanges && !entry.tweak && !entry.note && !(entry.skillIds?.length ?? 0)) continue;
+      if (!entry.textChange && !entry.styleChanges && !entry.tweak && !entry.note && !(entry.skillIds?.length ?? 0) && !(entry.externalComments?.length ?? 0)) continue;
       entries.push(entry);
       if (elementKey) {
         appendedKeys.add(elementKey);
@@ -1498,10 +1601,11 @@ export function createPersistenceService(options: {
     }
 
     for (const meta of state.editMetaByKey.values()) {
+      if (meta.readOnly && !(meta.externalComments?.length ?? 0)) continue;
       if (appendedKeys.has(meta.elementKey)) continue;
       const hasRecordedTweak = (meta.tweakSummaryLines?.length ?? 0) > 0;
       const hasImages = meta.images.length > 0;
-      if (!meta.note && !hasRecordedTweak && !hasImages && !(meta.skillIds?.length ?? 0)) continue;
+      if (!meta.note && !hasRecordedTweak && !hasImages && !(meta.skillIds?.length ?? 0) && !(meta.externalComments?.length ?? 0)) continue;
       entries.push({
         commentId: ensureElementEditCommentId(meta),
         elementKey: meta.elementKey,
@@ -1522,6 +1626,14 @@ export function createPersistenceService(options: {
               dirtySince: meta.dirtySince,
             }
           : null,
+        voiceCreateOperationId: meta.voiceCreateOperationId,
+        voiceElementKey: meta.voiceElementKey,
+        voiceTargetRef: meta.voiceTargetRef,
+        voiceTarget: meta.voiceTarget,
+        anchorPlacement: meta.anchorPlacement,
+        author: meta.author,
+        externalComments: meta.externalComments?.map((comment) => ({ ...comment })),
+        readOnly: meta.readOnly,
       });
     }
 
@@ -1575,6 +1687,19 @@ export function createPersistenceService(options: {
       if (!commentId) continue;
       const entryNote = changes.normalizeNote(entry.note ?? '');
       const entrySkillIds = normalizePromptCardSkillIds(entry.skillIds ?? []);
+      const externalComments = Array.isArray(entry.externalComments)
+        ? entry.externalComments
+          .filter((comment) => comment && typeof comment === 'object' && String(comment.content ?? '').trim())
+          .map((comment) => ({
+            id: String(comment.id ?? '').trim(),
+            authorId: String(comment.authorId ?? '').trim(),
+            authorName: String(comment.authorName ?? '').trim() || '评审者',
+            content: String(comment.content ?? '').trim(),
+            createdAt: Number(comment.createdAt) > 0 ? Number(comment.createdAt) : Date.now(),
+            ...(Number(comment.updatedAt) > 0 ? { updatedAt: Number(comment.updatedAt) } : {}),
+          }))
+          .filter((comment) => Boolean(comment.id && comment.authorId && comment.content))
+        : [];
       const documentImages = currentAdapterDocument?.images?.filter((image) =>
         image.commentId === commentId && isCurrentPageScopedRecord(image),
       ) ?? [];
@@ -1606,14 +1731,14 @@ export function createPersistenceService(options: {
         continue;
       }
       const entryLocator = annotationPanelIdentity?.locator ?? entry.locator;
-      const element = locateElement(entryLocator);
+      const liveIdentity = resolveCommentaryElementIdentity(entryLocator);
+      const element = liveIdentity?.element ?? null;
       const canRestoreWithoutLiveElement = Boolean(annotationPanelIdentity) && Boolean(entry.marker);
       if ((!element || !element.isConnected) && !canRestoreWithoutLiveElement) continue;
 
       const resolvedElementKey = annotationPanelIdentity?.elementKey
-        ?? (element
-          ? generateStableElementKey(element, entryLocator.shadowHostChain)
-          : locatorKey(entryLocator));
+        ?? liveIdentity?.elementKey
+        ?? locatorKey(entryLocator);
       const resolvedLabel = String(entry.label ?? '').trim() || (
         element
           ? generateFullElementLabel(element, entryLocator.shadowHostChain)
@@ -1625,17 +1750,33 @@ export function createPersistenceService(options: {
         resolvedLabel,
       );
       meta.commentId = commentId;
+      meta.author = typeof entry.author === 'string' ? entry.author.trim() || null : null;
+      meta.readOnly = Boolean(entry.readOnly);
       meta.locator = entryLocator;
       meta.label = resolvedLabel;
       meta.note = changes.normalizeNote(entry.note ?? meta.note);
+      meta.externalComments = Array.isArray(entry.externalComments) ? externalComments : undefined;
       if (meta.note.trim() && entrySkillIds.length > 0) {
         meta.skillIds = entrySkillIds;
       } else {
         delete meta.skillIds;
       }
       meta.anchor = entry.marker ? normalizeMarkerAnchor(entry.marker) ?? meta.anchor : meta.anchor;
+      meta.voiceCreateOperationId = entry.voiceCreateOperationId;
+      meta.voiceElementKey = entry.voiceElementKey;
+      meta.voiceTargetRef = entry.voiceTargetRef;
+      meta.voiceTarget = entry.voiceTarget;
+      meta.anchorPlacement = entry.anchorPlacement;
       if (entry.marker && Number.isFinite(Number(entry.marker.dirtySince))) {
         meta.dirtySince = Number(entry.marker.dirtySince);
+      }
+      if (externalComments.length > 0 && meta.dirtySince === null) {
+        meta.dirtySince = Math.min(...externalComments.map((comment) => comment.createdAt || Date.now()));
+      }
+      if (meta.readOnly && meta.dirtySince === null) {
+        meta.dirtySince = Number.isFinite(Number(entry.updatedAt)) && Number(entry.updatedAt) > 0
+          ? Number(entry.updatedAt)
+          : Date.now();
       }
       if (documentImages.length > 0) {
         const hydratedImages = documentImages
@@ -1647,6 +1788,9 @@ export function createPersistenceService(options: {
             mimeType: String(image.mimeType ?? '').trim() || 'image/png',
             size: Number(image.size ?? 0),
             createdAt: Number(image.createdAt ?? Date.now()),
+            ...(image.source === 'user' || image.source === 'target-screenshot'
+              ? { source: image.source }
+              : {}),
             ...(typeof image.assetPath === 'string' && image.assetPath.trim()
               ? { assetPath: image.assetPath.trim() }
               : {}),
@@ -1668,7 +1812,7 @@ export function createPersistenceService(options: {
         }
       }
 
-      if (entry.styleChanges) {
+      if (entry.styleChanges && !meta.readOnly) {
         const afterStyles = entry.styleChanges.after ?? {};
         const beforeStyles = entry.styleChanges.before ?? {};
         for (const prop of Object.keys(afterStyles)) {
@@ -1687,7 +1831,7 @@ export function createPersistenceService(options: {
         }
       }
 
-      if (entry.textChange && element) {
+      if (entry.textChange && element && !meta.readOnly) {
         const before = String(entry.textChange.before ?? '');
         const after = String(entry.textChange.after ?? '');
         if (before !== after && element instanceof HTMLElement) {
@@ -1774,7 +1918,7 @@ export function createPersistenceService(options: {
       if (scope) {
         try {
           const documentToCompact = adapterDocument;
-          await enqueueAdapterWrite(
+          await enqueueTrackedAdapterWrite(
             scope,
             () => persistenceAdapter.write(scope, documentToCompact, 'restore', {
               observedTombstones: adapterResult.observedTombstones,
@@ -1885,13 +2029,14 @@ export function createPersistenceService(options: {
       if (entry.tweak) next.tweak = entry.tweak;
       if (entry.note) next.note = entry.note;
       if (entry.skillIds) next.skillIds = entry.skillIds;
+      if (entry.externalComments) next.externalComments = entry.externalComments;
       if (entry.marker) next.marker = entry.marker;
       if (kind === 'text') {
         if (entry.styleChanges) next.styleChanges = entry.styleChanges;
       } else {
         if (entry.textChange) next.textChange = entry.textChange;
       }
-      if (!next.textChange && !next.styleChanges && !next.tweak && !next.note && !(next.skillIds?.length ?? 0)) continue;
+      if (!next.textChange && !next.styleChanges && !next.tweak && !next.note && !(next.skillIds?.length ?? 0) && !(next.externalComments?.length ?? 0)) continue;
       nextEntries.push(next);
     }
 
@@ -1942,8 +2087,9 @@ export function createPersistenceService(options: {
     pruneExpiredAgentTaskStates,
     recordCommentTaskState,
     getCommentTaskState,
-    resetCompletedCommentStateForElement,
+    resetTerminalCommentStateForElement,
     waitForPendingWrites,
+    getSaveStatus,
     listEditingConversationTasks,
     transitionConversationTaskTerminal,
     clearCommentRecord,

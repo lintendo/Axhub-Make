@@ -57,6 +57,8 @@ import {
     normalizeAssistantCurrentFileV1,
 } from '@/common/assistant-context/bridge';
 import type { AcpProvider } from '@/common/assistant-context/types';
+import { resolveAcpPromptClientProvider } from '@/common/acpModelConfig';
+import { readAssistantImageSavedEvent, type AssistantImageSavedEvent } from '../assistantImageSavedEvent';
 
 type AssistantTriggerSource = 'button' | 'event';
 type AssistantRuntimeState = Awaited<ReturnType<typeof apiService.getAssistantRuntime>>;
@@ -330,8 +332,10 @@ interface UseAssistantPanelControllerParams {
     messageApi: AssistantMessageApi;
     modal: AssistantModalApi;
     preferredPromptClient: PromptClientPreference;
+    preferredModel?: string | null;
     onOpenAISettings?: (runtime?: AssistantRuntimeState | null, message?: string) => void;
     onAiNotification?: (intent: NotificationIntent) => void;
+    onImageSaved?: (event: AssistantImageSavedEvent) => void;
     activeProjectId: string | null;
     activeTab: TabType;
     viewMode: ViewMode;
@@ -341,6 +345,7 @@ interface UseAssistantPanelControllerParams {
     currentMarkdownResource: AssistantMarkdownResourceSelection;
     initialAssistantPanelMode?: AssistantAiPanelMode;
     assistantImageGenerationConfig?: AssistantImageGenerationConfig | null;
+    imageAiSaveDirectory?: string | null;
     currentCanvas?: CanvasItem | null;
     currentTheme?: ThemeResourceItem | null;
     currentDataTable?: DataTableResourceItem | null;
@@ -349,8 +354,11 @@ interface UseAssistantPanelControllerParams {
 export function useAssistantPanelController({
     messageApi,
     modal: _modal,
+    preferredPromptClient,
+    preferredModel = null,
     onOpenAISettings,
     onAiNotification,
+    onImageSaved,
     activeProjectId,
     activeTab,
     viewMode,
@@ -360,6 +368,7 @@ export function useAssistantPanelController({
     currentMarkdownResource,
     initialAssistantPanelMode = null,
     assistantImageGenerationConfig = null,
+    imageAiSaveDirectory = null,
     currentCanvas = null,
     currentTheme = null,
     currentDataTable = null,
@@ -463,13 +472,21 @@ export function useAssistantPanelController({
         if (projectPath) {
             url.searchParams.set('cwd', projectPath);
         }
+        const preferredProvider = resolveAcpPromptClientProvider(preferredPromptClient);
+        if (preferredProvider) {
+            url.searchParams.set('provider', preferredProvider);
+        }
+        const normalizedPreferredModel = String(preferredModel || '').trim();
+        if (normalizedPreferredModel) {
+            url.searchParams.set('model', normalizedPreferredModel);
+        }
         const normalizedConversationStorePath = String(conversationStorePath || '').trim();
         if (normalizedConversationStorePath) {
             url.searchParams.set('conversationStorePath', normalizedConversationStorePath);
             url.searchParams.set('restoreLastThread', '1');
         }
         return url.toString();
-    }, []);
+    }, [preferredModel, preferredPromptClient]);
 
     const buildImagePlaygroundUrlForRuntime = useCallback((runtime?: AssistantRuntimeState | null) => {
         const webBaseUrl = (runtime?.webBaseUrl || DEFAULT_ASSISTANT_WEB_BASE_URL).replace(/\/+$/g, '');
@@ -488,6 +505,10 @@ export function useAssistantPanelController({
     const assistantFallbackIframeSrc = assistantIframeOverrideUrl || assistantIframeUrl;
     const assistantSupportsAcpContext = assistantPanelMode === 'general-ai';
     const assistantAcceptsImageRuntimeConfig = assistantPanelMode === 'general-ai' || assistantPanelMode === 'image-ai';
+    const effectiveAssistantImageGenerationConfig = useMemo<AssistantImageGenerationConfig>(() => ({
+        ...(assistantImageGenerationConfig || {}),
+        ...(imageAiSaveDirectory ? { saveDirectory: imageAiSaveDirectory } : {}),
+    }), [assistantImageGenerationConfig, imageAiSaveDirectory]);
     const assistantContextAppendAvailable = assistantSupportsAcpContext && assistantVisible;
     const assistantIframeSrc = assistantSupportsAcpContext
         ? assistantIframePool.activeEntry?.src || assistantFallbackIframeSrc
@@ -707,7 +728,9 @@ export function useAssistantPanelController({
                 return;
             }
             const iframeEntry = assistantIframePool.entries.find((entry) => entry.key === iframeKey);
-            if (!iframeEntry) {
+            const iframeElement = assistantIframePool.getIframe(iframeKey);
+            const iframeSrc = iframeEntry?.src || iframeElement?.src;
+            if (!iframeSrc) {
                 if (diagnosticEvent) {
                     notificationDiagnostics.record('assistant.event.received', {
                         ...diagnosticEvent,
@@ -715,14 +738,14 @@ export function useAssistantPanelController({
                         expectedOrigin: null,
                         sourceMatched: true,
                         originMatched: false,
-                        reason: 'missing-iframe-entry',
+                        reason: 'missing-iframe-source',
                     });
                 }
                 return;
             }
             let expectedOrigin = '';
             try {
-                expectedOrigin = new URL(iframeEntry.src, window.location.origin).origin;
+                expectedOrigin = new URL(iframeSrc, window.location.origin).origin;
             } catch {
                 if (diagnosticEvent) {
                     notificationDiagnostics.record('assistant.event.received', {
@@ -764,6 +787,10 @@ export function useAssistantPanelController({
             if (runEvent) {
                 assistantIframePool.markRunState(iframeKey, runEvent.runState, runEvent.threadId);
             }
+            const imageSavedEvent = readAssistantImageSavedEvent(event.data);
+            if (imageSavedEvent) {
+                onImageSaved?.(imageSavedEvent);
+            }
             const notificationIntent = assistantNotificationTrackerRef.current.consume(event.data);
             if (notificationIntent) {
                 onAiNotification?.(notificationIntent);
@@ -774,7 +801,7 @@ export function useAssistantPanelController({
         return () => {
             window.removeEventListener('message', handleAssistantIframeRunEvent);
         };
-    }, [assistantIframePool, onAiNotification]);
+    }, [assistantIframePool, onAiNotification, onImageSaved]);
 
     useEffect(() => {
         localStorage.setItem(STORAGE_KEY_ASSISTANT_WIDTH, String(Math.round(assistantPanelWidth)));
@@ -856,18 +883,18 @@ export function useAssistantPanelController({
             return;
         }
 
-        const imageConfigSignature = getAcpImageGenerationConfigSignature(assistantImageGenerationConfig);
+        const imageConfigSignature = getAcpImageGenerationConfigSignature(effectiveAssistantImageGenerationConfig);
         if (!options.force && assistantImageGenerationConfigSyncSignatureRef.current === imageConfigSignature) {
             return;
         }
 
         assistantImageGenerationConfigSyncSignatureRef.current = imageConfigSignature;
-        postAssistantImageGenerationConfigToIframeWithRetry(assistantImageGenerationConfig);
+        postAssistantImageGenerationConfigToIframeWithRetry(effectiveAssistantImageGenerationConfig);
     }, [
         assistantIframeLoaded,
         assistantIframeRef,
         assistantAcceptsImageRuntimeConfig,
-        assistantImageGenerationConfig,
+        effectiveAssistantImageGenerationConfig,
         assistantVisible,
         postAssistantImageGenerationConfigToIframeWithRetry,
     ]);
@@ -884,19 +911,19 @@ export function useAssistantPanelController({
             return false;
         }
 
-        const imageConfigSignature = getAcpImageGenerationConfigSignature(assistantImageGenerationConfig);
+        const imageConfigSignature = getAcpImageGenerationConfigSignature(effectiveAssistantImageGenerationConfig);
         if (!options.force && assistantImageGenerationConfigSyncSignatureRef.current === imageConfigSignature) {
             return true;
         }
 
-        await postAssistantImageGenerationConfigToIframeWithAck(assistantImageGenerationConfig);
+        await postAssistantImageGenerationConfigToIframeWithAck(effectiveAssistantImageGenerationConfig);
         assistantImageGenerationConfigSyncSignatureRef.current = imageConfigSignature;
         return true;
     }, [
         assistantIframeLoaded,
         assistantIframeRef,
         assistantAcceptsImageRuntimeConfig,
-        assistantImageGenerationConfig,
+        effectiveAssistantImageGenerationConfig,
         assistantVisible,
         postAssistantImageGenerationConfigToIframeWithAck,
     ]);
@@ -2046,6 +2073,9 @@ export function useAssistantPanelController({
     }, [ensureAssistantReadyThenOpen]);
 
     const openImageAiPanel = useCallback(() => {
+        const imagePanelWidth = getAssistantPanelMaxWidth();
+        setAssistantPanelMaxWidth(imagePanelWidth);
+        setAssistantPanelWidthValue(getAssistantPanelMaxWidth());
         void ensureAssistantReadyThenOpen('button', undefined, undefined, 'iframe', null, {
             panelMode: 'image-ai',
             suppressResourceThreadBinding: true,
@@ -2170,8 +2200,8 @@ export function useAssistantPanelController({
         syncAssistantContextToTargets,
     ]);
 
-    const handleOpenAssistantInNewWindowNoContext = useCallback(() => {
-        void ensureAssistantReadyThenOpen('button', assistantIframeUrl, undefined, 'window', null, {
+    const handleOpenAssistantInNewWindowNoContext = useCallback((targetPath?: string) => {
+        void ensureAssistantReadyThenOpen('button', assistantIframeUrl, targetPath, 'window', null, {
             panelMode: 'general-ai',
         });
     }, [assistantIframeUrl, ensureAssistantReadyThenOpen]);
@@ -2399,10 +2429,6 @@ export function useAssistantPanelController({
             return assistantRuntime;
         }
 
-        if (assistantRuntime?.health.status === 'ready') {
-            return assistantRuntime;
-        }
-
         try {
             const runtime = await refreshRuntime({ autoStart: true }) as AssistantRuntimeState;
             setAssistantRuntime(runtime);
@@ -2496,6 +2522,7 @@ export function useAssistantPanelController({
         handleAssistantIframeLoad,
         assistantContextV1,
         assistantProjectPath: assistantRuntime?.projectPath || '',
+		assistantWebBaseUrl: (assistantRuntime?.webBaseUrl || DEFAULT_ASSISTANT_RUNTIME_STATE.webBaseUrl).trim(),
         assistantApiBaseUrl: (assistantRuntime?.apiBaseUrl || DEFAULT_ASSISTANT_RUNTIME_STATE.apiBaseUrl).trim(),
         probeAssistantRuntimeSilently,
         connectAssistantRuntimeSilently,

@@ -174,6 +174,28 @@ export function readAnnotationPanelNodeId(element: Element | null | undefined): 
   return readClosestElementAttribute(element, ANNOTATION_MARKER_NODE_ID_ATTR);
 }
 
+function readActiveAnnotationPanelNodeId(): string {
+  if (typeof document === 'undefined') return '';
+
+  const selector = `[${ANNOTATION_PANEL_TARGET_ATTR}="true"][${ANNOTATION_PANEL_NODE_ID_ATTR}]`;
+  try {
+    const host = typeof document.getElementById === 'function'
+      ? document.getElementById(ANNOTATION_HOST_ID)
+      : null;
+    const shadowRoot = (host as (Element & { shadowRoot?: ShadowRoot | null }) | null)?.shadowRoot ?? null;
+    const shadowPanel = shadowRoot?.querySelector(selector) ?? null;
+    const shadowNodeId = readElementAttribute(shadowPanel, ANNOTATION_PANEL_NODE_ID_ATTR);
+    if (shadowNodeId) return shadowNodeId;
+
+    const documentPanel = typeof document.querySelector === 'function'
+      ? document.querySelector(selector)
+      : null;
+    return readElementAttribute(documentPanel, ANNOTATION_PANEL_NODE_ID_ATTR);
+  } catch {
+    return '';
+  }
+}
+
 export function buildAnnotationPanelLocator(nodeId: string): ElementLocator {
   const normalizedNodeId = normalizeText(nodeId);
   return {
@@ -204,7 +226,12 @@ export function resolveAnnotationElementIdentity(
   }
 
   const locator = createElementLocator(element);
-  const nodeId = resolveAnnotationNodeIdFromLocator(locator);
+  const sourceNodes = readAnnotationSourceNodes();
+  const activePanelNodeId = readActiveAnnotationPanelNodeId();
+  const activePanelNode = sourceNodes.find((node) => node.id === activePanelNodeId);
+  const nodeId = activePanelNode?.locator && locatorsMatch(locator, activePanelNode.locator)
+    ? activePanelNode.id
+    : resolveAnnotationNodeIdFromLocator(locator);
   if (!nodeId) return null;
 
   return {

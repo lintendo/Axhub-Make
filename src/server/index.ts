@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 import { getOpenCodeBridgeHub, isOpenCodeBridgeUpgrade } from './opencodeBridge.ts';
 import { getCanvasBridgeHub, isCanvasBridgeUpgrade } from './canvasBridge.ts';
+import { createCanvasWriteCoordinator, type CanvasWriteCoordinator } from './canvasWriteCoordinator.ts';
+import { createCanvasWorkStore } from './assistantWorkStore.ts';
 import { getPreviewBridgeHub, isPreviewBridgeUpgrade } from './previewBridge.ts';
 import {
   createAxhubCanvasMcpToken,
@@ -19,6 +21,7 @@ import {
   checkMakeStateHealth,
   createServerConfigStore,
   createProjectRegistry,
+  getServerInfoFilePath,
   getGlobalMakeStateDir,
   type AxhubServerInfo,
   type MakeStateHealthResult,
@@ -39,6 +42,7 @@ import type { AdminStaticOptions } from './adminStatic.ts';
 import { DEFAULT_MAKE_SERVER_PORT } from './defaults.ts';
 import { closeManagedOpenCodeServers, readManagedOpenCodeServerUrl } from './agentOpen.ts';
 import { getLocalIP, getRequestUrl, sendJson } from './http.ts';
+import { removeLegacyCursorIntegration } from './cursorLegacyCleanup.ts';
 import { getMakeClientDevStatus } from './makeClientProject.ts';
 import { handleManagementApi } from './managementApi.ts';
 import {
@@ -46,6 +50,7 @@ import {
   handleLanAccessApi,
   handleLanAccessGate,
 } from './lanAccessControl.ts';
+import { handleLocalPublishingPublicRoute, isPublicPublishedRequest } from './localPublishingPublic.ts';
 import type { CommandExecutor } from './managementApi.cloudPublishing.ts';
 import type { GitWorkspaceCommandExecutor } from './managementApi.git.ts';
 import { releaseListeningProcessesOnPort } from './portOccupancy.ts';
@@ -58,6 +63,7 @@ import {
 } from './runtimeProxy.ts';
 import type { ViteDevMiddleware } from './viteDevServer.ts';
 import type { DiagnosticLog } from './diagnosticLog.ts';
+import { removeOwnedServerInfoFile } from './serverInfoRecord.ts';
 
 export interface StartMakeServerOptions {
   projectRoot: string;
@@ -69,6 +75,7 @@ export interface StartMakeServerOptions {
   registryPath?: string;
   serverInfoHomeDir?: string;
   devMode?: boolean;
+  quiet?: boolean;
   logFile?: string;
   diagnosticLog?: DiagnosticLog;
   axhubOnlineBaseUrl?: string;
@@ -263,6 +270,9 @@ async function resolveRuntimeOriginForProxy(options: {
   currentRuntimeOrigin?: string;
   allowUnknownProjectFallback?: boolean;
 }): Promise<string | undefined> {
+  if (!options.projectId && !options.allowUnknownProjectFallback) {
+    return undefined;
+  }
   if (options.projectId && !resolveRequestProject(options.registryPath, options.projectId)) {
     if (!options.allowUnknownProjectFallback) {
       return undefined;
@@ -274,7 +284,12 @@ async function resolveRuntimeOriginForProxy(options: {
   return resolveActiveProjectRuntimeOrigin({
     registryPath: options.registryPath,
     projectId: options.projectId,
-    fallbackRuntimeOrigin: resolveRuntimeOrigin(null, options.currentRuntimeOrigin),
+    // A configured runtime origin belongs to the process that started the
+    // admin server, not necessarily to the project on this request. Once a
+    // project id is present, only that project's runtime discovery is valid.
+    fallbackRuntimeOrigin: options.projectId
+      ? undefined
+      : resolveRuntimeOrigin(null, options.currentRuntimeOrigin),
   });
 }
 
@@ -310,6 +325,11 @@ function resolveOpenCodeWebUiRoot(adminRoot: string, explicitRoot?: string): str
 }
 
 export async function startMakeServer(options: StartMakeServerOptions): Promise<RunningMakeServer> {
+  await removeLegacyCursorIntegration().catch((error) => {
+    if (!options.quiet) {
+      console.warn(`Unable to remove the legacy Cursor companion: ${error?.message || error}`);
+    }
+  });
   const requestedPort = options.port ?? DEFAULT_MAKE_SERVER_PORT;
   const adminRoot = options.adminRoot || resolveDefaultAdminRoot();
   const opencodeWebUiRoot = resolveOpenCodeWebUiRoot(adminRoot, options.opencodeWebUiRoot);
@@ -326,6 +346,20 @@ export async function startMakeServer(options: StartMakeServerOptions): Promise<
   let adminServerInfo: AxhubServerInfo | null = null;
   const canvasBridgeHub = getCanvasBridgeHub();
   const axhubCanvasMcpToken = createAxhubCanvasMcpToken();
+  const canvasWriteCoordinators = new Map<string, CanvasWriteCoordinator>();
+  const getCanvasWriteCoordinator = (projectRootForCanvas: string, projectId: string): CanvasWriteCoordinator => {
+    const key = `${path.resolve(projectRootForCanvas)}\u0000${projectId}`;
+    const existing = canvasWriteCoordinators.get(key);
+    if (existing) return existing;
+    const coordinator = createCanvasWriteCoordinator({
+      projectRoot: projectRootForCanvas,
+      bridgeHub: canvasBridgeHub,
+      resolveCanvasPath: (resourcePath) => path.join(path.resolve(projectRootForCanvas), 'src', 'resources', resourcePath),
+      store: createCanvasWorkStore({ projectRoot: projectRootForCanvas, projectId }),
+    });
+    canvasWriteCoordinators.set(key, coordinator);
+    return coordinator;
+  };
   const previewBridgeHub = getPreviewBridgeHub();
   const axhubPreviewMcpToken = createAxhubPreviewMcpToken();
   let makeStateHealth: MakeStateHealthResult = checkMakeStateHealth(
@@ -394,7 +428,9 @@ export async function startMakeServer(options: StartMakeServerOptions): Promise<
         const { createViteDevMiddleware } = await import('./viteDevServer.ts');
         const middleware = await createViteDevMiddleware(server, makeServerRoot);
         viteMiddleware = middleware;
-        console.log('Vite HMR middleware attached (frontend hot reload enabled)');
+        if (!options.quiet) {
+          console.log('Vite HMR middleware attached (frontend hot reload enabled)');
+        }
         return middleware;
       })().catch((error) => {
         viteMiddlewarePromise = null;
@@ -440,15 +476,34 @@ export async function startMakeServer(options: StartMakeServerOptions): Promise<
       if (await handleLanAccessApi(req, res, accessConfigOptions)) {
         return;
       }
-      if (handleLanAccessGate(req, res, accessConfigOptions)) {
+      if (handleLanAccessGate(req, res, {
+        ...accessConfigOptions,
+        isPublicPublishedRequest: (request) => isPublicPublishedRequest(request, {
+          projectRoot: startupProjectRoot,
+          startupProjectRoot,
+          registryPath: options.registryPath,
+          origin,
+        }),
+      })) {
+        return;
+      }
+      if (await handleLocalPublishingPublicRoute(req, res, {
+        projectRoot: startupProjectRoot,
+        startupProjectRoot,
+        registryPath: options.registryPath,
+        origin,
+      })) {
         return;
       }
       if (redirectMissingPlaceholderPrototypeShortLink(req, res, adminStaticOptions)) {
         return;
       }
+      canvasBridgeHub.configureProjectRoot(activeProjectRoot || startupProjectRoot);
       if (await handleAxhubCanvasMcp(req, res, {
         token: axhubCanvasMcpToken,
         bridgeHub: canvasBridgeHub,
+        projectId: requestProjectId || undefined,
+        writeCoordinator: getCanvasWriteCoordinator(activeProjectRoot || startupProjectRoot, requestProjectId || 'unknown-project'),
       })) {
         return;
       }
@@ -478,6 +533,7 @@ export async function startMakeServer(options: StartMakeServerOptions): Promise<
         devMode,
         diagnosticLog: options.diagnosticLog,
         axhubOnlineBaseUrl: options.axhubOnlineBaseUrl,
+        axhubCanvasMcpToken,
         cloudPublishingCommandExecutor: options.cloudPublishingCommandExecutor,
         gitWorkspaceCommandExecutor: options.gitWorkspaceCommandExecutor,
       })) {
@@ -634,6 +690,12 @@ export async function startMakeServer(options: StartMakeServerOptions): Promise<
     const activeProjectRoot = resolveActiveProjectRoot(options.registryPath, requestProjectId);
     const accessDecision = getLanAccessGateDecision(req, {
       getConfig: () => serverConfigStore.getConfig({ activeProjectRoot: activeProjectRoot || startupProjectRoot }),
+      isPublicPublishedRequest: (request) => isPublicPublishedRequest(request, {
+        projectRoot: startupProjectRoot,
+        startupProjectRoot,
+        registryPath: options.registryPath,
+        origin,
+      }),
     });
     if (!accessDecision.allowed) {
       socket.end(`HTTP/1.1 ${accessDecision.status} ${accessDecision.status === 403 ? 'Forbidden' : 'Unauthorized'}\r\n\r\n`);
@@ -686,7 +748,7 @@ export async function startMakeServer(options: StartMakeServerOptions): Promise<
     }
   }
 
-  if (lanHost !== 'localhost') {
+  if (lanHost !== 'localhost' && !options.quiet) {
     console.log(`Axhub Make network URL: http://${lanHost}:${actualPort}`);
   }
 
@@ -709,6 +771,12 @@ export async function startMakeServer(options: StartMakeServerOptions): Promise<
         server.closeIdleConnections?.();
         server.closeAllConnections?.();
       });
+      if (adminServerInfo) {
+        removeOwnedServerInfoFile(
+          getServerInfoFilePath(projectRoot, 'admin', { homeDir: serverInfoHomeDir }),
+          adminServerInfo,
+        );
+      }
     },
   };
 }

@@ -8,6 +8,11 @@ import {
 
 describe('preview device URL', () => {
   it('parses preset and custom dimensions', () => {
+    expect(parsePreviewDeviceParam('desktop')).toEqual({
+      preset: 'desktop',
+      width: 1440,
+      height: 900,
+    });
     expect(parsePreviewDeviceParam('393x852')).toEqual({
       preset: 'mobile',
       width: 393,
@@ -33,6 +38,7 @@ describe('preview device URL', () => {
 
   it('omits default desktop and serializes manual single devices only', () => {
     expect(serializePreviewDeviceParam(createDefaultPreviewConfig())).toBeNull();
+    expect(serializePreviewDeviceParam(createDefaultPreviewConfig(), { explicitDesktop: true })).toBe('desktop');
     expect(serializePreviewDeviceParam({
       ...createDefaultPreviewConfig(),
       singlePreset: 'mobile',

@@ -109,15 +109,12 @@ describe('AxhubWebEmbed source', () => {
         expect(source).not.toContain('setScreenshotDataUrl(null);');
     });
 
-    it('only activates the screenshot overlay when the click started on an already-selected embed', () => {
+    it('does not activate the screenshot overlay from a single click', () => {
         const source = readFileSync(resolve(__dirname, './AxhubWebEmbed.tsx'), 'utf8');
 
-        expect(source).toContain("import { shouldActivateEmbedOverlayClick } from './embedActivationIntent';");
-        expect(source).toContain('const selectedRef = useRef(false);');
-        expect(source).toContain('selectedAtPointerDown: selectedRef.current');
-        expect(source).toContain('selectedRef.current = true;');
-        expect(source).toContain('selectedRef.current = false;');
-        expect(source).toContain('shouldActivateEmbedOverlayClick({');
-        expect(source).not.toContain('const shouldActivate = !pointerIntent.moved && !pointerIntent.cancelled;');
+        expect(source).not.toContain("import { shouldActivateEmbedOverlayClick } from './embedActivationIntent';");
+        expect(source).not.toContain('handleOverlayPointerDown');
+        expect(source).not.toContain('shouldActivateFromOverlayClickRef');
+        expect(source).not.toContain('onClick={(e) => {');
     });
 });

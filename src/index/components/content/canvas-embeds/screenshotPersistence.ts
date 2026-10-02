@@ -140,12 +140,10 @@ export function deriveResourceCanvasScreenshotUrl(
     if (fileName.includes('/') || fileName.includes('\\')) return undefined;
     const safeFileBase = normalizeScreenshotFileBase(fileName.replace(/\.png$/iu, ''));
     if (!resourceCanvasPath || !safeFileBase) return undefined;
-    const canvasBase = resourceCanvasPath.split('/').pop()?.replace(/\.excalidraw$/iu, '') || '';
-    const assetPath = `${canvasBase}.assets/${safeFileBase}.png`;
     try {
         return new URL(
             withProjectScope(
-                `/api/canvas/resources/${encodeCanvasApiPath(resourceCanvasPath)}/${encodeCanvasApiPath(assetPath)}`,
+                `/api/canvas/resources/${encodeCanvasApiPath(resourceCanvasPath)}/asset/${safeFileBase}.png`,
                 { projectId },
             ),
             window.location.origin,

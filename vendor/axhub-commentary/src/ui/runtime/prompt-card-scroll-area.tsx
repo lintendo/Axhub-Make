@@ -1,5 +1,4 @@
 import React from 'react';
-import 'overlayscrollbars/styles/overlayscrollbars.css';
 import type { PartialOptions } from 'overlayscrollbars';
 import {
   OverlayScrollbarsComponent,

@@ -71,7 +71,6 @@ describe('project-scoped Admin API source contract', () => {
   it('keeps smoke and browser regressions on explicit project-scoped requests', () => {
     const smokeSource = readPackageSource('scripts/smoke/run-smoke.mjs');
     const realAcpSource = readPackageSource('scripts/regression/run-real-acp-canvas-artifact-regression.mjs');
-    const midsceneSource = readPackageSource('midscene/acp-host-regression.yaml');
 
     expect(smokeSource).toContain("projectId: 'smoke-client',");
     expect(smokeSource).toContain('buildProjectApiUrl(context.origin,');
@@ -79,8 +78,6 @@ describe('project-scoped Admin API source contract', () => {
     expect(smokeSource).not.toContain('`${context.origin}/api/git/status`');
     expect(realAcpSource).toContain("throw new Error('Project-scoped regression request requires projectId');");
     expect(realAcpSource).toContain("appendProjectIdSearchParam(new URL('/api/prototypes/create-placeholder', baseUrl), projectId)");
-    expect(midsceneSource).toContain("canvasUrl.searchParams.set('projectId', '${AXHUB_MAKE_E2E_PROJECT_ID}');");
-    expect(midsceneSource).not.toContain("fetch('/api/prototypes/create-placeholder',");
   });
 
   it('configures the canvas bridge from the explicit request context', () => {

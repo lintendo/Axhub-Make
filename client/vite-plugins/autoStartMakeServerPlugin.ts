@@ -50,8 +50,6 @@ type MakeServerStatusPayload = {
 let startPromise: Promise<MakeServerStatusPayload> | null = null;
 
 type ReusableAdminOriginOptions = {
-  requireDevMode?: boolean;
-  runtimeOrigin?: string;
   healthTimeoutMs?: number;
 };
 
@@ -150,48 +148,26 @@ export async function getReusableAdminOrigin(
 
   for (const origin of candidates) {
     const health = await fetchHealth(origin, options.healthTimeoutMs ?? DEFAULT_ADMIN_HEALTH_TIMEOUT_MS);
-    if (normalizeHealthServerInfo(health)?.origin && isReusableAdminHealth(health, options)) {
+    if (normalizeHealthServerInfo(health)?.origin && isReusableAdminHealth(health)) {
       return origin;
     }
   }
   return null;
 }
 
-function isReusableAdminHealth(health: unknown, options: ReusableAdminOriginOptions): boolean {
+function isReusableAdminHealth(health: unknown): boolean {
   if (!health || typeof health !== 'object') {
     return false;
   }
-  const payload = health as { role?: unknown; devMode?: unknown };
+  const payload = health as { role?: unknown };
   if (payload.role !== 'admin') {
     return false;
   }
-  if (options.requireDevMode && payload.devMode !== true) {
-    return false;
-  }
-  if (!hasAdminCapability(health, 'reviewReports')) {
-    return false;
-  }
-  return isReusableRuntimeOrigin(health, options);
-}
-
-function isReusableRuntimeOrigin(health: unknown, options: ReusableAdminOriginOptions): boolean {
-  const expectedRuntimeOrigin = normalizeOrigin(options.runtimeOrigin);
-  if (!expectedRuntimeOrigin) {
-    return true;
-  }
-  if (!health || typeof health !== 'object') {
-    return false;
-  }
-  const payload = health as { runtimeOrigin?: unknown };
-  return normalizeOrigin(payload.runtimeOrigin) === expectedRuntimeOrigin;
+  return hasAdminCapability(health, 'reviewReports');
 }
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function shouldRequireDevAdmin(projectRoot: string): boolean {
-  return Boolean(resolveLocalMakeServerCli(projectRoot));
 }
 
 export async function waitForAdminOrigin(
@@ -292,8 +268,7 @@ async function getRegisteredMakeServerStatus(
   }
 
   const adminOrigin = await getReusableAdminOrigin(projectRoot, {
-    requireDevMode: shouldRequireDevAdmin(projectRoot),
-    runtimeOrigin: options.runtimeOrigin,
+    healthTimeoutMs: options.healthTimeoutMs,
   });
   if (!adminOrigin) {
     return createStatusPayload(null);
@@ -331,8 +306,6 @@ export async function startOrReuseMakeServer(
   startPromise = (async () => {
     try {
       const reuseOptions = {
-        requireDevMode: shouldRequireDevAdmin(projectRoot),
-        runtimeOrigin: options.runtimeOrigin,
         healthTimeoutMs: options.healthTimeoutMs,
       };
       const reusableOrigin = await getReusableAdminOrigin(projectRoot, reuseOptions);

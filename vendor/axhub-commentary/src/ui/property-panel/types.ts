@@ -31,6 +31,7 @@ import type {
   WebEditorUiSettings,
 } from '../../core/editor/ui-settings';
 import type {
+  CommentaryAnnotationSaveStatus,
   CommentaryClearEditsOptions,
   CommentaryClearEditsTarget,
   CommentaryHostSurfaceVisibilityControl,
@@ -41,6 +42,7 @@ import type {
   CommentaryHostToolbarStateListener,
   CommentaryToolbarMode,
 } from '../../web-editor-types';
+import type { ReactNode } from 'react';
 
 // =============================================================================
 // Tab Types
@@ -91,11 +93,25 @@ export interface PropertyPanelOptions {
   hasPrototypeComments?: () => boolean;
   /** Clear the current element's related edits, note, and local modifications */
   onClearCurrentElementEdits?: (element: Element) => boolean | Promise<boolean>;
+  /** Read commenter/source metadata for the selected note. */
+  getAiNoteMeta?: (element: Element | null) => {
+    commenterName?: string;
+    commenterColor?: string;
+    readOnly?: boolean;
+  } | null;
+  /** Whether the selected note can be edited. */
+  canEditAiNote?: (element: Element | null) => boolean;
+  /** Whether the selected note can be cleared. */
+  canClearCurrentElementEdits?: (element: Element | null) => boolean;
+  /** Delete one external review entry from the selected element. */
+  onDeleteExternalComment?: (element: Element, commentId: string) => boolean | Promise<boolean>;
   /** Delete the current annotation node and its runtime marker. */
   onDeleteCurrentAnnotationNode?: (element: Element) => void | Promise<void>;
 
   /** Pre-flight check to block Copy Prompt */
   getCopyPromptBlockReason?: () => string | undefined;
+  /** Read the live prompt text so the copy action cannot stay enabled on stale state. */
+  getCopyPromptText?: () => string;
   /** Whether the floating toolbar should render the Copy Prompt action */
   showCopyPromptAction?: boolean;
   /** Whether toolbar chrome is rendered inline or delegated to the host */
@@ -104,6 +120,20 @@ export interface PropertyPanelOptions {
   hideExecutionControls?: boolean;
   /** Hide the current-element send action in the prompt bubble. */
   hideCurrentElementExecutionAction?: boolean;
+  /** Hide the clear-edits action from the built-in toolbar. */
+  hideClearEditsAction?: boolean;
+  /** Hide the toolbar close/minimize action. */
+  hideToolbarCloseAction?: boolean;
+  /** Render only the selection control, host-provided extras, and close control. */
+  compactToolbar?: boolean;
+  /** Host-owned controls rendered inside the built-in toolbar shell. */
+  toolbarExtraContent?: ReactNode;
+  /** Limit settings to visitor-facing controls for an externally shared annotation session. */
+  externalAnnotationMode?: boolean;
+  /** Optional public-review commenter name shown in the existing settings surface. */
+  commenterName?: string;
+  /** Persist a public-review commenter name without coupling Commentary to host storage. */
+  onCommenterNameChange?: (name: string) => void | Promise<void>;
   /** Replace the execution slot with a host-owned surface visibility toggle. */
   hostSurfaceVisibilityControl?: CommentaryHostSurfaceVisibilityControl | null;
   /** Single-line summary for the host-managed AI execution settings. */
@@ -366,6 +396,9 @@ export interface PropertyPanelOptions {
   /** Get current modified/marked element count */
   getModifiedElementCount?: () => number;
 
+  /** Get the current annotation persistence status */
+  getAnnotationSaveStatus?: () => CommentaryAnnotationSaveStatus;
+
   /** Toggle hover/selection visual chrome visibility */
   onSelectionChromeVisibleChange?: (visible: boolean) => void;
 
@@ -405,8 +438,8 @@ export interface PropertyPanel {
   /** Focus note entry using the requested comment mode */
   enterCommentInput?(mode?: CommentEntryMode): void;
 
-  /** Legacy no-op retained for older host integrations. */
-  enterInlineTextEdit?(): void;
+  /** Start inline editing for the selected element or an explicit descendant text target. */
+  enterInlineTextEdit?(element?: HTMLElement | null): void;
 
   /** Read the current host toolbar state */
   getHostToolbarState(): CommentaryHostToolbarState;

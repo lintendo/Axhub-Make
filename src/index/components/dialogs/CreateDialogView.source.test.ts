@@ -176,15 +176,27 @@ describe('CreateDialogView online template library source', () => {
         expect(source).not.toContain('directDisabled = Boolean(template.previewUrl)');
     });
 
-    it('keeps template cover failures as a silent gray placeholder', () => {
+    it('allows each library to choose its direct import button label', () => {
         const cardSource = readTemplateLibraryCardSource();
 
+        expect(cardSource).toContain('directImportLabel?: string;');
+        expect(cardSource).toContain("directImportLabel = '直接导入'");
+        expect(cardSource).toContain('{directImportLabel}');
+    });
+
+    it('keeps templates with missing or failed covers visible with an explicit placeholder', () => {
+        const cardSource = readTemplateLibraryCardSource();
+
+        expect(cardSource).toContain('sourcePath?: string;');
+        expect(cardSource).toContain('coverUrl?: string;');
+        expect(cardSource).toContain('metaLabel?: string;');
         expect(cardSource).toContain('const [coverLoadFailed, setCoverLoadFailed] = React.useState(false);');
         expect(cardSource).toContain('setCoverLoadFailed(false);');
         expect(cardSource).toContain("const shouldRenderCoverImage = Boolean(template.coverUrl) && !coverLoadFailed;");
         expect(cardSource).toContain("className={compact ? 'aspect-[10/7] overflow-hidden rounded border bg-[#edf1f5]' : 'h-[112px] overflow-hidden rounded border bg-[#edf1f5]'}");
         expect(cardSource).toContain('{shouldRenderCoverImage ? (');
         expect(cardSource).toContain('onError={() => setCoverLoadFailed(true)}');
+        expect(cardSource).toContain('暂无封面');
         expect(cardSource).not.toContain('图片加载失败');
         expect(cardSource).not.toContain('封面加载失败');
     });

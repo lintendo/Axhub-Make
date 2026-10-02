@@ -60,7 +60,9 @@ import {
     isLocalNewer,
 } from './canvasLocalCache';
 import {
+    AXHUB_EMBED_ACTIVATE_REQUESTED_EVENT,
     AXHUB_EMBED_ACTIVE_PREVIEW_CHANGED_EVENT,
+    AXHUB_EMBED_EXIT_PREVIEW_EVENT,
     resolveCanvasEmbedPreviewUrl,
     resolveEmbedRenderKind,
     shouldCaptureInitialPrototypePreviewScreenshot,
@@ -78,7 +80,11 @@ import { removeKeyedBackgroundFromDataUrl } from './canvas-embeds/transparentIma
 import { createCanvasBackgroundTransparentImageUpdate } from './canvasBackgroundTransparentInsertion';
 import { copyImageDataUrlToClipboard } from '../../utils/clipboard';
 import { getAiImageTaskStore } from '../../domains/ai-image/aiImageStore';
-import CanvasAiGenerationTool, { type CanvasAiGenerationRequest, type CanvasAiGenerationResult } from '../../domains/ai-generation/CanvasAiGenerationTool';
+import CanvasAiGenerationTool, {
+    type CanvasAiGenerationRequest,
+    type CanvasAiGenerationResult,
+    type CanvasViewportAiCapture,
+} from '../../domains/ai-generation/CanvasAiGenerationTool';
 import { applyGenerationArtifactsToCanvasElements } from '../../domains/ai-generation/canvasArtifactInsertion';
 import { createCanvasDirectRunController, type CanvasDirectRunController } from '../../domains/ai-generation/canvasDirectRun';
 import { appendCanvasGenerationPromptSettings } from '../../domains/ai-generation/canvasGenerationPromptSettings';
@@ -136,6 +142,7 @@ type CanvasResourcePayload = {
     openUrl?: string;
 };
 type CanvasCommandName = 'canvas_get_state'
+    | 'canvas_checkpoint'
     | 'canvas_insert_elements'
     | 'canvas_insert_mermaid'
     | 'canvas_refresh'
@@ -200,7 +207,6 @@ interface ExcalidrawCanvasProps {
     onAnnotationsChange?: (annotations: CanvasElementContextInfo[]) => void;
     onOpenCanvasInIDE?: (canvasFilePath: string) => void | Promise<void>;
     assistantApiBaseUrl?: string;
-    assistantProjectPath?: string;
     preferredIDE?: MainIDEPreference;
     ideAvailability?: IDEAvailabilityMap;
     agentAvailability?: RuntimeAgentAvailability;
@@ -213,6 +219,7 @@ interface ExcalidrawCanvasProps {
     onCloseWebAgentPanel?: () => void;
     onPreferredIDEChange?: (ide: MainIDEPreference) => void;
     onOpenAISettings?: () => void;
+    preferredModel?: string | null;
     preferredPromptClient?: PromptClientPreference;
     prototypes?: ItemData[];
     themes?: ThemeResourceItem[];
@@ -511,6 +518,16 @@ function isCanvasWelcomeAppStateVisible(appState: ReturnType<ExcalidrawAPI['getA
     );
 }
 
+function isPreviewEmbeddableElement(element: any): boolean {
+    return Boolean(
+        element
+        && element.type === 'embeddable'
+        && !element.isDeleted
+        && element.customData?.embedViewMode === 'preview'
+        && (element.link || element.customData?.previewUrl),
+    );
+}
+
 function selectCanvasWelcomeAppStateVisible(appState: ReturnType<ExcalidrawAPI['getAppState']>): boolean {
     return isCanvasWelcomeAppStateVisible(appState);
 }
@@ -794,6 +811,23 @@ async function captureExcalidrawElements(
         height: captureDimensions?.height,
         elementIds: elements.map((element) => element.id),
     };
+}
+
+async function captureExcalidrawViewport(excalidrawAPI: ExcalidrawAPI): Promise<AxhubExcalidrawCaptureResult> {
+    const appState = excalidrawAPI.getAppState();
+    const viewportRect = getCanvasCommandViewportRect(appState);
+    if (viewportRect.width <= 0 || viewportRect.height <= 0) {
+        throw new Error('Canvas viewport is not ready.');
+    }
+    const elements = excalidrawAPI.getSceneElements();
+    return captureExcalidrawElements(excalidrawAPI, [
+        ...getCanvasCommandElementsInRect(elements, viewportRect),
+        createCanvasCommandRectElement(viewportRect, 'viewport-context-rect'),
+    ], {
+        mimeType: 'image/png',
+        exportPadding: 0,
+        maxWidthOrHeight: 1600,
+    });
 }
 
 function createAxhubExcalidrawCaptureApi(excalidrawAPI: ExcalidrawAPI): AxhubExcalidrawCaptureApi {
@@ -1128,7 +1162,7 @@ function resolveCanvasResourceDocPreviewKind(item: ItemData): CanvasDropPreviewK
     return 'none';
 }
 
-function buildCanvasResourcePayloadFromPickerSelection(selection: CanvasProjectResourceItemSelection): CanvasResourcePayload | null {
+function buildCanvasResourcePayloadFromPickerSelection(selection: CanvasProjectResourceItemSelection, projectId: string): CanvasResourcePayload | null {
     const { item, tab } = selection;
     const resourceId = item.resourceId || item.name;
     const displayName = item.displayName || item.name;
@@ -1149,6 +1183,7 @@ function buildCanvasResourcePayloadFromPickerSelection(selection: CanvasProjectR
             openUrl: buildResourceDeepLinkUrl({
                 resourceType: 'doc',
                 resourceId,
+                projectId,
                 collapseSidebar: true,
             }),
         };
@@ -1168,6 +1203,7 @@ function buildCanvasResourcePayloadFromPickerSelection(selection: CanvasProjectR
             openUrl: buildResourceDeepLinkUrl({
                 resourceType: 'theme',
                 resourceId,
+                projectId,
                 collapseSidebar: true,
             }),
         };
@@ -1186,6 +1222,7 @@ function buildCanvasResourcePayloadFromPickerSelection(selection: CanvasProjectR
         openUrl: buildResourceDeepLinkUrl({
             resourceType: 'prototype',
             resourceId,
+            projectId,
             view: 'demo',
             collapseSidebar: true,
         }),
@@ -1241,7 +1278,7 @@ async function insertCanvasResourceSelections({
     scheduleExplicitCanvasSave: () => void;
 }) {
     const payloads = selections
-        .map(buildCanvasResourcePayloadFromPickerSelection)
+        .map((selection) => buildCanvasResourcePayloadFromPickerSelection(selection, projectId))
         .filter((payload): payload is CanvasResourcePayload => Boolean(payload));
     if (payloads.length === 0) return;
 
@@ -1627,13 +1664,13 @@ export default function ExcalidrawCanvas({
     onAddScreenshotToAI,
     onAddImageToAI,
     onAnnotationsChange,
-    assistantProjectPath,
     onOpenAcpWebAgent,
     aiPanelMode,
     onOpenImageAiPanel,
     onCloseAiPanel,
     onCloseWebAgentPanel,
     onOpenAISettings,
+    preferredModel,
     preferredPromptClient,
     themes,
     projectResourceTrees,
@@ -1667,6 +1704,7 @@ export default function ExcalidrawCanvas({
     const bridgeSocketRef = useRef<WebSocket | null>(null);
     const bridgeClientIdRef = useRef<string | null>(null);
     const bridgeDirtyRef = useRef(false);
+    const sceneRevisionRef = useRef<string | null>(null);
     const canvasBridgeCommandHandlerRef = useRef<((msg: CanvasBridgeCommandRequestMessage) => void) | null>(null);
     const applyingRemoteCanvasReloadRef = useRef(false);
     const remoteReloadIgnoreUntilRef = useRef(0);
@@ -1680,6 +1718,9 @@ export default function ExcalidrawCanvas({
     const canvasDirectRunControlledRemovalIdsRef = useRef(new Set<string>());
     const canvasDirectRunRecoveryAppliedKeyRef = useRef('');
     const canvasContainerRef = useRef<HTMLDivElement>(null);
+    const requestedEmbedActivationRef = useRef<string | null>(null);
+    const activePreviewElementIdRef = useRef<string | null>(null);
+    const clearingActiveEmbeddableRef = useRef(false);
     const previousDesktopUiModeRef = useRef(desktopUiMode);
     const aiOpenTargetPath = canvasFilePath || canvasName;
     const imageAiActive = aiPanelMode === 'image-ai';
@@ -1768,6 +1809,136 @@ export default function ExcalidrawCanvas({
         });
         return () => {
             unsubscribeViewBackground?.();
+        };
+    }, [excalidrawAPI]);
+
+    // Keep inactive embeddables in the normal canvas interaction layer. The
+    // patched Excalidraw renderer enables pointer events for active embeds, so
+    // activeEmbeddable is accepted only after the toolbar's explicit request.
+    useEffect(() => {
+        if (!excalidrawAPI) return;
+
+        const dispatchPreviewState = (elementId: string, active: boolean, reason: string) => {
+            window.dispatchEvent(new CustomEvent(AXHUB_EMBED_ACTIVE_PREVIEW_CHANGED_EVENT, {
+                detail: { elementId, active, reason },
+            }));
+        };
+
+        const clearActiveEmbeddable = () => {
+            requestedEmbedActivationRef.current = null;
+            if (clearingActiveEmbeddableRef.current) return;
+            if (!excalidrawAPI.getAppState().activeEmbeddable) return;
+
+            clearingActiveEmbeddableRef.current = true;
+            excalidrawAPI.updateScene({
+                appState: { activeEmbeddable: null },
+                captureUpdate: CaptureUpdateAction.NEVER,
+            });
+            clearingActiveEmbeddableRef.current = false;
+        };
+
+        const handleActivationRequested = (event: Event) => {
+            const detail = (event as CustomEvent).detail;
+            const elementId = typeof detail?.elementId === 'string' ? detail.elementId : null;
+            if (!elementId) return;
+
+            const element = excalidrawAPI.getSceneElements().find((candidate: any) => candidate.id === elementId);
+            if (!isPreviewEmbeddableElement(element)) return;
+
+            requestedEmbedActivationRef.current = elementId;
+            excalidrawAPI.updateScene({
+                appState: {
+                    activeEmbeddable: { element, state: 'active' },
+                    selectedElementIds: { [elementId]: true },
+                    selectedGroupIds: {},
+                },
+                captureUpdate: CaptureUpdateAction.NEVER,
+            });
+        };
+
+        const handleExitPreview = (event: Event) => {
+            const detail = (event as CustomEvent).detail;
+            const elementId = typeof detail?.elementId === 'string' ? detail.elementId : null;
+            if (!elementId) return;
+
+            requestedEmbedActivationRef.current = null;
+            if (excalidrawAPI.getAppState().activeEmbeddable?.element?.id !== elementId) return;
+            clearActiveEmbeddable();
+        };
+
+        const unsubscribeActiveEmbeddable = excalidrawAPI.onStateChange('activeEmbeddable', (activeEmbeddable) => {
+            const activeElementId = activeEmbeddable?.state === 'active'
+                ? activeEmbeddable.element?.id
+                : null;
+            const previousElementId = activePreviewElementIdRef.current;
+
+            if (
+                activeElementId
+                && (
+                    activeElementId === requestedEmbedActivationRef.current
+                    || activeElementId === previousElementId
+                )
+            ) {
+                requestedEmbedActivationRef.current = null;
+                if (isPreviewEmbeddableElement(activeEmbeddable?.element)) {
+                    if (previousElementId && previousElementId !== activeElementId) {
+                        dispatchPreviewState(previousElementId, false, 'switch-preview');
+                    }
+                    activePreviewElementIdRef.current = activeElementId;
+                    if (previousElementId !== activeElementId) {
+                        dispatchPreviewState(activeElementId, true, 'explicit-activation');
+                    }
+                }
+                return;
+            }
+
+            if (activeElementId) {
+                clearActiveEmbeddable();
+                return;
+            }
+
+            if (previousElementId) {
+                activePreviewElementIdRef.current = null;
+                window.dispatchEvent(new CustomEvent(AXHUB_EMBED_EXIT_PREVIEW_EVENT, {
+                    detail: { elementId: previousElementId, reason: 'state-deactivated' },
+                }));
+                dispatchPreviewState(previousElementId, false, 'deactivate');
+            }
+        });
+
+        const unsubscribeActiveTool = excalidrawAPI.onStateChange('activeTool', (activeTool, appState) => {
+            if (activeTool?.type === appState.preferredSelectionTool?.type) return;
+            const activeElementId = appState.activeEmbeddable?.element?.id;
+            if (activeElementId) {
+                window.dispatchEvent(new CustomEvent(AXHUB_EMBED_EXIT_PREVIEW_EVENT, {
+                    detail: { elementId: activeElementId, reason: 'tool-change' },
+                }));
+            }
+        });
+
+        const unsubscribeSelection = excalidrawAPI.onStateChange('selectedElementIds', (selectedElementIds, appState) => {
+            const activeElementId = appState.activeEmbeddable?.element?.id;
+            if (activeElementId && !selectedElementIds?.[activeElementId]) {
+                window.dispatchEvent(new CustomEvent(AXHUB_EMBED_EXIT_PREVIEW_EVENT, {
+                    detail: { elementId: activeElementId, reason: 'selection-change' },
+                }));
+            }
+        });
+
+        window.addEventListener(AXHUB_EMBED_ACTIVATE_REQUESTED_EVENT, handleActivationRequested);
+        window.addEventListener(AXHUB_EMBED_EXIT_PREVIEW_EVENT, handleExitPreview);
+
+        return () => {
+            unsubscribeActiveEmbeddable?.();
+            unsubscribeActiveTool?.();
+            unsubscribeSelection?.();
+            window.removeEventListener(AXHUB_EMBED_ACTIVATE_REQUESTED_EVENT, handleActivationRequested);
+            window.removeEventListener(AXHUB_EMBED_EXIT_PREVIEW_EVENT, handleExitPreview);
+            if (activePreviewElementIdRef.current) {
+                dispatchPreviewState(activePreviewElementIdRef.current, false, 'unmount');
+                activePreviewElementIdRef.current = null;
+            }
+            requestedEmbedActivationRef.current = null;
         };
     }, [excalidrawAPI]);
 
@@ -2020,6 +2191,7 @@ export default function ExcalidrawCanvas({
                 setIsCanvasSceneEmpty(isSceneEmpty(normalizedData?.elements));
                 setCanvasBackgroundDraft(normalizedData?.appState?.viewBackgroundColor || '#ffffff');
                 lastSavedContentRef.current = serverContent;
+                sceneRevisionRef.current = typeof data?.sceneRevision === 'string' ? data.sceneRevision : null;
                 hasLoadedRef.current = true;
                 logCanvasDebug('load:success', {
                     canvasName,
@@ -2076,6 +2248,7 @@ export default function ExcalidrawCanvas({
         if (!response.ok) return;
         const data = await response.json();
         const remoteContent = normalizeCanvasDataForSaveBaseline(data);
+        sceneRevisionRef.current = typeof data?.sceneRevision === 'string' ? data.sceneRevision : sceneRevisionRef.current;
         lastSavedContentRef.current = remoteContent;
         pendingLocalContentRef.current = null;
         if (localSaveTimerRef.current) { clearTimeout(localSaveTimerRef.current); localSaveTimerRef.current = null; }
@@ -2259,6 +2432,10 @@ export default function ExcalidrawCanvas({
             if (!response.ok) {
                 throw new Error(`保存画布失败 (${response.status})`);
             }
+            const savedResponse = await response.json().catch(() => null);
+            sceneRevisionRef.current = typeof savedResponse?.sceneRevision === 'string'
+                ? savedResponse.sceneRevision
+                : sceneRevisionRef.current;
             lastSavedContentRef.current = nextContent;
             pendingLocalContentRef.current = null;
             sendCanvasBridgeStatus(false);
@@ -2339,6 +2516,21 @@ export default function ExcalidrawCanvas({
             void saveToServer(latestElements, appState);
         }, IDLE_SAVE_DELAY_MS);
     }, [excalidrawAPI, saveLocally, scheduleServerSave, saveToServer]);
+
+    const flushExplicitCanvasSave = useCallback(async (elements: readonly any[], appState: any) => {
+        if (localSaveTimerRef.current) { clearTimeout(localSaveTimerRef.current); localSaveTimerRef.current = null; }
+        if (serverSaveTimerRef.current) { clearTimeout(serverSaveTimerRef.current); serverSaveTimerRef.current = null; }
+        if (idleSaveTimerRef.current) { clearTimeout(idleSaveTimerRef.current); idleSaveTimerRef.current = null; }
+        pendingLocalContentRef.current = { elements, appState };
+        sendCanvasBridgeStatus(true);
+        await saveToServer(elements, appState);
+        const deadline = Date.now() + 8_000;
+        while (pendingLocalContentRef.current && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        if (pendingLocalContentRef.current) throw new Error('当前画布尚未保存完成');
+        return sceneRevisionRef.current;
+    }, [saveToServer]);
 
     const updateCanvasDirectRunAnnotationTask = useCallback((
         statusTaskId: string,
@@ -2601,8 +2793,15 @@ export default function ExcalidrawCanvas({
                         payload?.includeElements ? elements : elements.slice(0, 80),
                     ),
                     dirty: Boolean(pendingLocalContentRef.current || bridgeDirtyRef.current),
+                    sceneRevision: sceneRevisionRef.current,
                     saveStatus,
                 };
+            case 'canvas_checkpoint':
+                await handleRefreshCanvasFromServer();
+                if (pendingLocalContentRef.current || bridgeDirtyRef.current) {
+                    throw new Error('当前画布尚未保存完成');
+                }
+                return { sceneRevision: sceneRevisionRef.current, dirty: false };
             case 'canvas_refresh':
                 await handleRefreshCanvasFromServer();
                 return { refreshed: true };
@@ -2626,11 +2825,13 @@ export default function ExcalidrawCanvas({
                                     ...getCanvasCommandElementsInRect(elements, viewportRect),
                                     createCanvasCommandRectElement(viewportRect, 'viewport-rect'),
                                 ];
-                const capture = await captureExcalidrawElements(excalidrawAPI, captureElements, {
-                    mimeType: 'image/png',
-                    exportPadding: scope === 'viewport' || scope === 'rect' ? 0 : 16,
-                    ...(Number.isFinite(payload?.maxWidthOrHeight) ? { maxWidthOrHeight: Number(payload.maxWidthOrHeight) } : {}),
-                });
+                const capture = scope === 'viewport'
+                    ? await captureExcalidrawViewport(excalidrawAPI)
+                    : await captureExcalidrawElements(excalidrawAPI, captureElements, {
+                        mimeType: 'image/png',
+                        exportPadding: scope === 'rect' ? 0 : 16,
+                        ...(Number.isFinite(payload?.maxWidthOrHeight) ? { maxWidthOrHeight: Number(payload.maxWidthOrHeight) } : {}),
+                    });
                 return {
                     dataUrl: capture.dataUrl,
                     width: capture.width,
@@ -2653,9 +2854,10 @@ export default function ExcalidrawCanvas({
                     },
                     captureUpdate: CaptureUpdateAction.IMMEDIATELY,
                 } as any);
-                scheduleExplicitCanvasSave({ elements: nextElements, appState: excalidrawAPI.getAppState() });
+                const resultRevision = await flushExplicitCanvasSave(nextElements, excalidrawAPI.getAppState());
                 return {
                     insertedElementIds: insertedElements.map((element: any) => element.id),
+                    resultRevision,
                 };
             }
             case 'canvas_insert_mermaid': {
@@ -2693,10 +2895,11 @@ export default function ExcalidrawCanvas({
                     fitToContent: true,
                     animate: true,
                 } as any);
-                scheduleExplicitCanvasSave({ elements: nextElements, appState: excalidrawAPI.getAppState() });
+                const resultRevision = await flushExplicitCanvasSave(nextElements, excalidrawAPI.getAppState());
                 return {
                     insertedElementIds: insertedElements.map((element) => element.id),
                     fileIds: Object.keys(files),
+                    resultRevision,
                 };
             }
             case 'canvas_update_elements': {
@@ -2705,9 +2908,10 @@ export default function ExcalidrawCanvas({
                     elements: updateResult.elements as any,
                     captureUpdate: CaptureUpdateAction.IMMEDIATELY,
                 } as any);
-                scheduleExplicitCanvasSave({ elements: updateResult.elements, appState: excalidrawAPI.getAppState() });
+                const resultRevision = await flushExplicitCanvasSave(updateResult.elements, excalidrawAPI.getAppState());
                 return {
                     updatedElementIds: updateResult.updatedElementIds,
+                    resultRevision,
                 };
             }
             case 'canvas_delete_elements': {
@@ -2727,9 +2931,10 @@ export default function ExcalidrawCanvas({
                     elements: nextElements as any,
                     captureUpdate: CaptureUpdateAction.IMMEDIATELY,
                 } as any);
-                scheduleExplicitCanvasSave({ elements: nextElements, appState: excalidrawAPI.getAppState() });
+                const resultRevision = await flushExplicitCanvasSave(nextElements, excalidrawAPI.getAppState());
                 return {
                     deletedElementIds: [...deleteIds],
+                    resultRevision,
                 };
             }
             case 'canvas_focus': {
@@ -2770,8 +2975,8 @@ export default function ExcalidrawCanvas({
         canvasFilePath,
         excalidrawAPI,
         handleRefreshCanvasFromServer,
+        flushExplicitCanvasSave,
         saveStatus,
-        scheduleExplicitCanvasSave,
     ]);
 
     const handleCanvasBridgeCommandRequest = useCallback(async (msg: CanvasBridgeCommandRequestMessage) => {
@@ -2803,12 +3008,39 @@ export default function ExcalidrawCanvas({
 
     useEffect(() => {
         canvasBridgeCommandHandlerRef.current = handleCanvasBridgeCommandRequest;
+        (window as any).__AXHUB_CANVAS_VOICE_COMMAND__ = (
+            command: CanvasCommandName,
+            payload?: Record<string, unknown>,
+        ) => executeCanvasBridgeCommand(command, payload || {});
         return () => {
             if (canvasBridgeCommandHandlerRef.current === handleCanvasBridgeCommandRequest) {
                 canvasBridgeCommandHandlerRef.current = null;
             }
+            if ((window as any).__AXHUB_CANVAS_VOICE_COMMAND__) {
+                (window as any).__AXHUB_CANVAS_VOICE_COMMAND__ = null;
+            }
         };
-    }, [handleCanvasBridgeCommandRequest]);
+    }, [executeCanvasBridgeCommand, handleCanvasBridgeCommandRequest]);
+
+    const captureCurrentCanvasViewport = useCallback(async (): Promise<CanvasViewportAiCapture> => {
+        if (!excalidrawAPI) throw new Error('Canvas API is not ready.');
+        const appState = excalidrawAPI.getAppState();
+        const elements = excalidrawAPI.getSceneElements();
+        if (pendingLocalContentRef.current || bridgeDirtyRef.current) {
+            await saveToServer(elements, appState);
+            if (pendingLocalContentRef.current || bridgeDirtyRef.current) {
+                throw new Error('当前画布尚未保存完成');
+            }
+        }
+        const viewportRect = getCanvasCommandViewportRect(appState);
+        const visibleElements = getCanvasCommandElementsInRect(elements, viewportRect);
+        const capture = await captureExcalidrawViewport(excalidrawAPI);
+        return {
+            dataUrl: capture.dataUrl,
+            viewportRect,
+            visibleElementIds: visibleElements.map((element) => String(element.id)),
+        };
+    }, [excalidrawAPI, saveToServer]);
 
     const handleSubmitCanvasAssistantPromptWithArtifacts = useCallback(async (request: CanvasAiGenerationRequest) => {
         const result = await onSubmitCanvasAssistantPrompt?.(request);
@@ -2818,7 +3050,8 @@ export default function ExcalidrawCanvas({
         const artifacts = typeof result === 'object' && result !== null && Array.isArray(result.artifacts)
             ? result.artifacts
             : [];
-        if (artifacts.length > 0 && excalidrawAPI) {
+        const shouldApplyReturnedArtifacts = request.source !== 'canvas-viewport';
+        if (shouldApplyReturnedArtifacts && artifacts.length > 0 && excalidrawAPI) {
             if (request.statusTaskId) {
                 canvasDirectRunControlledRemovalIdsRef.current.add(request.statusTaskId);
             }
@@ -2966,7 +3199,7 @@ export default function ExcalidrawCanvas({
                     source: 'annotation-prompt-card',
                 },
             }),
-            source: 'canvas-start',
+            source: 'annotation-prompt-card',
             sceneSettings,
             canvasFilePath: canvasPromptPath,
             statusTaskId: statusTask.id,
@@ -3644,6 +3877,7 @@ export default function ExcalidrawCanvas({
             </Excalidraw>
             <TooltipProvider>
                 <div className="axhub-canvas-top-right-capsule">
+                    {onOpenImageAiPanel ? (
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <button
@@ -3661,6 +3895,8 @@ export default function ExcalidrawCanvas({
                             {imageAiActive ? '关闭生图 AI' : '打开生图 AI'}
                         </TooltipContent>
                     </Tooltip>
+                    ) : null}
+                    {onOpenAcpWebAgent ? (
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <button
@@ -3678,6 +3914,7 @@ export default function ExcalidrawCanvas({
                             {generalAiActive ? '关闭对话 AI' : '打开对话 AI'}
                         </TooltipContent>
                     </Tooltip>
+                    ) : null}
                 </div>
             </TooltipProvider>
             {excalidrawAPI && (
@@ -3701,16 +3938,12 @@ export default function ExcalidrawCanvas({
                     />
                     <CanvasAiGenerationTool
                         projectId={activeProjectId}
-                        excalidrawAPI={excalidrawAPI}
+                        captureViewport={captureCurrentCanvasViewport}
                         canvasFilePath={canvasFilePath || canvasName}
-                        assistantProjectPath={assistantProjectPath}
+                        preferredModel={preferredModel}
                         preferredPromptClient={preferredPromptClient}
-                        themes={themes}
-                        defaultThemeName={defaultThemeName}
-                        agentRunConcurrency={agentRunConcurrency}
                         onOpenAISettings={onOpenAISettings}
                         onSubmitCanvasAssistantPrompt={handleSubmitCanvasAssistantPromptWithArtifacts}
-                        canvasDirectRunOverlayController={canvasDirectRunOverlayController}
                     />
                     <CanvasDrawioTool
                         excalidrawAPI={excalidrawAPI}

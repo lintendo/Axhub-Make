@@ -23,6 +23,7 @@ import type { WebEditorUiSettings } from './ui-settings';
 import type { PromptImageAttachment } from './state';
 import type {
   CommentaryCopyPromptContext,
+  CommentaryAnnotationSaveStatus,
   CommentaryClearEditsOptions,
   CommentaryClearEditsTarget,
   CommentaryHostResource,
@@ -171,6 +172,12 @@ export interface EditorChangesService {
     label: string,
   ): import('./state').ElementEditMeta;
   getMetaForElement(element: Element | null): import('./state').ElementEditMeta | null;
+  getCommenterDisplayMeta?: (element: Element | null) => {
+    name: string;
+    color: string;
+    readOnly: boolean;
+    externalComments?: import('../../web-editor-types').PrototypeExternalCommentEntry[];
+  } | null;
   rememberSelectionAnchor(
     element: Element,
     selectionAnchor?: { clientX: number; clientY: number },
@@ -178,7 +185,18 @@ export interface EditorChangesService {
   clearPendingSelectionAnchor(): void;
   renderChangeMarkers(): void;
   syncEditMetaWithTransactions(): void;
-  setNoteForElement(element: Element | null, note: string, options?: { skillIds?: readonly string[] }): void;
+  setNoteForElement(
+    element: Element | null,
+    note: string,
+    options?: {
+      skillIds?: readonly string[];
+      voiceCreateOperationId?: string;
+      voiceTargetRef?: string;
+      voiceTarget?: import('../../web-editor-types').CommentaryPageElementSummary;
+      anchorPlacement?: 'target';
+    },
+  ): string | null;
+  removeExternalCommentForElement(element: Element | null, commentId: string): boolean;
   getImagesForElement(element: Element | null): PromptImageAttachment[];
   setImagesForElement(element: Element | null, images: readonly PromptImageAttachment[]): void;
   recordTweakValuesForElement(
@@ -210,6 +228,7 @@ export interface EditorChangesService {
     label: string;
     note: string;
     changeKinds: import('./state').EditChangeKind[];
+    externalComments?: import('../../web-editor-types').PrototypeExternalCommentEntry[];
     marker: {
       index: number;
       clientX: number;
@@ -246,8 +265,9 @@ export interface EditorPersistenceService {
   getCommentTaskState?(
     elementKey: WebEditorElementKey,
   ): PrototypeEditCommentStatus | null;
-  resetCompletedCommentStateForElement(elementKey: WebEditorElementKey): void;
+  resetTerminalCommentStateForElement(elementKey: WebEditorElementKey): boolean;
   waitForPendingWrites(): Promise<void>;
+  getSaveStatus(): CommentaryAnnotationSaveStatus;
   listEditingConversationTasks(): PersistedConversationTask[];
   transitionConversationTaskTerminal(
     input: ConversationTaskTerminalTransition,
@@ -274,10 +294,15 @@ export interface EditorTextSessionService {
 
 export interface EditorInteractionService {
   handleHover(element: Element | null): void;
+  activatePageTarget(
+    element: Element,
+    selectionAnchor?: { clientX: number; clientY: number },
+  ): boolean;
   handleSelect(
     element: Element,
     modifiers: EventModifiers,
     selectionAnchor?: { clientX: number; clientY: number },
+    initialSelectionElement?: Element,
   ): Promise<void>;
   handleDeselect(): void;
   handlePositionUpdate(rects: TrackedRects): void;

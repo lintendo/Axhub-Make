@@ -164,7 +164,7 @@ describe('buildOnDemand', () => {
     const result = await buildOnDemand(root, path.join(root, 'src', 'entry.tsx'));
 
     expect(result.cssText).toContain('.entry');
-    expect(result.cssText).toMatch(/color:(?:rgb\(12 34 56\)|#0c2238)/);
+    expect(result.cssText).toMatch(/(?:#0c2238|rgb\(12 34 56\))/u);
   });
 
   it('reports when an entry bundles the annotation runtime', async () => {

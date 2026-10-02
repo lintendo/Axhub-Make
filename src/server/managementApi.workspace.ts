@@ -17,6 +17,7 @@ import {
 import { readJsonBody, sendJson } from './http.ts';
 import { runLocalCommand } from './localCommand.ts';
 import type { ManagementApiOptions } from './managementApi.ts';
+import { isResourceAssetSidecarDirectoryName } from './resourceFiles.ts';
 
 interface WorkspaceProjectContext {
   project: RegisteredProject;
@@ -177,12 +178,12 @@ export function buildSystemOpenCommand(
   }
   if (platform === 'win32') {
     return {
-      command: 'powershell.exe',
+      command: 'cmd.exe',
       args: [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        'Invoke-Item -LiteralPath $args[0] -ErrorAction Stop',
+        '/d',
+        '/c',
+        'start',
+        'explorer.exe',
         targetPath,
       ],
     };
@@ -190,9 +191,15 @@ export function buildSystemOpenCommand(
   return { command: 'xdg-open', args: [targetPath] };
 }
 
-export function openPathInSystem(targetPath: string): Promise<void> {
-  const openCommand = buildSystemOpenCommand(targetPath);
-  return runLocalCommand(openCommand.command, openCommand.args, { timeoutMs: 10000 }).then(() => undefined);
+export function openPathInSystem(
+  targetPath: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  const openCommand = buildSystemOpenCommand(targetPath, platform);
+  return runLocalCommand(openCommand.command, openCommand.args, {
+    timeoutMs: 10000,
+    ...(platform === 'win32' ? { detached: true, stdio: 'ignore' as const } : {}),
+  }).then(() => undefined);
 }
 
 function createResourceFolderNodeId(relativePath: string): string {
@@ -216,6 +223,7 @@ function scanResourceSidebarTree(resourceRoot: string, relativePath = ''): Sideb
     const entryRelativePath = normalizePath(path.join(relativePath, entry.name));
     if (isIgnoredResourceRelativePath(entryRelativePath)) continue;
     if (entry.isDirectory()) {
+      if (isResourceAssetSidecarDirectoryName(entry.name)) continue;
       folders.push({
         id: createResourceFolderNodeId(entryRelativePath),
         kind: 'folder',
@@ -238,6 +246,68 @@ function scanResourceSidebarTree(resourceRoot: string, relativePath = ''): Sideb
 
   const byTitle = (a: SidebarTreeNode, b: SidebarTreeNode) => a.title.localeCompare(b.title);
   return [...folders.sort(byTitle), ...files.sort(byTitle)];
+}
+
+function findResourceFolderNode(nodes: SidebarTreeNode[], folderPath: string): SidebarTreeNode | null {
+  for (const node of nodes) {
+    if (node.kind !== 'folder') continue;
+    if (normalizeResourceRelativePath(node.folderPath || node.path) === folderPath) {
+      return node;
+    }
+    const nested = findResourceFolderNode(node.children || [], folderPath);
+    if (nested) {
+      return nested;
+    }
+  }
+  return null;
+}
+
+function ensureResourceFolder(resourceRoot: string, value: unknown): {
+  ok: true;
+  folder: SidebarTreeNode;
+  absolutePath: string;
+  tree: SidebarTreeNode[];
+  created: boolean;
+} | {
+  ok: false;
+  status: number;
+  error: string;
+} {
+  const rawPath = String(value || '').trim();
+  const slashNormalizedPath = rawPath.replace(/\\/g, '/');
+  const rawSegments = slashNormalizedPath.split('/');
+  const folderPath = normalizeResourceRelativePath(rawPath);
+  if (
+    !folderPath
+    || /^[a-zA-Z]:\//u.test(slashNormalizedPath)
+    || slashNormalizedPath.startsWith('//')
+    || rawSegments.some((segment) => !segment || segment === '.' || segment === '..')
+  ) {
+    return { ok: false, status: 400, error: 'Invalid resource folder path' };
+  }
+
+  const absolutePath = resolveResourcePath(resourceRoot, folderPath);
+  if (!absolutePath) {
+    return { ok: false, status: 400, error: 'Invalid resource folder path' };
+  }
+  if (fs.existsSync(absolutePath) && !fs.statSync(absolutePath).isDirectory()) {
+    return { ok: false, status: 409, error: 'Resource folder path is not a directory' };
+  }
+
+  const created = !fs.existsSync(absolutePath);
+  fs.mkdirSync(absolutePath, { recursive: true });
+  const tree = scanResourceSidebarTree(resourceRoot);
+  const folder = findResourceFolderNode(tree, folderPath);
+  if (!folder) {
+    return { ok: false, status: 500, error: 'Resource folder was not found after creation' };
+  }
+  return {
+    ok: true,
+    folder,
+    absolutePath,
+    tree,
+    created,
+  };
 }
 
 function shouldUseFilesystemResourceRoot(
@@ -530,6 +600,21 @@ function createFolderMoveExecutionPlan(operations: ResourceMoveOperation[]): Res
   return plan;
 }
 
+function createResourceAssetMoveOperation(
+  assetRoot: string,
+  resourceRoot: string,
+  operation: ResourceMoveOperation,
+): ResourceMoveOperation | null {
+  const sourceRelativePath = normalizePath(path.relative(resourceRoot, operation.sourcePath));
+  const sourcePath = resolveResourcePath(assetRoot, sourceRelativePath);
+  const targetPath = resolveResourcePath(assetRoot, operation.nextPath);
+  const originalSourcePath = resolveResourcePath(assetRoot, operation.previousPath);
+  if (!sourcePath || !targetPath || !originalSourcePath || !fs.existsSync(originalSourcePath)) {
+    return null;
+  }
+  return { ...operation, sourcePath, targetPath, originalSourcePath };
+}
+
 function applyResourceSidebarTree(resourceRoot: string, payload: {
   tree: SidebarTreeNode[];
   folders: Array<{ previousPath: string; nextPath: string }>;
@@ -609,6 +694,22 @@ function applyResourceSidebarTree(resourceRoot: string, payload: {
     fileOperations.push(operation);
   }
 
+  const assetRoot = path.resolve(resourceRoot, '.assets');
+  const assetFolderOperations: ResourceMoveOperation[] = [];
+  const assetFileOperations: ResourceMoveOperation[] = [];
+  for (const operation of folderOperations) {
+    const assetOperation = createResourceAssetMoveOperation(assetRoot, resourceRoot, operation);
+    if (assetOperation) {
+      assetFolderOperations.push(assetOperation);
+    }
+  }
+  for (const operation of fileOperations) {
+    const assetOperation = createResourceAssetMoveOperation(assetRoot, resourceRoot, operation);
+    if (assetOperation) {
+      assetFileOperations.push(assetOperation);
+    }
+  }
+
   const folderExecutionPlan = createFolderMoveExecutionPlan(folderOperations);
   if (!folderExecutionPlan) {
     return {
@@ -617,7 +718,20 @@ function applyResourceSidebarTree(resourceRoot: string, payload: {
       body: createResourceNameConflictBody(folderOperations[0]?.nextPath || ''),
     };
   }
-  const preflight = preflightResourceMoveOperations([...folderOperations, ...fileOperations]);
+  const assetFolderExecutionPlan = createFolderMoveExecutionPlan(assetFolderOperations);
+  if (!assetFolderExecutionPlan) {
+    return {
+      ok: false,
+      status: 409,
+      body: createResourceNameConflictBody(assetFolderOperations[0]?.nextPath || ''),
+    };
+  }
+  const preflight = preflightResourceMoveOperations([
+    ...folderOperations,
+    ...fileOperations,
+    ...assetFolderOperations,
+    ...assetFileOperations,
+  ]);
   if (preflight.ok === false) {
     return preflight;
   }
@@ -626,6 +740,12 @@ function applyResourceSidebarTree(resourceRoot: string, payload: {
     movePathIfNeeded(operation.sourcePath, operation.targetPath);
   }
   for (const operation of fileOperations) {
+    movePathIfNeeded(operation.sourcePath, operation.targetPath);
+  }
+  for (const operation of assetFolderExecutionPlan) {
+    movePathIfNeeded(operation.sourcePath, operation.targetPath);
+  }
+  for (const operation of assetFileOperations) {
     movePathIfNeeded(operation.sourcePath, operation.targetPath);
   }
 
@@ -1233,6 +1353,29 @@ export function handleWorkspaceApi(
       ];
       sidebarTreeStore.setTree(tab, nextTree);
       sendJson(res, { success: true, tab, version: SIDEBAR_TREE_VERSION, tree: nextTree, createdFolderId }, { status: 201 });
+      return true;
+    }
+    if (req.method === 'PUT') {
+      if (tab !== 'docs' || !shouldUseFilesystemResourceRoot(projectRoot, context.metadata, 'docs')) {
+        sendJson(res, { error: 'Named folders are only supported for filesystem resources' }, { status: 400 });
+        return true;
+      }
+      readJsonBody(req).then((body) => {
+        const result = ensureResourceFolder(getDocsResourceRoot(projectRoot), body?.folderPath);
+        if (result.ok === false) {
+          sendJson(res, { error: result.error }, { status: result.status });
+          return;
+        }
+        sendJson(res, {
+          success: true,
+          tab,
+          version: SIDEBAR_TREE_VERSION,
+          tree: result.tree,
+          folder: result.folder,
+          absolutePath: result.absolutePath,
+          created: result.created,
+        }, { status: result.created ? 201 : 200 });
+      }).catch((error) => sendJson(res, { error: error.message }, { status: 400 }));
       return true;
     }
   }

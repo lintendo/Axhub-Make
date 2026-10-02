@@ -79,7 +79,8 @@ describe('useAssistantPanelController source', () => {
     expect(source).toContain('refreshRuntime({ autoStart: false })');
     expect(source).not.toContain('buildAssistantIframeUrlForRuntime(assistantRuntime, provider)');
     expect(source).not.toContain("searchParams.set('targetPath'");
-    expect(source).not.toContain("url.searchParams.set('provider'");
+    expect(source).toContain("url.searchParams.set('provider', preferredProvider);");
+    expect(source).toContain("url.searchParams.set('model', normalizedPreferredModel);");
     expect(source).not.toContain("url.searchParams.set('context'");
     expect(source).not.toContain("url.searchParams.set('prompt'");
     expect(source).toContain('openAssistantInNewWindowWithUrl(resolvedTargetUrl, targetPath, resolvedRuntime, contextOverride);');
@@ -118,6 +119,47 @@ describe('useAssistantPanelController source', () => {
     expect(source).toContain('setAssistantPanelWidthValue(clampAssistantPanelWidth(nextWidth));');
     expect(source).toContain('assistantPanelMinWidth: Math.min(MIN_ASSISTANT_PANEL_WIDTH, assistantPanelMaxWidth),');
     expect(source).toContain('assistantPanelMaxWidth,');
+  });
+
+  it('opens image AI at half width with a transient resyncable save directory', () => {
+    const source = readFileSync(resolve(__dirname, './useAssistantPanelController.tsx'), 'utf8');
+    const imageOpenStart = source.indexOf('const openImageAiPanel = useCallback');
+    const imageOpenEnd = source.indexOf('const handleOpenImageAiPanelInNewWindow', imageOpenStart);
+    const imageOpenSource = source.slice(imageOpenStart, imageOpenEnd);
+    const imageSyncStart = source.indexOf('const syncAssistantImageGenerationConfigToIframe = useCallback');
+    const imageSyncEnd = source.indexOf('const postAssistantContextToWindowWithRetry', imageSyncStart);
+    const imageSyncSource = source.slice(imageSyncStart, imageSyncEnd);
+
+    expect(source).toContain('imageAiSaveDirectory?: string | null;');
+    expect(source).toContain('imageAiSaveDirectory = null,');
+    expect(source).toContain('const effectiveAssistantImageGenerationConfig = useMemo<AssistantImageGenerationConfig>(() => ({');
+    expect(source).toContain('...(assistantImageGenerationConfig || {}),');
+    expect(source).toContain('...(imageAiSaveDirectory ? { saveDirectory: imageAiSaveDirectory } : {}),');
+    expect(imageSyncSource).toContain('getAcpImageGenerationConfigSignature(effectiveAssistantImageGenerationConfig)');
+    expect(imageSyncSource).toContain('postAssistantImageGenerationConfigToIframeWithRetry(effectiveAssistantImageGenerationConfig)');
+    expect(imageSyncSource).toContain('postAssistantImageGenerationConfigToIframeWithAck(effectiveAssistantImageGenerationConfig)');
+    expect(imageOpenSource).toContain('setAssistantPanelWidthValue(getAssistantPanelMaxWidth());');
+    expect(imageOpenSource.indexOf('setAssistantPanelWidthValue(getAssistantPanelMaxWidth());'))
+      .toBeLessThan(imageOpenSource.indexOf('ensureAssistantReadyThenOpen'));
+    expect(source).toContain('setAssistantPanelWidth,');
+  });
+
+  it('refreshes the host only for origin-checked image save events from the ACP iframe', () => {
+    const source = readFileSync(resolve(__dirname, './useAssistantPanelController.tsx'), 'utf8');
+    const messageHandlerStart = source.indexOf('const handleAssistantIframeRunEvent = (event: MessageEvent) => {');
+    const messageHandlerEnd = source.indexOf("window.addEventListener('message', handleAssistantIframeRunEvent);", messageHandlerStart);
+    const messageHandlerSource = source.slice(messageHandlerStart, messageHandlerEnd);
+
+    expect(source).toContain("import { readAssistantImageSavedEvent, type AssistantImageSavedEvent } from '../assistantImageSavedEvent';");
+    expect(source).toContain('onImageSaved?: (event: AssistantImageSavedEvent) => void;');
+    expect(messageHandlerSource).toContain('const iframeElement = assistantIframePool.getIframe(iframeKey);');
+    expect(messageHandlerSource).toContain('const iframeSrc = iframeEntry?.src || iframeElement?.src;');
+    expect(messageHandlerSource).toContain('if (!iframeSrc) {');
+    expect(messageHandlerSource).not.toContain('if (!iframeEntry) {');
+    expect(messageHandlerSource).toContain('const imageSavedEvent = readAssistantImageSavedEvent(event.data);');
+    expect(messageHandlerSource).toContain('onImageSaved?.(imageSavedEvent);');
+    expect(messageHandlerSource.indexOf('if (event.origin !== expectedOrigin)'))
+      .toBeLessThan(messageHandlerSource.indexOf('const imageSavedEvent = readAssistantImageSavedEvent(event.data);'));
   });
 
   it('keys assistant runtime probing by active project id so cached cwd cannot cross projects', () => {
@@ -503,7 +545,7 @@ describe('useAssistantPanelController source', () => {
     expect(contextAckSource).not.toContain('!assistantAcceptsImageRuntimeConfig');
     expect(imageSyncSource).toContain('!assistantAcceptsImageRuntimeConfig');
     expect(imageSyncSource).not.toContain('!assistantSupportsAcpContext');
-    expect(imageSyncSource).toContain('postAssistantImageGenerationConfigToIframeWithRetry(assistantImageGenerationConfig);');
+    expect(imageSyncSource).toContain('postAssistantImageGenerationConfigToIframeWithRetry(effectiveAssistantImageGenerationConfig);');
     expect(iframeLoadSource).toContain("if (assistantPanelMode === 'image-ai') {");
     expect(iframeLoadSource).toContain('syncAssistantImageGenerationConfigToIframe({');
     expect(iframeLoadSource).toContain('requireLoaded: false,');
@@ -637,10 +679,10 @@ describe('useAssistantPanelController source', () => {
     expect(controllerSource).toContain('const requireVisible = options.requireVisible !== false;');
     expect(controllerSource).toContain('|| (requireVisible && !assistantVisible)');
     expect(controllerSource).toContain('|| (requireLoaded && !assistantIframeLoaded)');
-    expect(controllerSource).toContain('const imageConfigSignature = getAcpImageGenerationConfigSignature(assistantImageGenerationConfig);');
+    expect(controllerSource).toContain('const imageConfigSignature = getAcpImageGenerationConfigSignature(effectiveAssistantImageGenerationConfig);');
     expect(controllerSource).toContain('if (!options.force && assistantImageGenerationConfigSyncSignatureRef.current === imageConfigSignature) {');
     expect(controllerSource).toContain('assistantImageGenerationConfigSyncSignatureRef.current = imageConfigSignature;');
-    expect(controllerSource).toContain('postAssistantImageGenerationConfigToIframeWithRetry(assistantImageGenerationConfig);');
+    expect(controllerSource).toContain('postAssistantImageGenerationConfigToIframeWithRetry(effectiveAssistantImageGenerationConfig);');
     expect(controllerSource).toContain('syncAssistantImageGenerationConfigToIframe();');
     expect(controllerSource).toContain('syncAssistantImageGenerationConfigToIframe({');
     expect(controllerSource).toContain('syncAssistantImageGenerationConfigToIframeWithAck({');
@@ -835,6 +877,17 @@ describe('useAssistantPanelController source', () => {
     expect(source).toContain('connectAssistantRuntimeSilently,');
   });
 
+  it('revalidates a cached assistant runtime before a silent connection', () => {
+    const source = readFileSync(resolve(__dirname, './useAssistantPanelController.tsx'), 'utf8');
+    const connectorSource = source.slice(
+      source.indexOf('const connectAssistantRuntimeSilently = useCallback(async () => {'),
+      source.indexOf('const handleCopyProjectDirectoryForMobile', source.indexOf('const connectAssistantRuntimeSilently = useCallback(async () => {')),
+    );
+
+    expect(connectorSource).not.toContain("if (assistantRuntime?.health.status === 'ready') {");
+    expect(connectorSource).toContain('refreshRuntime({ autoStart: true })');
+  });
+
   it('exposes a comment sync callback and sends comment-only context changes with replace mode', () => {
     const source = readFileSync(resolve(__dirname, './useAssistantPanelController.tsx'), 'utf8');
 
@@ -870,6 +923,17 @@ describe('useAssistantPanelController source', () => {
     expect(itemContextSource).not.toContain("searchParams.set('targetPath'");
     expect(itemContextSource).not.toContain("url.searchParams.set('context'");
     expect(itemContextSource).not.toContain('JSON.stringify');
+  });
+
+  it('allows the compact viewport entry point to preserve the selected target path in a new window', () => {
+    const source = readFileSync(resolve(__dirname, './useAssistantPanelController.tsx'), 'utf8');
+    const entrySource = source.slice(
+      source.indexOf('const handleOpenAssistantInNewWindowNoContext'),
+      source.indexOf('const handleOpenAssistantWithItemContext'),
+    );
+
+    expect(entrySource).toContain('(targetPath?: string)');
+    expect(entrySource).toContain("ensureAssistantReadyThenOpen('button', assistantIframeUrl, targetPath, 'window', null");
   });
 
   it('can restore the assistant panel after a page refresh without submitting a prompt', () => {

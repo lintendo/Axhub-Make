@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
-import { QRCode } from 'antd';
 import {
     ArrowLeft,
     Bot,
@@ -26,7 +25,6 @@ import {
     Copy,
     Link as LinkIcon,
     History,
-    ExternalLink,
     Download,
 
     Settings,
@@ -38,6 +36,7 @@ import {
     PanelsTopLeft,
     Square,
     RefreshCw,
+    MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -66,7 +65,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SidebarTab } from './IconNavigation';
 import { ItemData, SidebarTreeNode, SidebarTreeTab, ViewMode } from '../../types';
-import type { SelectedResourceFolder, UploadedResourceFile } from '../../types/index-page.types';
+import type { PromptExecutionMeta, SelectedResourceFolder, UploadedResourceFile } from '../../types/index-page.types';
 import type { IDEAvailabilityMap, MainIDEPreference } from '../../../common/ide';
 import type { RuntimeAgentAvailability } from '../../../common/agent';
 import type { AcpProvider } from '@/common/assistant-context/types';
@@ -80,8 +79,6 @@ import { getClipboardImageFiles } from '../../domains/shared/clipboardImages';
 import { createSidebarTreeItemLookup, resolveSidebarTreeItem } from '../../utils/sidebarTree';
 import { sidebarApi } from '../../services/sidebar.api';
 import { requireProjectScope, withProjectScope } from '../../services/projectScope';
-import { apiService } from '../../services/api';
-import { buildItemUrl, buildLANItemUrl } from '../../utils/url';
 import { makeClientTemplateMirrorDownloadUrl, makeClientTemplatePrimaryDownloadUrl } from '../../../common/makeClientTemplate';
 import { formatProjectRootDisplayPath } from './projectSwitcherPathDisplay';
 import { copyToClipboard } from '../../utils/clipboard';
@@ -130,6 +127,7 @@ interface ContentPanelProps {
     selectedPrototypePageId?: string | null;
     selectedFolder?: SelectedResourceFolder | null;
     onPrototypePageSelect: (item: ItemData, pageId: string) => void | Promise<void>;
+    onOpenLocalPublishDialog?: (mode: 'html' | 'realtime', targetPath?: string) => void;
     onItemClick: (item: ItemData) => void;
     onFolderClick?: (folder: SidebarTreeNode) => void;
     onSearch: (text: string) => void;
@@ -146,12 +144,14 @@ interface ContentPanelProps {
     preferredIDE: MainIDEPreference;
     ideAvailability?: IDEAvailabilityMap;
     agentAvailability?: RuntimeAgentAvailability;
+    skipLanPreviewAuth?: boolean;
     onOpenAcpWebAgent?: (targetPath?: string, provider?: AcpProvider) => void | Promise<void>;
     onOpenImageAiPanel?: () => void | Promise<void>;
     onOpenWebAgentInPanel?: (url: string) => boolean | void | Promise<boolean | void>;
-    onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+    onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
     webAgentPanelOpen?: boolean;
     aiPanelMode?: 'general-ai' | 'image-ai' | null;
+    externalOpenMenu?: boolean;
     onCloseAiPanel?: () => void;
     onCloseWebAgentPanel?: () => void;
     onPreferredIDEChange?: (ide: MainIDEPreference) => void;
@@ -162,8 +162,7 @@ interface ContentPanelProps {
     handleCopyItemPath: (item: ItemData) => void;
     handleVersionManagement: (item: ItemData) => void;
     handleDeleteItem: (item: ItemData) => void;
-    onSettingsClick: (tab?: 'project' | 'update') => void;
-    onVersionCollaborationClick: () => void;
+    onSettingsClick: (tab?: 'project' | 'update' | 'ai' | 'network') => void;
     onToggleTheme: () => void;
     selectedTheme: ThemeResourceItem | null;
     defaultThemeName?: string | null;
@@ -1051,7 +1050,7 @@ interface ProjectSetupDialogProps {
         projectName?: string;
     }) => Promise<unknown>;
     assistantOpen?: boolean;
-    onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
+    onExecutePrompt?: (prompt: string, meta: PromptExecutionMeta) => Promise<boolean | void> | boolean | void;
 }
 
 function ProjectSetupDialog({
@@ -1715,6 +1714,7 @@ export default function ContentPanel({
     selectedPrototypePageId,
     selectedFolder,
     onPrototypePageSelect,
+    onOpenLocalPublishDialog,
     onItemClick,
     onFolderClick,
     onSearch,
@@ -1737,6 +1737,7 @@ export default function ContentPanel({
     onExecutePrompt,
     webAgentPanelOpen,
     aiPanelMode,
+    externalOpenMenu = true,
     onCloseAiPanel,
     onCloseWebAgentPanel,
     onPreferredIDEChange,
@@ -1748,7 +1749,6 @@ export default function ContentPanel({
     handleVersionManagement,
     handleDeleteItem,
     onSettingsClick,
-    onVersionCollaborationClick,
     onToggleTheme,
     selectedTheme,
     defaultThemeName,
@@ -1796,8 +1796,6 @@ export default function ContentPanel({
     const [makeVersion, setMakeVersion] = useState<string | null>(null);
     const [isFileDropActive, setIsFileDropActive] = useState(false);
     const [isUploadingFiles, setIsUploadingFiles] = useState(false);
-    const [lanTokenUrls, setLanTokenUrls] = useState<Record<string, string>>({});
-    const [lanTokenLoadingKey, setLanTokenLoadingKey] = useState<string | null>(null);
     const [documentPasteTargetFolder, setDocumentPasteTargetFolder] = useState<string | null>(null);
     const fileDropCounterRef = useRef(0);
     const documentPanelRootRef = useRef<HTMLDivElement>(null);
@@ -2047,12 +2045,6 @@ export default function ContentPanel({
             onSettingsClick(makeClientUpdateReminderVisible ? 'update' : 'project');
         }, 0);
     }, [makeClientUpdateReminderVisible, onSettingsClick]);
-    const handleVersionCollaborationMenuSelect = useCallback(() => {
-        window.setTimeout(() => {
-            onVersionCollaborationClick();
-        }, 0);
-    }, [onVersionCollaborationClick]);
-
     useEffect(() => {
         knownFolderIdsRef.current = new Set(collectFolderIds(tree));
     }, [tree]);
@@ -2466,13 +2458,7 @@ export default function ContentPanel({
         const showOpenResourceDirectoryAction = dataTab === 'docs';
         const prototypeLocalBasePath = isPrototypeItem ? getPrototypeLocalBasePath(item) : '';
         const showLocalPathActions = isPrototypeItem ? Boolean(prototypeLocalBasePath) : hasExplicitLocalPath(item);
-        const localShareUrl = buildItemUrl(item, 'demo')?.toString() || '';
-        const lanShareUrl = buildLANItemUrl(item, 'demo');
-        const lanTokenKey = `${activeProjectId || ''}:${item.name}:demo`;
-        const lanTokenUrl = lanTokenUrls[lanTokenKey] || '';
-        const hasShareUrl = Boolean(localShareUrl);
-        const showPrototypeAccessLinks = isPrototypeItem && item.previewDisabled !== true && hasShareUrl;
-        const showLANShareGroup = Boolean(lanShareUrl);
+        const localPublishTargetPath = prototypeLocalBasePath || `prototypes/${item.name}`;
         const canDownloadPrototypeZip = isPrototypeItem && showLocalPathActions && Boolean(handleDownloadItemSource);
         const canDownloadDesignZip = isThemeItem && showLocalPathActions && Boolean(handleDownloadThemeZip);
         const canUseLocalFileOperation = !isPrototypeItem || showLocalPathActions;
@@ -2483,68 +2469,9 @@ export default function ContentPanel({
                 ? resourceWriteCapabilities.prototypeCreate && showLocalPathActions
                 : true;
         const canDeleteItem = canUseLocalFileOperation;
-        const showVersionAction = showLocalPathActions && !isDocItem;
+        const showVersionAction = !isPrototypeItem && showLocalPathActions && !isDocItem;
         const stopRowActivation = (event: { stopPropagation: () => void }) => {
             event.stopPropagation();
-        };
-        const openShareUrl = (url: string) => {
-            if (!url) {
-                toast.warning('当前没有可访问的链接');
-                return;
-            }
-            window.open(url, '_blank', 'noopener,noreferrer');
-        };
-        const copyShareUrl = (url: string, label: string) => {
-            if (!url) {
-                toast.warning('当前没有可访问的链接');
-                return;
-            }
-            void navigator.clipboard.writeText(url).then(() => {
-                toast.success(`${label}已复制`);
-            }).catch(() => {
-                toast.error('复制失败');
-            });
-        };
-        const resolveLanShareUrl = async () => {
-            if (lanTokenUrl) {
-                return lanTokenUrl;
-            }
-            if (!lanShareUrl) {
-                toast.warning('当前没有可访问的局域网链接');
-                return '';
-            }
-            setLanTokenLoadingKey(lanTokenKey);
-            try {
-                const result = await apiService.createLanAccessShareUrl(lanShareUrl);
-                setLanTokenUrls((previous) => ({ ...previous, [lanTokenKey]: result.url }));
-                return result.url;
-            } catch (error: any) {
-                if (error?.code === 'LAN_PASSWORD_NOT_SET') {
-                    toast.warning('请先在设置中设置局域网访问密码');
-                    onSettingsClick('project');
-                } else {
-                    toast.error(error?.message || '生成局域网链接失败');
-                }
-                return '';
-            } finally {
-                setLanTokenLoadingKey((current) => (current === lanTokenKey ? null : current));
-            }
-        };
-        const copyLanShareUrl = async () => {
-            const url = await resolveLanShareUrl();
-            if (!url) return;
-            try {
-                await navigator.clipboard.writeText(url);
-                toast.success('局域网链接已复制');
-            } catch {
-                toast.error('复制失败');
-            }
-        };
-        const openLanShareUrl = async () => {
-            const url = await resolveLanShareUrl();
-            if (url) {
-                window.open(url, '_blank', 'noopener,noreferrer');
-            }
         };
         return (
             <>
@@ -2622,65 +2549,24 @@ export default function ContentPanel({
                         </DropdownMenuItem>
                     </>
                 ) : null}
-                {showPrototypeAccessLinks ? (
+                {isPrototypeItem && onOpenLocalPublishDialog ? (
                     <DropdownMenuSub>
                         <DropdownMenuSubTrigger className="gap-2">
                             <Globe className="mr-2 h-4 w-4" />
-                            访问链接
+                            发布
                         </DropdownMenuSubTrigger>
                         <DropdownMenuSubContent className="w-64 p-1.5">
                             <DropdownMenuLabel className="px-2 py-1 text-[11px] font-normal text-muted-foreground">
-                                本地链接
+                                发布
                             </DropdownMenuLabel>
-                            <DropdownMenuItem disabled={!hasShareUrl} onClick={() => copyShareUrl(localShareUrl, '本地链接')}>
-                                <Copy className="mr-2 h-4 w-4" />
-                                复制本地链接
+                            <DropdownMenuItem onClick={() => onOpenLocalPublishDialog('html', localPublishTargetPath)}>
+                                <Globe className="mr-2 h-4 w-4" />
+                                发布当前版本原型
                             </DropdownMenuItem>
-                            <DropdownMenuItem disabled={!hasShareUrl} onClick={() => openShareUrl(localShareUrl)}>
-                                <ExternalLink className="mr-2 h-4 w-4" />
-                                新窗口打开本地链接
+                            <DropdownMenuItem onClick={() => onOpenLocalPublishDialog('realtime', localPublishTargetPath)}>
+                                <MessageSquare className="mr-2 h-4 w-4" />
+                                发布实时原型
                             </DropdownMenuItem>
-                            {showLANShareGroup ? (
-                                <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuLabel className="px-2 py-1 text-[11px] font-normal text-muted-foreground">
-                                        局域网链接
-                                    </DropdownMenuLabel>
-                                    <DropdownMenuItem disabled={lanTokenLoadingKey === lanTokenKey} onClick={() => void copyLanShareUrl()}>
-                                        <Copy className="mr-2 h-4 w-4" />
-                                        复制局域网链接
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem disabled={lanTokenLoadingKey === lanTokenKey} onClick={() => void openLanShareUrl()}>
-                                        <ExternalLink className="mr-2 h-4 w-4" />
-                                        新窗口打开局域网链接
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <div
-                                        className="flex flex-col items-center gap-2 px-2 py-2"
-                                        onPointerDown={(event) => event.stopPropagation()}
-                                        onClick={(event) => event.stopPropagation()}
-                                    >
-                                        <span className="text-[11px] text-muted-foreground">二维码</span>
-                                        {lanTokenUrl ? (
-                                            <div className="rounded-md border bg-background p-2">
-                                                <QRCode value={lanTokenUrl} size={132} bordered={false} />
-                                            </div>
-                                        ) : (
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-7 gap-1.5"
-                                                disabled={lanTokenLoadingKey === lanTokenKey}
-                                                onClick={() => void resolveLanShareUrl()}
-                                            >
-                                                {lanTokenLoadingKey === lanTokenKey ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                                                生成二维码
-                                            </Button>
-                                        )}
-                                    </div>
-                                </>
-                            ) : null}
                         </DropdownMenuSubContent>
                     </DropdownMenuSub>
                 ) : null}
@@ -3048,6 +2934,13 @@ export default function ContentPanel({
             return <div className="py-8 text-center text-[12px] text-muted-foreground">加载中...</div>;
         }
         if (displayTree.length === 0) {
+            if (dataTab === 'themes' && !searchText.trim()) {
+                return (
+                    <div className="px-4 py-8 text-center text-[12px] leading-5 text-muted-foreground">
+                        暂无内容，创建设计规范，统一原型的视觉与文案风格
+                    </div>
+                );
+            }
             if (dataTab === 'docs' && !searchText.trim()) {
                 return (
                     <div
@@ -3120,14 +3013,18 @@ export default function ContentPanel({
                             <DropdownMenuContent align="start" className="text-sm min-w-[132px]">
                                 <DropdownMenuItem className="relative h-7 gap-2 text-sm" onSelect={handleSettingsMenuSelect}>
                                     <Settings className="h-3.5 w-3.5" />
-                                    设置
+                                    项目设置
                                     {makeClientUpdateReminderVisible ? (
                                         <span aria-label="有项目更新" className="ml-auto h-1.5 w-1.5 rounded-full bg-destructive" />
                                     ) : null}
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="h-7 gap-2 text-sm" onSelect={handleVersionCollaborationMenuSelect}>
-                                    <GitBranch className="h-3.5 w-3.5" />
-                                    版本和协作
+                                <DropdownMenuItem className="h-7 gap-2 text-sm" onSelect={() => onSettingsClick('ai')}>
+                                    <Bot className="h-3.5 w-3.5" />
+                                    AI 设置
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="h-7 gap-2 text-sm" onSelect={() => onSettingsClick('network')}>
+                                    <Globe className="h-3.5 w-3.5" />
+                                    网络设置
                                 </DropdownMenuItem>
                                 <DropdownMenuItem className="h-7 gap-2 text-sm" onClick={onToggleTheme}>
                                     {isDarkMode ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
@@ -3160,8 +3057,9 @@ export default function ContentPanel({
                         </DropdownMenu>
                     </TooltipProvider>
 
-                    <div className="flex items-center gap-1">
-                        <OpenInDropdown
+                    {externalOpenMenu ? (
+                        <div className="flex items-center gap-1">
+                            <OpenInDropdown
                             handleOpenProjectInIDE={handleOpenProjectInIDE}
                             preferredIDE={preferredIDE}
                             activeProjectId={activeProjectId}
@@ -3178,8 +3076,9 @@ export default function ContentPanel({
                             onCloseWebAgentPanel={onCloseWebAgentPanel}
                             onPreferredIDEChange={onPreferredIDEChange}
                             onOpenAISettings={onOpenAISettings}
-                        />
-                    </div>
+                            />
+                        </div>
+                    ) : null}
                 </div>
 
                 <div className="px-2 pb-2">
@@ -3336,7 +3235,7 @@ export default function ContentPanel({
                             value="document"
                             className="h-6 w-auto min-w-[36px] px-2 text-[11px] leading-none whitespace-nowrap rounded-sm bg-transparent hover:bg-muted/50 data-[state=off]:!text-muted-foreground/60 data-[state=off]:hover:!text-muted-foreground data-[state=on]:bg-accent data-[state=on]:!text-foreground data-[state=on]:!font-medium"
                         >
-                            资源
+                            文档
                         </ToggleGroupItem>
                         <ToggleGroupItem
                             value="assets"

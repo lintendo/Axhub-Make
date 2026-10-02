@@ -3,13 +3,14 @@ import http from 'node:http';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createServer as createViteServer, type Plugin, type ViteDevServer } from 'vite';
 
 import { writeServerInfo } from '../scripts/utils/serverInfo.mjs';
 
-import { clientPreviewPlugin } from '../vite-plugins/clientPreviewPlugin';
+import { clientPreviewPlugin, shouldInjectManagementRuntime } from '../vite-plugins/clientPreviewPlugin';
 
 const originalCwd = process.cwd();
 const tempRoots: string[] = [];
@@ -209,6 +210,151 @@ async function listenPreviewViteServer(server: ViteDevServer) {
 }
 
 describe('client preview routes', () => {
+  it('injects the existing management runtime for published annotation sessions', () => {
+    expect(shouldInjectManagementRuntime(
+      '/prototypes/home?annotationSession=1&publishedShareId=share-review',
+    )).toBe(true);
+    expect(shouldInjectManagementRuntime(
+      '/prototypes/home?annotationSession=1',
+    )).toBe(false);
+    expect(shouldInjectManagementRuntime(
+      '/prototypes/home?publishedShareId=share-review',
+    )).toBe(false);
+    expect(shouldInjectManagementRuntime('/prototypes/home')).toBe(false);
+  });
+
+  it('keeps git-version snapshots read-only even when the toolbar flag is manually added', () => {
+    expect(shouldInjectManagementRuntime(
+      '/prototypes/home?gitVersion=abc123&agentToolbar=host',
+    )).toBe(false);
+    expect(shouldInjectManagementRuntime(
+      '/prototypes/home?gitVersion=abc123&annotationSession=1&publishedShareId=share-review',
+    )).toBe(false);
+  });
+
+  it('handles local text editing API requests inside the client preview runtime', async () => {
+    const projectRoot = createFixtureProject();
+    process.chdir(projectRoot);
+    const server = await createPreviewViteServer(projectRoot);
+    const origin = await listenPreviewViteServer(server);
+
+    const response = await originalFetch(`${origin}/api/text-replace/count`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: 'prototypes/home',
+        replacements: [{ searchText: 'Home' }],
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      totalCount: 1,
+    });
+  });
+
+  it('applies LAN preview authorization before local editing API requests', async () => {
+    const projectRoot = createFixtureProject();
+    globalThis.fetch = vi.fn(async () => ({
+      ok: false,
+      json: async () => ({}),
+    })) as any;
+    process.chdir(projectRoot);
+    const server = await createPreviewViteServer(projectRoot);
+    const origin = await listenPreviewViteServer(server);
+
+    const response = await originalFetch(`${origin}/api/text-replace/count`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': '192.168.1.42',
+      },
+      body: JSON.stringify({
+        path: 'prototypes/home',
+        replacements: [{ searchText: 'Home' }],
+      }),
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.text()).toContain('无法连接 Make 管理端');
+  });
+
+  it('does not trust a forged local forwarded address from a remote editing client', async () => {
+    const projectRoot = createFixtureProject();
+    globalThis.fetch = vi.fn(async () => ({
+      ok: false,
+      json: async () => ({}),
+    })) as any;
+    process.chdir(projectRoot);
+    const plugin = clientPreviewPlugin();
+    const { server, getMiddleware } = createMockPreviewServer();
+    const configureServer = plugin.configureServer;
+    if (typeof configureServer === 'function') {
+      await configureServer(server as any);
+    } else {
+      await configureServer?.handler(server as any);
+    }
+
+    const requestBody = JSON.stringify({
+      path: 'prototypes/home',
+      replacements: [{ searchText: 'Home' }],
+    });
+    const req = Object.assign(Readable.from([requestBody]), {
+      method: 'POST',
+      url: '/api/text-replace/count',
+      headers: {
+        host: '192.168.1.79:51720',
+        'content-type': 'application/json',
+        'content-length': String(Buffer.byteLength(requestBody)),
+        'x-forwarded-for': '127.0.0.1',
+      },
+      socket: { remoteAddress: '192.168.1.42' },
+    });
+    const res = { statusCode: 0, setHeader: vi.fn(), end: vi.fn() };
+    const next = vi.fn();
+
+    await getMiddleware()(req, res, next);
+    await vi.waitFor(() => expect(res.end).toHaveBeenCalled());
+
+    expect(res.statusCode).toBe(503);
+    expect(String(res.end.mock.calls[0]?.[0] || '')).toContain('无法连接 Make 管理端');
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('loads persisted hack.css after style.css only while the file exists', async () => {
+    const projectRoot = createFixtureProject();
+    const hackCssPath = path.join(projectRoot, 'src/prototypes/home/hack.css');
+    writeFile(hackCssPath, '.home { color: blue; }\n');
+    process.chdir(projectRoot);
+    const plugin = clientPreviewPlugin();
+    const { server, getMiddleware } = createMockPreviewServer();
+    const configureServer = plugin.configureServer;
+    if (typeof configureServer === 'function') {
+      await configureServer(server as any);
+    } else {
+      await configureServer?.handler(server as any);
+    }
+
+    const renderPreview = async () => {
+      const req = { method: 'GET', url: '/prototypes/home', headers: {} };
+      const res = { statusCode: 0, setHeader: vi.fn(), end: vi.fn() };
+      const next = vi.fn();
+      await getMiddleware()(req, res, next);
+      expect(next).not.toHaveBeenCalled();
+      return res.end.mock.calls[0]?.[0] as string;
+    };
+
+    const htmlWithHack = await renderPreview();
+    expect(htmlWithHack).toContain('href="/prototypes/home/hack.css"');
+    expect(htmlWithHack.indexOf('/prototypes/home/style.css'))
+      .toBeLessThan(htmlWithHack.indexOf('/prototypes/home/hack.css'));
+
+    fs.unlinkSync(hackCssPath);
+    const htmlWithoutHack = await renderPreview();
+    expect(htmlWithoutHack).not.toContain('/prototypes/home/hack.css');
+  });
+
   it('uses a stable .html transform URL for virtual prototype previews', async () => {
     const projectRoot = createFixtureProject();
     stubAdminHealth(['http://localhost:5174']);
@@ -412,12 +558,12 @@ describe('client preview routes', () => {
     const fetchCalls: string[] = [];
     vi.spyOn(os, 'networkInterfaces').mockReturnValue({
       en0: [{
-        address: '192.168.31.79',
+        address: '192.168.1.79',
         netmask: '255.255.255.0',
         family: 'IPv4',
         mac: '00:00:00:00:00:00',
         internal: false,
-        cidr: '192.168.31.79/24',
+        cidr: '192.168.1.79/24',
       }],
     } as any);
     globalThis.fetch = vi.fn(async (input: any) => {
@@ -437,7 +583,7 @@ describe('client preview routes', () => {
 
     const response = await originalFetch(`${origin}/prototypes/home`, {
       headers: {
-        host: '192.168.31.79:51720',
+        host: '192.168.1.79:51720',
       },
     });
     const html = await response.text();
@@ -920,10 +1066,11 @@ describe('client preview routes', () => {
     const server = await createPreviewViteServer(projectRoot);
     const origin = await listenPreviewViteServer(server);
 
-    const loaderResponse = await originalFetch(`${origin}/prototypes/home/__axhub-preview-loader.js?projectId=make-project&gitVersion=abc12345&gitPath=src%2Fprototypes%2Fhome`);
+    const loaderResponse = await originalFetch(`${origin}/prototypes/home/__axhub-preview-loader.js?projectId=make-project&publishedShareId=share-a&gitVersion=abc12345&gitPath=src%2Fprototypes%2Fhome`);
     const loaderCode = await loaderResponse.text();
     const entryUrl = loaderCode.match(/import PreviewComponent from "([^"]+)"/u)?.[1] || '';
     expect(entryUrl).toContain('/.git-versions/abc12345/src/prototypes/home/index.tsx?projectId=make-project');
+    expect(entryUrl).toContain('&publishedShareId=share-a');
 
     const entryResponse = await originalFetch(new URL(entryUrl, origin), {
       headers: {
@@ -1066,7 +1213,7 @@ describe('client preview routes', () => {
 
   it('does not inject management runtimes into a direct network preview with an admin referer', async () => {
     const projectRoot = createFixtureProject();
-    stubAdminHealth(['http://192.168.31.79:5174'], { acceptSessionToken: 'valid-client-session' });
+    stubAdminHealth(['http://192.168.1.79:5174'], { acceptSessionToken: 'valid-client-session' });
     writeServerInfo(projectRoot, 'admin', {
       pid: 12345,
       port: 5174,
@@ -1082,9 +1229,9 @@ describe('client preview routes', () => {
       method: 'GET',
       url: '/prototypes/home',
       headers: {
-        host: '192.168.31.79:51720',
+        host: '192.168.1.79:51720',
         cookie: 'axhub_lan_auth=valid-client-session',
-        referer: 'http://192.168.31.79:5174/?projectId=make-project',
+        referer: 'http://192.168.1.79:5174/?projectId=make-project',
       },
     };
     const res = {
@@ -1312,8 +1459,8 @@ describe('client preview routes', () => {
       url: '/prototypes/home/style.css',
       headers: {
         accept: '*/*',
-        origin: 'http://192.168.31.79:51720',
-        referer: 'http://192.168.31.79:51720/prototypes/home/index.tsx',
+        origin: 'http://192.168.1.79:51720',
+        referer: 'http://192.168.1.79:51720/prototypes/home/index.tsx',
       },
     };
     const res = {
@@ -1345,8 +1492,8 @@ describe('client preview routes', () => {
       url: '/prototypes/home/style.css',
       headers: {
         accept: '*/*',
-        origin: 'http://192.168.31.79:51720',
-        referer: 'http://192.168.31.79:51720/prototypes/home',
+        origin: 'http://192.168.1.79:51720',
+        referer: 'http://192.168.1.79:51720/prototypes/home',
       },
     };
     const res = {
@@ -1378,7 +1525,7 @@ describe('client preview routes', () => {
       url: '/prototypes/home/style.css',
       headers: {
         accept: '*/*',
-        referer: 'http://192.168.31.79:51720/prototypes/home',
+        referer: 'http://192.168.1.79:51720/prototypes/home',
       },
     };
     const res = {

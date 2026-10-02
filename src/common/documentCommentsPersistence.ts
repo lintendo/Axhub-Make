@@ -4,37 +4,18 @@ import type {
   PrototypeEditCommentsPersistenceAdapter,
   PrototypeEditCommentsPersistenceScope,
 } from '@axhub/commentary';
+import { buildMakeServerApiUrl } from './makeServerOrigin';
 
 export type DocumentCommentContext = {
   projectId: string;
   documentPath: string;
+  makeServerOrigin?: string;
   commentFilePath?: string;
   commentAssetRoot?: string;
 };
 
 function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
-}
-
-function normalizeOrigin(value: unknown): string {
-  const raw = normalizeString(value);
-  if (!raw) return '';
-  try {
-    return new URL(raw).origin.replace(/\/+$/u, '');
-  } catch {
-    return '';
-  }
-}
-
-async function resolveApiOrigin(): Promise<string> {
-  try {
-    const response = await fetch('/__axhub/make-server/status', { method: 'GET' });
-    if (!response.ok) return '';
-    const payload = await response.json().catch(() => null) as { adminOrigin?: unknown } | null;
-    return normalizeOrigin(payload?.adminOrigin);
-  } catch {
-    return '';
-  }
 }
 
 function resolveScopeContext(
@@ -79,8 +60,6 @@ export function createDocumentCommentsPersistenceScope(
 export function createDocumentCommentsPersistenceAdapter(
   getContext: () => DocumentCommentContext | null,
 ): PrototypeEditCommentsPersistenceAdapter {
-  let cachedApiOrigin = '';
-
   const resolveRequestUrl = async (
     scope: PrototypeEditCommentsPersistenceScope,
     extraSearchParams: Record<string, string> = {},
@@ -92,9 +71,11 @@ export function createDocumentCommentsPersistenceAdapter(
       projectId: context.projectId,
       ...extraSearchParams,
     });
-    const relativePath = `/api/document-comments?${params.toString()}`;
-    if (!cachedApiOrigin) cachedApiOrigin = await resolveApiOrigin();
-    return cachedApiOrigin ? new URL(relativePath, cachedApiOrigin).toString() : relativePath;
+    return buildMakeServerApiUrl(
+      context.makeServerOrigin || '',
+      '/api/document-comments',
+      params,
+    );
   };
 
   return {
@@ -112,8 +93,15 @@ export function createDocumentCommentsPersistenceAdapter(
       return payload?.exists && payload.document ? payload.document : null;
     },
     async write(scope, document, reason, context) {
+      if (!resolveScopeContext(getContext, scope)) {
+        throw new Error('Document comment context is unavailable');
+      }
       const url = await resolveRequestUrl(scope);
-      if (!url) throw new Error('Document comment context is unavailable');
+      if (!url) {
+        throw new Error(
+          'Make server origin is unavailable; standalone previews do not support comments.',
+        );
+      }
       const response = await fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

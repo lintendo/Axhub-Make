@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PRD 06｜指标阅读</title>
+  <style>
+    :root { color-scheme: light; font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif; color: #111; background: #fff; }
+    * { box-sizing: border-box; }
+    body { max-width: 760px; margin: 0 auto; padding: 24px 20px 44px; font-size: 14px; line-height: 1.65; }
+    header { border-bottom: 1px solid #d4d4d2; padding-bottom: 20px; }
+    .eyebrow { margin: 0 0 10px; color: #002fa7; font: 700 11px/1.4 monospace; }
+    h1 { margin: 0 0 12px; font-size: 26px; line-height: 1.25; }
+    h2 { margin: 0 0 12px; font-size: 18px; line-height: 1.35; }
+    p { margin: 0 0 12px; }
+    section { padding: 24px 0; border-bottom: 1px solid #d4d4d2; scroll-margin-top: 16px; }
+    nav { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 18px; }
+    a { color: #002fa7; text-underline-offset: 3px; }
+    a:focus-visible { outline: 2px solid #002fa7; outline-offset: 3px; }
+    .chart { margin: 18px 0 10px; border-top: 2px solid #111; border-bottom: 1px solid #d4d4d2; padding: 18px 0 8px; }
+    canvas { display: block; width: 100%; height: 160px; }
+    .chart-labels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 12px; text-align: center; }
+    .chart-labels strong { display: block; color: #002fa7; font-size: 17px; }
+    ul { padding-left: 20px; margin: 0; }
+    li + li { margin-top: 8px; }
+    @media (max-width: 480px) { h1 { font-size: 22px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">PRD 06 / METRICS</p>
+    <h1>指标阅读</h1>
+    <p>转化率卡片同时呈现数值、状态和判断依据，便于评审时核对不同业务分支。</p>
+    <nav aria-label="文章导航">
+      <a href="#metric-rules">查看判断规则</a>
+      <a href="#axhub-target:state-metric-card">定位原型指标卡</a>
+      <a href="./prd-03-states.md">返回状态 PRD</a>
+    </nav>
+  </header>
+
+  <section aria-labelledby="metric-range">
+    <h2 id="metric-range">1. 指标区间</h2>
+    <p>示例以 68% 作为常态读数，并保留偏低与偏高两种分支。图表使用相同刻度，避免不同状态下的视觉比较失真。</p>
+    <div class="chart">
+      <canvas id="metric-chart" role="img" aria-label="转化率示例：偏低 32%，正常 68%，偏高 92%">32%、68%、92% 三档转化率。</canvas>
+      <div class="chart-labels" aria-hidden="true">
+        <span>偏低<strong>32%</strong></span>
+        <span>正常<strong>68%</strong></span>
+        <span>偏高<strong>92%</strong></span>
+      </div>
+    </div>
+  </section>
+
+  <section id="metric-rules" aria-labelledby="metric-rules-title">
+    <h2 id="metric-rules-title">2. 判断规则</h2>
+    <ul>
+      <li>偏低状态提示与目标的差距，并给出需要排查的方向。</li>
+      <li>正常状态保留业务语义，不用警示颜色放大普通波动。</li>
+      <li>偏高状态说明峰值原因，避免只显示一个看似积极的数字。</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="metric-acceptance">
+    <h2 id="metric-acceptance">3. 验收关注</h2>
+    <p>切换卡片状态后，数值、趋势描述与标注中的判断依据应保持一致。评审者可从上方链接直接回到原型核对。</p>
+  </section>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById('metric-chart');
+      const context = canvas.getContext('2d');
+      if (!context) return;
+      const values = [32, 68, 92];
+      const colors = ['#d97706', '#002fa7', '#059669'];
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const duration = reduceMotion ? 0 : 600;
+      let start = 0;
+
+      const draw = (progress) => {
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        const ratio = window.devicePixelRatio || 1;
+        canvas.width = Math.max(1, Math.round(width * ratio));
+        canvas.height = Math.max(1, Math.round(height * ratio));
+        context.scale(ratio, ratio);
+        context.clearRect(0, 0, width, height);
+        context.fillStyle = '#e8e8e6';
+        context.fillRect(0, height - 1, width, 1);
+        values.forEach((value, index) => {
+          const barWidth = Math.min(54, width / 6);
+          const x = ((index + 0.5) * width / 3) - barWidth / 2;
+          const barHeight = (height - 16) * value / 100 * progress;
+          context.fillStyle = colors[index];
+          context.fillRect(x, height - barHeight - 1, barWidth, barHeight);
+        });
+      };
+
+      const animate = (time) => {
+        if (!start) start = time;
+        const progress = duration ? Math.min(1, (time - start) / duration) : 1;
+        draw(progress);
+        if (progress < 1) requestAnimationFrame(animate);
+      };
+      requestAnimationFrame(animate);
+    })();
+  </script>
+</body>
+</html>

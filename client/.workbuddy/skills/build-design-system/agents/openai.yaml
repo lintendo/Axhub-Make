@@ -1,0 +1,4 @@
+interface:
+  display_name: "构建设计系统"
+  short_description: "从产品要求和多种设计来源规划并完成 Axhub Make 主题"
+  default_prompt: "使用 $build-design-system 基于当前要求和来源创建或更新设计系统，并完成一期主题产物。"

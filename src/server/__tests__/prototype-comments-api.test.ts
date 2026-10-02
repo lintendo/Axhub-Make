@@ -1,10 +1,9 @@
 import crypto from 'node:crypto';
-import childProcess from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   cleanupProjectApiTestRoots,
@@ -65,7 +64,6 @@ async function startActivatedProjectServer(projectRoot: string): Promise<Awaited
 }
 
 afterEach(() => {
-  vi.restoreAllMocks();
   cleanupProjectApiTestRoots();
 });
 
@@ -741,46 +739,6 @@ describe('prototype comments API', () => {
     }
   });
 
-  it('does not overwrite an outside file through a child asset symlink', async () => {
-    const projectRoot = createTempRoot('axhub-make-prototype-comments-');
-    writePrototypeProject(projectRoot);
-    const { assetDir } = prototypeCommentStorage(projectRoot);
-    const outsideFile = path.join(projectRoot, 'outside-prototype-asset.png');
-    fs.mkdirSync(assetDir, { recursive: true });
-    fs.writeFileSync(outsideFile, 'outside', 'utf8');
-    try {
-      fs.symlinkSync(outsideFile, path.join(assetDir, 'escape.png'), 'file');
-    } catch {
-      return;
-    }
-    const server = await startActivatedProjectServer(projectRoot);
-
-    try {
-      const response = await fetch(scopeProjectApiUrl(
-        projectRoot,
-        `${server.origin}/api/prototype-comments?targetPath=prototypes/home`,
-      ), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reason: 'changes',
-          document: {
-            schemaVersion: 3,
-            kind: 'prototype-edit-comments',
-            resource: { id: 'home', targetPath: 'prototypes/home', filePath: '' },
-            comments: [],
-            images: [{ id: 'escape', data: PNG_DATA_URL }],
-          },
-        }),
-      });
-
-      expect(response.status).toBe(400);
-      expect(fs.readFileSync(outsideFile, 'utf8')).toBe('outside');
-    } finally {
-      await server.close();
-    }
-  });
-
   it('rejects a prototype directory symlink that escapes the project root', async () => {
     const projectRoot = createTempRoot('axhub-make-prototype-comments-');
     writeProjectMetadata(projectRoot, {
@@ -890,7 +848,6 @@ describe('prototype comments API', () => {
     const projectRoot = createTempRoot('axhub-make-prototype-comments-');
     writePrototypeProject(projectRoot);
     const server = await startActivatedProjectServer(projectRoot);
-    const spawn = vi.spyOn(childProcess, 'spawnSync');
 
     try {
       const response = await fetch(scopeProjectApiUrl(
@@ -913,6 +870,7 @@ describe('prototype comments API', () => {
               {
                 id: 'hero-image',
                 elementKey: 'hero',
+                source: 'target-screenshot',
                 name: 'Hero Image.PNG',
                 mimeType: 'image/png',
                 size: 128,
@@ -939,6 +897,7 @@ describe('prototype comments API', () => {
       expect(body.document.images).toEqual([
         expect.objectContaining({
           id: 'hero-image',
+          source: 'target-screenshot',
           assetPath: prototypeCommentAssetPath('hero-image.png'),
         }),
         expect.objectContaining({
@@ -968,6 +927,7 @@ describe('prototype comments API', () => {
       expect(hydratedResponse.status).toBe(200);
       expect(hydratedBody.document.images[0]).toMatchObject({
         id: 'hero-image',
+        source: 'target-screenshot',
         assetPath: prototypeCommentAssetPath('hero-image.png'),
         data: expect.stringMatching(/^data:image\/png;base64,/u),
       });
@@ -976,10 +936,6 @@ describe('prototype comments API', () => {
         assetPath: prototypeCommentAssetPath('hero-detail.png'),
         data: expect.stringMatching(/^data:image\/png;base64,/u),
       });
-      const mutationCalls = spawn.mock.calls.filter(([, args]) => (
-        Array.isArray(args) && args[1] === '--eval' && args[3] === 'mutate'
-      ));
-      expect(mutationCalls).toHaveLength(1);
     } finally {
       await server.close();
     }

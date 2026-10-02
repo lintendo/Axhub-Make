@@ -179,6 +179,21 @@ function writeMakeClientPackage(projectRoot: string, version?: string) {
   });
 }
 
+function writeRegistryRoutingMakeClientPackage(projectRoot: string) {
+  writeJson(path.join(projectRoot, 'package.json'), {
+    scripts: {
+      dev: 'vite',
+      'metadata:sync': 'node scripts/sync-project-metadata.mjs',
+    },
+    dependencies: {
+      '@axhub/annotation': '^1.0.18',
+    },
+    devDependencies: {
+      vite: '5.4.21',
+    },
+  });
+}
+
 function writeInstalledMakeClientDependencies(projectRoot: string) {
   const binDir = path.join(projectRoot, 'node_modules', '.bin');
   fs.mkdirSync(binDir, { recursive: true });
@@ -213,84 +228,29 @@ function writeMakeClientMetadata(projectRoot: string, id = 'make-client-a', name
   }, { makeClientMarker: false });
 }
 
-function writeMakeClientTemplate(
-  templateRoot: string,
-  options: { packageContent?: string; includeResourceTemplates?: boolean } = {},
-) {
-  if (options.packageContent !== undefined) {
-    fs.mkdirSync(templateRoot, { recursive: true });
-    fs.writeFileSync(path.join(templateRoot, 'package.json'), options.packageContent, 'utf8');
-  } else {
-    writeJson(path.join(templateRoot, 'package.json'), {
-      name: '@axhub/make-client',
-      version: DEFAULT_TEMPLATE_VERSION,
-      scripts: {
-        dev: 'vite',
-        'metadata:sync': 'node scripts/sync-project-metadata.mjs',
-        build: 'vite build',
-      },
-      dependencies: {
-        shared: '2.0.0',
-        moved: '2.0.0',
-        'official-runtime': '1.0.0',
-      },
-      devDependencies: {
-        'official-tool': '1.0.0',
-      },
-    });
-  }
+function writeMakeClientTemplate(templateRoot: string) {
+  writeJson(path.join(templateRoot, 'package.json'), {
+    name: '@axhub/make-client',
+    version: DEFAULT_TEMPLATE_VERSION,
+    scripts: {
+      dev: 'vite',
+      'metadata:sync': 'node scripts/sync-project-metadata.mjs',
+    },
+  });
   fs.mkdirSync(path.join(templateRoot, 'scripts'), { recursive: true });
   fs.writeFileSync(path.join(templateRoot, 'scripts', 'sync-project-metadata.mjs'), 'export {};\n', 'utf8');
+  fs.mkdirSync(path.join(templateRoot, 'templates'), { recursive: true });
+  fs.writeFileSync(path.join(templateRoot, 'templates', 'prd.md'), '# Official PRD\n', 'utf8');
+  fs.writeFileSync(path.join(templateRoot, 'templates', 'prototype-spec.md'), '# Official Markdown Spec\n', 'utf8');
+  fs.writeFileSync(path.join(templateRoot, 'templates', 'prototype-spec.html'), '<html><body>Official HTML Spec</body></html>\n', 'utf8');
+  fs.writeFileSync(path.join(templateRoot, 'templates', 'prototype-review.md'), '# Official Prototype Review\n', 'utf8');
+  fs.writeFileSync(path.join(templateRoot, 'templates', 'ui-review.md'), '# Official UI Review\n', 'utf8');
   fs.mkdirSync(path.join(templateRoot, 'src', 'prototypes', 'template-home'), { recursive: true });
   fs.writeFileSync(path.join(templateRoot, 'src', 'prototypes', 'template-home', 'index.tsx'), 'export default function TemplateHome() { return null; }\n', 'utf8');
   fs.mkdirSync(path.join(templateRoot, 'src', 'prototypes', 'beginner-guide'), { recursive: true });
   fs.writeFileSync(path.join(templateRoot, 'src', 'prototypes', 'beginner-guide', 'index.tsx'), 'export default function BeginnerGuide() { return "updated"; }\n', 'utf8');
   fs.mkdirSync(path.join(templateRoot, 'src', 'prototypes', 'annotation-demo'), { recursive: true });
   fs.writeFileSync(path.join(templateRoot, 'src', 'prototypes', 'annotation-demo', 'index.tsx'), 'export default function AnnotationDemo() { return "updated"; }\n', 'utf8');
-  if (options.includeResourceTemplates) {
-    fs.mkdirSync(path.join(templateRoot, 'src', 'resources', 'templates'), { recursive: true });
-    fs.writeFileSync(
-      path.join(templateRoot, 'src', 'resources', 'templates', 'prd-template.md'),
-      '# Official PRD template\n',
-      'utf8',
-    );
-    fs.writeFileSync(
-      path.join(templateRoot, 'src', 'resources', 'templates', 'prd-comprehensive-template.md'),
-      '# Official comprehensive PRD template\n',
-      'utf8',
-    );
-    fs.writeFileSync(
-      path.join(templateRoot, 'src', 'resources', 'templates', 'prototype-review-report-template.md'),
-      '# Official prototype review template\n',
-      'utf8',
-    );
-    fs.writeFileSync(
-      path.join(templateRoot, 'src', 'resources', 'templates', 'ui-review-report-template.md'),
-      '# Official UI review template\n',
-      'utf8',
-    );
-    fs.writeFileSync(
-      path.join(templateRoot, 'src', 'resources', 'templates', '规格文档 HTML 模板.html'),
-      '<!doctype html>\n',
-      'utf8',
-    );
-    fs.writeFileSync(
-      path.join(templateRoot, 'src', 'resources', 'templates', '规格文档 Markdown 模板.md'),
-      '# Official specification template\n',
-      'utf8',
-    );
-    fs.writeFileSync(
-      path.join(templateRoot, 'src', 'resources', 'templates', 'prd-linked-template.md'),
-      '# Official linked PRD template\n',
-      'utf8',
-    );
-    fs.mkdirSync(path.join(templateRoot, 'src', 'resources', 'templates', 'research'), { recursive: true });
-    fs.writeFileSync(
-      path.join(templateRoot, 'src', 'resources', 'templates', 'research', 'discovery.md'),
-      '# Official discovery template\n',
-      'utf8',
-    );
-  }
   writeJson(getMakeClientMarkerPath(templateRoot), {
     schemaVersion: 1,
     kind: 'axhub-make-client',
@@ -371,7 +331,7 @@ function writeStaleMakeClientRuntimePlugins(projectRoot: string) {
   fs.writeFileSync(path.join(projectRoot, 'vite-plugins', 'utils', 'moduleSpecifierQuery.ts'), 'export const stale = true;\n', 'utf8');
 }
 
-function createMakeClientTemplateZip(options: { unsafeEntry?: string; packageContent?: string; includeResourceTemplates?: boolean } = {}) {
+function createMakeClientTemplateZip(options: { unsafeEntry?: string } = {}) {
   const sourceRoot = createTempRoot('axhub-make-template-zip-source-');
   const zipRoot = createTempRoot('axhub-make-template-zip-file-');
   if (options.unsafeEntry) {
@@ -381,13 +341,7 @@ function createMakeClientTemplateZip(options: { unsafeEntry?: string; packageCon
     execFileSync('zip', ['-q', zipPath, options.unsafeEntry], { cwd: path.join(sourceRoot, 'nested') });
     return fs.readFileSync(zipPath);
   }
-  writeMakeClientTemplate(
-    path.join(sourceRoot, 'axhub-make-client-template'),
-    {
-      ...(options.packageContent !== undefined ? { packageContent: options.packageContent } : {}),
-      ...(options.includeResourceTemplates ? { includeResourceTemplates: true } : {}),
-    },
-  );
+  writeMakeClientTemplate(path.join(sourceRoot, 'axhub-make-client-template'));
   const zipPath = path.join(zipRoot, 'axhub-make-client-template.zip');
   createZipFromDirectory(sourceRoot, zipPath);
   return fs.readFileSync(zipPath);
@@ -419,24 +373,48 @@ function createOnlineTemplateManifest(version = ONLINE_TEMPLATE_VERSION) {
 function installRemoteTemplateFetchMock(options: {
   failPrimary?: boolean;
   failMirror?: boolean;
-  failOnlinePrimary?: boolean;
-  failOnlineMirror?: boolean;
+  failPrimaryProbe?: boolean;
+  failMirrorProbe?: boolean;
   manifest?: Record<string, unknown>;
   failManifest?: boolean;
   unsafePrimaryZipEntry?: string;
+  invalidPrimaryZip?: boolean;
+  invalidMirrorZip?: boolean;
   customTemplateUrl?: string;
-  packageContent?: string;
-  includeResourceTemplates?: boolean;
+  primaryDelayMs?: number;
+  mirrorDelayMs?: number;
+  primaryProbeDelayMs?: number;
+  mirrorProbeDelayMs?: number;
 } = {}) {
-  const primaryZip = createMakeClientTemplateZip({
-    ...(options.unsafePrimaryZipEntry ? { unsafeEntry: options.unsafePrimaryZipEntry } : {}),
-    ...(options.packageContent !== undefined ? { packageContent: options.packageContent } : {}),
-    ...(options.includeResourceTemplates ? { includeResourceTemplates: true } : {}),
-  });
-  const mirrorZip = createMakeClientTemplateZip();
+  const primaryZip = options.invalidPrimaryZip
+    ? new Uint8Array([0, 1, 2])
+    : createMakeClientTemplateZip(
+      options.unsafePrimaryZipEntry ? { unsafeEntry: options.unsafePrimaryZipEntry } : {},
+    );
+  const mirrorZip = options.invalidMirrorZip ? new Uint8Array([0, 1, 2]) : createMakeClientTemplateZip();
   const originalFetch = globalThis.fetch;
+  const templateProbeState = {
+    mirrorStartedBeforePrimaryFinished: false,
+    primaryFinished: false,
+  };
+  const waitForDelay = (delayMs: number, signal?: AbortSignal | null) => new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('The operation was aborted', 'AbortError'));
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timeout);
+      reject(new DOMException('The operation was aborted', 'AbortError'));
+    };
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, delayMs);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    const method = String(init?.method || 'GET').toUpperCase();
     if (url === TEMPLATE_MANIFEST_URL || url === TEMPLATE_MANIFEST_MIRROR_URL) {
       if (options.failManifest || !options.manifest) {
         return new Response('Template manifest unavailable', { status: 503 });
@@ -448,44 +426,140 @@ function installRemoteTemplateFetchMock(options: {
     if (options.customTemplateUrl && url === options.customTemplateUrl) {
       return new Response(primaryZip, { headers: { 'Content-Type': 'application/zip' } });
     }
-    if (url === TEMPLATE_ZIP_URL) {
+    if (url === TEMPLATE_ZIP_URL || url === ONLINE_TEMPLATE_ZIP_URL) {
+      if (method === 'HEAD') {
+        await waitForDelay(options.primaryProbeDelayMs ?? 0, init?.signal);
+        templateProbeState.primaryFinished = true;
+        return new Response(null, { status: options.failPrimaryProbe ? 503 : 200 });
+      }
+      await waitForDelay(options.primaryDelayMs ?? 0, init?.signal);
       if (options.failPrimary) {
         return new Response('Primary template zip unavailable', { status: 503 });
       }
       return new Response(primaryZip, { headers: { 'Content-Type': 'application/zip' } });
     }
-    if (url === ONLINE_TEMPLATE_ZIP_URL) {
-      if (options.failPrimary || options.failOnlinePrimary) {
-        return new Response('Online primary template zip unavailable', { status: 503 });
+    if (url === TEMPLATE_MIRROR_ZIP_URL || url === ONLINE_TEMPLATE_MIRROR_ZIP_URL) {
+      if (method === 'HEAD') {
+        templateProbeState.mirrorStartedBeforePrimaryFinished = !templateProbeState.primaryFinished;
+        await waitForDelay(options.mirrorProbeDelayMs ?? 0, init?.signal);
+        return new Response(null, { status: options.failMirrorProbe ? 503 : 200 });
       }
-      return new Response(primaryZip, { headers: { 'Content-Type': 'application/zip' } });
-    }
-    if (url === TEMPLATE_MIRROR_ZIP_URL) {
+      await waitForDelay(options.mirrorDelayMs ?? 1, init?.signal);
       if (options.failMirror) {
         return new Response('Mirror template zip unavailable', { status: 503 });
       }
       return new Response(mirrorZip, { headers: { 'Content-Type': 'application/zip' } });
     }
-    if (url === ONLINE_TEMPLATE_MIRROR_ZIP_URL) {
-      if (options.failMirror || options.failOnlineMirror) {
-        return new Response('Online mirror template zip unavailable', { status: 503 });
-      }
-      return new Response(mirrorZip, { headers: { 'Content-Type': 'application/zip' } });
-    }
     return originalFetch(input, init);
+  });
+  Object.assign(fetchMock, { templateProbeState });
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+function templateZipFetchCalls(fetchMock: ReturnType<typeof vi.fn>) {
+  return fetchMock.mock.calls
+    .map(([url, init]: [RequestInfo | URL, RequestInit | undefined]) => ({
+      method: String(init?.method || 'GET').toUpperCase(),
+      url: String(url),
+    }))
+    .filter(({ url }) => [TEMPLATE_ZIP_URL, TEMPLATE_MIRROR_ZIP_URL, ONLINE_TEMPLATE_ZIP_URL, ONLINE_TEMPLATE_MIRROR_ZIP_URL].includes(url));
+}
+
+function installNpmRegistryFetchMock(options: {
+  npmjsDelayMs?: number;
+  npmmirrorDelayMs?: number;
+} = {}) {
+  vi.stubEnv('NPM_CONFIG_REGISTRY', '');
+  vi.stubEnv('npm_config_registry', '');
+  const previousFetch = globalThis.fetch;
+  let mirrorResponses = 0;
+  let releaseOfficialProbe!: () => void;
+  const mirrorProbeComplete = new Promise<void>((resolve) => { releaseOfficialProbe = resolve; });
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const isNpmjs = url.startsWith('https://registry.npmjs.org/');
+    const isNpmmirror = url.startsWith('https://registry.npmmirror.com/');
+    if (!isNpmjs && !isNpmmirror) {
+      return previousFetch(input, init);
+    }
+    if (isNpmjs) await mirrorProbeComplete;
+    const delayMs = isNpmjs ? options.npmjsDelayMs ?? 200 : options.npmmirrorDelayMs ?? 1;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    if (isNpmmirror && ++mirrorResponses === 3) releaseOfficialProbe();
+    if (url.endsWith('/-/ping')) {
+      return new Response('{}', { headers: { 'Content-Type': 'application/json' } });
+    }
+    const version = url.includes('%40axhub%2Fannotation') ? '1.0.18' : '5.4.21';
+    return new Response(JSON.stringify({ version }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
   });
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
 }
 
+function installRuntimeSpawnMock(port: number) {
+  childProcessMock.spawn.mockImplementation((_file: string, _args: string[], options: { cwd?: string }) => {
+    const targetRoot = String(options.cwd || '');
+    writeServerInfo(targetRoot, 'runtime', {
+      pid: process.pid,
+      port,
+      host: 'localhost',
+      origin: `http://localhost:${port}`,
+      projectRoot: targetRoot,
+      startedAt: new Date().toISOString(),
+    });
+    const child = {
+      once: vi.fn((event: string, callback: (...args: any[]) => void) => {
+        if (event === 'spawn') {
+          setTimeout(callback, 0);
+        }
+        return child;
+      }),
+      unref: vi.fn(),
+    };
+    return child;
+  });
+}
+
+async function registerAndEnsureMakeClient(defaultRoot: string, projectRoot: string, projectId: string) {
+  const server = await startTestServer(defaultRoot);
+  try {
+    const registerResponse = await fetch(`${server.origin}/api/projects/make/register-existing`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ root: projectRoot }),
+    });
+    expect(registerResponse.status).toBe(201);
+    const ensureResponse = await fetch(`${server.origin}/api/projects/${projectId}/dev/ensure`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timeoutMs: 50, pollIntervalMs: 5 }),
+    });
+    return {
+      body: await ensureResponse.json(),
+      status: ensureResponse.status,
+    };
+  } finally {
+    await server.close();
+  }
+}
+
 function installRemoteTemplateCommandMock(options: {
   failPrimary?: boolean;
   failMirror?: boolean;
-  failOnlinePrimary?: boolean;
-  failOnlineMirror?: boolean;
+  failPrimaryProbe?: boolean;
+  failMirrorProbe?: boolean;
   manifest?: Record<string, unknown>;
   unsafePrimaryZipEntry?: string;
+  invalidPrimaryZip?: boolean;
+  invalidMirrorZip?: boolean;
   customTemplateUrl?: string;
+  primaryDelayMs?: number;
+  mirrorDelayMs?: number;
+  primaryProbeDelayMs?: number;
+  mirrorProbeDelayMs?: number;
   metadataId?: string;
   metadataName?: string;
 } = {}) {
@@ -1445,6 +1519,7 @@ describe('make-server make client project APIs', () => {
       });
       const ensureBody = await ensureResponse.json();
       const previewPluginSource = fs.readFileSync(path.join(projectRoot, 'vite-plugins', 'clientPreviewPlugin.ts'), 'utf8');
+      const localEditingApiSource = fs.readFileSync(path.join(projectRoot, 'vite-plugins', 'localEditingApi.ts'), 'utf8');
       const hotUpdateFilterSource = fs.readFileSync(path.join(projectRoot, 'vite-plugins', 'canvasHotUpdateFilter.ts'), 'utf8');
       const moduleSpecifierSource = fs.readFileSync(path.join(projectRoot, 'vite-plugins', 'utils', 'moduleSpecifierQuery.ts'), 'utf8');
 
@@ -1459,6 +1534,7 @@ describe('make-server make client project APIs', () => {
       expect(previewPluginSource).toContain('appendPreviewLoaderSearchParams');
       expect(previewPluginSource).not.toContain('annotationVersion');
       expect(previewPluginSource).not.toContain('createPreviewLoaderVersionSearchParam');
+      expect(localEditingApiSource).toContain('handleLocalEditingApi');
       expect(hotUpdateFilterSource).toContain('ANNOTATION_SOURCE_FILE_NAME');
       expect(hotUpdateFilterSource).toContain('filterCanvasUpdatePayload');
       expect(hotUpdateFilterSource).toContain('invalidateHotUpdateModules');
@@ -1732,6 +1808,137 @@ describe('make-server make client project APIs', () => {
     } finally {
       await server.close();
     }
+  });
+
+  it('uses npmmirror for npm registry routing when required package probes are faster', async () => {
+    const defaultRoot = createTempRoot();
+    writeProjectMetadata(defaultRoot);
+    const projectRoot = createTempRoot('axhub-make-client-registry-routing-');
+    writeMakeClientMarker(projectRoot, 'registry-routing-client', 'Registry Routing Client');
+    writeRegistryRoutingMakeClientPackage(projectRoot);
+    writeMakeClientMetadata(projectRoot, 'registry-routing-client', 'Registry Routing Client');
+    installNpmRegistryFetchMock();
+    runLocalCommandMock.mockImplementation(async (command: string, args: string[]) => {
+      if ((command === 'npm' || command === 'npm.cmd') && args.join(' ') === 'config get registry') {
+        return { ...localCommandResult(command, args), stdout: 'https://registry.npmjs.org/\n' };
+      }
+      if ((command === 'npm' || command === 'npm.cmd') && args[0] === 'install') {
+        writeInstalledMakeClientDependencies(projectRoot);
+      }
+      return localCommandResult(command, args);
+    });
+    installRuntimeSpawnMock(51735);
+
+    const result = await registerAndEnsureMakeClient(defaultRoot, projectRoot, 'registry-routing-client');
+
+    expect(result).toMatchObject({ status: 200, body: { success: true } });
+    expect(runLocalCommandMock).toHaveBeenCalledWith(
+      process.platform === 'win32' ? 'npm.cmd' : 'npm',
+      ['install', '--include=dev', '--registry=https://registry.npmmirror.com'],
+      expect.objectContaining({ cwd: projectRoot }),
+    );
+    expect(runLocalCommandMock).not.toHaveBeenCalledWith('pnpm', expect.any(Array), expect.any(Object));
+  });
+
+  it('preserves a configured npm registry in the dependency install workflow', async () => {
+    const defaultRoot = createTempRoot();
+    writeProjectMetadata(defaultRoot);
+    const projectRoot = createTempRoot('axhub-make-client-configured-registry-');
+    writeMakeClientMarker(projectRoot, 'configured-registry-client', 'Configured Registry Client');
+    writeRegistryRoutingMakeClientPackage(projectRoot);
+    writeMakeClientMetadata(projectRoot, 'configured-registry-client', 'Configured Registry Client');
+    const registryFetchMock = installNpmRegistryFetchMock();
+    runLocalCommandMock.mockImplementation(async (command: string, args: string[]) => {
+      if ((command === 'npm' || command === 'npm.cmd') && args.join(' ') === 'config get registry') {
+        return { ...localCommandResult(command, args), stdout: 'https://packages.example.test/\n' };
+      }
+      if ((command === 'npm' || command === 'npm.cmd') && args[0] === 'install') {
+        writeInstalledMakeClientDependencies(projectRoot);
+      }
+      return localCommandResult(command, args);
+    });
+    installRuntimeSpawnMock(51740);
+
+    const result = await registerAndEnsureMakeClient(defaultRoot, projectRoot, 'configured-registry-client');
+
+    expect(result).toMatchObject({ status: 200, body: { success: true } });
+    expect(runLocalCommandMock).toHaveBeenCalledWith(
+      process.platform === 'win32' ? 'npm.cmd' : 'npm',
+      ['install', '--include=dev'],
+      expect.objectContaining({ cwd: projectRoot }),
+    );
+    expect(runLocalCommandMock.mock.calls.some(([, args]) => args.some((arg) => arg.startsWith('--registry=')))).toBe(false);
+    expect(registryFetchMock.mock.calls.some(([url]) => String(url).startsWith('https://registry.'))).toBe(false);
+  });
+
+  it('retries an automatic npm registry route once when npmmirror has a network failure', async () => {
+    const defaultRoot = createTempRoot();
+    writeProjectMetadata(defaultRoot);
+    const projectRoot = createTempRoot('axhub-make-client-registry-retry-');
+    writeMakeClientMarker(projectRoot, 'registry-retry-client', 'Registry Retry Client');
+    writeRegistryRoutingMakeClientPackage(projectRoot);
+    writeMakeClientMetadata(projectRoot, 'registry-retry-client', 'Registry Retry Client');
+    installNpmRegistryFetchMock();
+    runLocalCommandMock.mockImplementation(async (command: string, args: string[]) => {
+      if ((command === 'npm' || command === 'npm.cmd') && args.join(' ') === 'config get registry') {
+        return { ...localCommandResult(command, args), stdout: 'https://registry.npmjs.org/\n' };
+      }
+      if ((command === 'npm' || command === 'npm.cmd') && args[0] === 'install') {
+        if (args.includes('--registry=https://registry.npmmirror.com')) {
+          throw Object.assign(new Error('request timed out'), { code: 'ETIMEDOUT' });
+        }
+        if (args.includes('--registry=https://registry.npmjs.org')) {
+          writeInstalledMakeClientDependencies(projectRoot);
+        }
+      }
+      return localCommandResult(command, args);
+    });
+    installRuntimeSpawnMock(51736);
+
+    const result = await registerAndEnsureMakeClient(defaultRoot, projectRoot, 'registry-retry-client');
+
+    expect(result).toMatchObject({ status: 200, body: { success: true } });
+    const installCalls = runLocalCommandMock.mock.calls.filter(([, args]) => args[0] === 'install');
+    expect(installCalls.map(([, args]) => args)).toEqual([
+      ['install', '--include=dev', '--registry=https://registry.npmmirror.com'],
+      ['install', '--include=dev', '--registry=https://registry.npmjs.org'],
+    ]);
+  });
+
+  it('keeps the selected registry when npm falls back to pnpm after a semantic error', async () => {
+    const defaultRoot = createTempRoot();
+    writeProjectMetadata(defaultRoot);
+    const projectRoot = createTempRoot('axhub-make-client-registry-pnpm-');
+    writeMakeClientMarker(projectRoot, 'registry-pnpm-client', 'Registry PNPM Client');
+    writeRegistryRoutingMakeClientPackage(projectRoot);
+    writeMakeClientMetadata(projectRoot, 'registry-pnpm-client', 'Registry PNPM Client');
+    installNpmRegistryFetchMock();
+    runLocalCommandMock.mockImplementation(async (command: string, args: string[]) => {
+      if ((command === 'npm' || command === 'npm.cmd') && args.join(' ') === 'config get registry') {
+        return { ...localCommandResult(command, args), stdout: 'https://registry.npmjs.org/\n' };
+      }
+      if ((command === 'npm' || command === 'npm.cmd') && args[0] === 'install') {
+        throw Object.assign(new Error('unable to resolve dependency tree'), { code: 'ERESOLVE' });
+      }
+      if (command === 'pnpm' && args[0] === 'install') {
+        writeInstalledMakeClientDependencies(projectRoot);
+      }
+      return localCommandResult(command, args);
+    });
+    installRuntimeSpawnMock(51737);
+
+    const result = await registerAndEnsureMakeClient(defaultRoot, projectRoot, 'registry-pnpm-client');
+
+    expect(result).toMatchObject({ status: 200, body: { success: true } });
+    const installCalls = runLocalCommandMock.mock.calls.filter(([, args]) => args[0] === 'install');
+    expect(installCalls.map(([command, args]) => [command, args])).toEqual([
+      [process.platform === 'win32' ? 'npm.cmd' : 'npm', [
+        'install',
+        '--include=dev',
+        '--registry=https://registry.npmmirror.com',
+      ]],
+      ['pnpm', ['install', '--prod=false', '--registry=https://registry.npmmirror.com']],
+    ]);
   });
 
   it('retries npm install with legacy peer deps when npm arborist crashes', async () => {
@@ -2337,10 +2544,8 @@ describe('make-server make client project APIs', () => {
     writeMakeClientMarker(projectRoot, 'existing-client', 'Existing Client');
     writeMakeClientPackage(projectRoot);
     writeMakeClientMetadata(projectRoot, 'existing-client', 'Existing Client');
-    const serverRegistryHome = createTempRoot('axhub-make-client-server-home-');
-    const runtimeRegistryHome = createTempRoot('axhub-make-client-runtime-home-');
-    const server = await startTestServer(defaultRoot, serverRegistryHome);
-    const runtimeServer = await startTestServer(projectRoot, runtimeRegistryHome);
+    const server = await startTestServer(defaultRoot);
+    const runtimeServer = await startTestServer(projectRoot);
 
     try {
       writeServerInfo(projectRoot, 'runtime', {
@@ -2380,7 +2585,8 @@ describe('make-server make client project APIs', () => {
           origin: runtimeServer.origin,
         },
       });
-      expect(fs.existsSync(getAdminServerInfoPath(projectRoot, { homeDir: serverRegistryHome }))).toBe(true);
+      const context = await fetch(`${server.origin}/api/admin/context`).then((response) => response.json());
+      expect(fs.existsSync(context.admin.infoPath)).toBe(true);
 
       const activeResponse = await fetch(`${server.origin}/api/projects/active`, {
         method: 'PUT',
@@ -2647,14 +2853,11 @@ describe('make-server make client project APIs', () => {
         expect.any(Array),
         expect.any(Object),
       );
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        TEMPLATE_ZIP_URL,
-        expect.objectContaining({ signal: expect.any(AbortSignal) }),
-      );
-      expect(globalThis.fetch).not.toHaveBeenCalledWith(
-        TEMPLATE_MIRROR_ZIP_URL,
-        expect.any(Object),
-      );
+      expect(templateZipFetchCalls(globalThis.fetch as any)).toEqual(expect.arrayContaining([
+        expect.objectContaining({ url: TEMPLATE_ZIP_URL, method: 'HEAD' }),
+        expect.objectContaining({ url: TEMPLATE_MIRROR_ZIP_URL, method: 'HEAD' }),
+        expect.objectContaining({ url: TEMPLATE_ZIP_URL, method: 'GET' }),
+      ]));
       expect(runLocalCommandMock).toHaveBeenCalledWith(
         process.platform === 'win32' ? 'npm.cmd' : 'npm',
         ['install', '--include=dev'],
@@ -2739,78 +2942,14 @@ describe('make-server make client project APIs', () => {
         TEMPLATE_MANIFEST_URL,
         expect.objectContaining({ signal: expect.any(AbortSignal) }),
       );
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        ONLINE_TEMPLATE_ZIP_URL,
-        expect.objectContaining({ signal: expect.any(AbortSignal) }),
-      );
-      expect(globalThis.fetch).not.toHaveBeenCalledWith(
-        TEMPLATE_ZIP_URL,
-        expect.any(Object),
-      );
-    } finally {
-      await server.close();
-    }
-  });
-
-  it('falls back to the bundled template when online latest zips fail', async () => {
-    const defaultRoot = createTempRoot();
-    writeProjectMetadata(defaultRoot);
-    const parentRoot = createTempRoot('axhub-make-online-fallback-parent-');
-    const registryHome = createTempRoot('axhub-make-projects-api-home-');
-    const server = await startTestServer(defaultRoot, registryHome);
-
-    installRemoteTemplateCommandMock({
-      manifest: createOnlineTemplateManifest(),
-      failOnlinePrimary: true,
-      failOnlineMirror: true,
-      metadataId: 'bundled-fallback-client',
-      metadataName: 'Bundled Fallback Client',
-    });
-    childProcessMock.spawn.mockImplementation((_file: string, _args: string[], options: { cwd?: string }) => {
-      const targetRoot = String(options.cwd || '');
-      writeMakeClientMetadata(targetRoot, 'bundled-fallback-client', 'Bundled Fallback Client');
-      writeServerInfo(targetRoot, 'runtime', {
-        pid: process.pid,
-        port: 51724,
-        host: 'localhost',
-        origin: 'http://localhost:51724',
-        projectRoot: targetRoot,
-        startedAt: new Date().toISOString(),
-      });
-      const child = {
-        once: vi.fn((event: string, callback: (...args: any[]) => void) => {
-          if (event === 'spawn') {
-            setTimeout(callback, 0);
-          }
-          return child;
-        }),
-        unref: vi.fn(),
-      };
-      return child;
-    });
-
-    try {
-      const response = await fetch(`${server.origin}/api/projects/make/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          parentRoot,
-          folderName: 'bundled-fallback-client',
-          projectName: 'Bundled Fallback Client',
-        }),
-      });
-      expect(response.status).toBe(201);
-      const targetRoot = path.join(parentRoot, 'bundled-fallback-client');
-      const marker = JSON.parse(fs.readFileSync(getMakeClientMarkerPath(targetRoot), 'utf8'));
-
-      expect(marker).toMatchObject({
-        repository: TEMPLATE_SOURCE_URL,
-        templateUrl: TEMPLATE_ZIP_URL,
-        templateVersion: DEFAULT_TEMPLATE_VERSION,
-      });
-      expect(globalThis.fetch).toHaveBeenCalledWith(ONLINE_TEMPLATE_ZIP_URL, expect.any(Object));
-      expect(globalThis.fetch).toHaveBeenCalledWith(ONLINE_TEMPLATE_MIRROR_ZIP_URL, expect.any(Object));
-      expect(globalThis.fetch).toHaveBeenCalledWith(TEMPLATE_ZIP_URL, expect.any(Object));
+      expect(templateZipFetchCalls(globalThis.fetch as any)).toEqual(expect.arrayContaining([
+        expect.objectContaining({ url: ONLINE_TEMPLATE_ZIP_URL, method: 'HEAD' }),
+        expect.objectContaining({ url: ONLINE_TEMPLATE_MIRROR_ZIP_URL, method: 'HEAD' }),
+        expect.objectContaining({ url: ONLINE_TEMPLATE_ZIP_URL, method: 'GET' }),
+      ]));
+      expect(templateZipFetchCalls(globalThis.fetch as any)).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ url: TEMPLATE_ZIP_URL }),
+      ]));
     } finally {
       await server.close();
     }
@@ -3491,7 +3630,97 @@ describe('make-server make client project APIs', () => {
     }
   });
 
-  it('uses AXHUB_MAKE_CLIENT_TEMPLATE_URL as the only template source', async () => {
+  it('template source probes both remotes and sends the first full GET only to preferred GitHub', async () => {
+    const defaultRoot = createTempRoot();
+    writeProjectMetadata(defaultRoot);
+    const parentRoot = createTempRoot('axhub-make-fast-template-parent-');
+    const server = await startTestServer(defaultRoot);
+    const fetchMock = installRemoteTemplateFetchMock({
+      primaryProbeDelayMs: 75,
+      mirrorProbeDelayMs: 0,
+    });
+    runLocalCommandMock.mockImplementation(async (command: string, args: string[], commandOptions: any) => {
+      if ((command === 'pnpm' || command === 'npm' || command === 'npm.cmd') && args[0] === 'install') {
+        writeInstalledMakeClientDependencies(String(commandOptions?.cwd || ''));
+      }
+      if (command === 'pnpm' && args[0] === 'metadata:sync') {
+        writeMakeClientMetadata(String(commandOptions?.cwd || ''), 'fast-template-demo', 'Fast Template Demo');
+      }
+      return localCommandResult(command, args);
+    });
+    installRuntimeSpawnMock(51738);
+
+    try {
+      const response = await fetch(`${server.origin}/api/projects/make/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parentRoot,
+          folderName: 'Fast Template Demo',
+          projectName: 'Fast Template Demo',
+        }),
+      });
+      const targetRoot = path.join(parentRoot, 'Fast Template Demo');
+
+      expect(response.status).toBe(201);
+      expect(JSON.parse(fs.readFileSync(getMakeClientMarkerPath(targetRoot), 'utf8'))).toMatchObject({
+        repository: TEMPLATE_SOURCE_URL,
+        templateUrl: TEMPLATE_ZIP_URL,
+      });
+      const templateCalls = templateZipFetchCalls(globalThis.fetch as any);
+      expect((fetchMock as any).templateProbeState.mirrorStartedBeforePrimaryFinished).toBe(true);
+      expect(templateCalls.filter(({ method }) => method === 'HEAD')).toEqual(expect.arrayContaining([
+        { url: TEMPLATE_ZIP_URL, method: 'HEAD' },
+        { url: TEMPLATE_MIRROR_ZIP_URL, method: 'HEAD' },
+      ]));
+      expect(templateCalls.filter(({ method }) => method === 'GET')).toEqual([
+        { url: TEMPLATE_ZIP_URL, method: 'GET' },
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('template probe keeps a failed HEAD source in the later full GET fallback sequence', async () => {
+    const defaultRoot = createTempRoot();
+    writeProjectMetadata(defaultRoot);
+    const parentRoot = createTempRoot('axhub-make-valid-template-parent-');
+    const server = await startTestServer(defaultRoot);
+    installRemoteTemplateCommandMock({
+      failPrimaryProbe: true,
+      invalidMirrorZip: true,
+      metadataId: 'valid-template-demo',
+      metadataName: 'Valid Template Demo',
+    });
+    installRuntimeSpawnMock(51739);
+
+    try {
+      const response = await fetch(`${server.origin}/api/projects/make/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parentRoot,
+          folderName: 'Valid Template Demo',
+          projectName: 'Valid Template Demo',
+        }),
+      });
+      const targetRoot = path.join(parentRoot, 'Valid Template Demo');
+
+      expect(response.status).toBe(201);
+      expect(JSON.parse(fs.readFileSync(getMakeClientMarkerPath(targetRoot), 'utf8'))).toMatchObject({
+        repository: TEMPLATE_SOURCE_URL,
+        templateUrl: TEMPLATE_ZIP_URL,
+      });
+      expect(templateZipFetchCalls(globalThis.fetch as any).filter(({ method }) => method === 'GET')).toEqual([
+        { url: TEMPLATE_MIRROR_ZIP_URL, method: 'GET' },
+        { url: TEMPLATE_ZIP_URL, method: 'GET' },
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('uses a single full GET for an explicit template source without probing', async () => {
     const defaultRoot = createTempRoot();
     writeProjectMetadata(defaultRoot);
     const parentRoot = createTempRoot('axhub-make-parent-');
@@ -3544,10 +3773,87 @@ describe('make-server make client project APIs', () => {
         templateUrl: customTemplateUrl,
       });
       expect(JSON.parse(fs.readFileSync(getMakeClientMarkerPath(targetRoot), 'utf8')).templateVersion).toBeUndefined();
-      expect((globalThis.fetch as any).mock.calls.filter(([url]: [string]) => String(url).includes('template.zip'))).toHaveLength(1);
-      expect(globalThis.fetch).toHaveBeenCalledWith(customTemplateUrl, expect.any(Object));
-      expect(globalThis.fetch).not.toHaveBeenCalledWith(TEMPLATE_ZIP_URL, expect.any(Object));
-      expect(globalThis.fetch).not.toHaveBeenCalledWith(TEMPLATE_MIRROR_ZIP_URL, expect.any(Object));
+      const explicitCalls = (globalThis.fetch as any).mock.calls
+        .map(([url, init]: [RequestInfo | URL, RequestInit | undefined]) => ({
+          method: String(init?.method || 'GET').toUpperCase(),
+          url: String(url),
+        }))
+        .filter(({ url }: { url: string }) => url === customTemplateUrl);
+      expect(explicitCalls).toEqual([{ url: customTemplateUrl, method: 'GET' }]);
+      expect(templateZipFetchCalls(globalThis.fetch as any)).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('template source uses a valid cache before probing remote sources', async () => {
+    const defaultRoot = createTempRoot();
+    writeProjectMetadata(defaultRoot);
+    const parentRoot = createTempRoot('axhub-make-template-cache-parent-');
+    const cachePath = templateCachePath(TEMPLATE_ZIP_URL);
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+    fs.writeFileSync(cachePath, createMakeClientTemplateZip());
+    writeJson(templateCacheManifestPath(TEMPLATE_ZIP_URL), {
+      schemaVersion: 1,
+      templateVersion: DEFAULT_TEMPLATE_VERSION,
+      url: TEMPLATE_ZIP_URL,
+      cachedAt: new Date().toISOString(),
+    });
+    installRemoteTemplateCommandMock();
+    installRuntimeSpawnMock(51740);
+    const server = await startTestServer(defaultRoot);
+
+    try {
+      const response = await fetch(`${server.origin}/api/projects/make/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parentRoot,
+          folderName: 'Cached Template Source',
+          projectName: 'Cached Template Source',
+        }),
+      });
+
+      expect(response.status).toBe(201);
+      expect(templateZipFetchCalls(globalThis.fetch as any)).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('template source removes a corrupt cache and retries that source over the network', async () => {
+    const defaultRoot = createTempRoot();
+    writeProjectMetadata(defaultRoot);
+    const parentRoot = createTempRoot('axhub-make-corrupt-template-cache-parent-');
+    const cachePath = templateCachePath(TEMPLATE_ZIP_URL);
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+    fs.writeFileSync(cachePath, new Uint8Array([0, 1, 2]));
+    writeJson(templateCacheManifestPath(TEMPLATE_ZIP_URL), {
+      schemaVersion: 1,
+      templateVersion: DEFAULT_TEMPLATE_VERSION,
+      url: TEMPLATE_ZIP_URL,
+      cachedAt: new Date().toISOString(),
+    });
+    installRemoteTemplateCommandMock();
+    installRuntimeSpawnMock(51741);
+    const server = await startTestServer(defaultRoot);
+
+    try {
+      const response = await fetch(`${server.origin}/api/projects/make/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parentRoot,
+          folderName: 'Corrupt Cached Template Source',
+          projectName: 'Corrupt Cached Template Source',
+        }),
+      });
+
+      expect(response.status).toBe(201);
+      expect(templateZipFetchCalls(globalThis.fetch as any).filter(({ method }) => method === 'GET')).toEqual([
+        { url: TEMPLATE_ZIP_URL, method: 'GET' },
+      ]);
+      expect(fs.readFileSync(cachePath)).not.toEqual(Buffer.from([0, 1, 2]));
     } finally {
       await server.close();
     }
@@ -3667,7 +3973,7 @@ describe('make-server make client project APIs', () => {
 
       expect(first.status).toBe(201);
       expect(second.status).toBe(201);
-      expect((globalThis.fetch as any).mock.calls.filter(([url]: [string]) => url === TEMPLATE_ZIP_URL)).toHaveLength(1);
+      expect(templateZipFetchCalls(globalThis.fetch as any).filter(({ method, url }) => method === 'GET' && url === TEMPLATE_ZIP_URL)).toHaveLength(1);
     } finally {
       await server.close();
     }
@@ -3721,7 +4027,7 @@ describe('make-server make client project APIs', () => {
       });
 
       expect(response.status).toBe(201);
-      expect((globalThis.fetch as any).mock.calls.filter(([url]: [string]) => url === TEMPLATE_ZIP_URL)).toHaveLength(1);
+      expect(templateZipFetchCalls(globalThis.fetch as any).filter(({ method, url }) => method === 'GET' && url === TEMPLATE_ZIP_URL)).toHaveLength(1);
       expect(JSON.parse(fs.readFileSync(templateCacheManifestPath(TEMPLATE_ZIP_URL), 'utf8'))).toMatchObject({
         templateVersion: DEFAULT_TEMPLATE_VERSION,
         url: TEMPLATE_ZIP_URL,
@@ -3777,7 +4083,7 @@ describe('make-server make client project APIs', () => {
 
       expect(response.status).toBe(201);
       const signals = (globalThis.fetch as any).mock.calls
-        .filter(([url]: [string]) => [TEMPLATE_ZIP_URL, TEMPLATE_MIRROR_ZIP_URL].includes(String(url)))
+        .filter(([url, options]: [string, RequestInit]) => [TEMPLATE_ZIP_URL, TEMPLATE_MIRROR_ZIP_URL].includes(String(url)) && String(options?.method || 'GET').toUpperCase() === 'GET')
         .map(([, options]: [string, RequestInit]) => options?.signal);
       expect(signals).toEqual([expect.any(AbortSignal), expect.any(AbortSignal)]);
     } finally {
@@ -4288,18 +4594,6 @@ describe('make-server make client project APIs', () => {
     writeMakeClientMarker(projectRoot, 'online-current-status-client', 'Online Current Status Client', ONLINE_TEMPLATE_VERSION);
     writeMakeClientPackage(projectRoot, ONLINE_TEMPLATE_VERSION);
     writeMakeClientMetadata(projectRoot, 'online-current-status-client', 'Online Current Status Client');
-    const resourceTemplatesRoot = path.join(projectRoot, 'src', 'resources', 'templates');
-    fs.mkdirSync(resourceTemplatesRoot, { recursive: true });
-    for (const relativePath of [
-      'prd-template.md',
-      'prd-comprehensive-template.md',
-      'prototype-review-report-template.md',
-      'ui-review-report-template.md',
-      '规格文档 HTML 模板.html',
-      '规格文档 Markdown 模板.md',
-    ]) {
-      fs.writeFileSync(path.join(resourceTemplatesRoot, relativePath), 'official template\n', 'utf8');
-    }
     installRemoteTemplateFetchMock({ manifest: createOnlineTemplateManifest() });
     installMakeClientUpdateCommandMock();
     const server = await startTestServer(defaultRoot);
@@ -4445,6 +4739,8 @@ describe('make-server make client project APIs', () => {
     writeMakeClientMetadata(projectRoot, 'update-no-git-apply-client', 'Update No Git Apply Client');
     fs.mkdirSync(path.join(projectRoot, 'src', 'prototypes', 'beginner-guide'), { recursive: true });
     fs.writeFileSync(path.join(projectRoot, 'src', 'prototypes', 'beginner-guide', 'index.tsx'), 'old official\n', 'utf8');
+    fs.mkdirSync(path.join(projectRoot, 'templates'), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, 'templates', 'prd.md'), '# Custom PRD\n', 'utf8');
     installRemoteTemplateFetchMock();
     runLocalCommandMock.mockImplementation(async (command: string, args: string[], commandOptions: any) => {
       const cwd = String(commandOptions?.cwd || '');
@@ -4511,6 +4807,10 @@ describe('make-server make client project APIs', () => {
         '.axhub/make/client.json',
       ]));
       expect(fs.readFileSync(path.join(projectRoot, 'src', 'prototypes', 'beginner-guide', 'index.tsx'), 'utf8')).toContain('BeginnerGuide');
+      expect(fs.readFileSync(path.join(projectRoot, 'templates', 'prd.md'), 'utf8')).toBe('# Custom PRD\n');
+      expect(fs.readFileSync(path.join(projectRoot, 'templates', 'prototype-review.md'), 'utf8')).toBe('# Official Prototype Review\n');
+      expect(applyBody.writtenFiles).not.toContain('templates/prd.md');
+      expect(applyBody.writtenFiles).toContain('templates/prototype-review.md');
       expect(fs.readFileSync(path.join(applyBody.backupRoot, 'original', 'src', 'prototypes', 'beginner-guide', 'index.tsx'), 'utf8')).toBe('old official\n');
       expect(fs.existsSync(applyBody.backupZipPath)).toBe(true);
       expect(fs.existsSync(applyBody.manifestPath)).toBe(true);
@@ -4587,6 +4887,63 @@ describe('make-server make client project APIs', () => {
         templateUrl: ONLINE_TEMPLATE_ZIP_URL,
         templateVersion: ONLINE_TEMPLATE_VERSION,
       });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('uses the faster valid mirror when applying a make client template update', async () => {
+    const defaultRoot = createTempRoot();
+    writeProjectMetadata(defaultRoot, {
+      project: { id: 'default-client', name: 'Default Client' },
+    });
+    const projectRoot = createTempRoot('axhub-make-client-fast-update-');
+    writeMakeClientMarker(projectRoot, 'fast-update-client', 'Fast Update Client', '0.1.0');
+    writeMakeClientPackage(projectRoot, '0.1.0');
+    writeMakeClientMetadata(projectRoot, 'fast-update-client', 'Fast Update Client');
+    installRemoteTemplateFetchMock({ primaryProbeDelayMs: 500, mirrorProbeDelayMs: 1 });
+    runLocalCommandMock.mockImplementation(async (command: string, args: string[], commandOptions: any) => {
+      const cwd = String(commandOptions?.cwd || '');
+      if ((command === 'npm' || command === 'npm.cmd') && args[0] === 'install') {
+        writeInstalledMakeClientDependencies(cwd);
+      }
+      if ((command === 'npm' || command === 'npm.cmd') && args[0] === 'run' && args[1] === 'metadata:sync') {
+        writeMakeClientMetadata(cwd, 'fast-update-client', 'Fast Update Client');
+      }
+      return localCommandResult(command, args);
+    });
+    const server = await startTestServer(defaultRoot);
+
+    try {
+      const registerResponse = await fetch(`${server.origin}/api/projects/make/register-existing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ root: projectRoot }),
+      });
+      expect(registerResponse.status).toBe(201);
+
+      const applyResponse = await fetch(`${server.origin}/api/projects/fast-update-client/make-client/update/apply`, {
+        method: 'POST',
+      });
+      const applyBody = await applyResponse.json();
+
+      expect(applyResponse.status).toBe(200);
+      expect(applyBody).toMatchObject({
+        success: true,
+        templateUrl: TEMPLATE_MIRROR_ZIP_URL,
+      });
+      expect(JSON.parse(fs.readFileSync(getMakeClientMarkerPath(projectRoot), 'utf8'))).toMatchObject({
+        repository: TEMPLATE_MIRROR_SOURCE_URL,
+        templateUrl: TEMPLATE_MIRROR_ZIP_URL,
+      });
+      expect(templateZipFetchCalls(globalThis.fetch as any)).toEqual(expect.arrayContaining([
+        { url: TEMPLATE_ZIP_URL, method: 'HEAD' },
+        { url: TEMPLATE_MIRROR_ZIP_URL, method: 'HEAD' },
+        { url: TEMPLATE_MIRROR_ZIP_URL, method: 'GET' },
+      ]));
+      expect(templateZipFetchCalls(globalThis.fetch as any).filter(({ method }) => method === 'GET')).toEqual([
+        { url: TEMPLATE_MIRROR_ZIP_URL, method: 'GET' },
+      ]);
     } finally {
       await server.close();
     }
@@ -4683,178 +5040,6 @@ describe('make-server make client project APIs', () => {
       });
       expect(applyBody.writtenFiles).toEqual(expect.arrayContaining(['package.json']));
       expect(fs.readFileSync(path.join(applyBody.backupRoot, 'original', 'package.json'), 'utf8')).toBe(dirtyPackageContent);
-    } finally {
-      await server.close();
-    }
-  });
-
-  it('preserves project package extensions while official package fields win conflicts', async () => {
-    const defaultRoot = createTempRoot();
-    writeProjectMetadata(defaultRoot, {
-      project: { id: 'default-client', name: 'Default Client' },
-    });
-    const projectRoot = createTempRoot('axhub-make-client-update-package-merge-');
-    writeMakeClientMarker(projectRoot, 'update-package-merge-client', 'Update Package Merge Client', '0.1.0');
-    writeMakeClientMetadata(projectRoot, 'update-package-merge-client', 'Update Package Merge Client');
-    fs.writeFileSync(path.join(projectRoot, 'package.json'), `${JSON.stringify({
-      version: '0.1.0',
-      customConfig: { enabled: true },
-      scripts: {
-        dev: 'local-vite',
-        'metadata:sync': 'node scripts/sync-project-metadata.mjs',
-        'deploy:staging': 'deploy-staging',
-      },
-      dependencies: {
-        shared: '1.0.0',
-        'project-runtime': '2.0.0',
-      },
-      devDependencies: {
-        moved: '1.0.0',
-        'project-tool': '3.0.0',
-      },
-      peerDependencies: { 'project-peer': '^4.0.0' },
-      optionalDependencies: { 'project-optional': '^5.0.0' },
-    }, null, 2)}\n`, 'utf8');
-    initCleanGitRepo(projectRoot);
-    installRemoteTemplateFetchMock();
-    installMakeClientUpdateCommandMock({
-      metadataId: 'update-package-merge-client',
-      metadataName: 'Update Package Merge Client',
-    });
-    const server = await startTestServer(defaultRoot);
-
-    try {
-      const registerResponse = await fetch(`${server.origin}/api/projects/make/register-existing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ root: projectRoot }),
-      });
-      expect(registerResponse.status).toBe(201);
-      commitGitChangesIfNeeded(projectRoot, 'registered');
-
-      const applyResponse = await fetch(`${server.origin}/api/projects/update-package-merge-client/make-client/update/apply`, {
-        method: 'POST',
-      });
-      const applyBody = await applyResponse.json();
-
-      expect(applyResponse.status).toBe(200);
-      expect(applyBody.writtenFiles).toEqual(expect.arrayContaining(['package.json']));
-      const updatedPackage = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
-      expect(updatedPackage).toMatchObject({
-        name: '@axhub/make-client',
-        version: DEFAULT_TEMPLATE_VERSION,
-        customConfig: { enabled: true },
-        scripts: {
-          dev: 'vite',
-          'metadata:sync': 'node scripts/sync-project-metadata.mjs',
-          'deploy:staging': 'deploy-staging',
-          build: 'vite build',
-        },
-        dependencies: {
-          shared: '2.0.0',
-          moved: '2.0.0',
-          'project-runtime': '2.0.0',
-          'official-runtime': '1.0.0',
-        },
-        devDependencies: {
-          'project-tool': '3.0.0',
-          'official-tool': '1.0.0',
-        },
-        peerDependencies: { 'project-peer': '^4.0.0' },
-        optionalDependencies: { 'project-optional': '^5.0.0' },
-      });
-      expect(updatedPackage.devDependencies).not.toHaveProperty('moved');
-    } finally {
-      await server.close();
-    }
-  });
-
-  it('rejects an invalid project package before writing update files', async () => {
-    const defaultRoot = createTempRoot();
-    writeProjectMetadata(defaultRoot, {
-      project: { id: 'default-client', name: 'Default Client' },
-    });
-    const projectRoot = createTempRoot('axhub-make-client-update-invalid-package-');
-    writeMakeClientMarker(projectRoot, 'update-invalid-package-client', 'Update Invalid Package Client', '0.1.0');
-    writeMakeClientPackage(projectRoot, '0.1.0');
-    writeMakeClientMetadata(projectRoot, 'update-invalid-package-client', 'Update Invalid Package Client');
-    fs.mkdirSync(path.join(projectRoot, 'src', 'prototypes', 'beginner-guide'), { recursive: true });
-    fs.writeFileSync(path.join(projectRoot, 'src', 'prototypes', 'beginner-guide', 'index.tsx'), 'old official\n', 'utf8');
-    initCleanGitRepo(projectRoot);
-    installRemoteTemplateFetchMock();
-    const server = await startTestServer(defaultRoot);
-
-    try {
-      const registerResponse = await fetch(`${server.origin}/api/projects/make/register-existing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ root: projectRoot }),
-      });
-      expect(registerResponse.status).toBe(201);
-      const markerPath = getMakeClientMarkerPath(projectRoot);
-      const originalMarkerContent = fs.readFileSync(markerPath, 'utf8');
-      fs.writeFileSync(path.join(projectRoot, 'package.json'), '{"scripts":', 'utf8');
-
-      const applyResponse = await fetch(`${server.origin}/api/projects/update-invalid-package-client/make-client/update/apply`, {
-        method: 'POST',
-      });
-      const applyBody = await applyResponse.json();
-
-      expect(applyResponse.status).toBe(409);
-      expect(applyBody).toMatchObject({
-        code: 'MAKE_CLIENT_PACKAGE_INVALID',
-        phase: 'merge-package',
-        details: { source: 'project' },
-      });
-      expect(fs.readFileSync(path.join(projectRoot, 'src', 'prototypes', 'beginner-guide', 'index.tsx'), 'utf8'))
-        .toBe('old official\n');
-      expect(fs.readFileSync(markerPath, 'utf8')).toBe(originalMarkerContent);
-      expect(fs.existsSync(path.join(projectRoot, '.axhub', 'make', 'backups'))).toBe(false);
-    } finally {
-      await server.close();
-    }
-  });
-
-  it('rejects an invalid template package before writing update files', async () => {
-    const defaultRoot = createTempRoot();
-    writeProjectMetadata(defaultRoot, {
-      project: { id: 'default-client', name: 'Default Client' },
-    });
-    const projectRoot = createTempRoot('axhub-make-client-update-invalid-template-package-');
-    writeMakeClientMarker(projectRoot, 'update-invalid-template-package-client', 'Update Invalid Template Package Client', '0.1.0');
-    writeMakeClientPackage(projectRoot, '0.1.0');
-    writeMakeClientMetadata(projectRoot, 'update-invalid-template-package-client', 'Update Invalid Template Package Client');
-    fs.mkdirSync(path.join(projectRoot, 'src', 'prototypes', 'beginner-guide'), { recursive: true });
-    fs.writeFileSync(path.join(projectRoot, 'src', 'prototypes', 'beginner-guide', 'index.tsx'), 'old official\n', 'utf8');
-    initCleanGitRepo(projectRoot);
-    installRemoteTemplateFetchMock({ packageContent: '{"scripts":' });
-    const server = await startTestServer(defaultRoot);
-
-    try {
-      const registerResponse = await fetch(`${server.origin}/api/projects/make/register-existing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ root: projectRoot }),
-      });
-      expect(registerResponse.status).toBe(201);
-      const markerPath = getMakeClientMarkerPath(projectRoot);
-      const originalMarkerContent = fs.readFileSync(markerPath, 'utf8');
-
-      const applyResponse = await fetch(`${server.origin}/api/projects/update-invalid-template-package-client/make-client/update/apply`, {
-        method: 'POST',
-      });
-      const applyBody = await applyResponse.json();
-
-      expect(applyResponse.status).toBe(500);
-      expect(applyBody).toMatchObject({
-        code: 'MAKE_CLIENT_PACKAGE_INVALID',
-        phase: 'merge-package',
-        details: { source: 'template' },
-      });
-      expect(fs.readFileSync(path.join(projectRoot, 'src', 'prototypes', 'beginner-guide', 'index.tsx'), 'utf8'))
-        .toBe('old official\n');
-      expect(fs.readFileSync(markerPath, 'utf8')).toBe(originalMarkerContent);
-      expect(fs.existsSync(path.join(projectRoot, '.axhub', 'make', 'backups'))).toBe(false);
     } finally {
       await server.close();
     }
@@ -5103,132 +5288,6 @@ describe('make-server make client project APIs', () => {
     }
   });
 
-  it('repairs missing official resource templates in current-version projects while preserving project-owned resources', async () => {
-    const defaultRoot = createTempRoot();
-    writeProjectMetadata(defaultRoot, {
-      project: { id: 'default-client', name: 'Default Client' },
-    });
-    const projectRoot = createTempRoot('axhub-make-client-resource-template-update-');
-    writeMakeClientMarker(projectRoot, 'resource-template-update-client', 'Resource Template Update Client', DEFAULT_TEMPLATE_VERSION);
-    writeMakeClientPackage(projectRoot, DEFAULT_TEMPLATE_VERSION);
-    writeMakeClientMetadata(projectRoot, 'resource-template-update-client', 'Resource Template Update Client');
-    fs.mkdirSync(path.join(projectRoot, 'src', 'resources', 'templates'), { recursive: true });
-    fs.writeFileSync(path.join(projectRoot, 'src', 'resources', 'notes.md'), '# User notes\n', 'utf8');
-    fs.writeFileSync(path.join(projectRoot, 'src', 'resources', 'templates', 'prd-template.md'), '# Custom PRD template\n', 'utf8');
-    initCleanGitRepo(projectRoot);
-    installRemoteTemplateFetchMock({ includeResourceTemplates: true });
-    installMakeClientUpdateCommandMock({
-      metadataId: 'resource-template-update-client',
-      metadataName: 'Resource Template Update Client',
-    });
-    const server = await startTestServer(defaultRoot);
-
-    try {
-      const registerResponse = await fetch(`${server.origin}/api/projects/make/register-existing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ root: projectRoot }),
-      });
-      expect(registerResponse.status).toBe(201);
-      commitGitChangesIfNeeded(projectRoot, 'registered');
-
-      const statusResponse = await fetch(`${server.origin}/api/projects/resource-template-update-client/make-client/update/status`);
-      const statusBody = await statusResponse.json();
-      expect(statusResponse.status).toBe(200);
-      expect(statusBody).toMatchObject({
-        currentVersion: DEFAULT_TEMPLATE_VERSION,
-        targetVersion: DEFAULT_TEMPLATE_VERSION,
-        updateAvailable: true,
-        repairAvailable: true,
-        canApply: true,
-      });
-
-      const applyResponse = await fetch(`${server.origin}/api/projects/resource-template-update-client/make-client/update/apply`, {
-        method: 'POST',
-      });
-      const applyBody = await applyResponse.json();
-
-      expect(applyResponse.status).toBe(200);
-      expect(applyBody).toMatchObject({
-        currentVersion: DEFAULT_TEMPLATE_VERSION,
-        targetVersion: DEFAULT_TEMPLATE_VERSION,
-        installMethod: 'skipped',
-      });
-      expect(applyBody.plannedFiles).not.toEqual(expect.arrayContaining([
-        'package.json',
-        'src/prototypes/beginner-guide/index.tsx',
-      ]));
-      expect(applyBody.writtenFiles).toEqual(expect.arrayContaining([
-        'src/resources/templates/prd-comprehensive-template.md',
-      ]));
-      expect(fs.readFileSync(path.join(projectRoot, 'src', 'resources', 'templates', 'prd-template.md'), 'utf8'))
-        .toBe('# Custom PRD template\n');
-      expect(fs.readFileSync(path.join(projectRoot, 'src', 'resources', 'templates', 'prd-comprehensive-template.md'), 'utf8'))
-        .toBe('# Official comprehensive PRD template\n');
-      expect(fs.readFileSync(path.join(projectRoot, 'src', 'resources', 'notes.md'), 'utf8')).toBe('# User notes\n');
-
-      const nextStatusResponse = await fetch(`${server.origin}/api/projects/resource-template-update-client/make-client/update/status`);
-      const nextStatusBody = await nextStatusResponse.json();
-      expect(nextStatusResponse.status).toBe(200);
-      expect(nextStatusBody).toMatchObject({
-        updateAvailable: false,
-        repairAvailable: false,
-        canApply: false,
-      });
-    } finally {
-      await server.close();
-    }
-  });
-
-  it.skipIf(process.platform === 'win32')('does not write official resource templates through project symlinks', async () => {
-    const defaultRoot = createTempRoot();
-    writeProjectMetadata(defaultRoot, {
-      project: { id: 'default-client', name: 'Default Client' },
-    });
-    const projectRoot = createTempRoot('axhub-make-client-resource-template-symlink-');
-    writeMakeClientMarker(projectRoot, 'resource-template-symlink-client', 'Resource Template Symlink Client', '0.1.0');
-    writeMakeClientPackage(projectRoot, '0.1.0');
-    writeMakeClientMetadata(projectRoot, 'resource-template-symlink-client', 'Resource Template Symlink Client');
-    const templatesRoot = path.join(projectRoot, 'src', 'resources', 'templates');
-    const outsideRoot = createTempRoot('axhub-make-client-resource-template-outside-');
-    const danglingTarget = path.join(outsideRoot, 'prd-linked-template.md');
-    fs.mkdirSync(templatesRoot, { recursive: true });
-    fs.symlinkSync(danglingTarget, path.join(templatesRoot, 'prd-linked-template.md'), 'file');
-    fs.symlinkSync(outsideRoot, path.join(templatesRoot, 'research'), 'dir');
-    initCleanGitRepo(projectRoot);
-    installRemoteTemplateFetchMock({ includeResourceTemplates: true });
-    installMakeClientUpdateCommandMock({
-      metadataId: 'resource-template-symlink-client',
-      metadataName: 'Resource Template Symlink Client',
-    });
-    const server = await startTestServer(defaultRoot);
-
-    try {
-      const registerResponse = await fetch(`${server.origin}/api/projects/make/register-existing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ root: projectRoot }),
-      });
-      expect(registerResponse.status).toBe(201);
-      commitGitChangesIfNeeded(projectRoot, 'registered');
-
-      const applyResponse = await fetch(`${server.origin}/api/projects/resource-template-symlink-client/make-client/update/apply`, {
-        method: 'POST',
-      });
-      const applyBody = await applyResponse.json();
-
-      expect(applyResponse.status).toBe(200);
-      expect(applyBody.writtenFiles).not.toEqual(expect.arrayContaining([
-        'src/resources/templates/prd-linked-template.md',
-        'src/resources/templates/research/discovery.md',
-      ]));
-      expect(fs.existsSync(danglingTarget)).toBe(false);
-      expect(fs.existsSync(path.join(outsideRoot, 'discovery.md'))).toBe(false);
-    } finally {
-      await server.close();
-    }
-  });
-
   it('retries make client update npm install with legacy peer deps when npm arborist crashes', async () => {
     const defaultRoot = createTempRoot();
     writeProjectMetadata(defaultRoot, {
@@ -5464,85 +5523,6 @@ describe('make-server make client project APIs', () => {
         ['install', '--include=dev'],
         expect.objectContaining({ cwd: projectRoot }),
       );
-    } finally {
-      await server.close();
-    }
-  });
-
-  it('keeps the old template version and allows retry after a mid-copy failure', async () => {
-    const defaultRoot = createTempRoot();
-    writeProjectMetadata(defaultRoot, {
-      project: { id: 'default-client', name: 'Default Client' },
-    });
-    const projectRoot = createTempRoot('axhub-make-client-update-retry-');
-    writeMakeClientMarker(projectRoot, 'update-retry-client', 'Update Retry Client', '0.1.0');
-    writeMakeClientPackage(projectRoot, '0.1.0');
-    writeMakeClientMetadata(projectRoot, 'update-retry-client', 'Update Retry Client');
-    installRemoteTemplateFetchMock();
-    installMakeClientUpdateCommandMock({
-      metadataId: 'update-retry-client',
-      metadataName: 'Update Retry Client',
-    });
-    const server = await startTestServer(defaultRoot);
-
-    try {
-      const registerResponse = await fetch(`${server.origin}/api/projects/make/register-existing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ root: projectRoot }),
-      });
-      expect(registerResponse.status).toBe(201);
-
-      const copyFileSync = fs.copyFileSync.bind(fs);
-      const failedTarget = path.join(projectRoot, 'src', 'prototypes', 'beginner-guide', 'index.tsx');
-      const copySpy = vi.spyOn(fs, 'copyFileSync').mockImplementation((...args) => {
-        if (path.resolve(String(args[1])) === failedTarget) {
-          const error = new Error('simulated mid-copy failure') as NodeJS.ErrnoException;
-          error.code = 'EACCES';
-          throw error;
-        }
-        return copyFileSync(...args);
-      });
-
-      const failedResponse = await fetch(`${server.origin}/api/projects/update-retry-client/make-client/update/apply`, {
-        method: 'POST',
-      });
-      const failedBody = await failedResponse.json();
-
-      expect(failedResponse.status).toBe(500);
-      expect(failedBody).toMatchObject({
-        projectId: 'update-retry-client',
-        currentVersion: '0.1.0',
-        targetVersion: DEFAULT_TEMPLATE_VERSION,
-        writtenFiles: expect.arrayContaining(['package.json']),
-      });
-      expect(JSON.parse(fs.readFileSync(getMakeClientMarkerPath(projectRoot), 'utf8'))).toMatchObject({
-        templateVersion: '0.1.0',
-      });
-
-      copySpy.mockRestore();
-
-      const retryStatus = await fetch(`${server.origin}/api/projects/update-retry-client/make-client/update/status`)
-        .then((response) => response.json());
-      expect(retryStatus).toMatchObject({
-        canApply: true,
-        currentVersion: '0.1.0',
-        targetVersion: DEFAULT_TEMPLATE_VERSION,
-      });
-
-      const retryResponse = await fetch(`${server.origin}/api/projects/update-retry-client/make-client/update/apply`, {
-        method: 'POST',
-      });
-      const retryBody = await retryResponse.json();
-      expect(retryResponse.status).toBe(200);
-      expect(retryBody).toMatchObject({
-        success: true,
-        currentVersion: '0.1.0',
-        targetVersion: DEFAULT_TEMPLATE_VERSION,
-      });
-      expect(JSON.parse(fs.readFileSync(getMakeClientMarkerPath(projectRoot), 'utf8'))).toMatchObject({
-        templateVersion: DEFAULT_TEMPLATE_VERSION,
-      });
     } finally {
       await server.close();
     }
