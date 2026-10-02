@@ -476,11 +476,19 @@ describe('make-server agent open API', () => {
     async (provider) => {
       const projectRoot = createTempRoot();
       writeProjectMetadata(projectRoot);
+      const appPath = path.join(projectRoot, 'WorkBuddy.app', 'Contents', 'MacOS', 'WorkBuddy');
+      writeFile(appPath, '');
       coordinateDesktopIntegrationOpenMock.mockResolvedValue({
         provider,
         status: 'restart-required',
       });
-      const server = await startTestServer(projectRoot);
+      const server = await startTestServer(projectRoot, {
+        serverConfig: {
+          schemaVersion: 1,
+          toolOpenState: { 'local-app:workbuddy': { executablePath: appPath } },
+        },
+      });
+      const applicationProbe = mockMissingMacApplications('WorkBuddy');
 
       try {
         const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
@@ -509,6 +517,7 @@ describe('make-server agent open API', () => {
           }),
         );
       } finally {
+        applicationProbe.mockRestore();
         await server.close();
       }
     },
@@ -911,11 +920,19 @@ describe('make-server agent open API', () => {
     async (provider) => {
       const projectRoot = createTempRoot();
       writeProjectMetadata(projectRoot);
+      const appPath = path.join(projectRoot, 'WorkBuddy.app', 'Contents', 'MacOS', 'WorkBuddy');
+      writeFile(appPath, '');
       coordinateDesktopIntegrationOpenMock.mockResolvedValue({
         provider,
         status: 'restart-required',
       });
-      const server = await startTestServer(projectRoot);
+      const server = await startTestServer(projectRoot, {
+        serverConfig: {
+          schemaVersion: 1,
+          toolOpenState: { 'local-app:workbuddy': { executablePath: appPath } },
+        },
+      });
+      const applicationProbe = mockMissingMacApplications('WorkBuddy');
 
       try {
         const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
@@ -943,6 +960,7 @@ describe('make-server agent open API', () => {
         expect(openMakeAgentProjectOnlyMock).not.toHaveBeenCalled();
         expect(childProcessMock.spawn).not.toHaveBeenCalled();
       } finally {
+        applicationProbe.mockRestore();
         await server.close();
       }
     },
@@ -1554,11 +1572,17 @@ describe('make-server agent open API', () => {
   it('opens OpenCode local app with an encoded project deeplink', async () => {
     const projectRoot = createTempRoot();
     const targetDir = path.join(projectRoot, 'Axhub Runtime');
+    const appPath = path.join(projectRoot, 'OpenCode.app', 'Contents', 'MacOS', 'OpenCode');
     fs.mkdirSync(targetDir, { recursive: true });
+    writeFile(appPath, '');
     writeProjectMetadata(projectRoot);
-    mockDetectedCommands(['opencode']);
-
-    const server = await startTestServer(projectRoot);
+    const server = await startTestServer(projectRoot, {
+      serverConfig: {
+        schemaVersion: 1,
+        toolOpenState: { 'local-app:opencode': { executablePath: appPath } },
+      },
+    });
+    const applicationProbe = mockMissingMacApplications('OpenCode');
 
     try {
       const response = await fetch(`${server.origin}/api/agent/local-app/open?projectId=agent-client`, {
@@ -1581,6 +1605,7 @@ describe('make-server agent open API', () => {
       expect(spawnCalls).toContain('opencode://open-project?directory=');
       expect(spawnCalls).toContain('/Axhub%20Runtime');
     } finally {
+      applicationProbe.mockRestore();
       await server.close();
     }
   });
