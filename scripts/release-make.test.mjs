@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -992,33 +991,16 @@ describe('release make artifact helpers', () => {
     assert.doesNotMatch(releaseSource, /packages\/axhub-export-core\/scripts\/canvas-fig-sync\.mjs/u);
   });
 
-  it('keeps vendored source package TypeScript deprecation config compatible with the release toolchain', () => {
-    const releaseTypescriptPackageJson = JSON.parse(
-      fs.readFileSync(
-        createRequire(import.meta.url).resolve('typescript/package.json'),
-        'utf8',
-      ),
-    );
-    const releaseTypescriptMajor = Number.parseInt(
-      String(releaseTypescriptPackageJson.version).split('.')[0] || '',
-      10,
-    );
-    assert(Number.isInteger(releaseTypescriptMajor), 'release TypeScript major version must be detectable');
+  it('ships prebuilt export-core artifacts without depending on monorepo source', () => {
+    const vendorRoot = path.resolve('vendor/axhub-export-core');
+    const manifest = JSON.parse(fs.readFileSync(path.join(vendorRoot, 'package.json'), 'utf8'));
 
-    const exportCoreTsconfig = JSON.parse(
-      fs.readFileSync(path.resolve('../../packages/axhub-export-core/tsconfig.json'), 'utf8'),
-    );
-    const ignoreDeprecations = exportCoreTsconfig.compilerOptions?.ignoreDeprecations;
-    if (ignoreDeprecations === undefined) {
-      return;
+    assert.equal(manifest.exports?.['.']?.import?.default, './dist/index.mjs');
+    assert.equal(manifest.exports?.['.']?.require?.default, './dist/index.js');
+    assert.equal(manifest.exports?.['./scripts/canvas-fig-sync.mjs']?.import, './scripts/canvas-fig-sync.mjs');
+    for (const file of ['dist/index.mjs', 'dist/index.js', 'dist/index.d.ts', 'scripts/canvas-fig-sync.mjs']) {
+      assert(fs.statSync(path.join(vendorRoot, file)).isFile(), `${file} must be vendored`);
     }
-
-    const ignoreDeprecationsMajor = Number.parseInt(String(ignoreDeprecations).split('.')[0] || '', 10);
-    assert(Number.isInteger(ignoreDeprecationsMajor), 'ignoreDeprecations must start with a major version');
-    assert(
-      ignoreDeprecationsMajor <= releaseTypescriptMajor,
-      `ignoreDeprecations ${ignoreDeprecations} is not accepted by release TypeScript ${releaseTypescriptPackageJson.version}`,
-    );
   });
 
   it('bundles the canvas fig sync release script with runtime dependencies', () => {

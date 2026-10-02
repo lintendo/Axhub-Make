@@ -3,7 +3,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import {
   getGlobalServerConfigPath,
@@ -133,6 +133,16 @@ const {
 const runLocalCommandMock = vi.mocked(runLocalCommand);
 
 const tempRoots: string[] = [];
+const hostPlatform = process.platform;
+
+// Desktop integration cases exercise macOS launch behavior; platform-specific cases override it explicitly.
+beforeAll(() => {
+  Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
+});
+
+afterAll(() => {
+  Object.defineProperty(process, 'platform', { value: hostPlatform, configurable: true });
+});
 
 function createSpawnChildMock() {
   const child = {
