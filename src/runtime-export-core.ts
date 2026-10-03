@@ -32,6 +32,7 @@ body::-webkit-scrollbar,
 `;
 
 export interface CaptureDocumentScreenshotOptions {
+  scope?: 'viewport' | 'full-page';
   targetWidth?: number;
   targetHeight?: number;
   targetPixelRatio?: number;
@@ -641,11 +642,12 @@ export async function captureDocumentScreenshot(
   const format = options.format === 'jpeg' || options.format === 'jpg' ? 'jpeg' : 'png';
   const quality = normalizedQuality(options.quality);
   const maxBytes = positiveByteLimit(options.maxBytes);
+  const captureViewport = options.scope === 'viewport';
   const restoreScreenshotLayout = installScreenshotLayoutOverride(element, {
     targetWidth,
     targetHeight,
   });
-  const restoreScrollOrigin = installScreenshotScrollOrigin(element);
+  const restoreScrollOrigin = captureViewport ? () => undefined : installScreenshotScrollOrigin(element);
   if (targetWidth || targetHeight) {
     await settleScreenshotLayout();
   }
@@ -655,8 +657,8 @@ export async function captureDocumentScreenshot(
   try {
     await settleScreenshotLayout();
     const measuredSize = collectScreenshotSize(element);
-    const width = measuredSize.width;
-    const height = measuredSize.height;
+    const width = captureViewport ? targetWidth ?? Math.max(1, window.innerWidth) : measuredSize.width;
+    const height = captureViewport ? targetHeight ?? Math.max(1, window.innerHeight) : measuredSize.height;
     applyScreenshotBoxSize(element, document.documentElement instanceof HTMLElement ? document.documentElement : null, document.body instanceof HTMLElement ? document.body : null, {
       width,
       height,

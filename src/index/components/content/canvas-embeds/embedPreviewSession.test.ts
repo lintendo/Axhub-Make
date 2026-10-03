@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-    EMBED_PREVIEW_EXIT_CONFIRM_MS,
-    EMBED_PREVIEW_ENTERED_HINT_MS,
+    AXHUB_EMBED_ACTIVATE_REQUESTED_EVENT,
     resolveCanvasEmbedPreviewUrl,
-    resolveEmbedPreviewSessionHint,
-    resolveEmbedPreviewExitPointerDecision,
     resolveScreenshotCompletionAction,
     resolveEmbedRenderKind,
     shouldCaptureInitialPrototypePreviewScreenshot,
@@ -21,107 +18,8 @@ const activePreview = {
 };
 
 describe('embed preview session guards', () => {
-    it('creates a short entered-preview hint with explicit preview copy', () => {
-        expect(resolveEmbedPreviewSessionHint({
-            kind: 'entered',
-            elementId: 'embed-1',
-            now: 1000,
-        })).toEqual({
-            kind: 'entered',
-            elementId: 'embed-1',
-            message: '已进入预览页面',
-            expiresAt: 1000 + EMBED_PREVIEW_ENTERED_HINT_MS,
-        });
-    });
-
-    it('creates a fixed-position exit hint with the existing confirmation copy', () => {
-        expect(resolveEmbedPreviewSessionHint({
-            kind: 'exit-confirm',
-            elementId: 'embed-1',
-            now: 1000,
-        })).toEqual({
-            kind: 'exit-confirm',
-            elementId: 'embed-1',
-            message: '再次点击退出预览',
-            expiresAt: 1000 + EMBED_PREVIEW_EXIT_CONFIRM_MS,
-        });
-    });
-
-    it('blocks the first outside pointer and creates a two-second exit prompt', () => {
-        const decision = resolveEmbedPreviewExitPointerDecision({
-            activePreview,
-            currentPrompt: null,
-            clientX: 240,
-            clientY: 40,
-            now: 1000,
-            targetWithinEmbedUi: false,
-        });
-
-        expect(decision.action).toBe('prompt');
-        expect(decision.shouldPreventCanvasEvent).toBe(true);
-        expect(decision.nextPrompt).toEqual({
-            elementId: 'embed-1',
-            expiresAt: 1000 + EMBED_PREVIEW_EXIT_CONFIRM_MS,
-        });
-    });
-
-    it('exits and still swallows the second outside pointer within the prompt window', () => {
-        const decision = resolveEmbedPreviewExitPointerDecision({
-            activePreview,
-            currentPrompt: {
-                elementId: 'embed-1',
-                expiresAt: 2500,
-            },
-            clientX: 240,
-            clientY: 40,
-            now: 2400,
-            targetWithinEmbedUi: false,
-        });
-
-        expect(decision.action).toBe('exit');
-        expect(decision.shouldPreventCanvasEvent).toBe(true);
-        expect(decision.nextPrompt).toBeNull();
-    });
-
-    it('starts a fresh prompt when the previous confirmation expired', () => {
-        const decision = resolveEmbedPreviewExitPointerDecision({
-            activePreview,
-            currentPrompt: {
-                elementId: 'embed-1',
-                expiresAt: 2500,
-            },
-            clientX: 240,
-            clientY: 40,
-            now: 2501,
-            targetWithinEmbedUi: false,
-        });
-
-        expect(decision.action).toBe('prompt');
-        expect(decision.shouldPreventCanvasEvent).toBe(true);
-        expect(decision.nextPrompt).toEqual({
-            elementId: 'embed-1',
-            expiresAt: 2501 + EMBED_PREVIEW_EXIT_CONFIRM_MS,
-        });
-    });
-
-    it('does not intercept clicks inside the active preview or embed toolbar UI', () => {
-        expect(resolveEmbedPreviewExitPointerDecision({
-            activePreview,
-            currentPrompt: null,
-            clientX: 40,
-            clientY: 40,
-            now: 1000,
-            targetWithinEmbedUi: false,
-        }).action).toBe('allow');
-
-        expect(resolveEmbedPreviewExitPointerDecision({
-            activePreview,
-            currentPrompt: null,
-            clientX: 240,
-            clientY: 40,
-            now: 1000,
-            targetWithinEmbedUi: true,
-        }).action).toBe('allow');
+    it('exposes a dedicated activation request event for double-click entry', () => {
+        expect(AXHUB_EMBED_ACTIVATE_REQUESTED_EVENT).toBe('axhub:embedActivateRequested');
     });
 
     it('blocks canvas wheel events while a preview is active outside the iframe', () => {

@@ -83,7 +83,7 @@ const RUNTIME_GRAPH_REFERER_PATTERNS = [
   /^\/src\//u,
   /^\/themes\//u,
 ];
-const RUNTIME_CONTEXT_QUERY_KEYS = ['projectId', 'gitVersion', 'gitPath'] as const;
+const RUNTIME_CONTEXT_QUERY_KEYS = ['projectId', 'publishedShareId', 'gitVersion', 'gitPath'] as const;
 
 export interface RuntimeDevModuleRequestOptions {
   runtimeProjectRoot?: string | null;

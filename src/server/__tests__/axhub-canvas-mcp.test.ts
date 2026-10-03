@@ -95,6 +95,7 @@ describe('axhub canvas MCP endpoint', () => {
     expect(json.id).toBe('tools');
     expect(json.result.tools.map((tool: any) => tool.name)).toEqual([
       'canvas_get_state',
+      'canvas_checkpoint',
       'canvas_insert_elements',
       'canvas_insert_mermaid',
       'canvas_refresh',
@@ -148,7 +149,6 @@ describe('axhub canvas MCP endpoint', () => {
         arguments: {
           canvasName: 'resources/flows/home.excalidraw',
           includeElements: true,
-          requestId: 'tool-request',
           timeoutMs: 1234,
         },
       },
@@ -161,7 +161,6 @@ describe('axhub canvas MCP endpoint', () => {
       includeElements: true,
     }, {
       canvasName: 'resources/flows/home.excalidraw',
-      requestId: 'tool-request',
       timeoutMs: 1234,
     });
     expect(json.result).toEqual({
@@ -191,6 +190,8 @@ describe('axhub canvas MCP endpoint', () => {
         name: 'canvas_insert_mermaid',
         arguments: {
           canvasName: 'resources/flows/home.excalidraw',
+          expectedRevision: 'revision-1',
+          requestId: 'tool-request',
           mermaidCode: 'flowchart TD\n  A --> B',
           position: { x: 120, y: 240 },
           themeVariables: { fontSize: '20px' },
@@ -203,12 +204,14 @@ describe('axhub canvas MCP endpoint', () => {
     });
 
     expect(sendCommand).toHaveBeenCalledWith('canvas_insert_mermaid', {
+      expectedRevision: 'revision-1',
       mermaidCode: 'flowchart TD\n  A --> B',
       position: { x: 120, y: 240 },
       themeVariables: { fontSize: '20px' },
       flowchart: { curve: 'linear' },
     }, {
       canvasName: 'resources/flows/home.excalidraw',
+      requestId: 'tool-request',
     });
     expect(json.result).toEqual({
       content: [{
@@ -233,7 +236,7 @@ describe('axhub canvas MCP endpoint', () => {
       id: 'call-2',
       method: 'tools/call',
       params: {
-        name: 'canvas_capture',
+          name: 'canvas_capture',
         arguments: { scope: 'viewport' },
       },
     }, {
@@ -254,6 +257,16 @@ describe('axhub canvas MCP endpoint', () => {
         }),
       }],
     });
+  });
+
+  it('rejects persistent mutations without revision and request id', async () => {
+    const { json } = await callMcp({
+      jsonrpc: '2.0',
+      id: 'missing-revision',
+      method: 'tools/call',
+      params: { name: 'canvas_delete_elements', arguments: { elementIds: ['node-a'] } },
+    }, { headerToken: 'secret-token' });
+    expect(json.error).toMatchObject({ data: { code: 'CANVAS_REVISION_CONFLICT' } });
   });
 
   it('returns a JSON-RPC error for invalid tool calls instead of closing the request', async () => {

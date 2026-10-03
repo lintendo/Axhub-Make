@@ -7,6 +7,8 @@ export * from './project-registry.ts';
 export * from './project-metadata.ts';
 export * from './project-records.ts';
 export * from './server-config.ts';
+export * from './server-secrets.ts';
+export * from './ai-services-settings.ts';
 export * from './codex-local-config.ts';
 export * from './make-client-marker.ts';
 export * from './make-state-health.ts';

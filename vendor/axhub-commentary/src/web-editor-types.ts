@@ -169,6 +169,14 @@ export interface ElementLocator {
   frameChain?: string[];
   /** Shadow DOM host selector chain - Phase 2 */
   shadowHostChain?: string[];
+  /** Direct text-node fragment inside the located parent element. */
+  textFragment?: TextFragmentLocator;
+}
+
+/** Stable address for a direct text node edited as its own inline fragment. */
+export interface TextFragmentLocator {
+  /** Index in parent.childNodes; unchanged when the text node is replaced by its wrapper. */
+  childNodeIndex: number;
 }
 
 // =============================================================================
@@ -522,6 +530,8 @@ export interface PrototypeEditCommentMarkerEntry {
 
 export interface PrototypeEditCommentEntry {
   id: string;
+  /** Stable node identity used by external review comments and execution context. */
+  elementKey?: WebEditorElementKey;
   deletedAt?: number | null;
   pageScope?: string;
   state: PrototypeEditCommentStatus;
@@ -540,13 +550,44 @@ export interface PrototypeEditCommentEntry {
   };
   tweak?: PrototypeEditCommentTweakEntry;
   comment?: string;
+  externalComments?: PrototypeExternalCommentEntry[];
   skillIds?: string[];
   marker?: PrototypeEditCommentMarkerEntry | null;
+  /** Host-only idempotency key for a voice-created comment. */
+  voiceCreateOperationId?: string;
+  voiceExecuteOperationId?: string;
+  voiceExecutionPreparedAt?: number;
+  voiceCancelOperationId?: string;
+  voiceCancelPreparedOperationId?: string;
+  voiceStatus?: string;
+  linkedAnnotationId?: string;
+  latestExecution?: {
+    executionId: string;
+    status: string;
+    phase?: string;
+    updatedAt?: number | null;
+  };
+  voiceElementKey?: string;
+  voiceTargetRef?: string;
+  voiceTarget?: CommentaryPageElementSummary;
+  anchorPlacement?: 'target';
+  /** Display metadata for comments imported from a published review. */
+  author?: string | null;
+}
+
+export interface PrototypeExternalCommentEntry {
+  id: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  createdAt: number;
+  updatedAt?: number;
 }
 
 export interface PrototypeEditCommentImageEntry {
   id: string;
   commentId: string;
+  source?: CommentaryImageSource;
   deletedAt?: number | null;
   pageScope?: string;
   name?: string;
@@ -556,6 +597,8 @@ export interface PrototypeEditCommentImageEntry {
   assetPath?: string;
   data?: string;
 }
+
+export type CommentaryImageSource = 'user' | 'target-screenshot';
 
 export interface PrototypeEditCommentsDocument {
   schemaVersion: 3;
@@ -616,6 +659,8 @@ export interface PrototypeEditCommentsPersistenceAdapter {
 }
 
 export interface CommentaryModifiedElementSummary {
+  /** Stable persisted comment identity used by host-managed execution. */
+  commentId?: string;
   elementKey: WebEditorElementKey;
   locator: ElementLocator;
   label: string;
@@ -672,7 +717,6 @@ export interface CommentarySkillOption {
   id: string;
   label: string;
   description?: string;
-  sourceUrl?: string;
   prompt?: string;
   custom?: boolean;
 }
@@ -681,6 +725,8 @@ export interface CommentarySkillSettingsSnapshot {
   selectedSkillIds: string[];
   skillOptions: CommentarySkillOption[];
 }
+
+export type CommentaryAnnotationSaveStatus = 'saving' | 'saved' | 'unsaved';
 
 export interface CommentaryHostToolbarState {
   toolbarMode: CommentaryToolbarMode;
@@ -707,6 +753,7 @@ export interface CommentaryHostToolbarState {
   propertyPanelTitle: string;
   modifiedCount: number;
   terminalTaskCount: number;
+  annotationSaveStatus?: CommentaryAnnotationSaveStatus;
   selectedAgent: WebEditorAgentProvider | null;
   agentOptions: CommentaryHostToolbarAgentOption[];
   aiExecutionConfigSummary: string;
@@ -717,6 +764,8 @@ export interface CommentaryHostToolbarState {
   aiExecutionProviderOptions: CommentaryAiExecutionProviderOption[];
   darkMode: boolean;
   disablePageAnimations: boolean;
+  captureTargetScreenshotAvailable: boolean;
+  captureTargetScreenshot: boolean;
   pageZoomEnabled: boolean;
   copySkillInstallPromptDisabled: boolean;
   selectionModeActive: boolean;
@@ -732,6 +781,8 @@ export type CommentaryHostToolbarAction =
   | { type: 'wake-agent' }
   | ({
       type: 'send-to-agent';
+      /** Real persisted comment identity; execution hosts must not infer a prompt-only task. */
+      commentId?: string;
       elementKey?: WebEditorElementKey;
       pane?: 'primary' | 'secondary';
       promptText?: string;
@@ -763,6 +814,7 @@ export type CommentaryHostToolbarAction =
   | { type: 'copy-global-panel-prompt' }
   | { type: 'toggle-dark-mode'; darkMode?: boolean }
   | { type: 'toggle-page-animations' }
+  | { type: 'toggle-target-screenshot'; enabled?: boolean }
   | { type: 'toggle-page-zoom' }
   | { type: 'toggle-selection-mode'; active?: boolean }
   | { type: 'set-host-surface-visibility'; visible: boolean }
@@ -836,6 +888,8 @@ export interface CommentaryConversationTaskTransport {
 
 export interface CommentaryHostOptions {
   getResourceContext?: () => CommentaryHostResource | null;
+  /** Return the host page element currently under the pointer for voice context. */
+  getCurrentHoveredElement?: () => Element | null;
   /** Optional host-owned scope for external persistence. Local storage remains host-independent. */
   getPersistenceScope?: () => PrototypeEditCommentsPersistenceScope | null;
   persistenceAdapter?: PrototypeEditCommentsPersistenceAdapter;
@@ -860,6 +914,8 @@ export interface CommentaryHostOptions {
   onElementToolAction?: (tool: CommentaryElementTool, element: Element) => void | Promise<void>;
   /** Whether local annotation markdown editing is available for the selected element. */
   canEditAnnotationMarkdown?: (element: Element | null) => boolean;
+  /** Whether the selected-element card may show its inline annotation Markdown editor. */
+  showAnnotationMarkdownEditor?: boolean;
   /** Return a host-specific reason that prevents creating an annotation for the selected element. */
   getCreateAnnotationBlockReason?: (element: Element | null) => string | undefined;
   /** Select whether the Markdown composer edits annotation metadata or document source. */
@@ -895,6 +951,95 @@ export interface SelectedElementSummary {
   tagName: string;
   /** Timestamp for deduplication */
   updatedAt: number;
+}
+
+/** Serializable target context used by host-provided voice tools. */
+export interface CommentaryVoiceTarget {
+  source: 'selected' | 'hovered';
+  elementKey: WebEditorElementKey;
+  locator: ElementLocator;
+  label: string;
+  fullLabel: string;
+  tagName: string;
+  text: string;
+  attributes: Record<string, string>;
+  updatedAt: number;
+}
+
+/** Bounded, serializable page element description for Commentary voice tools. */
+export interface CommentaryPageElementSummary {
+  /** Short-lived opaque reference, valid only for the current page revision. */
+  targetRef: string;
+  /** Human-readable element name. */
+  label: string;
+  /** Visible text, bounded to 120 characters. */
+  textExcerpt: string;
+  /** Lowercase DOM tag name. */
+  tagName: string;
+  /** Explicit or inferred semantic role when available. */
+  role: string | null;
+  /** Compact structural path with tag names only. */
+  path: string;
+  /** Number of visible, included direct children. */
+  childCount: number;
+}
+
+/** Selected and hovered page targets exposed to voice-tool consumers. */
+export interface CommentaryVoiceTargets {
+  selected: CommentaryPageElementSummary | null;
+  hovered: CommentaryPageElementSummary | null;
+  preferred: CommentaryPageElementSummary | null;
+}
+
+export type CommentaryVoiceTargetsListener = (targets: CommentaryVoiceTargets) => void;
+
+/** Bounded criteria for discovering visible page elements. */
+export interface CommentaryPageElementSearchQuery {
+  text?: string;
+  role?: string;
+  tagName?: string;
+  parentTargetRef?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+/** Bounded criteria for reading a compact page-element tree. */
+export interface CommentaryPageElementStructureQuery {
+  targetRef?: string;
+  depth?: number;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface CommentaryPageElementSearchResult {
+  elements: CommentaryPageElementSummary[];
+  nextCursor: string | null;
+}
+
+export interface CommentaryPageElementStructureResult {
+  elements: CommentaryPageElementSummary[];
+  nextCursor: string | null;
+}
+
+export type CommentaryPageElementActivationResult =
+  | { activated: true; targetRef: string }
+  | { activated: false; targetRef: string; error: string };
+
+export type CommentaryVoiceCommentResult =
+  | {
+      applied: true;
+      targetRef: string;
+      commentId: string;
+      target: CommentaryPageElementSummary;
+    }
+  | { applied: false; targetRef: string; error: string };
+
+export interface CommentaryVoiceCommentOptions {
+  anchorPlacement: 'target';
+  /** Host-owned idempotency key; persisted but never exposed in model DTOs. */
+  operationId?: string;
+  /** Built-in prompt-card skills selected for this comment. */
+  skillIds?: readonly string[];
 }
 
 /**
@@ -995,6 +1140,7 @@ export interface CommentaryDebugState {
     elementKey: string;
     status: string;
     sessionId: string | null;
+    requestId: string;
     provider: string | null;
     message: string;
     updatedAt: number;
@@ -1024,6 +1170,33 @@ export interface CommentaryApi {
   refresh: () => void;
   /** Read the currently selected element summary */
   getSelectedElement: () => SelectedElementSummary | null;
+  /** Read a safe selected-first, hover-fallback target snapshot for voice tools. */
+  getVoiceTarget: () => CommentaryVoiceTarget | null;
+  /** Read selected and hovered page targets together. */
+  getVoiceTargets: () => CommentaryVoiceTargets;
+  /** Subscribe to immediate selection and stable-hover target snapshots. */
+  subscribeVoiceTargets: (listener: CommentaryVoiceTargetsListener) => () => void;
+  /** Find visible page elements using bounded, structured criteria. */
+  findVoiceElements: (
+    query: CommentaryPageElementSearchQuery,
+  ) => CommentaryPageElementSearchResult;
+  /** Read a bounded page structure snapshot. */
+  getVoiceElementStructure: (
+    query: CommentaryPageElementStructureQuery,
+  ) => CommentaryPageElementStructureResult;
+  /** Scroll, select, and highlight an opaque target without opening comment input. */
+  activateVoiceElement: (targetRef: string) => Promise<CommentaryPageElementActivationResult>;
+  /** Apply an AI-created comment using an explicit target anchor. */
+  createVoiceComment: (
+    targetRef: string,
+    content: string,
+    options: CommentaryVoiceCommentOptions,
+  ) => Promise<CommentaryVoiceCommentResult>;
+  /** Validate a persisted host execution target without changing editor state. */
+  validateExternalEditingTarget: (
+    elementKey: WebEditorElementKey,
+    targetRef?: CommentaryExternalEditingTargetRef | null,
+  ) => boolean;
   /** Read the current modified element summaries */
   getModifiedElements: () => CommentaryModifiedElementSummary[];
   /** Read aggregated text changes */

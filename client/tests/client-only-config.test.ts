@@ -54,6 +54,12 @@ describe('make-project client-only defaults', () => {
     expect(viteConfig).toContain("appType: 'mpa'");
   });
 
+  it('inlines dynamic runtime modules for single-entry IIFE builds', () => {
+    const viteConfig = fs.readFileSync(path.join(appRoot, 'vite.config.ts'), 'utf8');
+
+    expect(viteConfig).toContain('inlineDynamicImports: isIifeBuild');
+  });
+
   it('does not declare Ant Design as a client dependency or Vite prebundle', () => {
     const packageJson = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8'));
     const viteConfig = fs.readFileSync(path.join(appRoot, 'vite.config.ts'), 'utf8');

@@ -22,11 +22,17 @@ interface ConfigResponse {
         defaultTheme?: string | null;
     };
     automation?: {
-        defaultPromptClient?: PromptClientPreference;
+        conversationPromptClient?: PromptClientPreference;
+        conversationModel?: string | null;
         defaultIDE?: MainIDEPreference;
+        injectLocalAiEntry?: boolean;
+        launchLocalAiApp?: boolean;
         annotationPromptClient?: PromptClientPreference;
         annotationModel?: string | null;
+        canvasPromptClient?: PromptClientPreference;
+        canvasModel?: string | null;
         agentRunConcurrency?: number;
+        autoClearCompletedComments?: boolean;
     };
     assistant?: {
         webBaseUrl?: string | null;
@@ -34,6 +40,9 @@ interface ConfigResponse {
     };
     ai?: {
         imageGeneration?: AssistantImageGenerationConfig | null;
+    };
+    server?: {
+        skipLanPreviewAuth?: boolean;
     };
     uiPreferences?: {
         excalidrawPropertyPanelMode?: ExcalidrawPropertyPanelMode;
@@ -81,7 +90,6 @@ export interface MakeClientUpdateStatus {
     metadataSource: 'online' | 'bundled';
     metadataError?: string;
     updateAvailable: boolean;
-    repairAvailable: boolean;
     canApply: boolean;
     backupPolicy: 'zip-before-overwrite';
     lastBackup: MakeClientUpdateBackupRecord | null;
@@ -250,11 +258,17 @@ interface GetGitWorkspacePromptRequest {
 
 interface SaveServerPreferencesRequest {
     automation?: {
-        defaultPromptClient?: PromptClientPreference;
+        conversationPromptClient?: PromptClientPreference;
+        conversationModel?: string | null;
         defaultIDE?: MainIDEPreference;
+        injectLocalAiEntry?: boolean;
+        launchLocalAiApp?: boolean;
         annotationPromptClient?: PromptClientPreference;
         annotationModel?: string | null;
+        canvasPromptClient?: PromptClientPreference;
+        canvasModel?: string | null;
         agentRunConcurrency?: number;
+        autoClearCompletedComments?: boolean;
     };
     assistant?: {
         webBaseUrl?: string | null;
@@ -360,6 +374,29 @@ interface OpenLocalAppAgentRequest {
     projectId: string;
     agent: LocalAppAgent;
     targetPath?: string;
+}
+
+export type DesktopIntegrationProvider = 'chatgpt' | 'cursor' | 'workbuddy' | 'traework';
+export type DesktopIntegrationOpenAction = 'prepare' | 'restart' | 'normal';
+
+export interface DesktopIntegrationOpenRequest {
+    projectId: string;
+    provider: DesktopIntegrationProvider;
+    action: DesktopIntegrationOpenAction;
+    targetPath?: string;
+}
+
+export interface DesktopIntegrationOpenResponse {
+    success: true;
+    provider: DesktopIntegrationProvider;
+    status: 'opened' | 'restart-required';
+    mode?: 'integrated' | 'normal';
+    launched?: boolean;
+    reused?: boolean;
+    url?: string;
+    openInBrowser?: boolean;
+    noticeCode?: 'project-selection-required';
+    notice?: string;
 }
 
 interface OpenAgentResponse {
@@ -670,6 +707,46 @@ export interface CloudPublishingLatestResponse {
     };
 }
 
+export interface LanHtmlPublishRequest {
+    path: string;
+    includeSource?: boolean;
+}
+
+export interface LanHtmlPublishResponse {
+    publishId: string;
+    resourcePath: string;
+    version: number;
+    url: string;
+    createdAt: string;
+}
+
+export interface LanRealtimePublishRequest {
+    path: string;
+    previewUrl?: string;
+    commentable: boolean;
+}
+
+export interface LanRealtimePublishResponse {
+    shareId: string;
+    resourcePath: string;
+    commentable: boolean;
+    url: string;
+    annotationUrl: string;
+    previewUrl: string;
+}
+
+export interface LanRealtimeContextResponse {
+    shareId: string;
+    commentable: boolean;
+    defaultAuthorIp: string;
+}
+
+export interface LanLatestPublishResponse {
+    resourcePath: string;
+    html: (LanHtmlPublishResponse & { version: number }) | null;
+    realtime: (LanRealtimePublishResponse & { updatedAt: string }) | null;
+}
+
 export interface AxhubUserInfo {
     uid?: number;
     userName?: string;
@@ -819,14 +896,24 @@ function normalizeMakeApiOrigin(value: unknown): string {
         return url.protocol === 'http:' || url.protocol === 'https:' ? url.origin : '';
     } catch {
         return '';
-    }
+  }
 }
 
-function buildMakeApiUrl(path: string): string {
+function readInjectedMakeApiOrigin(): string {
     const globals = typeof window === 'undefined'
         ? null
         : window as unknown as { __AXHUB_MAKE_API_ORIGIN__?: unknown };
-    const makeApiOrigin = normalizeMakeApiOrigin(globals?.__AXHUB_MAKE_API_ORIGIN__);
+    return normalizeMakeApiOrigin(globals?.__AXHUB_MAKE_API_ORIGIN__);
+}
+
+export function resolveMakeApiOrigin(): string {
+    const injectedOrigin = readInjectedMakeApiOrigin();
+    if (injectedOrigin) return injectedOrigin;
+    return typeof window === 'undefined' ? '' : normalizeMakeApiOrigin(window.location.origin);
+}
+
+function buildMakeApiUrl(path: string): string {
+    const makeApiOrigin = readInjectedMakeApiOrigin();
     if (!makeApiOrigin) {
         return path;
     }
@@ -871,18 +958,6 @@ export const apiService = {
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
             throw new Error(result?.error || '创建原型失败');
-        }
-        return result;
-    },
-
-    async startPlaceholderPrototypeGeneration(prototypeName: string, scope: ProjectScope) {
-        const encodedPrototypeName = encodeURIComponent(prototypeName);
-        const response = await fetch(withProjectScope(`/api/prototypes/${encodedPrototypeName}/start-generation`, scope), {
-            method: 'POST',
-        });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            throw new Error(result?.error || '进入原型等待生成态失败');
         }
         return result;
     },
@@ -1214,6 +1289,60 @@ export const apiService = {
             throw createCloudPublishingApiError(result, '云服务发布失败');
         }
         return result;
+    },
+
+    async publishLanHtml(
+        payload: LanHtmlPublishRequest,
+        scope: ProjectScope,
+    ): Promise<LanHtmlPublishResponse> {
+        const response = await fetch(withProjectScope('/api/local-publishing/html', scope), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        return readApiJsonResponse<LanHtmlPublishResponse>(response, '发布固定 HTML 链接失败');
+    },
+
+    async getLatestLanPublishing(path: string | undefined, scope: ProjectScope): Promise<LanLatestPublishResponse> {
+        const query = new URLSearchParams();
+        if (path?.trim()) query.set('path', path.trim());
+        const response = await fetch(withProjectScope(`/api/local-publishing/latest${query.size ? `?${query.toString()}` : ''}`, scope), {
+            cache: 'no-store',
+        });
+        return readApiJsonResponse<LanLatestPublishResponse>(response, '加载最近局域网发布地址失败');
+    },
+
+    async cancelLanPublish(
+        mode: 'html' | 'realtime',
+        payload: { path: string },
+        scope: ProjectScope,
+    ): Promise<{ success: boolean; removed?: boolean }> {
+        const response = await fetch(withProjectScope(`/api/local-publishing/${mode}`, scope), {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        return readApiJsonResponse<{ success: boolean; removed?: boolean }>(response, '取消局域网发布失败');
+    },
+
+    async publishLanRealtime(
+        payload: LanRealtimePublishRequest,
+        scope: ProjectScope,
+    ): Promise<LanRealtimePublishResponse> {
+        const response = await fetch(withProjectScope('/api/local-publishing/realtime', scope), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        return readApiJsonResponse<LanRealtimePublishResponse>(response, '发布实时原型链接失败');
+    },
+
+    async getLanRealtimeContext(shareId: string): Promise<LanRealtimeContextResponse> {
+        const query = new URLSearchParams({ shareId: String(shareId || '').trim() });
+        const response = await fetch(`/api/local-publishing/realtime-context?${query.toString()}`, {
+            cache: 'no-store',
+        });
+        return readApiJsonResponse<LanRealtimeContextResponse>(response, '读取批注发布配置失败');
     },
 
     async getAxhubStatus(): Promise<AxhubStatusResponse> {
@@ -1599,6 +1728,25 @@ export const apiService = {
         const result = await response.json();
         if (!response.ok) {
             throw new Error(result?.error || formatLocalAppOpenFailureMessage());
+        }
+
+        return result;
+    },
+
+    async openDesktopIntegration(
+        payload: DesktopIntegrationOpenRequest,
+    ): Promise<DesktopIntegrationOpenResponse> {
+        const response = await fetch(withProjectScope('/api/desktop-integration/open', { projectId: payload.projectId }), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(result?.error || '打开桌面应用失败');
         }
 
         return result;

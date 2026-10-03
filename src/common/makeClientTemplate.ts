@@ -1,7 +1,7 @@
 export const MAKE_CLIENT_TEMPLATE_ZIP_NAME = 'axhub-make-client-template.zip';
 export const MAKE_CLIENT_TEMPLATE_LATEST_MANIFEST_NAME = 'axhub-make-client-template.latest.json';
-export const DEFAULT_MAKE_CLIENT_TEMPLATE_VERSION = '0.1.18';
-export const DEFAULT_MAKE_CLIENT_TEMPLATE_RELEASE_NOTES = "# Axhub Make Client 0.1.18\n\n- 更新客户端工作规则和内置技能，完善原型开发与截图还原流程\n- 为 `screenshot-to-prototype` 新增 rembg 背景移除能力和重建清单校验\n- `check-app-ready` 返回 Make 管理端深链，便于直接打开目标资源\n- 支持仅包含主规格的原型参与项目元数据同步\n- 更新内置示例原型及相关标注内容";
+export const DEFAULT_MAKE_CLIENT_TEMPLATE_VERSION = '0.1.21';
+export const DEFAULT_MAKE_CLIENT_TEMPLATE_RELEASE_NOTES = "# Axhub Make Client 0.1.21\n\n- 升级 `@axhub/annotation` 至 `^1.0.20`，纳入 Mermaid 与 XMarkdown 文档渲染、跨文档目标和 HTML 文档阅读能力\n- 更新 `annotation-demo`、`beginner-guide`、`touch-and-talk-annotation-demo` 三个官方示例及其批注内容\n- 发布模板继续携带 Design Knowledge `2026-08-14.2` 双平台索引和完整文档快照\n- 更新客户端工作规则和内置技能，完善原型开发与截图还原流程\n- 为 `screenshot-to-prototype` 新增 rembg 背景移除能力和重建清单校验\n- `check-app-ready` 返回 Make 管理端深链，便于直接打开目标资源\n- 支持仅包含主规格的原型参与项目元数据同步\n- 更新内置示例原型及相关标注内容";
 export const PRIMARY_MAKE_CLIENT_TEMPLATE_RELEASE_REPOSITORY = 'lintendo/Axhub-Make';
 export const GITEE_MAKE_CLIENT_TEMPLATE_RELEASE_BASE_URL = 'https://gitee.com/axhub/Axhub-Make/releases/download';
 export const GITEE_MAKE_CLIENT_TEMPLATE_LATEST_RELEASE_TAG = 'make-client-template-latest';

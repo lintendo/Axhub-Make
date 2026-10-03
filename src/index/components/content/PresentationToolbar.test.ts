@@ -54,6 +54,13 @@ describe('PresentationToolbar cloud publishing source', () => {
     expect(centerToolsSource).not.toContain('{deviceSwitcher}');
   });
 
+  it('keeps the paused canvas voice entry out of the toolbar menu', () => {
+    const source = readToolbarSource();
+
+    expect(source).not.toContain('画布语音助手');
+    expect(source).not.toContain('onToggleCanvasVoice?.()');
+  });
+
   it('uses one consistent gap between centered toolbar buttons', () => {
     const source = readToolbarSource();
     const centerToolsSource = source.slice(
@@ -101,7 +108,7 @@ describe('PresentationToolbar cloud publishing source', () => {
   it('keeps only the default publish action, copy URL, and platform settings visible by default', () => {
     const source = readToolbarSource();
 
-    expect(source).toContain('<span>发布</span>');
+    expect(source).toContain('<span className="ax-presentation-toolbar-label">发布</span>');
     expect(source).toContain('云服务');
     expect(source).toContain("visibleCloudPublishTargets = ['axhub']");
     expect(source).toContain("visibleCloudPublishTargetSet.has('axhub')");
@@ -246,17 +253,17 @@ describe('PresentationToolbar Agent host controls source', () => {
       '<div className="h-4 w-px bg-border" aria-hidden="true" />',
     );
     expect(source).toContain(
-      "const showHostPropertyPanelAction = contentMode !== 'theme' && !isDocumentCommentActive;",
+      "const showHostPropertyPanelAction = contentMode !== 'theme' && !isDocumentCommentToolbarActive;",
     );
     expect(source).toContain(
       'const showHostPropertyPanelToolbarAction = showHostPropertyPanelAction && canShowPrototypeDecisionActions;',
     );
     expect(source).toContain(
-      'const showHostPropertyPanelMenuAction = showHostPropertyPanelAction && !canShowPrototypeDecisionActions;',
+      'const showHostPropertyPanelMenuAction = contentMode !== \'theme\' && (isDocumentCommentToolbarActive || !canShowPrototypeDecisionActions);',
     );
   });
 
-  it('labels remaining open-in-editor tooltips with the resolved IDE app name', () => {
+  it('labels open-in-editor tooltips with the resolved IDE app name', () => {
     const source = readToolbarSource();
 
     expect(source).toContain("import { MAIN_IDE_APP_NAMES, resolveVisibleIDEPreference } from '../../../common/ide';");
@@ -265,8 +272,6 @@ describe('PresentationToolbar Agent host controls source', () => {
     expect(source).toContain('resolveVisibleIDEPreference(preferredIDE, ideAvailability)');
     expect(source).toContain("const openInIdeTooltip = openInIdeName ? `在 ${openInIdeName} 中打开` : '在编辑器中打开';");
     expect(source).toContain("const getOpenInIdeTooltip = (targetLabel: string) => openInIdeName ? `在 ${openInIdeName} 中打开${targetLabel}` : `在编辑器中打开${targetLabel}`;");
-    expect(source).not.toContain('{getOpenInIdeTooltip(currentMarkdownLabel)}');
-    expect(source).not.toContain("{getOpenInIdeTooltip('主题')}");
     expect(source).toContain("{getOpenInIdeTooltip('数据表')}");
     expect(source).not.toContain("const openInIdeTooltip = '在编辑器中打开';");
   });
@@ -307,7 +312,34 @@ describe('PresentationToolbar Agent host controls source', () => {
     expect(source).not.toContain("'关闭属性调整'");
   });
 
-  it('keeps host design decisions available without existing decision data and during PRD annotation', () => {
+  it('uses one theme-colored checkbox presentation for target screenshots and voice', () => {
+    const source = readToolbarSource();
+    const hostMoreMenuSource = source.slice(
+      source.indexOf('const hostMoreMenu = hostToolbarState?.visible ? ('),
+      source.indexOf('const hostExecutionToolbarControls = hostToolbarState?.visible ? ('),
+    );
+
+    expect(source).not.toContain("import { Switch } from '@/components/ui/switch';");
+    expect(hostMoreMenuSource).toContain('hostToolbarState.captureTargetScreenshotAvailable ? (');
+    expect(hostMoreMenuSource).toContain('role="menuitemcheckbox"');
+    expect(hostMoreMenuSource).toContain('aria-checked={hostToolbarState.captureTargetScreenshot}');
+    expect(hostMoreMenuSource).not.toContain('<Switch');
+    expect(hostMoreMenuSource).toContain(
+      'hostToolbarState.captureTargetScreenshot\n                                        ? <Check className={hostMenuIconClass} />\n                                        : <ImageIcon className={hostMenuIconClass} />',
+    );
+    expect(hostMoreMenuSource).toContain("type: 'toggle-target-screenshot'");
+    expect(hostMoreMenuSource).toContain(
+      'enabled: !hostToolbarState.captureTargetScreenshot',
+    );
+    expect(hostMoreMenuSource).toContain('附带目标截图');
+    expect(source).toContain(
+      'const hostMenuSelectedItemClass = "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary";',
+    );
+    expect(hostMoreMenuSource.match(/&& hostMenuSelectedItemClass/g)).toHaveLength(2);
+    expect(hostMoreMenuSource).not.toContain('&& "bg-accent text-accent-foreground"');
+  });
+
+  it('keeps host design decisions available without existing decision data outside PRD annotation', () => {
     const source = readToolbarSource();
     const hostMoreMenuSource = source.slice(
       source.indexOf('const hostMoreMenu = hostToolbarState?.visible ? ('),
@@ -317,11 +349,58 @@ describe('PresentationToolbar Agent host controls source', () => {
     expect(source).toContain('prototypeDecisionDataAvailable?: boolean;');
     expect(source).toContain('prototypeDecisionDataAvailable = false,');
     expect(source).toContain('const canShowPrototypeDecisionActions = !isPreviewContent || prototypeDecisionDataAvailable;');
-    expect(source).toContain("const showHostPropertyPanelAction = contentMode !== 'theme' && !isDocumentCommentActive;");
+    expect(source).toContain("const showHostPropertyPanelAction = contentMode !== 'theme' && !isDocumentCommentToolbarActive;");
     expect(source).toContain('const showHostPropertyPanelToolbarAction = showHostPropertyPanelAction && canShowPrototypeDecisionActions;');
-    expect(source).toContain('const showHostPropertyPanelMenuAction = showHostPropertyPanelAction && !canShowPrototypeDecisionActions;');
+    expect(source).toContain('const showHostPropertyPanelMenuAction = contentMode !== \'theme\' && (isDocumentCommentToolbarActive || !canShowPrototypeDecisionActions);');
     expect(hostMoreMenuSource).toContain('showHostPropertyPanelMenuAction ? (');
-    expect(hostMoreMenuSource).not.toContain('prototypeAnnotationSessionActive');
+  });
+
+  it('hides page and save menu groups only during PRD annotation', () => {
+    const source = readToolbarSource();
+    const hostMoreMenuSource = source.slice(
+      source.indexOf('const hostMoreMenu = hostToolbarState?.visible ? ('),
+      source.indexOf('const hostExecutionToolbarControls = hostToolbarState?.visible ? ('),
+    );
+    const pageGuardStart = hostMoreMenuSource.indexOf('{!prototypeAnnotationSessionActive ? (');
+    const pageGuardClosing = '\n                        ) : null}';
+    const pageGuardEnd = hostMoreMenuSource.indexOf(
+      `${pageGuardClosing}\n                        <div role="separator" className={hostMenuSeparatorClass} />`,
+      pageGuardStart,
+    ) + pageGuardClosing.length;
+    const pageGuardSource = hostMoreMenuSource.slice(pageGuardStart, pageGuardEnd);
+    const saveGuardStart = hostMoreMenuSource.indexOf(
+      '{isQuickEditActive && !isReadOnlyHtmlPrototypeSpec && !prototypeAnnotationSessionActive ? (',
+    );
+    const saveGuardClosing = '\n                        ) : null}';
+    const saveGuardEnd = hostMoreMenuSource.indexOf(
+      `${saveGuardClosing}\n                    </>`,
+      saveGuardStart,
+    ) + saveGuardClosing.length;
+    const saveGuardSource = hostMoreMenuSource.slice(saveGuardStart, saveGuardEnd);
+    const separatorSource = '<div role="separator" className={hostMenuSeparatorClass} />';
+    const agentGroupIndex = hostMoreMenuSource.indexOf('<div role="group" aria-label="Agent">');
+    const helpGroupIndex = hostMoreMenuSource.indexOf('<div role="group" aria-label="帮助">');
+
+    expect(pageGuardStart).toBeGreaterThan(-1);
+    expect(pageGuardEnd).toBeGreaterThan(pageGuardStart);
+    expect(pageGuardSource.match(/role="separator"/g)).toHaveLength(1);
+    expect(pageGuardSource).toContain(separatorSource);
+    expect(pageGuardSource).toContain('<div role="group" aria-label="页面">');
+    expect(pageGuardSource).toContain("type: 'toggle-property-panel'");
+    expect(pageGuardSource).toContain("type: 'toggle-page-animations'");
+
+    expect(saveGuardStart).toBeGreaterThan(pageGuardEnd);
+    expect(saveGuardEnd).toBeGreaterThan(saveGuardStart);
+    expect(saveGuardSource.match(/role="separator"/g)).toHaveLength(1);
+    expect(saveGuardSource).toContain(separatorSource);
+    expect(saveGuardSource).toContain('<div role="group" aria-label="保存">');
+    expect(saveGuardSource).toContain("getQuickEditSaveMenuActionHandlers('save-text')");
+    expect(saveGuardSource).toContain("getQuickEditSaveMenuActionHandlers('save-style')");
+
+    expect(agentGroupIndex).toBeGreaterThan(-1);
+    expect(agentGroupIndex).toBeLessThan(pageGuardStart);
+    expect(helpGroupIndex).toBeGreaterThan(pageGuardEnd);
+    expect(helpGroupIndex).toBeLessThan(saveGuardStart);
   });
 
   it('adds the review action after annotation and design decisions', () => {
@@ -336,7 +415,7 @@ describe('PresentationToolbar Agent host controls source', () => {
     expect(source).toContain('prototypeAnnotationSessionActive?: boolean');
     expect(source).toContain('handleOpenPrototypeAnnotationSession: () => void | Promise<void>;');
     expect(source).toContain('<MapPin /> PRD 标注');
-    expect(source).toContain("<TooltipContent>{prototypeAnnotationSessionActive ? '退出标注' : '使用标注需求和生成 RRD'}</TooltipContent>");
+    expect(source).toContain("'使用标注需求和生成 RRD'");
     expect(source).toContain('<ListChecks /> 评审');
     expect(source).toContain("const reviewPanelTooltip = reviewPanelOpen ? '关闭评审' : '评审';");
     expect(normalPreviewActionsSource).not.toContain('<Code2 /> 打开');
@@ -349,6 +428,23 @@ describe('PresentationToolbar Agent host controls source', () => {
     expect(normalPreviewActionsSource.indexOf('<SlidersHorizontal /> 决策')).toBeLessThan(
       normalPreviewActionsSource.indexOf('<ListChecks /> 评审'),
     );
+  });
+
+  it('disables PRD annotation when the shared quick-edit runtime is unavailable', () => {
+    const source = readToolbarSource();
+    const annotationButtonStart = source.indexOf(
+      'variant={prototypeAnnotationSessionActive ? "secondary" : "ghost"}',
+    );
+    const annotationButtonEnd = source.indexOf('</TooltipProvider>', annotationButtonStart);
+    const annotationButtonSource = source.slice(annotationButtonStart, annotationButtonEnd);
+
+    expect(annotationButtonSource).toContain(
+      'disabled={quickEditDisabled || prototypeAnnotationEnableLoading}',
+    );
+    expect(annotationButtonSource).toContain(': quickEditDisabled');
+    expect(annotationButtonSource).toContain('? quickEditTooltip');
+    expect(annotationButtonSource).toContain("? '退出标注'");
+    expect(annotationButtonSource).toContain("'使用标注需求和生成 RRD'");
   });
 
   it('uses the standard title-description dialog when a prototype has no annotations yet', () => {
@@ -415,13 +511,13 @@ describe('PresentationToolbar Agent host controls source', () => {
       source.indexOf('const hostMoreMenu = hostToolbarState?.visible ? ('),
       source.indexOf('const hostExecutionToolbarControls = hostToolbarState?.visible ? ('),
     );
-    const hostControlsSource = source.slice(
+    const hostExecutionControlsSource = source.slice(
       source.indexOf('const hostExecutionToolbarControls = hostToolbarState?.visible ? ('),
-      source.indexOf('const activeQuickEditToolbarButtons = ('),
+      source.indexOf('const hostClearToolbarControl ='),
     );
 
-    expect(hostControlsSource).not.toContain("'host-copy'");
-    expect(hostControlsSource).not.toContain("{ type: 'copy-prompt' }");
+    expect(hostExecutionControlsSource).not.toContain("'host-copy'");
+    expect(hostExecutionControlsSource).not.toContain("{ type: 'copy-prompt' }");
     expect(hostMoreMenuSource).toContain('hostToolbarState.copyPromptVisible ? (');
     expect(hostMoreMenuSource).toContain("{...getHostMenuActionHandlers({ type: 'copy-prompt' })}");
     expect(hostMoreMenuSource).toContain('<Copy className={hostMenuIconClass} /> 复制提示词');
@@ -520,10 +616,90 @@ describe('PresentationToolbar Agent host controls source', () => {
   it('places the more button between refresh and exit while quick editing', () => {
     const source = readToolbarSource();
 
+    expect(source).toContain('const [exitPending, setExitPending] = React.useState(false);');
+    expect(source).toContain('const handleToolbarExit = () => {');
     expect(source).toMatch(/<RotateCw \/> 刷新[\s\S]*\{hostMoreMenu\}[\s\S]*<CircleX \/> 退出/);
+    expect(source).toContain("aria-label={exitPending ? '退出中' : '退出'}");
+    expect(source).toContain('<Loader2 className="animate-spin" /> 退出中');
+    expect(source).toContain('disabled={exitPending}');
+    expect(source).toContain('onClick={handleToolbarExit}');
   });
 
-  it('keeps text and style saving while hiding destructive style cleanup', () => {
+  it('shows the real annotation save status and count after all quick-edit buttons only when annotations exist', () => {
+    const source = readToolbarSource();
+    const statusComponentSource = source.slice(
+      source.indexOf('function QuickEditAnnotationSaveStatus('),
+      source.indexOf('function PreviewSplitIcon()'),
+    );
+    const statusSource = source.slice(
+      source.indexOf('const hostToolbarControls ='),
+      source.indexOf('const activeQuickEditToolbarButtons = ('),
+    );
+    const activeToolbarSource = source.slice(
+      source.indexOf('const activeQuickEditToolbarButtons = ('),
+      source.indexOf('const resourceActionButtons = (() => {'),
+    );
+
+    expect(source).toContain("saving: '正在保存'");
+    expect(source).toContain("saved: '已保存'");
+    expect(source).toContain("unsaved: '未保存'");
+    expect(source).toContain("saving: '正在保存批注。'");
+    expect(source).toContain("unsaved: '保存失败，请重试。'");
+    expect(statusSource).toContain('const quickEditAnnotationCount = Math.max(0, hostToolbarState?.modifiedCount ?? 0);');
+    expect(statusSource).toContain('const hasQuickEditAnnotationData = quickEditAnnotationCount > 0;');
+    expect(statusSource).not.toContain('prototypeDecisionDataAvailable');
+    expect(statusSource).toContain('const showQuickEditLocalSaveStatus = hasQuickEditAnnotationData;');
+    expect(statusSource).toContain("const quickEditAnnotationSaveStatus = hostToolbarState?.annotationSaveStatus ?? 'saved';");
+    expect(statusComponentSource).toContain('const visibleStatus = useSmoothedAnnotationSaveStatus(status);');
+    expect(statusComponentSource).toContain('`${QUICK_EDIT_ANNOTATION_SAVE_STATUS_LABELS[visibleStatus]} · ${count} 条`');
+    expect(statusComponentSource).toContain("if (visibleStatus === 'saved')");
+    expect(statusComponentSource).toContain('<HoverCard openDelay={160} closeDelay={120}>');
+    expect(statusComponentSource).toContain('className="w-[360px] space-y-3 p-3.5 text-left"');
+    expect(statusComponentSource).toContain('让 AI 处理批注');
+    expect(statusComponentSource).toContain('批注已保存，可以通过以下三种方式交给 AI。');
+    expect(statusComponentSource).toContain('直接让 AI 处理批注');
+    expect(statusComponentSource).toContain('推荐');
+    expect(statusComponentSource).toContain('在 AI 输入框中说“处理批注”即可。');
+    expect(statusComponentSource).toContain('disabled={copyPromptDisabled}');
+    expect(statusComponentSource).toContain('onClick={onCopyPrompt}');
+    expect(statusComponentSource).toContain('复制提示词');
+    expect(statusComponentSource).toContain('复制提示词给 AI');
+    expect(statusComponentSource).toContain('<span>，再粘贴到 AI 输入框中发送。</span>');
+    expect(statusComponentSource).toContain('在页面上执行');
+    expect(statusComponentSource).toContain('点击顶部工具栏的“AI 执行”，需本地安装相关 CLI 工具。');
+    expect(statusComponentSource.match(/flex flex-wrap items-center gap-1.5 text-xs font-medium text-foreground/g)).toHaveLength(3);
+    expect(statusComponentSource.match(/mt-1 whitespace-nowrap text-xs leading-5 text-muted-foreground/g)).toHaveLength(3);
+    expect(statusComponentSource.match(/onClick=/g)).toHaveLength(1);
+    expect(statusComponentSource).not.toContain('send-to-agent');
+    expect(statusSource).not.toContain('useSmoothedAnnotationSaveStatus(');
+    expect(statusSource).toContain('const quickEditLocalSaveStatus = showQuickEditLocalSaveStatus ? (');
+    expect(statusSource).toContain('<QuickEditAnnotationSaveStatus');
+    expect(statusSource).toContain('status={quickEditAnnotationSaveStatus}');
+    expect(statusSource).toContain('count={quickEditAnnotationCount}');
+    expect(statusSource).toContain('copyPromptDisabled={!hostToolbarState?.copyPromptVisible || Boolean(hostToolbarState.copyPromptDisabled)}');
+    expect(statusSource).toContain("onCopyPrompt={() => runHostAction({ type: 'copy-prompt' })}");
+    expect(statusSource).toContain(': null;');
+    expect(statusComponentSource).toContain('absolute left-full top-1/2');
+    expect(statusComponentSource).toContain('ml-4');
+    expect(statusComponentSource).toContain('min-w-[112px]');
+    expect(statusComponentSource).toContain('-translate-y-1/2');
+    expect(statusComponentSource).toContain('text-foreground opacity-50');
+    expect(statusComponentSource).toContain("aria-label={visibleStatus === 'saved' ? '查看批注处理方法'");
+    expect(statusComponentSource).toContain('{label}');
+    expect(statusComponentSource).toContain('<TooltipContent>{QUICK_EDIT_ANNOTATION_SAVE_STATUS_TOOLTIPS[visibleStatus]}</TooltipContent>');
+    expect(activeToolbarSource).toMatch(
+      /\{hostMoreMenu\}[\s\S]*<CircleX \/> 退出[\s\S]*\{quickEditLocalSaveStatus\}/,
+    );
+    expect(activeToolbarSource).toContain('className="relative inline-flex items-center gap-3"');
+    expect(activeToolbarSource).toMatch(
+      /data-axhub-toolbar-group="execution"[\s\S]*<CircleX \/> 退出[\s\S]*<\/div>\s*\{quickEditLocalSaveStatus\}/,
+    );
+    expect(source).toMatch(
+      /className="relative inline-flex items-center gap-1"[\s\S]*\{isDocumentEditActive \? documentEditTrailingActionButtons : null\}[\s\S]*\{isDocumentCommentActive \? quickEditLocalSaveStatus : null\}/,
+    );
+  });
+
+  it('keeps only text and style save actions in the save menu', () => {
     const source = readToolbarSource();
     const hostMoreMenuSource = source.slice(
       source.indexOf('const hostMoreMenu = hostToolbarState?.visible ? ('),
@@ -602,6 +778,20 @@ describe('PresentationToolbar Agent host controls source', () => {
     expect(hostControlsSource).toContain('active: hostToolbarState.selectionModeActive');
   });
 
+  it('uses annotation wording and exposes document management in prototype annotation mode', () => {
+    const source = readToolbarSource();
+    const hostControlsSource = source.slice(
+      source.indexOf('const hostExecutionToolbarControls = hostToolbarState?.visible ? ('),
+      source.indexOf('const activeQuickEditToolbarButtons = ('),
+    );
+
+    expect(hostControlsSource).toContain("prototypeAnnotationSessionActive ? '标注元素' : '选择元素'");
+    expect(hostControlsSource).toContain('文档管理');
+    expect(source).toContain('DocumentManagementDialog');
+    expect(hostControlsSource).toContain('prototypeAnnotationSessionActive || publishedAnnotationSession ? null :');
+    expect(hostControlsSource).not.toContain('prototypeAnnotationSessionActive ? null : (');
+  });
+
   it('hides element selection and design decision host actions during document annotation', () => {
     const source = readToolbarSource();
     const hostMoreMenuSource = source.slice(
@@ -610,8 +800,22 @@ describe('PresentationToolbar Agent host controls source', () => {
     );
 
     expect(source).toContain('const showHostSelectionModeAction = !isDocumentCommentActive;');
-    expect(source).toContain('&& !isDocumentCommentActive');
+    expect(source).toContain('const isDocumentCommentToolbarActive = isDocumentCommentActive || (isHtmlDocumentEditingContent && isQuickEditActive);');
     expect(hostMoreMenuSource).toContain('showHostPropertyPanelMenuAction ? (');
+  });
+
+  it('keeps design decisions in the more menu during HTML document annotation', () => {
+    const source = readToolbarSource();
+
+    expect(source).toContain(
+      'const isDocumentCommentToolbarActive = isDocumentCommentActive || (isHtmlDocumentEditingContent && isQuickEditActive);',
+    );
+    expect(source).toContain(
+      'const showHostPropertyPanelAction = contentMode !== \'theme\' && !isDocumentCommentToolbarActive;',
+    );
+    expect(source).toContain(
+      'const showHostPropertyPanelMenuAction = contentMode !== \'theme\' && (isDocumentCommentToolbarActive || !canShowPrototypeDecisionActions);',
+    );
   });
 
   it('shows the selection mode shortcut hint in the host toolbar without binding it in the parent page', () => {

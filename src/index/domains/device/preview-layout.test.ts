@@ -112,17 +112,6 @@ describe('preview layout', () => {
     });
   });
 
-  it('honors a locked automatic desktop decision during temporary layout changes', () => {
-    expect(resolveAdaptiveDesktopPreviewConfig(createDefaultPreviewConfig(), 1519, true)).toMatchObject({
-      singlePreset: 'custom',
-      adaptiveDesktop: true,
-    });
-    expect(resolveAdaptiveDesktopPreviewConfig(createDefaultPreviewConfig(), 1100, false)).toMatchObject({
-      singlePreset: 'desktop',
-      adaptiveDesktop: false,
-    });
-  });
-
   it('defaults multi-page preview to three columns with bounded live iframes', () => {
     const config = createDefaultPreviewConfig();
 
@@ -242,6 +231,25 @@ describe('preview layout', () => {
     expect(layout.single.logicalWidth).toBe(1280);
     expect(layout.single.logicalHeight).toBe(800);
     expect(layout.single.scale).toBeCloseTo(1000 / 1280, 5);
+  });
+
+  it('reserves a small horizontal gap around custom scaled previews', () => {
+    const layout = resolvePreviewLayout({
+      config: {
+        ...createDefaultPreviewConfig(),
+        singlePreset: 'custom',
+        customWidth: 1440,
+        customHeight: 900,
+        scaleMode: 'fit-screen',
+      },
+      containerWidth: 1000,
+      containerHeight: 900,
+      singleReservedWidth: 16,
+    });
+
+    expect(layout.mode).toBe('single');
+    expect(layout.single.viewportWidth).toBe(984);
+    expect(layout.single.scale).toBeCloseTo(984 / 1440, 5);
   });
 
   it('shrinks custom single preview by the tighter screen constraint in fit-screen mode', () => {

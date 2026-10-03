@@ -21,7 +21,7 @@ export function buildStartGuidePrompt({
   kind: CanvasAiStartKind;
   scene: CanvasAiScene;
   prompt: string;
-  settings: CanvasGenerationPromptSettings;
+  settings?: CanvasGenerationPromptSettings;
   finalGuide: CanvasGenerationFinalGuide;
 }): string {
   const configuredSystemPrompt = getCanvasAiStartSystemPrompt(kind, scene);

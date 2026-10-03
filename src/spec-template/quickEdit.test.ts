@@ -4,9 +4,34 @@ import {
     formatLocatorPath,
     resolveMarkdownQuickEditMeta,
     shouldIgnoreInitialMarkdownEditorChange,
+    syncDocumentCommentaryForMode,
 } from './quickEdit';
 
 describe('spec-template quickEdit helpers', () => {
+    it('keeps document commentary stopped in edit mode', () => {
+        const events: string[] = [];
+
+        syncDocumentCommentaryForMode('edit', {
+            startCommentary: () => events.push('start'),
+            stopCommentary: () => events.push('stop'),
+            disableSelectionMode: () => events.push('disable-selection'),
+        });
+
+        expect(events).toEqual(['stop']);
+    });
+
+    it('starts document commentary with selection disabled in comment mode', () => {
+        const events: string[] = [];
+
+        syncDocumentCommentaryForMode('comment', {
+            startCommentary: () => events.push('start'),
+            stopCommentary: () => events.push('stop'),
+            disableSelectionMode: () => events.push('disable-selection'),
+        });
+
+        expect(events).toEqual(['start', 'disable-selection']);
+    });
+
     it('builds a PUT save request for project-scoped prototype Markdown specs', async () => {
         const quickEditModule = await import('./quickEdit');
         const buildRequest = (quickEditModule as Record<string, unknown>).buildPrototypeSpecMarkdownSaveRequest;
@@ -44,6 +69,19 @@ describe('spec-template quickEdit helpers', () => {
             docType: 'doc',
             docPath: '/workspace/src/resources/intro.md',
             prototypePath: '',
+        });
+    });
+
+    it('resolves fixed Markdown template urls to their root templates path', () => {
+        expect(resolveMarkdownQuickEditMeta('/api/document-templates/prd?projectId=client-project&path=templates%2Fprd.md')).toMatchObject({
+            resourceKind: 'template',
+            docType: 'template',
+            docPath: 'templates/prd.md',
+            prototypePath: '',
+        });
+        expect(resolveMarkdownQuickEditMeta('/api/document-templates/custom?path=templates%2Fcustom.md')).toMatchObject({
+            resourceKind: 'unknown',
+            docPath: '',
         });
     });
 

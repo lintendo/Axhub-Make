@@ -20,11 +20,102 @@ import {
   createAppDialogController,
   setImperativeAppDialog,
 } from '../index/components/dialogs/AppDialogProvider';
-import type { CommentaryModifiedElementSummary } from '@/common/web-editor-types';
+import type {
+  CommentaryModifiedElementSummary,
+  CommentaryPageElementActivationResult,
+  CommentaryPageElementSearchResult,
+  CommentaryPageElementStructureResult,
+  CommentaryVoiceCommentResult,
+  CommentaryVoiceTargets,
+} from '@/common/web-editor-types';
+import { createQuickEditRequestRegistry } from '../common/quickEditRequestRegistry';
+import { normalizeMakeServerOrigin } from '../common/makeServerOrigin';
+import { isTrustedPrototypeEditorParentEvent as matchesTrustedPrototypeEditorParent } from './prototypeEditorBridgeTrust';
+import type {
+  QuickEditSaveAction,
+  QuickEditSaveCommitResult,
+  QuickEditSaveDraft,
+  QuickEditSavePreflight,
+} from '../common/quickEditSave';
 
 let editorModeManager: ReturnType<typeof createEditorModeManager> | null = null;
 const devTemplateDialogController = createAppDialogController();
 let prototypeEditorHostToolbarUnsubscribe: (() => void) | null = null;
+const prototypeEditorVoiceTargetSubscriptions = new Map<string, () => void>();
+const quickEditCommitRegistry = createQuickEditRequestRegistry<QuickEditSaveCommitResult>();
+let trustedPrototypeEditorParentOrigin = '';
+let publishedAnnotationRuntimeScheduled = false;
+
+function isPublishedAnnotationRoute(): boolean {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get('annotationSession') === '1' && Boolean(params.get('publishedShareId'));
+}
+
+function readPublishedMakeServerOrigin(): string {
+  if (typeof window === 'undefined') return '';
+  const params = new URLSearchParams(window.location.search);
+  return normalizeMakeServerOrigin(params.get('makeServerOrigin')) || window.location.origin;
+}
+
+function mountPublishedAnnotationRuntime() {
+  if (typeof window === 'undefined' || typeof document === 'undefined' || !isPublishedAnnotationRoute()) return;
+  if (publishedAnnotationRuntimeScheduled) return;
+  publishedAnnotationRuntimeScheduled = true;
+
+  const mount = () => {
+    const params = new URLSearchParams(window.location.search);
+    const projectId = String(params.get('projectId') || '').trim();
+    void Promise.resolve(editorModeManager?.api.enable('webEditorV2', {
+      toolbarMode: 'inline',
+      interactionProfile: 'annotation',
+      makeServerOrigin: readPublishedMakeServerOrigin(),
+      ...(projectId ? { annotationProjectId: projectId } : {}),
+    })).catch((error: unknown) => {
+      console.error('[Axhub] Published annotation runtime failed to start:', error);
+    });
+  };
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', () => window.setTimeout(mount, 0), { once: true });
+  } else {
+    window.setTimeout(mount, 0);
+  }
+}
+
+const PROTOTYPE_EDITOR_VOICE_MESSAGE_TYPES = new Set([
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_GET_TARGETS',
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_FIND_ELEMENTS',
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_GET_STRUCTURE',
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_ACTIVATE_ELEMENT',
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_CREATE_COMMENT',
+  'AXHUB_PROTOTYPE_EDITOR_VALIDATE_EDITING_TARGET',
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_REFRESH_COMMENTS',
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_SUBSCRIBE_TARGETS',
+  'AXHUB_PROTOTYPE_EDITOR_VOICE_UNSUBSCRIBE_TARGETS',
+]);
+
+const PROTOTYPE_EDITOR_TRUSTED_PARENT_MESSAGE_TYPES = new Set([
+  ...PROTOTYPE_EDITOR_VOICE_MESSAGE_TYPES,
+  'AXHUB_PROTOTYPE_EDITOR_DISABLE',
+  'AXHUB_PROTOTYPE_EDITOR_DISABLE_PANEL_ONLY',
+  'AXHUB_PROTOTYPE_EDITOR_HOST_TOOLBAR_ACTION',
+  'AXHUB_PROTOTYPE_EDITOR_SAVE_ACTION',
+  'AXHUB_PROTOTYPE_EDITOR_PREPARE_SAVE',
+  'AXHUB_PROTOTYPE_EDITOR_PREFLIGHT_SAVE',
+  'AXHUB_PROTOTYPE_EDITOR_COMMIT_SAVE',
+  'AXHUB_PROTOTYPE_EDITOR_NODE_EDITING_STATE',
+  'AXHUB_PROTOTYPE_EDITOR_QUERY_STATE',
+]);
+
+function isTrustedPrototypeEditorParentEvent(event: MessageEvent): boolean {
+  return matchesTrustedPrototypeEditorParent({
+    source: event.source,
+    origin: event.origin,
+    parentWindow: window.parent,
+    trustedOrigin: trustedPrototypeEditorParentOrigin,
+  });
+}
 
 /**
  * 渲染组件到页面
@@ -77,6 +168,8 @@ export function renderComponent(Component: any, props?: any) {
       )
     );
     setImperativeAppDialog(devTemplateDialogController);
+
+    mountPublishedAnnotationRuntime();
 
     // 渲染后自动注入稳定 ID，并在 DOM 就绪后启动编辑器
     setTimeout(() => {
@@ -144,11 +237,16 @@ function ensureEmbedScrollbarHidingStyle() {
 
 type PrototypeEditorStatePayload = {
   requestId?: unknown;
+  subscriptionId?: string;
+  targetOrigin?: string;
   success: boolean;
   handled?: boolean;
   error?: string;
   promptText?: string;
   modifiedElements?: CommentaryModifiedElementSummary[];
+  saveDraft?: QuickEditSaveDraft | null;
+  savePreflight?: QuickEditSavePreflight;
+  saveCommitResult?: QuickEditSaveCommitResult;
 };
 
 function postPrototypeEditorState(payload: PrototypeEditorStatePayload) {
@@ -158,6 +256,7 @@ function postPrototypeEditorState(payload: PrototypeEditorStatePayload) {
   window.parent.postMessage({
     type: 'AXHUB_PROTOTYPE_EDITOR_STATE',
     requestId: typeof payload.requestId === 'string' ? payload.requestId : undefined,
+    ...(payload.subscriptionId ? { subscriptionId: payload.subscriptionId } : {}),
     success: payload.success,
     active: editorModeManager?.api.getMode?.() === 'webEditorV2',
     mode: editorModeManager?.api.getMode?.() ?? 'none',
@@ -168,7 +267,55 @@ function postPrototypeEditorState(payload: PrototypeEditorStatePayload) {
     ...(payload.error ? { error: payload.error } : {}),
     ...(payload.promptText ? { promptText: payload.promptText } : {}),
     ...(payload.modifiedElements ? { modifiedElements: payload.modifiedElements } : {}),
-  }, '*');
+    ...(payload.saveDraft !== undefined ? { saveDraft: payload.saveDraft } : {}),
+    ...(payload.savePreflight ? { savePreflight: payload.savePreflight } : {}),
+    ...(payload.saveCommitResult ? { saveCommitResult: payload.saveCommitResult } : {}),
+  }, payload.targetOrigin || '*');
+}
+
+function teardownPrototypeEditorVoiceTargetSubscriptions() {
+  prototypeEditorVoiceTargetSubscriptions.forEach((unsubscribe) => unsubscribe());
+  prototypeEditorVoiceTargetSubscriptions.clear();
+}
+
+function postPrototypeEditorVoiceTargetsChanged(
+  subscriptionId: string,
+  voiceTargets: CommentaryVoiceTargets,
+  targetOrigin: string,
+) {
+  window.parent.postMessage({
+    type: 'AXHUB_PROTOTYPE_EDITOR_VOICE_TARGETS_CHANGED',
+    subscriptionId,
+    voiceTargets,
+  }, targetOrigin);
+}
+
+function postPrototypeEditorVoiceState(payload: {
+  requestId?: unknown;
+  subscriptionId?: string;
+  targetOrigin: string;
+  success: boolean;
+  error?: string;
+  voiceTargets?: CommentaryVoiceTargets;
+  voiceSearchResult?: CommentaryPageElementSearchResult;
+  voiceStructureResult?: CommentaryPageElementStructureResult;
+  voiceActivationResult?: CommentaryPageElementActivationResult;
+  voiceCommentResult?: CommentaryVoiceCommentResult;
+  editingTargetValid?: boolean;
+}) {
+  window.parent.postMessage({
+    type: 'AXHUB_PROTOTYPE_EDITOR_STATE',
+    requestId: typeof payload.requestId === 'string' ? payload.requestId : undefined,
+    success: payload.success,
+    ...(payload.subscriptionId ? { subscriptionId: payload.subscriptionId } : {}),
+    ...(payload.error ? { error: payload.error } : {}),
+    ...(payload.voiceTargets ? { voiceTargets: payload.voiceTargets } : {}),
+    ...(payload.voiceSearchResult ? { voiceSearchResult: payload.voiceSearchResult } : {}),
+    ...(payload.voiceStructureResult ? { voiceStructureResult: payload.voiceStructureResult } : {}),
+    ...(payload.voiceActivationResult ? { voiceActivationResult: payload.voiceActivationResult } : {}),
+    ...(payload.voiceCommentResult ? { voiceCommentResult: payload.voiceCommentResult } : {}),
+    ...(typeof payload.editingTargetValid === 'boolean' ? { editingTargetValid: payload.editingTargetValid } : {}),
+  }, payload.targetOrigin);
 }
 
 function ensurePrototypeEditorHostToolbarBridge() {
@@ -322,8 +469,7 @@ if (typeof window !== 'undefined') {
   }
 
   editorModeManager = createEditorModeManager();
-  const initialEditorMode = editorModeManager.getInitialMode();
-
+  mountPublishedAnnotationRuntime();
   (window as any).DevTemplateBootstrap = {
     renderComponent,
     React,
@@ -339,11 +485,22 @@ if (typeof window !== 'undefined') {
       return;
     }
 
+    if (PROTOTYPE_EDITOR_TRUSTED_PARENT_MESSAGE_TYPES.has(String(event.data?.type || ''))
+      && !isTrustedPrototypeEditorParentEvent(event)) {
+      return;
+    }
+
     if (event.data && event.data.type === 'AXHUB_PROTOTYPE_EDITOR_ENABLE') {
+      const launchOptions = event.data.options && typeof event.data.options === 'object'
+        ? event.data.options
+        : {};
+      const requestedParentOrigin = normalizeMakeServerOrigin(launchOptions.makeServerOrigin);
+      if (event.source !== window.parent || !requestedParentOrigin || requestedParentOrigin !== event.origin) {
+        return;
+      }
+      trustedPrototypeEditorParentOrigin = '';
+      teardownPrototypeEditorVoiceTargetSubscriptions();
       try {
-        const launchOptions = event.data.options && typeof event.data.options === 'object'
-          ? event.data.options
-          : {};
         await Promise.resolve(editorModeManager?.api.enable('webEditorV2', {
           mobileMode: typeof launchOptions.mobileMode === 'boolean' ? launchOptions.mobileMode : undefined,
           toolbarMode: 'host',
@@ -353,8 +510,8 @@ if (typeof window !== 'undefined') {
             : undefined,
           assistantPanelOpen: Boolean(launchOptions.assistantPanelOpen),
           commentPageScope: readPrototypeEditorBridgeCommentPageScope(event.data),
-          annotationApiBaseUrl: typeof launchOptions.annotationApiBaseUrl === 'string'
-            ? launchOptions.annotationApiBaseUrl
+          makeServerOrigin: typeof launchOptions.makeServerOrigin === 'string'
+            ? launchOptions.makeServerOrigin
             : undefined,
           annotationProjectId: typeof launchOptions.annotationProjectId === 'string'
             ? launchOptions.annotationProjectId
@@ -362,7 +519,11 @@ if (typeof window !== 'undefined') {
           interactionProfile: launchOptions.interactionProfile === 'annotation'
             ? 'annotation'
             : undefined,
+          initialSelectionModeActive: typeof launchOptions.initialSelectionModeActive === 'boolean'
+            ? launchOptions.initialSelectionModeActive
+            : undefined,
         }));
+        trustedPrototypeEditorParentOrigin = requestedParentOrigin;
         ensurePrototypeEditorHostToolbarBridge();
         postPrototypeEditorState({
           requestId: event.data.requestId,
@@ -381,6 +542,8 @@ if (typeof window !== 'undefined') {
       try {
         await Promise.resolve(editorModeManager?.api.disable());
         teardownPrototypeEditorHostToolbarBridge();
+        teardownPrototypeEditorVoiceTargetSubscriptions();
+        trustedPrototypeEditorParentOrigin = '';
         postPrototypeEditorState({
           requestId: event.data.requestId,
           success: true,
@@ -395,10 +558,16 @@ if (typeof window !== 'undefined') {
     }
 
     if (event.data && event.data.type === 'AXHUB_PROTOTYPE_EDITOR_ENABLE_PANEL_ONLY') {
+      const launchOptions = event.data.options && typeof event.data.options === 'object'
+        ? event.data.options
+        : {};
+      const requestedParentOrigin = normalizeMakeServerOrigin(launchOptions.makeServerOrigin);
+      if (event.source !== window.parent || !requestedParentOrigin || requestedParentOrigin !== event.origin) {
+        return;
+      }
+      trustedPrototypeEditorParentOrigin = '';
+      teardownPrototypeEditorVoiceTargetSubscriptions();
       try {
-        const launchOptions = event.data.options && typeof event.data.options === 'object'
-          ? event.data.options
-          : {};
         await Promise.resolve(editorModeManager?.api.enablePanelOnly({
           mobileMode: typeof launchOptions.mobileMode === 'boolean' ? launchOptions.mobileMode : undefined,
           toolbarMode: 'host',
@@ -408,13 +577,14 @@ if (typeof window !== 'undefined') {
             : undefined,
           assistantPanelOpen: Boolean(launchOptions.assistantPanelOpen),
           commentPageScope: readPrototypeEditorBridgeCommentPageScope(event.data),
-          annotationApiBaseUrl: typeof launchOptions.annotationApiBaseUrl === 'string'
-            ? launchOptions.annotationApiBaseUrl
+          makeServerOrigin: typeof launchOptions.makeServerOrigin === 'string'
+            ? launchOptions.makeServerOrigin
             : undefined,
           annotationProjectId: typeof launchOptions.annotationProjectId === 'string'
             ? launchOptions.annotationProjectId
             : undefined,
         }));
+        trustedPrototypeEditorParentOrigin = requestedParentOrigin;
         ensurePrototypeEditorHostToolbarBridge();
         postPrototypeEditorState({
           requestId: event.data.requestId,
@@ -433,6 +603,8 @@ if (typeof window !== 'undefined') {
       try {
         await Promise.resolve(editorModeManager?.api.disablePanelOnly());
         teardownPrototypeEditorHostToolbarBridge();
+        teardownPrototypeEditorVoiceTargetSubscriptions();
+        trustedPrototypeEditorParentOrigin = '';
         postPrototypeEditorState({
           requestId: event.data.requestId,
           success: true,
@@ -461,9 +633,13 @@ if (typeof window !== 'undefined') {
             promptText: promptText || undefined,
             modifiedElements,
           });
-        } else if (action?.type === 'send-to-agent' && action?.elementKey) {
-          const promptText = editorModeManager?.api.getElementPromptText?.(String(action.elementKey || '')) ?? '';
+        } else if (action?.type === 'send-to-agent' && (action?.elementKey || action?.commentId)) {
           const modifiedElements = editorModeManager?.api.getEditedSnapshot?.()?.modifiedElements ?? [];
+          const matchedElement = action?.elementKey
+            ? null
+            : modifiedElements.find((item) => String(item?.commentId || '') === String(action?.commentId || ''));
+          const elementKey = String(action?.elementKey || matchedElement?.elementKey || '');
+          const promptText = editorModeManager?.api.getElementPromptText?.(elementKey) ?? '';
           postPrototypeEditorState({
             requestId: event.data.requestId,
             success: true,
@@ -514,6 +690,67 @@ if (typeof window !== 'undefined') {
       }
     }
 
+    if (event.data && event.data.type === 'AXHUB_PROTOTYPE_EDITOR_PREPARE_SAVE') {
+      try {
+        const action = event.data.action as QuickEditSaveAction;
+        const saveDraft = await editorModeManager?.api.prepareQuickEditSave(action);
+        postPrototypeEditorState({
+          requestId: event.data.requestId,
+          success: true,
+          handled: Boolean(editorModeManager?.api.prepareQuickEditSave),
+          saveDraft: saveDraft ?? null,
+        });
+      } catch (error) {
+        postPrototypeEditorState({
+          requestId: event.data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (event.data && event.data.type === 'AXHUB_PROTOTYPE_EDITOR_PREFLIGHT_SAVE') {
+      try {
+        const savePreflight = await editorModeManager?.api.preflightQuickEditSave(event.data.draft as QuickEditSaveDraft);
+        if (!savePreflight) throw new Error('快速编辑保存预检能力不可用。');
+        postPrototypeEditorState({
+          requestId: event.data.requestId,
+          success: true,
+          handled: true,
+          savePreflight,
+        });
+      } catch (error) {
+        postPrototypeEditorState({
+          requestId: event.data.requestId,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (event.data && event.data.type === 'AXHUB_PROTOTYPE_EDITOR_COMMIT_SAVE') {
+      const requestId = String(event.data.requestId || '').trim();
+      try {
+        const saveCommitResult = await quickEditCommitRegistry.run(requestId, async () => {
+          const result = await editorModeManager?.api.commitQuickEditSave(event.data.draft as QuickEditSaveDraft);
+          if (!result) throw new Error('快速编辑保存提交能力不可用。');
+          return result;
+        });
+        postPrototypeEditorState({
+          requestId,
+          success: true,
+          handled: true,
+          saveCommitResult,
+        });
+      } catch (error) {
+        postPrototypeEditorState({
+          requestId,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     if (event.data && event.data.type === 'AXHUB_PROTOTYPE_EDITOR_NODE_EDITING_STATE') {
       try {
         if (!editorModeManager?.api.setNodeEditingState) {
@@ -537,6 +774,193 @@ if (typeof window !== 'undefined') {
           error: String(error),
         });
       }
+    }
+
+    if (event.source === window.parent && event.data?.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_GET_TARGETS') {
+      postPrototypeEditorVoiceState({
+        requestId: event.data.requestId,
+        targetOrigin: event.origin,
+        success: true,
+        voiceTargets: editorModeManager?.api.getVoiceTargets() ?? {
+          selected: null,
+          hovered: null,
+          preferred: null,
+        },
+      });
+    }
+
+    if (event.source === window.parent && event.data?.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_FIND_ELEMENTS') {
+      try {
+        const voiceSearchResult = editorModeManager?.api.findVoiceElements(event.data.query ?? {}) ?? {
+          elements: [],
+          nextCursor: null,
+        };
+        postPrototypeEditorVoiceState({
+          requestId: event.data.requestId,
+          targetOrigin: event.origin,
+          success: true,
+          voiceSearchResult,
+        });
+      } catch (error) {
+        postPrototypeEditorVoiceState({
+          requestId: event.data.requestId,
+          targetOrigin: event.origin,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (event.source === window.parent && event.data?.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_GET_STRUCTURE') {
+      try {
+        const voiceStructureResult = editorModeManager?.api.getVoiceElementStructure(event.data.query ?? {}) ?? {
+          elements: [],
+          nextCursor: null,
+        };
+        postPrototypeEditorVoiceState({
+          requestId: event.data.requestId,
+          targetOrigin: event.origin,
+          success: true,
+          voiceStructureResult,
+        });
+      } catch (error) {
+        postPrototypeEditorVoiceState({
+          requestId: event.data.requestId,
+          targetOrigin: event.origin,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (event.source === window.parent && event.data?.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_ACTIVATE_ELEMENT') {
+      const targetRef = String(event.data.targetRef || '');
+      try {
+        const voiceActivationResult = await editorModeManager?.api.activateVoiceElement(targetRef);
+        if (!voiceActivationResult) throw new Error('页面元素激活能力不可用');
+        postPrototypeEditorVoiceState({
+          requestId: event.data.requestId,
+          targetOrigin: event.origin,
+          success: true,
+          voiceActivationResult,
+        });
+      } catch (error) {
+        postPrototypeEditorVoiceState({
+          requestId: event.data.requestId,
+          targetOrigin: event.origin,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (event.source === window.parent && event.data?.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_CREATE_COMMENT') {
+      const targetRef = String(event.data.targetRef || '');
+      try {
+        const voiceCommentResult = await editorModeManager?.api.createVoiceComment(
+          targetRef,
+          String(event.data.content || ''),
+          {
+            anchorPlacement: 'target',
+            operationId: String(event.data.options?.operationId || ''),
+          },
+        );
+        if (!voiceCommentResult) throw new Error('页面批注能力不可用');
+        postPrototypeEditorVoiceState({
+          requestId: event.data.requestId,
+          targetOrigin: event.origin,
+          success: true,
+          voiceCommentResult,
+        });
+      } catch (error) {
+        postPrototypeEditorVoiceState({
+          requestId: event.data.requestId,
+          targetOrigin: event.origin,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (event.source === window.parent && event.data?.type === 'AXHUB_PROTOTYPE_EDITOR_VALIDATE_EDITING_TARGET') {
+      try {
+        const editingTargetValid = await editorModeManager?.api.validateExternalEditingTarget?.(
+          String(event.data.elementKey || ''),
+          event.data.targetRef ?? null,
+        ) === true;
+        postPrototypeEditorVoiceState({
+          requestId: event.data.requestId,
+          targetOrigin: event.origin,
+          success: true,
+          editingTargetValid,
+        });
+      } catch {
+        postPrototypeEditorVoiceState({
+          requestId: event.data.requestId,
+          targetOrigin: event.origin,
+          success: true,
+          editingTargetValid: false,
+        });
+      }
+    }
+
+    if (event.source === window.parent && event.data?.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_REFRESH_COMMENTS') {
+      const deletedCommentIds = Array.isArray(event.data.deletedCommentIds)
+        ? event.data.deletedCommentIds.filter((value: unknown): value is string => typeof value === 'string')
+        : [];
+      try {
+        await editorModeManager?.api.refreshPersistedComments?.(deletedCommentIds);
+        postPrototypeEditorVoiceState({
+          requestId: event.data.requestId,
+          targetOrigin: event.origin,
+          success: true,
+        });
+      } catch (error) {
+        postPrototypeEditorVoiceState({
+          requestId: event.data.requestId,
+          targetOrigin: event.origin,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (event.source === window.parent && event.data?.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_SUBSCRIBE_TARGETS') {
+      const subscriptionId = String(event.data.subscriptionId || '');
+      if (subscriptionId) {
+        prototypeEditorVoiceTargetSubscriptions.get(subscriptionId)?.();
+        let subscribed = false;
+        const unsubscribe = editorModeManager?.api.subscribeVoiceTargets((voiceTargets) => {
+          if (subscribed && event.origin === trustedPrototypeEditorParentOrigin) {
+            postPrototypeEditorVoiceTargetsChanged(subscriptionId, voiceTargets, event.origin);
+          }
+        }) ?? (() => undefined);
+        prototypeEditorVoiceTargetSubscriptions.set(subscriptionId, unsubscribe);
+        postPrototypeEditorVoiceState({
+          requestId: event.data.requestId,
+          subscriptionId,
+          targetOrigin: event.origin,
+          success: true,
+          voiceTargets: editorModeManager?.api.getVoiceTargets() ?? {
+            selected: null,
+            hovered: null,
+            preferred: null,
+          },
+        });
+        subscribed = true;
+      }
+    }
+
+    if (event.source === window.parent && event.data?.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_UNSUBSCRIBE_TARGETS') {
+      const subscriptionId = String(event.data.subscriptionId || '');
+      prototypeEditorVoiceTargetSubscriptions.get(subscriptionId)?.();
+      prototypeEditorVoiceTargetSubscriptions.delete(subscriptionId);
+      postPrototypeEditorVoiceState({
+        requestId: event.data.requestId,
+        subscriptionId,
+        targetOrigin: event.origin,
+        success: true,
+      });
     }
 
     // Delayed state sync: parent sends this after enterPrototypeEditor to catch

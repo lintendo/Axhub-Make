@@ -9,6 +9,7 @@ Axhub 画布节点本质上是标准 Excalidraw 元素，Axhub 扩展信息存�
 | `customData.title` | 面向用户的节点标题 |
 | `customData.previewUrl` | 预览模式中渲染的 URL |
 | `customData.openUrl` | 节点操作中打开的 URL |
+| `customData.projectId` | 节点所属的 Make 项目 ID |
 | `customData.previewKind` | 渲染类型，例如 `web`、`doc`、`image`、`none` |
 | `customData.resourceType` | 资源类型：`prototype`、`doc` 或 `theme` |
 | `customData.resourceId` | 项目 metadata 中的资源 id 或名称 |
@@ -19,6 +20,8 @@ Axhub 画布节点本质上是标准 Excalidraw 元素，Axhub 扩展信息存�
 | `customData.annotationUpdatedAt` | 批注更新时间，ISO 8601 格式 |
 
 `customData.previewUrl`、`customData.openUrl` 和元素 `link` 是画布运行时字段，可以使用相对路由或 API 路径。把预览入口发给用户验收时，不要直接复用相对字段值；先按项目“预览链接口径”补齐当前 runtime 或管理端 origin。
+
+新建项目内嵌入节点必须同时写入 `customData.projectId`。元素 `link`、`customData.previewUrl` 或 `customData.openUrl` 只要使用 Make 管理端相对路由或 `/api/` 路径，就必须携带与 `customData.projectId` 相同的 `projectId` query 参数；不要依赖打开节点时再补参数。
 
 ## 嵌入资源节点
 
@@ -35,11 +38,12 @@ AI 生成或新建资源节点默认使用 `customData.embedViewMode: "preview"`
 ```json
 {
   "type": "embeddable",
-  "link": "/?resourceType=prototype&resourceId=<prototype-id>&view=demo&sidebar=collapsed",
+  "link": "/?projectId=<project-id>&p=<prototype-id>&sidebar=collapsed",
   "customData": {
+    "projectId": "<project-id>",
     "title": "原型标题",
     "previewUrl": "http://localhost:<port>/prototypes/<prototype-id>",
-    "openUrl": "/?resourceType=prototype&resourceId=<prototype-id>&view=demo&sidebar=collapsed",
+    "openUrl": "/?projectId=<project-id>&p=<prototype-id>&sidebar=collapsed",
     "previewKind": "web",
     "resourceType": "prototype",
     "resourceId": "<prototype-id>",
@@ -58,11 +62,13 @@ AI 生成或新建资源节点默认使用 `customData.embedViewMode: "preview"`
 ```json
 {
   "type": "embeddable",
-  "link": "/api/markdown-file?path=<encoded-path>",
+  "link": "/api/markdown-file?path=<encoded-path>&projectId=<project-id>",
   "customData": {
     "type": "axhub-doc",
+    "projectId": "<project-id>",
     "title": "文档标题",
-    "previewUrl": "/api/markdown-file?path=<encoded-path>",
+    "previewUrl": "/api/markdown-file?path=<encoded-path>&projectId=<project-id>",
+    "openUrl": "/?projectId=<project-id>&doc=<doc-id>&sidebar=collapsed",
     "previewKind": "doc",
     "resourceType": "doc",
     "resourceId": "<doc-id>",
@@ -76,6 +82,25 @@ AI 生成或新建资源节点默认使用 `customData.embedViewMode: "preview"`
 通过 `customData.resourceType: "theme"` 或 `customData.type: "axhub-theme"` 识别。
 
 主题节点与原型/文档节点使用相同的 `embeddable` 结构，`resourceType` 为 `theme`，`previewKind` 通常为 `web` 或 `none`。
+
+新建主题节点示例：
+
+```json
+{
+  "type": "embeddable",
+  "link": "/?projectId=<project-id>&theme=<theme-id>&sidebar=collapsed",
+  "customData": {
+    "type": "axhub-theme",
+    "projectId": "<project-id>",
+    "title": "主题标题",
+    "openUrl": "/?projectId=<project-id>&theme=<theme-id>&sidebar=collapsed",
+    "previewKind": "web",
+    "resourceType": "theme",
+    "resourceId": "<theme-id>",
+    "embedViewMode": "preview"
+  }
+}
+```
 
 ## Drawio 节点
 
@@ -98,7 +123,7 @@ Drawio 节点是图片元素。`files[fileId].dataURL` 保存带 Drawio XML 的 
 
 创建或更新 Drawio 节点时：
 
-- 推荐持久化资源文件后缀为 `.drawio.svg`，例如 `src/resources/diagrams/<diagram-id>.drawio.svg` 或当前画布同级 `<name>.assets/diagrams/<diagram-id>.drawio.svg`。
+- 推荐持久化资源文件后缀为 `.drawio.svg`，例如 `src/resources/diagrams/<diagram-id>.drawio.svg` 或当前画布对应的 `src/resources/.assets/<resource-relative-path>/diagrams/<diagram-id>.drawio.svg`。
 - `files[fileId].dataURL` 应是 `data:image/svg+xml;base64,...`。
 - SVG 根节点应使用 `data-drawio="<base64-encoded mxfile>"` 保存 Drawio XML，便于后续在 diagrams.net 编辑器里继续编辑。
 - 如果只是初始化一个空 Drawio 节点，可以使用默认空图 XML；如果已经确定使用 Draw.io 承载流程图或关系图，应把图结构写入 Drawio XML，而不是只写普通 Excalidraw 文本框。
@@ -110,7 +135,7 @@ Drawio 节点是图片元素。`files[fileId].dataURL` 保存带 Drawio XML 的 
 原型嵌入节点如果存在 `customData.screenshotUrl`，优先使用该截图地址。截图文件常见位置：
 
 ```text
-src/resources/<folder>/<name>.assets/embed-<elementId>.png
+src/resources/.assets/<resource-relative-path>/embed-<elementId>.png
 ```
 
 截图缓存不等同于页面实现素材；只有用户明确要求把它作为素材使用时，才把它当作实现资产处理。

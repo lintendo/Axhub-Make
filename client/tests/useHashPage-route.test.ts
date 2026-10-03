@@ -126,7 +126,7 @@ describe('useHashPage route definition', () => {
     const route = defineHashPageRoute([
       { id: 'content-annotation', title: '内容标注', group: '标注类型' },
       { id: 'state-annotation', title: '状态标注', group: '标注类型' },
-      { id: 'prototype-directory', title: '原型目录' },
+      { id: 'prototype-directory', title: '页面目录' },
     ], { defaultPageId: 'content-annotation' });
 
     const result = renderUseHashPage(route);
@@ -138,7 +138,7 @@ describe('useHashPage route definition', () => {
       pages: [
         { id: 'content-annotation', title: '内容标注', group: '标注类型' },
         { id: 'state-annotation', title: '状态标注', group: '标注类型' },
-        { id: 'prototype-directory', title: '原型目录' },
+        { id: 'prototype-directory', title: '页面目录' },
       ],
       defaultPageId: 'content-annotation',
       activePageId: 'state-annotation',
@@ -183,7 +183,7 @@ describe('useHashPage route definition', () => {
     vi.stubGlobal('window', windowStub);
     const route = defineHashPageRoute([
       { id: 'prototype-as-prd', title: '原型即 PRD' },
-      { id: 'prototype-directory', title: '原型目录' },
+      { id: 'prototype-directory', title: '页面目录' },
     ], { defaultPageId: 'prototype-as-prd' });
 
     const result = renderUseHashPage(route);

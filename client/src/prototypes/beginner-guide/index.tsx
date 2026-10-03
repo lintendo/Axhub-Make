@@ -101,24 +101,24 @@ const modelRecommendations: ModelRecommendation[] = [
         feature: '综合能力强，但价格高，适合规划',
     },
     {
-        name: 'Grok 4.5',
+        name: 'Grok 4.6',
         vendor: 'xAI',
         feature: '综合能力强，速度快，性价比高',
-    },
-    {
-        name: 'GLM-5.2',
-        vendor: '智谱 AI',
-        feature: '国产平替，综合能力强，不支持多模态',
-    },
-    {
-        name: 'Kimi K2.7',
-        vendor: 'Moonshot',
-        feature: '国产平替，UI/UX 设计能力优秀',
     },
     {
         name: 'DeepSeek V4 Pro',
         vendor: 'DeepSeek',
         feature: '国产平替，性价比高，综合能力强，不支持多模态',
+    },
+    {
+        name: 'Kimi K3.0',
+        vendor: 'Moonshot',
+        feature: '国产平替，UI/UX 设计能力优秀',
+    },
+    {
+        name: 'GLM-5.3',
+        vendor: '智谱 AI',
+        feature: '国产平替，综合能力强，不支持多模态',
     },
 ];
 
@@ -138,6 +138,7 @@ const instructionTips: InstructionTip[] = [
 ];
 
 const guideRoute = defineHashPageRoute([
+    { id: 'overview', title: '总览' },
     { id: 'install-agent', title: '安装 Agent' },
     { id: 'choose-model', title: '选对模型' },
     { id: 'give-instructions', title: '给 AI 下达指令' },
@@ -145,13 +146,24 @@ const guideRoute = defineHashPageRoute([
     { id: 'edit-prototype', title: '编辑原型' },
     { id: 'publish-prototype', title: '发布原型' },
     { id: 'advanced-guide', title: '获取帮助' },
-], { defaultPageId: 'install-agent' });
+], { defaultPageId: 'overview' });
 
 const chapters: GuideChapter[] = [
     {
+        id: 'overview',
+        title: '认识 Axhub Make',
+        eyebrow: '第 01 章',
+        summary: '面向产品经理的 AI 工作台，可生成并管理原型、项目资料、PRD 与视觉规范。',
+        sections: ['本地服务', '原型生命周期', '资料与规范'],
+        highlights: [],
+        note: 'Axhub Make 把原型、项目资料、PRD 和视觉规范放在同一个本地项目中，让 AI 在一致的上下文里持续完成工作。',
+        wordCount: '约 500 字',
+        duration: '3 分钟',
+    },
+    {
         id: 'install-agent',
         title: '安装 Agent',
-        eyebrow: '第 01 章',
+        eyebrow: '第 02 章',
         summary: '选一个你顺手的 AI 工具，把 Axhub Make 项目打开，然后做一次简单确认。',
         sections: ['选择工具', '打开项目', '验证成功'],
         highlights: ['已选择一个 Agent', '已在 Agent 中打开本项目', 'AI 回复“已打开正确项目”'],
@@ -162,7 +174,7 @@ const chapters: GuideChapter[] = [
     {
         id: 'choose-model',
         title: '选对模型',
-        eyebrow: '第 02 章',
+        eyebrow: '第 03 章',
         summary: '先手动选推荐模型，不要一上来就用 Auto。',
         sections: ['模型优先级', '避开 Auto', '对话框入口'],
         highlights: ['已选择推荐模型之一', '未使用非 Cursor 的 Auto', '知道在输入框附近切换模型'],
@@ -173,7 +185,7 @@ const chapters: GuideChapter[] = [
     {
         id: 'give-instructions',
         title: '给 AI 下达指令',
-        eyebrow: '第 03 章',
+        eyebrow: '第 04 章',
         summary: '大胆说清楚你的想法，再用图片和新对话降低沟通成本。',
         sections: ['沟通心态', '三个技巧', '练习任务'],
         highlights: ['已用普通话描述任务', '已准备截图或参考图', '已复制练习提示词并发给 AI'],
@@ -184,7 +196,7 @@ const chapters: GuideChapter[] = [
     {
         id: 'create-prototype',
         title: '创建原型',
-        eyebrow: '第 04 章',
+        eyebrow: '第 05 章',
         summary: '直接说想法，让 AI 补全需求和设计，再生成原型。',
         sections: ['直接说需求', '补全信息', '练习任务'],
         highlights: ['知道清晰需求只要先说 3 项', '知道想法不完整时可以让 AI 补全', '已复制快递官网首页练习提示词'],
@@ -195,18 +207,18 @@ const chapters: GuideChapter[] = [
     {
         id: 'edit-prototype',
         title: '编辑原型',
-        eyebrow: '第 05 章',
-        summary: '直接说哪里要改，用截图、浏览器和批注减少来回沟通。',
-        sections: ['直接描述', '带上页面', '使用批注'],
-        highlights: ['会用截图、标注和语音描述修改', '知道把浏览器页面添加到对话', '知道用 Axhub Make 批注让 AI 执行'],
-        note: '编辑原型不是写长需求。指出位置，说清变化，最好带图。',
-        wordCount: '约 700 字',
+        eyebrow: '第 06 章',
+        summary: '直接说哪里要改，用截图、浏览器、批注或规格文档减少来回沟通。',
+        sections: ['局部编辑', '带上页面', '修改规格文档'],
+        highlights: ['会用截图、标注和语音描述修改', '知道把浏览器页面添加到对话', '知道用规格文档发起大范围调整'],
+        note: '编辑原型不是写长需求。局部修改直接点出位置；涉及流程和板块时，更新规格文档再让 AI 整体调整。',
+        wordCount: '约 800 字',
         duration: '5 分钟',
     },
     {
         id: 'publish-prototype',
         title: '发布原型',
-        eyebrow: '第 06 章',
+        eyebrow: '第 07 章',
         summary: '记住两个入口：右上角菜单负责发布和导出，项目菜单负责开发环境访问。',
         sections: ['右上角菜单', '项目菜单'],
         highlights: ['知道右上角菜单可以发布和导出', '知道可以导出 Axure、Figma 和 HTML', '会从项目菜单获取开发环境的局域网地址'],
@@ -217,10 +229,10 @@ const chapters: GuideChapter[] = [
     {
         id: 'advanced-guide',
         title: '获取帮助',
-        eyebrow: '第 07 章',
+        eyebrow: '第 08 章',
         summary: '遇到问题时，你可以加入 Axhub 社群，也可以让 AI 按文档一步步指导你。',
         sections: ['加入 Axhub 社群', '让 AI 指导你'],
-        highlights: ['知道从 Axhub 官网加入社群', '知道可以让 AI 指导使用 Axhub Make', '已复制 AI 指导提示词'],
+        highlights: [],
         note: '遇到问题不用自己摸索。你可以从 Axhub 官网加入社群，也可以把指导文档交给 AI，让 AI 按文档陪你排查和操作。',
         wordCount: '约 300 字',
         duration: '2 分钟',
@@ -265,6 +277,93 @@ function usePromptClipboard(prompt: string) {
     };
 
     return { copyStatus, handleCopyPrompt };
+}
+
+function OverviewChapter() {
+    return (
+        <>
+            <section className="beginner-guide-manuscript" aria-labelledby="overview-service-title">
+                <h3 className="beginner-guide-section-title" id="overview-service-title">运行方式</h3>
+                <p className="beginner-guide-lede">
+                    Axhub Make 是一个本地 Web 服务。打开浏览器，或打开 Agent 自带的浏览器，就能在你的电脑上使用它；项目和资料始终留在本地目录中。
+                </p>
+            </section>
+
+            <section className="beginner-guide-manuscript" aria-labelledby="overview-preparation-title">
+                <h3 className="beginner-guide-section-title" id="overview-preparation-title">准备工作</h3>
+                <div className="beginner-guide-preparation-flow" aria-label="准备工作流程">
+                    <div className="beginner-guide-preparation-step">
+                        <span>1</span>
+                        <div>
+                            <strong>安装 Agent</strong>
+                            <small>选择一个顺手的 AI 编程工具</small>
+                        </div>
+                    </div>
+                    <ArrowRight className="beginner-guide-preparation-arrow" size={17} aria-hidden="true" />
+                    <div className="beginner-guide-preparation-step">
+                        <span>2</span>
+                        <div>
+                            <strong>选对模型</strong>
+                            <small>让 AI 从一开始就有稳定的输出</small>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section className="beginner-guide-manuscript" aria-labelledby="overview-lifecycle-title">
+                <h3 className="beginner-guide-section-title" id="overview-lifecycle-title">核心流程</h3>
+                <p>
+                    从第一版页面到交付，先让 AI 生成原型，再围绕页面持续编辑；需要时再进入可选环节，最后完成发布。
+                </p>
+                <div className="beginner-guide-lifecycle-flow" aria-label="原型生命周期流程">
+                    <div className="beginner-guide-lifecycle-node">
+                        <small>01</small>
+                        <strong>生成原型</strong>
+                        <span>把想法变成首版页面</span>
+                    </div>
+                    <ArrowRight className="beginner-guide-lifecycle-arrow" size={17} aria-hidden="true" />
+                    <div className="beginner-guide-lifecycle-node">
+                        <small>02</small>
+                        <strong>编辑原型</strong>
+                        <span>通过对话、截图或批注迭代</span>
+                    </div>
+                    <ArrowRight className="beginner-guide-lifecycle-arrow" size={17} aria-hidden="true" />
+                    <div className="beginner-guide-lifecycle-node is-optional">
+                        <small>可选</small>
+                        <strong>外部工具精修</strong>
+                        <span>在 Figma 或 Axure 中继续完善</span>
+                    </div>
+                    <ArrowRight className="beginner-guide-lifecycle-arrow" size={17} aria-hidden="true" />
+                    <div className="beginner-guide-lifecycle-node is-optional">
+                        <small>可选</small>
+                        <strong>需求标注</strong>
+                        <span>整理页面说明并生成 PRD</span>
+                    </div>
+                    <ArrowRight className="beginner-guide-lifecycle-arrow" size={17} aria-hidden="true" />
+                    <div className="beginner-guide-lifecycle-node">
+                        <small>03</small>
+                        <strong>发布原型</strong>
+                        <span>分享链接或导出交付文件</span>
+                    </div>
+                </div>
+                <p className="beginner-guide-lifecycle-note">外部工具精修和需求标注按项目需要使用，可以直接跳过。</p>
+            </section>
+
+            <section className="beginner-guide-manuscript" aria-labelledby="overview-context-title">
+                <h3 className="beginner-guide-section-title" id="overview-context-title">更多功能</h3>
+                <div className="beginner-guide-capability-grid">
+                    <article className="beginner-guide-capability-card">
+                        <h4>项目资料管理</h4>
+                        <p>支持导入或生成项目资料，把需求、业务背景和已有材料放进项目。后续 AI 能基于同一份资料继续工作，减少上下文断裂。</p>
+                    </article>
+                    <article className="beginner-guide-capability-card">
+                        <h4>视觉规范管理</h4>
+                        <p>支持导入或生成视觉规范，把品牌、页面和文案的风格沉淀为规范。后续生成和编辑时，视觉与文字表达会更一致。</p>
+                    </article>
+                </div>
+            </section>
+        </>
+    );
 }
 
 function InstallAgentChapter({ projectPath }: { projectPath: string }) {
@@ -331,7 +430,7 @@ function InstallAgentChapter({ projectPath }: { projectPath: string }) {
                             <span>2</span>
                             <div>
                                 <h4>在 Agent 软件中打开 Make 项目</h4>
-                                <p>如果你用 WorkBuddy、TRAE Work、ChatGPT 这类工具，请在新建项目时，把这个目录加入进去。</p>
+                                <p>新建项目或打开工作区时，你可能会看到“工作空间”“项目目录”“项目文件夹”或“代码仓库（repo）”等名称。无论是 WorkBuddy、TRAE、Cursor、Claude Code、Codex 还是 ChatGPT，把这个目录加入进去即可。</p>
                             </div>
                         </div>
                         <figure className="beginner-guide-step-image">
@@ -431,7 +530,7 @@ function ChooseModelChapter() {
 }
 
 const practicePrompt = [
-    '请帮我修改第 03 章里的练习卡片。',
+    '请帮我修改第 04 章里的练习卡片。',
     '',
     '我想这样改：',
     '1. 标题改成：先试着和 AI 说一句',
@@ -534,7 +633,7 @@ function GiveInstructionsChapter() {
                                 <span className="beginner-guide-flow-step beginner-guide-uncertainty-result-b">结果 B</span>
                             </div>
                         </div>
-                        <p>同一个提示词，也可能得到不同结果。人需要判断方向，并决定保留哪一个。</p>
+                        <p className="beginner-guide-uncertainty-note">同一提示词，可能得到不同结果。人来判断并保留。</p>
                     </article>
                     <article className="beginner-guide-flowcard">
                         <div className="beginner-guide-flowcard-head">
@@ -553,7 +652,7 @@ function GiveInstructionsChapter() {
                                 <span className="beginner-guide-flow-step">任务完成</span>
                             </div>
                         </div>
-                        <p>单个任务的完成时间会波动。评估 AI 协作时，看一段时间内的平均效率提升。</p>
+                        <p className="beginner-guide-uncertainty-note">任务完成时间会波动；长期看平均效率。</p>
                     </article>
                 </div>
             </section>
@@ -696,7 +795,7 @@ function EditPrototypeChapter() {
             </section>
 
             <section className="beginner-guide-manuscript" aria-labelledby="edit-method-title">
-                <h3 className="beginner-guide-section-title" id="edit-method-title">三种更省事的方式</h3>
+                <h3 className="beginner-guide-section-title" id="edit-method-title">四种更省事的方式</h3>
                 <div className="beginner-guide-step-list">
                     <article className="beginner-guide-step-card beginner-guide-step-card-text-only">
                         <div className="beginner-guide-step-copy">
@@ -731,6 +830,15 @@ function EditPrototypeChapter() {
                             <img src={annotationToolbarImage} alt="Axhub Make 页面批注工具栏" />
                         </figure>
                     </article>
+                    <article className="beginner-guide-step-card beginner-guide-step-card-text-only">
+                        <div className="beginner-guide-step-copy">
+                            <span>4</span>
+                            <div>
+                                <h4>修改规格文档</h4>
+                                <p>遇到流程、页面板块或信息架构这类大范围调整时，先更新原型的方案或需求规格文档，再让 AI 按更新后的规格整体调整页面。</p>
+                            </div>
+                        </div>
+                    </article>
                 </div>
             </section>
 
@@ -739,7 +847,7 @@ function EditPrototypeChapter() {
                 <article className="beginner-guide-practice-card">
                     <span>练习任务</span>
                     <h4>改一处你看不顺眼的地方</h4>
-                    <p>截图或批注都可以。只说一处，先把改动跑通。</p>
+                    <p>局部改动用截图或批注；大范围改动先更新规格文档。每次只处理一个明确问题。</p>
                 </article>
             </section>
         </>
@@ -897,6 +1005,7 @@ function GuideShell({ config }: GuideShellProps) {
         const next = chapters[activeIndex + 1] ?? null;
         return { previous, next };
     }, [activeIndex]);
+    const showsChecklist = activeChapter.id !== 'overview' && activeChapter.id !== 'advanced-guide';
 
     return (
         <main className="beginner-guide-shell">
@@ -949,8 +1058,10 @@ function GuideShell({ config }: GuideShellProps) {
                         </dl>
                     </header>
 
-                    {activeChapter.id === 'install-agent'
-                        ? <InstallAgentChapter projectPath={projectPath} />
+                    {activeChapter.id === 'overview'
+                        ? <OverviewChapter />
+                        : activeChapter.id === 'install-agent'
+                            ? <InstallAgentChapter projectPath={projectPath} />
                         : activeChapter.id === 'choose-model'
                             ? <ChooseModelChapter />
                             : activeChapter.id === 'give-instructions'
@@ -965,7 +1076,7 @@ function GuideShell({ config }: GuideShellProps) {
                                                 ? <HelpChapter />
                                                 : <DefaultChapterContent chapter={activeChapter} />}
 
-                    {activeChapter.id !== 'advanced-guide' && (
+                    {showsChecklist && (
                         <section className="beginner-guide-manuscript" aria-labelledby="chapter-checklist-title">
                             <h3 className="beginner-guide-section-title" id="chapter-checklist-title">完成标准</h3>
 

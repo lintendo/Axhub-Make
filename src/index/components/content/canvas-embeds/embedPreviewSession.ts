@@ -1,5 +1,4 @@
-export const EMBED_PREVIEW_EXIT_CONFIRM_MS = 2000;
-export const EMBED_PREVIEW_ENTERED_HINT_MS = 2000;
+export const AXHUB_EMBED_ACTIVATE_REQUESTED_EVENT = 'axhub:embedActivateRequested';
 export const AXHUB_EMBED_ACTIVE_PREVIEW_CHANGED_EVENT = 'axhub:embedActivePreviewChanged';
 export const AXHUB_EMBED_EXIT_PREVIEW_EVENT = 'axhub:embedExitPreview';
 
@@ -9,28 +8,6 @@ export interface ActiveEmbedPreview {
     screenY: number;
     screenWidth: number;
     screenHeight: number;
-}
-
-export interface EmbedPreviewExitPrompt {
-    elementId: string;
-    expiresAt: number;
-}
-
-export type EmbedPreviewSessionHintKind = 'entered' | 'exit-confirm';
-
-export interface EmbedPreviewSessionHint {
-    kind: EmbedPreviewSessionHintKind;
-    elementId: string;
-    message: string;
-    expiresAt: number;
-}
-
-export type EmbedPreviewExitPointerAction = 'allow' | 'prompt' | 'exit';
-
-export interface EmbedPreviewExitPointerDecision {
-    action: EmbedPreviewExitPointerAction;
-    shouldPreventCanvasEvent: boolean;
-    nextPrompt: EmbedPreviewExitPrompt | null;
 }
 
 export type ScreenshotCompletionAction = 'idle' | 'recapture' | 'teardown';
@@ -94,77 +71,6 @@ function isMarkdownFileApiUrl(value: string): boolean {
     } catch {
         return value.startsWith('/api/markdown-file');
     }
-}
-
-function isPointInsideActivePreview(
-    preview: ActiveEmbedPreview,
-    clientX: number,
-    clientY: number,
-): boolean {
-    return clientX >= preview.screenX
-        && clientX <= preview.screenX + preview.screenWidth
-        && clientY >= preview.screenY
-        && clientY <= preview.screenY + preview.screenHeight;
-}
-
-export function resolveEmbedPreviewSessionHint(options: {
-    kind: EmbedPreviewSessionHintKind;
-    elementId: string;
-    now: number;
-}): EmbedPreviewSessionHint {
-    if (options.kind === 'entered') {
-        return {
-            kind: 'entered',
-            elementId: options.elementId,
-            message: '已进入预览页面',
-            expiresAt: options.now + EMBED_PREVIEW_ENTERED_HINT_MS,
-        };
-    }
-
-    return {
-        kind: 'exit-confirm',
-        elementId: options.elementId,
-        message: '再次点击退出预览',
-        expiresAt: options.now + EMBED_PREVIEW_EXIT_CONFIRM_MS,
-    };
-}
-
-export function resolveEmbedPreviewExitPointerDecision(options: {
-    activePreview: ActiveEmbedPreview | null;
-    currentPrompt: EmbedPreviewExitPrompt | null;
-    clientX: number;
-    clientY: number;
-    now: number;
-    targetWithinEmbedUi: boolean;
-}): EmbedPreviewExitPointerDecision {
-    const {
-        activePreview,
-        currentPrompt,
-        clientX,
-        clientY,
-        now,
-        targetWithinEmbedUi,
-    } = options;
-
-    if (!activePreview || targetWithinEmbedUi || isPointInsideActivePreview(activePreview, clientX, clientY)) {
-        return { action: 'allow', shouldPreventCanvasEvent: false, nextPrompt: currentPrompt };
-    }
-
-    const hasValidPrompt = currentPrompt?.elementId === activePreview.elementId
-        && currentPrompt.expiresAt >= now;
-
-    if (hasValidPrompt) {
-        return { action: 'exit', shouldPreventCanvasEvent: true, nextPrompt: null };
-    }
-
-    return {
-        action: 'prompt',
-        shouldPreventCanvasEvent: true,
-        nextPrompt: {
-            elementId: activePreview.elementId,
-            expiresAt: now + EMBED_PREVIEW_EXIT_CONFIRM_MS,
-        },
-    };
 }
 
 export function shouldBlockCanvasWheelForActivePreview(options: {

@@ -231,13 +231,18 @@ export function resolveMarkdownPreviewIframeUrl(
         }
     }
 
+    const projectDocumentPath = normalizeResourceName(item.projectDocumentPath);
+    if (kind === 'doc' && projectId && hasHtmlExtension(projectDocumentPath)) {
+        return buildApiMarkdownUrl(item, kind);
+    }
+
     const directFilePath = String(item.absoluteFilePath || item.filePath || '').trim();
     if (hasHtmlExtension(directFilePath)) {
         return projectId ? buildMarkdownFileUrl(directFilePath, projectId) : '';
     }
 
     const name = normalizeResourceName(item.name);
-    if (kind === 'doc' && item.projectId && normalizeResourceName(item.projectDocumentPath)) {
+    if (kind === 'doc' && projectId && projectDocumentPath) {
         const markdownUrl = buildApiMarkdownUrl(item, kind);
         return markdownUrl ? buildSpecTemplatePreviewUrl(markdownUrl) : '';
     }

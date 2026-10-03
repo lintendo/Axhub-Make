@@ -365,6 +365,167 @@
     gap: 16px;
 }
 
+.beginner-guide-preparation-flow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 0;
+}
+
+.beginner-guide-preparation-step {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+}
+
+.beginner-guide-preparation-step > span {
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--brand);
+    border-radius: 999px;
+    color: var(--brand);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1;
+}
+
+.beginner-guide-preparation-step div {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
+.beginner-guide-preparation-step strong {
+    color: var(--near-black);
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.beginner-guide-preparation-step small {
+    color: var(--stone);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.beginner-guide-preparation-arrow,
+.beginner-guide-lifecycle-arrow {
+    color: var(--brand);
+}
+
+.beginner-guide-lifecycle-flow {
+    display: flex;
+    align-items: stretch;
+    gap: 7px;
+    margin-top: 14px;
+}
+
+.beginner-guide-lifecycle-node {
+    min-width: 0;
+    min-height: 132px;
+    flex: 1 1 0;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--brand);
+    border-radius: 8px;
+    background: var(--ivory);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+}
+
+.beginner-guide-lifecycle-node small {
+    color: var(--brand);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1;
+}
+
+.beginner-guide-lifecycle-node strong {
+    color: var(--near-black);
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.beginner-guide-lifecycle-node span {
+    color: var(--stone);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.beginner-guide-lifecycle-node.is-optional {
+    border-color: #d8d6cd;
+    border-left-color: var(--stone);
+    background: #f0efe9;
+}
+
+.beginner-guide-lifecycle-node.is-optional small {
+    color: var(--stone);
+}
+
+.beginner-guide-lifecycle-arrow {
+    align-self: center;
+    flex: 0 0 17px;
+}
+
+.beginner-guide-lifecycle-note {
+    margin-top: 10px !important;
+    color: var(--stone) !important;
+    font-size: 13px !important;
+}
+
+.beginner-guide-capability-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.beginner-guide-capability-card {
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--ivory);
+    padding: 16px;
+}
+
+.beginner-guide-capability-card > span {
+    color: var(--brand);
+    display: block;
+    margin-bottom: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+.beginner-guide-capability-card h4 {
+    margin: 0 0 8px;
+    color: var(--near-black);
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.beginner-guide-capability-card p {
+    margin: 0;
+    color: var(--olive);
+    font-size: 14px;
+    line-height: 1.55;
+}
+
 .beginner-guide-step-card {
     min-height: 120px;
     border: 1px solid var(--border);
@@ -662,6 +823,11 @@
     color: var(--stone);
     font-size: 14px;
     line-height: 1.65;
+}
+
+.beginner-guide-flowcard .beginner-guide-uncertainty-note {
+    letter-spacing: 0;
+    white-space: nowrap;
 }
 
 .beginner-guide-uncertainty-effect-flow {
@@ -1005,6 +1171,26 @@
         gap: 14px;
     }
 
+    .beginner-guide-lifecycle-flow {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .beginner-guide-lifecycle-node {
+        min-height: 0;
+    }
+
+    .beginner-guide-lifecycle-arrow {
+        justify-self: center;
+        transform: rotate(90deg);
+    }
+
+    .beginner-guide-capability-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
     .beginner-guide-step-card {
         grid-template-columns: 1fr;
     }
@@ -1101,6 +1287,10 @@
     .beginner-guide-uncertainty-time-flow {
         grid-template-columns: minmax(68px, 1fr) 12px minmax(82px, 1.1fr) 12px minmax(68px, 1fr);
         gap: 4px;
+    }
+
+    .beginner-guide-flowcard .beginner-guide-uncertainty-note {
+        white-space: normal;
     }
 
     .beginner-guide-footer-actions {

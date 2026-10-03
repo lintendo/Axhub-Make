@@ -47,8 +47,8 @@ describe('prototypeSpecsApi', () => {
 
     expect(prompt).toContain('src/prototypes/home/.spec/spec.html');
     expect(prompt).toContain('src/prototypes/home/.spec/spec.md');
-    expect(prompt).toContain('src/resources/templates/规格文档 HTML 模板.html');
-    expect(prompt).toContain('src/resources/templates/规格文档 Markdown 模板.md');
+    expect(prompt).toContain('templates/prototype-spec.html');
+    expect(prompt).toContain('templates/prototype-spec.md');
     expect(prompt).toContain('Markdown（节省 Token）还是 HTML（体验更好）');
     expect(prompt).toContain('同时存在时以 HTML 为准');
     expect(prompt).toContain('不要同时创建两个主规格');

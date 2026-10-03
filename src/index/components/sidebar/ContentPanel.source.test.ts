@@ -7,6 +7,14 @@ function readContentPanelSource() {
 }
 
 describe('ContentPanel make client project setup source', () => {
+  it('uses one concise design-creation sentence for the empty design tree', () => {
+    const source = readContentPanelSource();
+
+    expect(source).toContain("if (dataTab === 'themes' && !searchText.trim())");
+    expect(source).toContain('暂无内容，创建设计规范，统一原型的视觉与文案风格');
+    expect(source.match(/暂无内容，创建设计规范，统一原型的视觉与文案风格/gu)).toHaveLength(1);
+  });
+
   it('renders the AI open dropdown in the sidebar header chrome', () => {
     const source = readContentPanelSource();
     const headerSource = source.slice(
@@ -523,7 +531,7 @@ describe('ContentPanel sidebar rename source', () => {
     expect(renderItemActionsSource).not.toContain('startItemRename(itemNodeId, item.displayName || item.name)');
   });
 
-  it('labels per-item version actions as version and collaboration', () => {
+  it('keeps per-item version actions out of prototype menus', () => {
     const source = readContentPanelSource();
     const renderItemActionsSource = source.slice(
       source.indexOf('const renderItemActions ='),
@@ -531,8 +539,7 @@ describe('ContentPanel sidebar rename source', () => {
     );
 
     expect(renderItemActionsSource).toContain('handleVersionManagement(item)');
-    expect(renderItemActionsSource).toContain('版本和协作');
-    expect(renderItemActionsSource).not.toContain('版本管理');
+    expect(source).toContain('const showVersionAction = !isPrototypeItem && showLocalPathActions && !isDocItem;');
   });
 });
 
@@ -543,22 +550,31 @@ describe('ContentPanel chrome styles source', () => {
     expect(source).toContain('<div className="border-b border-border">');
   });
 
-  it('labels the top-left settings entry as settings instead of project settings', () => {
+  it('labels the top-left settings entry as project settings', () => {
     const source = readContentPanelSource();
     const settingsItemIndex = source.indexOf('onSelect={handleSettingsMenuSelect}');
-    const versionCollaborationItemIndex = source.indexOf('onSelect={handleVersionCollaborationMenuSelect}');
     const menuSource = source.slice(
       source.lastIndexOf('<DropdownMenuContent align="start"', settingsItemIndex),
       source.indexOf('<DropdownMenuSeparator />', settingsItemIndex),
     );
 
     expect(menuSource).toContain('<Settings className="h-3.5 w-3.5" />');
-    expect(menuSource).toContain('设置');
+    expect(menuSource).toContain('项目设置');
     expect(source).toContain('GitBranch,');
-    expect(menuSource).toContain('<GitBranch className="h-3.5 w-3.5" />');
-    expect(menuSource).toContain('版本和协作');
-    expect(menuSource).not.toContain('项目设置');
-    expect(versionCollaborationItemIndex).toBeGreaterThan(settingsItemIndex);
+    expect(menuSource).not.toContain('版本和协作');
+    expect(menuSource).not.toContain('>设置<');
+  });
+
+  it('lists AI and network settings before the theme controls', () => {
+    const source = readContentPanelSource();
+    const menuStart = source.indexOf('<DropdownMenuContent align="start" className="text-sm min-w-[132px]">');
+    const menuEnd = source.indexOf('<DropdownMenuItem className="h-7 gap-2 text-sm" onClick={onToggleTheme}>', menuStart);
+    const menuSource = source.slice(menuStart, menuEnd);
+
+    expect(menuSource).toContain("onSettingsClick('ai')");
+    expect(menuSource).toContain("onSettingsClick('network')");
+    expect(menuSource.indexOf("onSettingsClick('ai')")).toBeLessThan(menuSource.indexOf("onSettingsClick('network')"));
+    expect(menuSource).not.toContain('版本和协作');
   });
 
   it('shows unread update badges on the menu trigger and settings menu without tagging project rows', () => {
@@ -751,7 +767,7 @@ describe('ContentPanel document paste upload source', () => {
       source.indexOf('const resetSidebarHorizontalScroll = () => {'),
     );
 
-    expect(source).toContain("import type { SelectedResourceFolder, UploadedResourceFile } from '../../types/index-page.types';");
+    expect(source).toContain("SelectedResourceFolder, UploadedResourceFile } from '../../types/index-page.types';");
     expect(source).toContain('onUploadedResourceFiles?: (files: UploadedResourceFile[]) => void | Promise<void>;');
     expect(uploadSource).toContain('const uploadedFiles = Array.isArray(result?.files)');
     expect(uploadSource).toContain('await Promise.resolve(onUploadedResourceFiles?.(uploadedFiles));');
@@ -992,32 +1008,24 @@ describe('ContentPanel prototype page children source', () => {
   });
 });
 
-describe('ContentPanel LAN share source', () => {
-  it('generates short-lived LAN share URLs on demand instead of exposing raw LAN URLs', () => {
+describe('ContentPanel prototype menu capabilities source', () => {
+  it('removes prototype access links while keeping publishing actions', () => {
     const source = readContentPanelSource();
     const itemActionsSource = source.slice(
       source.indexOf('const renderItemActions ='),
       source.indexOf('const renderFolderActions ='),
     );
-    const guardIndex = itemActionsSource.indexOf('const showLANShareGroup = Boolean(lanShareUrl);');
-    const resolverIndex = itemActionsSource.indexOf('resolveLanShareUrl');
-    const lanGroupIndex = itemActionsSource.indexOf('{showLANShareGroup ? (');
-    const lanLabelIndex = itemActionsSource.indexOf('局域网链接', lanGroupIndex);
-    const qrIndex = itemActionsSource.indexOf('<QRCode value={lanTokenUrl}');
 
-    expect(source).toContain('apiService.createLanAccessShareUrl');
-    expect(source).toContain('请先在设置中设置局域网访问密码');
-    expect(source).not.toContain('lanAccessAllowed?: boolean;');
-    expect(source).not.toContain('lanAccessAllowed = true,');
-    expect(guardIndex).toBeGreaterThan(-1);
-    expect(resolverIndex).toBeGreaterThan(guardIndex);
-    expect(lanGroupIndex).toBeGreaterThan(guardIndex);
-    expect(lanLabelIndex).toBeGreaterThan(lanGroupIndex);
-    expect(qrIndex).toBeGreaterThan(lanGroupIndex);
+    expect(itemActionsSource).not.toContain('访问链接');
+    expect(itemActionsSource).not.toContain('局域网链接');
+    expect(itemActionsSource).not.toContain('生成二维码');
+    expect(itemActionsSource).toContain('{isPrototypeItem && onOpenLocalPublishDialog ? (');
+    expect(itemActionsSource).toContain('发布当前版本原型');
+    expect(itemActionsSource).toContain('发布实时原型');
   });
 });
 
-describe('ContentPanel prototype menu capabilities source', () => {
+describe('ContentPanel prototype menu path source', () => {
   it('separates preview access from local directory management for spec-only prototypes', () => {
     const source = readContentPanelSource();
     const itemActionsSource = source.slice(
@@ -1028,9 +1036,7 @@ describe('ContentPanel prototype menu capabilities source', () => {
     expect(source).toContain("import { getPrototypeLocalBasePath, hasExplicitLocalPath } from '../../utils/localPath';");
     expect(itemActionsSource).toContain("const prototypeLocalBasePath = isPrototypeItem ? getPrototypeLocalBasePath(item) : '';");
     expect(itemActionsSource).toContain('const showLocalPathActions = isPrototypeItem ? Boolean(prototypeLocalBasePath) : hasExplicitLocalPath(item);');
-    expect(itemActionsSource).toContain('const showPrototypeAccessLinks = isPrototypeItem && item.previewDisabled !== true && hasShareUrl;');
-    expect(itemActionsSource).toContain('{showPrototypeAccessLinks ? (');
-    expect(itemActionsSource).not.toContain('{isPrototypeItem ? (\n                    <DropdownMenuSub>');
+    expect(itemActionsSource).not.toContain('showPrototypeAccessLinks');
     expect(itemActionsSource).toContain('{canDeleteItem ? (\n                    <>\n                        <DropdownMenuSeparator />');
   });
 });
@@ -1268,18 +1274,15 @@ describe('ContentPanel settings menu source', () => {
     expect(menuSource).not.toContain('onClick={onSettingsClick}');
   });
 
-  it('opens version and collaboration from the dropdown select event after the menu closes', () => {
+  it('keeps the top-left menu focused on settings and application controls', () => {
     const source = readContentPanelSource();
     const menuSource = source.slice(
       source.indexOf('<DropdownMenuContent align="start"'),
       source.indexOf('<DropdownMenuItem className="h-7 gap-2 text-sm" onClick={onToggleTheme}>'),
     );
 
-    expect(source).toContain('onVersionCollaborationClick: () => void;');
-    expect(source).toContain('const handleVersionCollaborationMenuSelect = useCallback(() => {');
-    expect(source).toContain('onVersionCollaborationClick();');
-    expect(menuSource).toContain('onSelect={handleVersionCollaborationMenuSelect}');
-    expect(menuSource).toContain('版本和协作');
-    expect(menuSource).not.toContain('onClick={onVersionCollaborationClick}');
+    expect(source).not.toContain('onVersionCollaborationClick');
+    expect(source).not.toContain('handleVersionCollaborationMenuSelect');
+    expect(menuSource).not.toContain('版本和协作');
   });
 });

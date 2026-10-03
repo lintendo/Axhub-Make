@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   getGlobalServerConfigPath,
+  getGlobalServerSecretsPath,
   getMakeClientMarkerPath,
   getProjectMetadataPath,
 } from '../projectCore/index.ts';
@@ -51,7 +52,7 @@ async function startRegisteredConfigTestServer(
 
 async function startImageApiProbeServer(responseBody: unknown = {
   data: [{ b64_json: 'aW1hZ2UtYnl0ZXM=' }],
-}) {
+}, statusCode = 200) {
   const requests: ImageApiRequestRecord[] = [];
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     const chunks: Buffer[] = [];
@@ -64,7 +65,7 @@ async function startImageApiProbeServer(responseBody: unknown = {
         headers: req.headers,
         body: rawBody ? JSON.parse(rawBody) : null,
       });
-      res.statusCode = 200;
+      res.statusCode = statusCode;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify(responseBody));
     });
@@ -117,17 +118,24 @@ describe('make-server project config APIs', () => {
     try {
       const legacyConfig = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(legacyConfig.automation).toEqual({
-        defaultPromptClient: 'acp:claude',
+        conversationPromptClient: 'acp:claude',
+        conversationModel: null,
         defaultIDE: 'cursor',
+        injectLocalAiEntry: true,
+        launchLocalAiApp: true,
         acp: {
           mode: 'prompt',
           permission: 'approve-all',
           timeout: 1800,
         },
-        annotationPromptClient: null,
+        annotationPromptClient: 'acp:claude',
         annotationModel: null,
+        canvasPromptClient: 'acp:claude',
+        canvasModel: null,
         agentRunConcurrency: 5,
+        autoClearCompletedComments: true,
       });
+      expect(legacyConfig.automation).not.toHaveProperty('defaultPromptClient');
       expect(legacyConfig.assistant).toEqual({
         webBaseUrl: 'http://legacy.local',
         apiBaseUrl: 'http://legacy.local/api',
@@ -140,8 +148,16 @@ describe('make-server project config APIs', () => {
           server: { host: '0.0.0.0', allowLAN: false, port: 51720 },
           projectInfo: { name: 'Updated Project' },
           automation: {
-            defaultPromptClient: 'manual',
+            conversationPromptClient: 'acp:codex',
+            conversationModel: 'gpt-5.1-codex',
+            annotationPromptClient: 'acp:cursor',
+            annotationModel: 'fast-cursor',
+            canvasPromptClient: 'acp:qoder',
+            canvasModel: 'qoder-canvas',
             defaultIDE: 'qoder',
+            injectLocalAiEntry: false,
+            launchLocalAiApp: false,
+            autoClearCompletedComments: false,
           },
           assistant: {
             webBaseUrl: 'http://assistant.local',
@@ -172,16 +188,22 @@ describe('make-server project config APIs', () => {
       const serverConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
       expect(serverConfig).toEqual({
         automation: {
-          defaultPromptClient: 'manual',
+          conversationPromptClient: 'acp:codex',
+          conversationModel: 'gpt-5.1-codex',
           defaultIDE: 'qoder',
+          injectLocalAiEntry: false,
+          launchLocalAiApp: false,
           acp: {
             mode: 'prompt',
             permission: 'approve-all',
             timeout: 1800,
           },
-          annotationPromptClient: null,
-          annotationModel: null,
+          annotationPromptClient: 'acp:cursor',
+          annotationModel: 'fast-cursor',
+          canvasPromptClient: 'acp:qoder',
+          canvasModel: 'qoder-canvas',
           agentRunConcurrency: 5,
+          autoClearCompletedComments: false,
         },
         assistant: {
           webBaseUrl: 'http://assistant.local',
@@ -190,8 +212,21 @@ describe('make-server project config APIs', () => {
         ai: {
           imageGeneration: {
             baseUrl: 'https://api.openai.com/v1',
-            apiKey: null,
             model: 'gpt-image-2',
+          },
+          doubao: {
+            appId: '',
+            speaker: '',
+          },
+          processing: {
+            baseUrl: 'https://api.openai.com/v1',
+            model: 'gpt-4.1-mini',
+          },
+          vision: {
+            endpoint: '',
+            family: '',
+            model: '',
+            responseFormat: 'auto',
           },
         },
         uiPreferences: {
@@ -208,8 +243,14 @@ describe('make-server project config APIs', () => {
         server: { host: '0.0.0.0' },
         projectInfo: { name: 'Updated Project' },
         automation: {
-          defaultPromptClient: 'manual',
+          conversationPromptClient: 'acp:codex',
+          conversationModel: 'gpt-5.1-codex',
+          annotationPromptClient: 'acp:cursor',
+          annotationModel: 'fast-cursor',
+          canvasPromptClient: 'acp:qoder',
+          canvasModel: 'qoder-canvas',
           defaultIDE: 'qoder',
+          injectLocalAiEntry: false,
           acp: {
             mode: 'prompt',
             permission: 'approve-all',
@@ -227,6 +268,52 @@ describe('make-server project config APIs', () => {
           },
         },
       });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('prefers explicit purpose fields when legacy and new AI preferences coexist', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot, {
+      project: { id: 'mixed-ai-preferences', name: 'Mixed AI Preferences' },
+    });
+    writeJson(path.join(projectRoot, '.axhub', 'make', 'axhub.config.json'), {
+      server: { host: 'localhost' },
+      projectInfo: { name: 'Mixed AI Preferences' },
+    });
+    const registryHome = createTempRoot('axhub-make-projects-api-home-');
+    writeJson(getGlobalServerConfigPath(registryHome), {
+      automation: {
+        defaultPromptClient: 'acp:claude',
+        conversationPromptClient: 'acp:qoder',
+        conversationModel: '  conversation-model  ',
+        annotationPromptClient: 'acp:cursor',
+        annotationModel: '  annotation-model  ',
+        canvasPromptClient: 'acp:codebuddy',
+        canvasModel: '  canvas-model  ',
+      },
+    });
+    const server = await startRegisteredConfigTestServer(
+      projectRoot,
+      registryHome,
+      'mixed-ai-preferences',
+      'Mixed AI Preferences',
+    );
+
+    try {
+      const config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`))
+        .then((response) => response.json());
+
+      expect(config.automation).toMatchObject({
+        conversationPromptClient: 'acp:qoder',
+        conversationModel: 'conversation-model',
+        annotationPromptClient: 'acp:cursor',
+        annotationModel: 'annotation-model',
+        canvasPromptClient: 'acp:codebuddy',
+        canvasModel: 'canvas-model',
+      });
+      expect(config.automation).not.toHaveProperty('defaultPromptClient');
     } finally {
       await server.close();
     }
@@ -512,7 +599,12 @@ describe('make-server project config APIs', () => {
         projectPath: projectRoot,
         projectInfo: { name: 'Bootstrap Client' },
         automation: {
-          defaultPromptClient: null,
+          conversationPromptClient: null,
+          conversationModel: null,
+          annotationPromptClient: null,
+          annotationModel: null,
+          canvasPromptClient: null,
+          canvasModel: null,
         },
         uiPreferences: {
           excalidrawPropertyPanelMode: 'collapsed',
@@ -585,8 +677,11 @@ describe('make-server project config APIs', () => {
       });
       const serverConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
       expect(serverConfig.automation).toEqual({
-        defaultPromptClient: null,
+        conversationPromptClient: null,
+        conversationModel: null,
         defaultIDE: 'windsurf',
+        injectLocalAiEntry: true,
+        launchLocalAiApp: true,
         acp: {
           mode: 'prompt',
           permission: 'approve-all',
@@ -594,8 +689,43 @@ describe('make-server project config APIs', () => {
         },
         annotationPromptClient: null,
         annotationModel: null,
+        canvasPromptClient: null,
+        canvasModel: null,
         agentRunConcurrency: 5,
+        autoClearCompletedComments: true,
       });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('does not migrate the legacy manual prompt client into annotation automation', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot, {
+      project: { id: 'legacy-manual-client', name: 'Legacy Manual Client' },
+    });
+    writeJson(path.join(projectRoot, '.axhub', 'make', 'axhub.config.json'), {
+      server: { host: 'localhost', allowLAN: true },
+      projectInfo: { name: 'Legacy Manual Client' },
+      automation: {
+        defaultPromptClient: 'manual',
+      },
+    });
+    const registryHome = createTempRoot('axhub-make-projects-api-home-');
+    const server = await startRegisteredConfigTestServer(
+      projectRoot,
+      registryHome,
+      'legacy-manual-client',
+      'Legacy Manual Client',
+    );
+
+    try {
+      const config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`))
+        .then((response) => response.json());
+
+      expect(config.automation.conversationPromptClient).toBe('manual');
+      expect(config.automation.annotationPromptClient).toBeNull();
+      expect(config.automation.canvasPromptClient).toBe('manual');
     } finally {
       await server.close();
     }
@@ -653,7 +783,7 @@ describe('make-server project config APIs', () => {
     }
   });
 
-  it('saves, reads, and bootstraps OpenCode as the default prompt client', async () => {
+  it('saves, reads, and bootstraps OpenCode as the conversation prompt client', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot, {
       project: { id: 'opencode-prompt-client', name: 'OpenCode Prompt Client' },
@@ -665,47 +795,47 @@ describe('make-server project config APIs', () => {
     const registryHome = createTempRoot('axhub-make-projects-api-home-');
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'opencode-prompt-client', 'OpenCode Prompt Client');
 
-    async function saveAndExpectDefaultPromptClient(input: string) {
+    async function saveAndExpectConversationPromptClient(input: string) {
       const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           automation: {
-            defaultPromptClient: input,
+            conversationPromptClient: input,
           },
         }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(saved).toMatchObject({ status: 200, body: { success: true } });
       const serverConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
-      expect(serverConfig.automation.defaultPromptClient).toBe('acp:opencode');
+      expect(serverConfig.automation.conversationPromptClient).toBe('acp:opencode');
 
       const config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
-      expect(config.automation.defaultPromptClient).toBe('acp:opencode');
+      expect(config.automation.conversationPromptClient).toBe('acp:opencode');
 
       const bootstrap = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/bootstrap`)).then((response) => response.json());
-      expect(bootstrap.automation.defaultPromptClient).toBe('acp:opencode');
+      expect(bootstrap.automation.conversationPromptClient).toBe('acp:opencode');
     }
 
     try {
-      await saveAndExpectDefaultPromptClient('acp:opencode');
-      await saveAndExpectDefaultPromptClient('opencode');
+      await saveAndExpectConversationPromptClient('acp:opencode');
+      await saveAndExpectConversationPromptClient('opencode');
 
       const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           automation: {
-            defaultPromptClient: 'genie:opencode',
+            conversationPromptClient: 'genie:opencode',
           },
         }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(saved).toMatchObject({ status: 200, body: { success: true } });
       const serverConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
-      expect(serverConfig.automation.defaultPromptClient).toBe('acp:opencode');
+      expect(serverConfig.automation.conversationPromptClient).toBe('acp:opencode');
       const config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
-      expect(config.automation.defaultPromptClient).toBe('acp:opencode');
+      expect(config.automation.conversationPromptClient).toBe('acp:opencode');
     } finally {
       await server.close();
     }
@@ -723,59 +853,68 @@ describe('make-server project config APIs', () => {
     const registryHome = createTempRoot('axhub-make-projects-api-home-');
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'new-acp-providers-client', 'New ACP Providers Client');
 
-    async function saveAndExpectDefaultPromptClient(input: string, expected: string) {
+    async function saveAndExpectPurposePromptClients(input: string, expected: string) {
       const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           automation: {
-            defaultPromptClient: input,
+            conversationPromptClient: input,
+            conversationModel: 'conversation-model',
             annotationPromptClient: 'acp:cursor',
             annotationModel: 'fast-cursor',
+            canvasPromptClient: input,
+            canvasModel: 'canvas-model',
           },
         }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(saved).toMatchObject({ status: 200, body: { success: true } });
       const serverConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
-      expect(serverConfig.automation.defaultPromptClient).toBe(expected);
+      expect(serverConfig.automation.conversationPromptClient).toBe(expected);
+      expect(serverConfig.automation.conversationModel).toBe('conversation-model');
       expect(serverConfig.automation.annotationPromptClient).toBe('acp:cursor');
       expect(serverConfig.automation.annotationModel).toBe('fast-cursor');
+      expect(serverConfig.automation.canvasPromptClient).toBe(expected);
+      expect(serverConfig.automation.canvasModel).toBe('canvas-model');
       expect(serverConfig.automation.acpModels).toBeUndefined();
 
       const config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
-      expect(config.automation.defaultPromptClient).toBe(expected);
+      expect(config.automation.conversationPromptClient).toBe(expected);
       expect(config.automation.annotationPromptClient).toBe('acp:cursor');
       expect(config.automation.annotationModel).toBe('fast-cursor');
+      expect(config.automation.canvasPromptClient).toBe(expected);
 
       const bootstrap = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/bootstrap`)).then((response) => response.json());
-      expect(bootstrap.automation.defaultPromptClient).toBe(expected);
+      expect(bootstrap.automation.conversationPromptClient).toBe(expected);
       expect(bootstrap.automation.annotationPromptClient).toBe('acp:cursor');
       expect(bootstrap.automation.annotationModel).toBe('fast-cursor');
+      expect(bootstrap.automation.canvasPromptClient).toBe(expected);
     }
 
     try {
-      await saveAndExpectDefaultPromptClient('acp:cursor', 'acp:cursor');
-      await saveAndExpectDefaultPromptClient('qoder', 'acp:qoder');
-      await saveAndExpectDefaultPromptClient('codebuddy', 'acp:codebuddy');
-      await saveAndExpectDefaultPromptClient('reasonix', 'acp:reasonix');
-      await saveAndExpectDefaultPromptClient('grok-build', 'acp:grok-build');
+      await saveAndExpectPurposePromptClients('acp:cursor', 'acp:cursor');
+      await saveAndExpectPurposePromptClients('qoder', 'acp:qoder');
+      await saveAndExpectPurposePromptClients('codebuddy', 'acp:codebuddy');
+      await saveAndExpectPurposePromptClients('reasonix', 'acp:reasonix');
+      await saveAndExpectPurposePromptClients('grok-build', 'acp:grok-build');
 
       const savedWithoutAnnotationProvider = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           automation: {
-            defaultPromptClient: 'acp:qoder',
+            conversationPromptClient: 'acp:qoder',
             annotationPromptClient: null,
             annotationModel: null,
+            canvasPromptClient: 'acp:qoder',
           },
         }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(savedWithoutAnnotationProvider).toMatchObject({ status: 200, body: { success: true } });
       const serverConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
-      expect(serverConfig.automation.defaultPromptClient).toBe('acp:qoder');
+      expect(serverConfig.automation.conversationPromptClient).toBe('acp:qoder');
       expect(serverConfig.automation.annotationPromptClient).toBeNull();
       expect(serverConfig.automation.annotationModel).toBeNull();
 
@@ -813,7 +952,13 @@ describe('make-server project config APIs', () => {
             },
             'cli:codex': {
               commandPath: '/usr/local/bin/codex',
+              executablePath: '/Applications/ChatGPT.app/Contents/MacOS/ChatGPT',
               lastOpenMode: 'terminal',
+            },
+            'local-app:codex': {
+              executablePath: '  /Applications/ChatGPT.app/Contents/MacOS/ChatGPT  ',
+              commandPath: '/usr/local/bin/codex',
+              lastOpenMode: 'direct-app',
             },
             'bad key': {
               executablePath: 'ignore-me',
@@ -834,6 +979,10 @@ describe('make-server project config APIs', () => {
           commandPath: '/usr/local/bin/codex',
           lastOpenMode: 'terminal',
         },
+        'local-app:codex': {
+          executablePath: '/Applications/ChatGPT.app/Contents/MacOS/ChatGPT',
+          lastOpenMode: 'direct-app',
+        },
       });
 
       const nextConfig = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
@@ -843,7 +992,7 @@ describe('make-server project config APIs', () => {
     }
   });
 
-  it('saves AI image generation settings to global server config', async () => {
+  it('saves AI image generation settings through the unified AI services API', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot, {
       project: { id: 'ai-settings-client', name: 'AI Settings Client' },
@@ -856,47 +1005,47 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'ai-settings-client', 'AI Settings Client');
 
     try {
-      const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
-        method: 'POST',
+      const saved = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/ai-services`), {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ai: {
+          patch: {
             imageGeneration: {
               baseUrl: 'api.images.example.com',
               apiKey: '  sk-ai  ',
               model: 'gpt-image-2',
-              apiMode: 'responses',
-              timeout: 90,
-              size: '1536x1024',
-              quality: 'medium',
-              outputFormat: 'webp',
-              outputCompression: 75,
-              moderation: 'low',
-              n: 3,
-              codexCli: true,
-              responseFormatB64Json: false,
             },
           },
         }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
-      expect(saved).toMatchObject({ status: 200, body: { success: true } });
+      expect(saved).toMatchObject({
+        status: 200,
+        body: { settings: { imageGeneration: { hasApiKey: true } } },
+      });
       const projectConfig = JSON.parse(fs.readFileSync(path.join(projectRoot, '.axhub', 'make', 'axhub.config.json'), 'utf8'));
       expect(projectConfig.ai).toBeUndefined();
 
       const serverConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
       expect(serverConfig.ai.imageGeneration).toEqual({
         baseUrl: 'https://api.images.example.com/v1',
-        apiKey: 'sk-ai',
         model: 'gpt-image-2',
       });
+      expect(JSON.stringify(serverConfig)).not.toContain('sk-ai');
+      const serverSecrets = JSON.parse(fs.readFileSync(getGlobalServerSecretsPath(registryHome), 'utf8'));
+      expect(serverSecrets.ai.imageGeneration.apiKey).toBe('sk-ai');
 
       const config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(config.ai.imageGeneration).toEqual({
         baseUrl: 'https://api.images.example.com/v1',
-        apiKey: 'sk-ai',
         model: 'gpt-image-2',
+        hasApiKey: true,
       });
+      expect(JSON.stringify(config)).not.toContain('sk-ai');
+
+      const bootstrap = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/bootstrap`)).then((response) => response.json());
+      expect(bootstrap.ai.imageGeneration.hasApiKey).toBe(true);
+      expect(JSON.stringify(bootstrap)).not.toContain('sk-ai');
     } finally {
       await server.close();
     }
@@ -915,11 +1064,11 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'ai-image-test-client', 'AI Image Test Client');
 
     try {
-      const savedPassed = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
-        method: 'POST',
+      const savedPassed = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/ai-services`), {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ai: {
+          patch: {
             imageGeneration: {
               baseUrl: 'https://api.images.example.com/v1',
               apiKey: 'sk-ai',
@@ -934,7 +1083,7 @@ describe('make-server project config APIs', () => {
         }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
-      expect(savedPassed).toMatchObject({ status: 200, body: { success: true } });
+      expect(savedPassed).toMatchObject({ status: 200, body: { settings: {} } });
       let config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(config.ai.imageGeneration.lastTest).toEqual({
         status: 'passed',
@@ -942,11 +1091,11 @@ describe('make-server project config APIs', () => {
         testedAt: 1780713600000,
       });
 
-      const savedFailed = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
-        method: 'POST',
+      const savedFailed = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/ai-services`), {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ai: {
+          patch: {
             imageGeneration: {
               lastTest: {
                 status: 'failed',
@@ -958,11 +1107,10 @@ describe('make-server project config APIs', () => {
         }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
-      expect(savedFailed).toMatchObject({ status: 200, body: { success: true } });
+      expect(savedFailed).toMatchObject({ status: 200, body: { settings: {} } });
       const serverConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
       expect(serverConfig.ai.imageGeneration).toEqual({
         baseUrl: 'https://api.images.example.com/v1',
-        apiKey: 'sk-ai',
         model: 'gpt-image-2',
         lastTest: {
           status: 'failed',
@@ -970,6 +1118,8 @@ describe('make-server project config APIs', () => {
           testedAt: 1780713900000,
         },
       });
+      const serverSecrets = JSON.parse(fs.readFileSync(getGlobalServerSecretsPath(registryHome), 'utf8'));
+      expect(serverSecrets.ai.imageGeneration.apiKey).toBe('sk-ai');
 
       config = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`)).then((response) => response.json());
       expect(config.ai.imageGeneration.lastTest).toEqual({
@@ -992,13 +1142,18 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'ai-image-probe-client', 'AI Image Probe Client');
 
     try {
-      const result = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/ai-image/test`), {
+      const result = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/ai-services/test`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          baseUrl: `${imageApi.origin}/v1`,
-          apiKey: 'sk-current-image',
-          model: 'gpt-image-2',
+          section: 'imageGeneration',
+          patch: {
+            imageGeneration: {
+              baseUrl: `${imageApi.origin}/v1`,
+              apiKey: 'sk-current-image',
+              model: 'gpt-image-2',
+            },
+          },
         }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
@@ -1021,11 +1176,11 @@ describe('make-server project config APIs', () => {
       });
       expect(imageApi.requests[0].headers.authorization).toBe('Bearer sk-current-image');
 
-      await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config`), {
-        method: 'POST',
+      await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/ai-services`), {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ai: {
+          patch: {
             imageGeneration: {
               baseUrl: `${imageApi.origin}/v1`,
               apiKey: 'sk-saved-image',
@@ -1034,26 +1189,77 @@ describe('make-server project config APIs', () => {
           },
         }),
       });
-      const resultWithoutKey = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/ai-image/test`), {
+      const resultWithoutKey = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/ai-services/test`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          baseUrl: `${imageApi.origin}/v1`,
-          apiKey: '',
-          model: 'gpt-image-2',
+          section: 'imageGeneration',
+          patch: {
+            imageGeneration: {
+              baseUrl: `${imageApi.origin}/v1`,
+              apiKey: '',
+              model: 'gpt-image-2',
+            },
+          },
         }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
 
       expect(resultWithoutKey).toMatchObject({ status: 200, body: { success: true } });
       expect(imageApi.requests).toHaveLength(2);
-      expect(imageApi.requests[1].headers.authorization).toBeUndefined();
+      expect(imageApi.requests[1].headers.authorization).toBe('Bearer sk-saved-image');
     } finally {
       await server.close();
       await imageApi.close();
     }
   });
 
-  it('resolves local Codex image generation settings for import', async () => {
+  it('redacts an image test API key before truncating a long provider error', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot, {
+      project: { id: 'ai-image-redaction-client', name: 'AI Image Redaction Client' },
+    });
+    const registryHome = createTempRoot('axhub-make-projects-api-home-');
+    const apiKey = `sk-${'sensitive-value-'.repeat(8)}`;
+    const imageApi = await startImageApiProbeServer({
+      error: { message: `${'x'.repeat(460)}${apiKey}` },
+    }, 500);
+    const server = await startRegisteredConfigTestServer(
+      projectRoot,
+      registryHome,
+      'ai-image-redaction-client',
+      'AI Image Redaction Client',
+    );
+
+    try {
+      const response = await fetch(scopeProjectApiUrl(
+        projectRoot,
+        `${server.origin}/api/config/ai-services/test`,
+      ), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          section: 'imageGeneration',
+          patch: {
+            imageGeneration: {
+              baseUrl: `${imageApi.origin}/v1`,
+              apiKey,
+              model: 'gpt-image-2',
+            },
+          },
+        }),
+      });
+      const responseText = await response.text();
+
+      expect(response.status).toBe(502);
+      expect(responseText).not.toContain(apiKey);
+      expect(responseText).not.toContain(apiKey.slice(0, 12));
+    } finally {
+      await server.close();
+      await imageApi.close();
+    }
+  });
+
+  it('imports local Codex image generation settings without returning the API key', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot, {
       project: { id: 'codex-local-config-client', name: 'Codex Local Config Client' },
@@ -1073,23 +1279,38 @@ describe('make-server project config APIs', () => {
     const server = await startRegisteredConfigTestServer(projectRoot, registryHome, 'codex-local-config-client', 'Codex Local Config Client');
 
     try {
-      const result = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/config/ai-image/codex-local`)).then(async (response) => ({
+      const result = await fetch(scopeProjectApiUrl(
+        projectRoot,
+        `${server.origin}/api/config/ai-services/import-codex`,
+      ), { method: 'POST' }).then(async (response) => ({
         status: response.status,
-        body: await response.json(),
+        text: await response.text(),
       }));
 
       expect(result.status).toBe(200);
-      expect(result.body).toMatchObject({
+      expect(result.text).not.toContain('sk-codex-local');
+      expect(JSON.parse(result.text)).toMatchObject({
         success: true,
         ready: true,
-        config: {
+        settings: {
           baseUrl: 'https://codex.example.com/v1',
-          apiKey: 'sk-codex-local',
           model: 'gpt-image-2',
+          hasApiKey: true,
         },
       });
-      expect(result.body.discovery.configFiles).toEqual([path.join(codexHome, 'config.toml')]);
-      expect(result.body.discovery.authFile).toBe(path.join(codexHome, 'auth.json'));
+      const publicConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
+      expect(publicConfig.ai.imageGeneration).toEqual({
+        baseUrl: 'https://codex.example.com/v1',
+        model: 'gpt-image-2',
+      });
+      expect(JSON.parse(fs.readFileSync(getGlobalServerSecretsPath(registryHome), 'utf8'))
+        .ai.imageGeneration.apiKey).toBe('sk-codex-local');
+
+      const oldRoute = await fetch(scopeProjectApiUrl(
+        projectRoot,
+        `${server.origin}/api/config/ai-image/codex-local`,
+      ));
+      expect(oldRoute.status).toBe(404);
     } finally {
       if (previousCodexHome === undefined) {
         delete process.env.CODEX_HOME;

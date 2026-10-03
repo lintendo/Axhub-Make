@@ -53,13 +53,13 @@ describe('HTML review diagram extraction', () => {
       kind: 'mermaid',
       documentIndex: 0,
       source: expect.stringContaining('A[下单] --> B[支付]'),
-      sourcePath: 'src/resources/review/demo.assets/diagrams/mermaid-1.excalidraw',
-      previewPath: 'src/resources/review/demo.assets/diagrams/mermaid-1.png',
+      sourcePath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.excalidraw',
+      previewPath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.png',
     });
     expect(first[2]).toMatchObject({
       kind: 'drawio',
       source: expect.stringContaining('&lt;mxGraphModel&gt;'),
-      sourcePath: 'src/resources/review/demo.assets/diagrams/drawio-inline-architecture.drawio.svg',
+      sourcePath: 'src/resources/.assets/review/demo.html/diagrams/drawio-inline-architecture.drawio.svg',
     });
     expect(first[3]).toMatchObject({
       kind: 'drawio',
@@ -70,16 +70,89 @@ describe('HTML review diagram extraction', () => {
     expect(first.map((item) => item.sourceHash)).toEqual(second.map((item) => item.sourceHash));
   });
 
-  it('rejects traversal, absolute paths, non-resource files, and unsupported documents', () => {
+  it('accepts safe project HTML paths and rejects traversal, absolute paths, and unsupported documents', () => {
     const projectRoot = createTempRoot();
     expect(resolveHtmlReviewDocument(projectRoot, '../demo.html')).toBeNull();
     expect(resolveHtmlReviewDocument(projectRoot, '/tmp/demo.html')).toBeNull();
-    expect(resolveHtmlReviewDocument(projectRoot, 'src/prototypes/demo.html')).toBeNull();
+    expect(resolveHtmlReviewDocument(projectRoot, 'src/prototypes/demo/.spec/spec.html')).toMatchObject({
+      documentPath: 'src/prototypes/demo/.spec/spec.html',
+      resourcesDir: projectRoot,
+      assetsPath: '.assets/src/prototypes/demo/.spec/spec.html',
+    });
     expect(resolveHtmlReviewDocument(projectRoot, 'src/resources/demo.md')).toBeNull();
   });
 });
 
 describe('HTML review artifact API', () => {
+  it('restores diagram draft sessions for HTML documents at arbitrary project paths', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot, { project: { id: 'html-review-project-path', name: 'HTML Review Project Path' } });
+    const documentPath = path.join(projectRoot, 'src/prototypes/demo/.spec/spec.html');
+    fs.mkdirSync(path.dirname(documentPath), { recursive: true });
+    fs.writeFileSync(documentPath, '<html><body><div class="mermaid">flowchart LR\nA-->B</div></body></html>', 'utf8');
+    const server = await startTestServer(projectRoot);
+
+    try {
+      await registerProject(server.origin, projectRoot, 'html-review-project-path', 'HTML Review Project Path');
+      await setActiveProject(server.origin, 'html-review-project-path');
+      const createResponse = await fetch(`${server.origin}/api/html-review/diagram-drafts?projectId=html-review-project-path`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: 'src/prototypes/demo/.spec/spec.html',
+          diagramKey: 'mermaid-1',
+          excalidraw: { type: 'excalidraw', version: 2, elements: [], appState: {}, files: {} },
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const created = await createResponse.json() as any;
+
+      const restoreResponse = await fetch(
+        `${server.origin}/api/html-review/diagram-drafts/${created.sessionId}?projectId=html-review-project-path`,
+      );
+      expect(restoreResponse.status).toBe(200);
+      await expect(restoreResponse.json()).resolves.toMatchObject({ sessionId: created.sessionId });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('rejects HTML review document and sidecar paths that escape through symlinks', async () => {
+    const projectRoot = createTempRoot();
+    const externalRoot = createTempRoot();
+    writeProjectMetadata(projectRoot, { project: { id: 'html-review-symlink', name: 'HTML Review Symlink' } });
+    const safeDocumentPath = path.join(projectRoot, 'src/prototypes/demo/.spec/spec.html');
+    fs.mkdirSync(path.dirname(safeDocumentPath), { recursive: true });
+    fs.writeFileSync(safeDocumentPath, '<html><body><div class="mermaid">flowchart LR\nA-->B</div></body></html>', 'utf8');
+    fs.writeFileSync(path.join(externalRoot, 'outside.html'), '<html><body><div class="mermaid">flowchart LR\nX-->Y</div></body></html>', 'utf8');
+    fs.symlinkSync(externalRoot, path.join(projectRoot, 'linked'), 'dir');
+    fs.symlinkSync(externalRoot, path.join(projectRoot, '.assets'), 'dir');
+    const server = await startTestServer(projectRoot);
+
+    try {
+      await registerProject(server.origin, projectRoot, 'html-review-symlink', 'HTML Review Symlink');
+      await setActiveProject(server.origin, 'html-review-symlink');
+      const documentResponse = await fetch(
+        `${server.origin}/api/html-review/diagrams?projectId=html-review-symlink&path=${encodeURIComponent('linked/outside.html')}`,
+      );
+      const sidecarResponse = await fetch(`${server.origin}/api/html-review/diagram-drafts?projectId=html-review-symlink`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: 'src/prototypes/demo/.spec/spec.html',
+          diagramKey: 'mermaid-1',
+          excalidraw: { type: 'excalidraw', version: 2, elements: [], appState: {}, files: {} },
+        }),
+      });
+
+      expect(documentResponse.status).toBe(400);
+      expect(sidecarResponse.status).toBe(400);
+      expect(fs.readdirSync(externalRoot).sort()).toEqual(['outside.html']);
+    } finally {
+      await server.close();
+    }
+  });
+
   it('lists diagrams, creates server-derived drafts, updates bounded metadata, and recovers sessions', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot, { project: { id: 'html-review', name: 'HTML Review' } });
@@ -129,8 +202,8 @@ describe('HTML review artifact API', () => {
       const created = await createResponse.json() as any;
       expect(created).toMatchObject({
         kind: 'mermaid',
-        sourcePath: 'src/resources/review/demo.assets/diagrams/mermaid-1.excalidraw',
-        previewPath: 'src/resources/review/demo.assets/diagrams/mermaid-1.png',
+        sourcePath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.excalidraw',
+        previewPath: 'src/resources/.assets/review/demo.html/diagrams/mermaid-1.png',
       });
       expect(created.sessionId).toMatch(/^[a-z0-9-]+$/u);
       expect(JSON.parse(fs.readFileSync(path.join(projectRoot, created.sourcePath), 'utf8'))).toMatchObject({ type: 'excalidraw' });
@@ -171,7 +244,7 @@ describe('HTML review artifact API', () => {
         summary: ['调整支付节点方向', '补充失败重试'],
       });
 
-      const manifest = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/resources/review/demo.assets/diagram-manifest.json'), 'utf8'));
+      const manifest = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/resources/.assets/review/demo.html/diagram-manifest.json'), 'utf8'));
       expect(manifest).toMatchObject({ version: 1, documentPath: 'src/resources/review/demo.html' });
       expect(manifest.diagrams[0]).not.toHaveProperty('source');
     } finally {
@@ -220,18 +293,18 @@ describe('HTML review artifact API', () => {
     }
   });
 
-  it('hides only matching HTML supporting asset folders from the resource list', () => {
+  it('hides all asset sidecar folders from the resource list', () => {
     const projectRoot = createTempRoot();
     const resources = path.join(projectRoot, 'src/resources');
     fs.mkdirSync(path.join(resources, 'demo.assets/diagrams'), { recursive: true });
     fs.mkdirSync(path.join(resources, 'ordinary.assets'), { recursive: true });
     fs.writeFileSync(path.join(resources, 'demo.html'), '<h1>Demo</h1>', 'utf8');
     fs.writeFileSync(path.join(resources, 'demo.assets/diagrams/flow.excalidraw'), '{}', 'utf8');
-    fs.writeFileSync(path.join(resources, 'ordinary.assets/notes.md'), '# Visible', 'utf8');
+    fs.writeFileSync(path.join(resources, 'ordinary.assets/notes.md'), '# Hidden asset', 'utf8');
 
     const paths = scanResourceFiles(projectRoot).map((item) => item.path);
     expect(paths).toContain('demo.html');
-    expect(paths).toContain('ordinary.assets/notes.md');
     expect(paths).not.toContain('demo.assets/diagrams/flow.excalidraw');
+    expect(paths).not.toContain('ordinary.assets/notes.md');
   });
 });

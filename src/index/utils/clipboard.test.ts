@@ -64,7 +64,7 @@ afterEach(() => {
 describe('copyToClipboard', () => {
     it('surfaces a LAN-friendly hint when clipboard access is blocked because the document is not focused', async () => {
         mockClipboardEnvironment({
-            hostname: '192.168.31.9',
+            hostname: '192.168.1.9',
             writeText: vi.fn().mockRejectedValue(
                 new DOMException(
                     "Failed to execute 'writeText' on 'Clipboard': Document is not focused.",
@@ -100,7 +100,7 @@ describe('copyToClipboard', () => {
     it('normalizes Figma clipboard focus failures from the host write path', async () => {
         mockClipboardItem();
         mockClipboardEnvironment({
-            hostname: '192.168.31.9',
+            hostname: '192.168.1.9',
             write: vi.fn().mockRejectedValue(
                 new DOMException(
                     "Failed to execute 'write' on 'Clipboard': Document is not focused.",

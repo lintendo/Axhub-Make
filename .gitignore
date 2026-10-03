@@ -103,3 +103,15 @@ tmp-midscene/
 *.tmp
 *.temp
 *.tgz
+
+# Local screenshots and TypeScript side-effect output
+client/.local-image-*.png
+src/**/*.js
+src/**/*.d.ts
+client/vite-plugins/**/*.js
+vite.config.js
+
+# Official client skill mirror
+!client/.workbuddy/
+!client/.workbuddy/skills/
+!client/.workbuddy/skills/**

@@ -91,8 +91,6 @@ describe('make-server project legacy compatibility APIs', () => {
     writeProjectMetadata(secondRoot, {
       project: { id: 'second-client', name: 'Second Client' },
     });
-    fs.rmSync(path.join(firstRoot, 'src', 'resources', 'spec.md'), { force: true });
-    fs.rmSync(path.join(secondRoot, 'src', 'resources', 'spec.md'), { force: true });
     fs.mkdirSync(path.join(firstRoot, 'src', 'resources'), { recursive: true });
     fs.mkdirSync(path.join(secondRoot, 'src', 'resources'), { recursive: true });
     fs.mkdirSync(path.join(firstRoot, 'src', 'prototypes', 'first-only'), { recursive: true });
@@ -122,7 +120,7 @@ describe('make-server project legacy compatibility APIs', () => {
       expect(config.projectInfo.name).toBe('Second Client');
 
       const docs = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/docs`)).then((response) => response.json());
-      expect(docs.map((doc: any) => doc.name)).toEqual(['second.md']);
+      expect(docs.map((doc: any) => doc.name)).toEqual(['second.md', 'spec.md']);
 
       const markdown = await fetch(scopeProjectApiUrl(secondRoot, `${server.origin}/api/markdown-file?path=${encodeURIComponent('src/resources/second.md')}`))
         .then((response) => response.text());
@@ -260,14 +258,13 @@ describe('make-server project legacy compatibility APIs', () => {
         docs: { type: 'project-relative-path', path: 'src/resources' },
       },
     });
-    fs.rmSync(path.join(resourcesDir, 'spec.md'), { force: true });
     const server = await startTestServer(projectRoot);
 
     try {
       await registerProject(server.origin, projectRoot, 'legacy-docs-list', 'Legacy Docs List');
 
       const docs = await fetch(scopeProjectApiUrl(projectRoot, `${server.origin}/api/docs`)).then((response) => response.json());
-      expect(docs.map((doc: any) => doc.name)).toEqual(['visible.json']);
+      expect(docs.map((doc: any) => doc.name)).toEqual(['spec.md', 'visible.json']);
     } finally {
       await server.close();
     }

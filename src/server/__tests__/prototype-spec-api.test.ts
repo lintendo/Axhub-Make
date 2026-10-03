@@ -289,10 +289,10 @@ describe('prototype spec API', () => {
     const server = await startActivatedProjectServer(projectRoot);
 
     try {
-      const response = await fetch(`${specUrl(server.origin, projectRoot)}?projectId=${encodeURIComponent(path.basename(projectRoot))}`, {
+      const response = await fetch(specUrl(server.origin, projectRoot), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ format: 'html' }),
+        body: JSON.stringify({ format: 'html', projectId: path.basename(projectRoot) }),
       });
       expect(response.status).toBe(404);
       expect(fs.existsSync(path.join(projectRoot, 'src/prototypes/home/.spec/spec.html'))).toBe(false);

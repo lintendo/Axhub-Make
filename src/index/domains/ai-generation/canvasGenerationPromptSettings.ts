@@ -156,7 +156,7 @@ function formatHtmlVisualSpecInstruction(
 
 function formatDocumentTemplatePath(templateName: string): string {
   const normalizedName = templateName.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-  return normalizedName ? `resources/templates/${normalizedName}` : '';
+  return normalizedName.startsWith('templates/') ? normalizedName : '';
 }
 
 function normalizeCanvasContextValue(value: unknown): string {

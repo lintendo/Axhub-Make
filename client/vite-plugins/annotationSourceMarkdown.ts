@@ -14,6 +14,7 @@ type AnnotationSourceMarkdownNode = {
 
 type AnnotationSourceLike = {
   directory?: unknown;
+  documents?: unknown;
   [key: string]: unknown;
 };
 
@@ -267,23 +268,43 @@ export function preprocessAnnotationSourceMarkdown<T extends AnnotationSourceLik
   const directoryRecord = source?.directory && typeof source.directory === 'object' && !Array.isArray(source.directory)
     ? source.directory as Record<string, unknown>
     : null;
-  const nodes = directoryRecord?.nodes;
-  if (!Array.isArray(nodes) || !getPrototypeDirFromAnnotationSourcePath(options.projectRoot, options.sourceFilePath)) {
+  const documentsRecord = source?.documents && typeof source.documents === 'object' && !Array.isArray(source.documents)
+    ? source.documents as Record<string, unknown>
+    : null;
+  const directoryNodes = directoryRecord?.nodes;
+  const documentNodes = documentsRecord?.nodes;
+  if (
+    (!Array.isArray(directoryNodes) && !Array.isArray(documentNodes))
+    || !getPrototypeDirFromAnnotationSourcePath(options.projectRoot, options.sourceFilePath)
+  ) {
     return { source, watchFiles: [] };
   }
 
   const watchFiles = new Set<string>();
   const nextSource = {
     ...source,
-    directory: {
-      ...directoryRecord,
-      nodes: nodes.map((node) => preprocessDirectoryNode(node, {
-        projectRoot: options.projectRoot,
-        sourceFilePath: options.sourceFilePath,
-        mode,
-        watchFiles,
-      })),
-    },
+    ...(directoryRecord && Array.isArray(directoryNodes) ? {
+      directory: {
+        ...directoryRecord,
+        nodes: directoryNodes.map((node) => preprocessDirectoryNode(node, {
+          projectRoot: options.projectRoot,
+          sourceFilePath: options.sourceFilePath,
+          mode,
+          watchFiles,
+        })),
+      },
+    } : {}),
+    ...(documentsRecord && Array.isArray(documentNodes) ? {
+      documents: {
+        ...documentsRecord,
+        nodes: documentNodes.map((node) => preprocessDirectoryNode(node, {
+          projectRoot: options.projectRoot,
+          sourceFilePath: options.sourceFilePath,
+          mode,
+          watchFiles,
+        })),
+      },
+    } : {}),
   } as T;
 
   return {

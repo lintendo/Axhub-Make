@@ -5,7 +5,6 @@ export interface PromptCardSkill {
   keywords?: string;
   prompt: string;
   chromeOnly?: boolean;
-  sourceUrl?: string;
   custom?: boolean;
 }
 
@@ -23,47 +22,154 @@ export interface PromptCardSkillSavePayload {
   skillIds: string[];
 }
 
+const IMPECCABLE_README_URL = 'https://github.com/pbakaus/impeccable#readme';
+
+function buildImpeccablePrompt(command: string, instruction: string): string {
+  return [
+    `请用 Impeccable 的「${command}」能力来处理当前批注。`,
+    `官方技能说明：${IMPECCABLE_README_URL}`,
+    '如果当前环境还没有安装 Impeccable，请先运行：',
+    'npx impeccable install',
+    '如果已经安装，直接继续即可。',
+    `执行时使用官方命令：/impeccable ${command}`,
+    '开始前请先阅读当前项目的 DESIGN.md，所有视觉决策都以它为准。',
+    instruction,
+  ].join('\n');
+}
+
 export const PROMPT_CARD_SKILLS: readonly PromptCardSkill[] = [
   {
     id: 'explore-options',
     label: '多方案探索',
-    description: '使用 explore-options 做多方案探索',
+    description: '同时生成几种不同方案，比较后再选一套',
     keywords: '多方案生成 方案对比 设计决策 多方案对比',
     prompt:
-      '使用本地 explore-options 技能，按多方案探索流程对齐当前批注、需求和设计决策，生成 2-3 个真实不同的可行修改方案，对比后选择最适合当前页面的一种再执行。',
+      '请先围绕当前批注和页面目标，提出 2-3 个方向明显不同的方案，简要说明各自取舍，选出最适合的一套后再开始修改。',
   },
   {
     id: 'prototype-annotation',
     label: '原型标注',
-    description: '使用 prototype-annotation 理解批注意图',
-    prompt: '使用本地 prototype-annotation 技能，结合当前原型标注理解修改意图，处理批注对应区域。',
+    description: '结合当前原型批注，准确理解要改哪里、为什么改',
+    prompt: '请先结合当前原型和批注，确认要改的区域、存在的问题和想达到的效果，再处理批注对应的内容。',
+  },
+  {
+    id: 'impeccable-polish',
+    label: '优化',
+    description: '整体打磨视觉细节，让界面更精致，但不改变页面结构和业务含义',
+    prompt: buildImpeccablePrompt(
+      'polish',
+      '请把当前批注指向的区域打磨得更精致、统一、好用，也可以顺手处理紧邻的必要细节；不要改变页面结构或业务含义，也不要重做整页。',
+    ),
+  },
+  {
+    id: 'impeccable-layout',
+    label: '布局',
+    description: '调整空间、对齐、尺寸和响应式结构，解决拥挤、错位或比例失衡',
+    prompt: buildImpeccablePrompt(
+      'layout',
+      '请重点调整当前区域的空间关系：位置、间距、对齐、尺寸和响应式表现；只改与批注相关的范围，不改变业务含义。',
+    ),
+  },
+  {
+    id: 'impeccable-typeset',
+    label: '排版',
+    description: '调整字体、字号、行高、字重和文字层级，让内容更易读',
+    prompt: buildImpeccablePrompt(
+      'typeset',
+      '请让当前区域的文字更好读：调整字体、字号、行高、字重和信息层级；不要改变文案含义。',
+    ),
+  },
+  {
+    id: 'impeccable-distill',
+    label: '精简',
+    description: '去掉多余装饰、重复信息和视觉噪音，让界面更清爽',
+    prompt: buildImpeccablePrompt(
+      'distill',
+      '请删掉当前区域里多余的装饰、重复信息和视觉噪音，让重点更突出；保留业务信息和必要状态。',
+    ),
+  },
+  {
+    id: 'impeccable-clarify',
+    label: '文案',
+    description: '改写按钮、提示和说明，让用户更快理解并知道下一步',
+    prompt: buildImpeccablePrompt(
+      'clarify',
+      '请把当前区域的按钮、提示和说明写得更清楚、更具体，让用户知道下一步怎么做；不要改变业务含义。',
+    ),
+  },
+  {
+    id: 'impeccable-animate',
+    label: '动效',
+    description: '补充加载、悬停、切换和反馈动画，让交互更有回应',
+    prompt: buildImpeccablePrompt(
+      'animate',
+      '请为当前区域补上必要的加载、切换和操作反馈，让交互更自然；动效要克制，并尊重用户的减少动效设置。',
+    ),
+  },
+  {
+    id: 'impeccable-adapt',
+    label: '适配',
+    description: '检查桌面、平板、手机和不同输入方式下的显示与操作',
+    prompt: buildImpeccablePrompt(
+      'adapt',
+      '请检查当前区域在桌面、平板、手机、横竖屏以及不同输入方式下是否好用，并修正明显问题。',
+    ),
+  },
+  {
+    id: 'impeccable-harden',
+    label: '健壮',
+    description: '补齐加载、空数据、错误、焦点、键盘和无障碍状态，避免边界情况失控',
+    prompt: buildImpeccablePrompt(
+      'harden',
+      '请补齐当前区域在加载、空数据、错误、焦点、键盘操作和无障碍使用时的状态，避免用户遇到没有反馈或无法继续的情况。',
+    ),
+  },
+  {
+    id: 'impeccable-onboard',
+    label: '引导',
+    description: '优化首次使用、空状态和关键步骤，告诉用户接下来该做什么',
+    prompt: buildImpeccablePrompt(
+      'onboard',
+      '请让第一次使用和关键操作更容易理解，尤其是空状态和下一步提示；用户应该能明确知道接下来该做什么。',
+    ),
+  },
+  {
+    id: 'impeccable-colorize',
+    label: '色彩',
+    description: '调整色彩层级、对比度和状态色，同时保持品牌一致',
+    prompt: buildImpeccablePrompt(
+      'colorize',
+      '请调整当前区域的颜色层级、对比度和状态颜色，让信息更容易分辨，同时保持现有品牌风格。',
+    ),
   },
   {
     id: 'impeccable',
     label: 'UI 评审',
-    description: '使用 impeccable 检查界面质量',
-    prompt:
-      '使用本地 impeccable 技能，按 UI critique 思路审查当前页面或区域，给出关键问题和修复方向。',
+    description: '只找问题并给出优先级和建议，不直接进行大范围修改',
+    prompt: buildImpeccablePrompt(
+      'critique',
+      '请只做评审，不要直接大范围修改。请列出问题、优先级、影响和具体修复建议。',
+    ),
   },
   {
     id: 'ui-design-image',
     label: 'UI 设计图片',
-    description: '使用 ui-design-image 生成 UI 设计图片',
+    description: '生成界面图片、图标、占位图或视觉参考素材',
     keywords:
       '生图 生成图片 图片生成 设计图 UI图片 UI素材 图标 占位图 视觉参考图 imagegen image generation',
     prompt:
-      '使用本地 ui-design-image 技能，结合当前批注、页面上下文和参考图片，生成 UI 设计图片、素材、图标、占位图或视觉参考图。需要把结果更新到当前画布或相关项目素材时，按当前项目规则落盘并回写。',
+      '请根据当前批注、页面上下文和参考图片，生成合适的界面图片、素材、图标、占位图或视觉参考图；如果结果需要放回当前画布或项目素材，请按项目规则保存并回写。',
   },
   {
     id: 'requirements-review',
     label: '需求评审',
-    description: 'axhub-prototype-context：需求/PRD 评审',
+    description: '检查 PRD、目录、原型和批注是否一致',
     keywords: '需求评审 PRD 原型评审 axhub-prototype-context',
     prompt: [
-      '使用 axhub-prototype-context 技能处理这条批注。',
+      '请使用 axhub-prototype-context 技能来评审这条批注。',
       '技能文档：https://github.com/lintendo/Axhub-Skills/blob/main/skills/axhub-prototype-context/SKILL.md',
-      '打开当前原型 URL，等待页面渲染后读取 window.__AXHUB_ANNOTATION_SOURCE__，将页面视为只读上下文。',
-      '评审 source.directory 中的目录/PRD、markdown 节点、批注节点，以及 source.root/source.manifest 中的源码交接线索。',
+      '打开当前原型 URL，等页面加载完成后读取 window.__AXHUB_ANNOTATION_SOURCE__，只把页面当作评审上下文，不要直接修改它。',
+      '重点检查目录和 PRD、Markdown 节点、批注节点是否一致，同时参考源码交接线索，指出需求与原型之间的缺口。',
     ].join('\n'),
     chromeOnly: true,
   },
@@ -100,7 +206,6 @@ export function mergePromptCardSkills(
       description,
       prompt,
       ...(option.keywords ? { keywords: String(option.keywords).trim() } : {}),
-      ...(option.sourceUrl ? { sourceUrl: String(option.sourceUrl).trim() } : {}),
       ...(option.chromeOnly === true ? { chromeOnly: true } : {}),
       ...(option.custom === true ? { custom: true } : {}),
     });
@@ -110,7 +215,7 @@ export function mergePromptCardSkills(
 }
 
 function normalizeSkillQuery(value: string): string {
-  return value.trim().toLocaleLowerCase();
+  return value.trim().toLocaleLowerCase().replace(/\s+/gu, '');
 }
 
 export function findPromptCardSkillTrigger(text: string): PromptCardSkillTrigger | null {
@@ -158,9 +263,17 @@ export function filterPromptCardSkills(
   );
   if (!normalizedQuery) return [...availableSkills];
 
+  const exactMatches = availableSkills.filter(
+    (skill) =>
+      normalizeSkillQuery(skill.id) === normalizedQuery ||
+      normalizeSkillQuery(skill.label) === normalizedQuery,
+  );
+  if (exactMatches.length > 0) return exactMatches;
+
   return availableSkills.filter((skill) => {
-    const searchableText =
-      `${skill.id} ${skill.label} ${skill.description} ${skill.keywords ?? ''}`.toLocaleLowerCase();
+    const searchableText = normalizeSkillQuery(
+      `${skill.id} ${skill.label} ${skill.description} ${skill.keywords ?? ''}`,
+    );
     return searchableText.includes(normalizedQuery);
   });
 }

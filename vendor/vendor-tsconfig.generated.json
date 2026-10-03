@@ -9,6 +9,9 @@
       "@ant-design/cssinjs": [
         "./node_modules/@ant-design/cssinjs"
       ],
+      "@axhub/agent-surface": [
+        "./vendor/agent-surface/dist/index.d.ts"
+      ],
       "@axhub/excalidraw": [
         "./vendor/axhub-excalidraw/dist/types/excalidraw/index.d.ts"
       ],
@@ -20,6 +23,9 @@
       ],
       "@axhub/commentary": [
         "./vendor/axhub-commentary/src/index.ts"
+      ],
+      "@axhub/commentary/prompt-card-skills": [
+        "./vendor/axhub-commentary/src/ui/runtime/prompt-card-skills.ts"
       ],
       "tiptap-editor": [
         "./vendor/tiptap-editor/dist/index.d.ts"

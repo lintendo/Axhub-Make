@@ -51,6 +51,9 @@ entries.json
 .agents/*
 !.agents/skills/
 !.agents/skills/**
+.workbuddy/*
+!.workbuddy/skills/
+!.workbuddy/skills/**
 .opencode/
 .codegraph/
 .trae/

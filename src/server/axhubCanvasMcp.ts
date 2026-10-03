@@ -6,6 +6,8 @@ import {
   type CanvasBridgeHub,
   type CanvasCommandOptions,
 } from './canvasBridge.ts';
+import { CanvasRevisionConflictError, type CanvasWriteCoordinator } from './canvasWriteCoordinator.ts';
+import { normalizeCanvasWorkResourcePath } from './assistantWorkStore.ts';
 import { readJsonBody, sendJson } from './http.ts';
 
 export const AXHUB_CANVAS_MCP_PATH = '/api/mcp/axhub-canvas';
@@ -29,10 +31,14 @@ type ToolDefinition = {
 export interface AxhubCanvasMcpOptions {
   token: string;
   bridgeHub: Pick<CanvasBridgeHub, 'sendCommand'>;
+  writeCoordinator?: CanvasWriteCoordinator;
+  projectId?: string;
+  workId?: string;
 }
 
 const TOOL_NAMES = [
   'canvas_get_state',
+  'canvas_checkpoint',
   'canvas_insert_elements',
   'canvas_insert_mermaid',
   'canvas_refresh',
@@ -73,12 +79,24 @@ const AXHUB_CANVAS_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'canvas_checkpoint',
+    description: 'Flush pending browser canvas changes and return the persisted scene revision.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...COMMON_TOOL_PROPERTIES,
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'canvas_insert_elements',
     description: 'Insert elements, images, documents, prototype references, or chart nodes into the browser canvas.',
     inputSchema: {
       type: 'object',
       properties: {
         ...COMMON_TOOL_PROPERTIES,
+        expectedRevision: { type: 'string', description: 'Opaque persisted scene revision read before planning the mutation.' },
         elements: { type: 'array', items: { type: 'object' } },
         files: { type: 'object' },
         position: {
@@ -92,6 +110,7 @@ const AXHUB_CANVAS_TOOLS: ToolDefinition[] = [
           ],
         },
       },
+      required: ['expectedRevision', 'requestId'],
       additionalProperties: true,
     },
   },
@@ -102,6 +121,7 @@ const AXHUB_CANVAS_TOOLS: ToolDefinition[] = [
       type: 'object',
       properties: {
         ...COMMON_TOOL_PROPERTIES,
+        expectedRevision: { type: 'string', description: 'Opaque persisted scene revision read before planning the mutation.' },
         mermaidCode: {
           type: 'string',
           description: 'Mermaid diagram definition to convert and insert.',
@@ -127,7 +147,7 @@ const AXHUB_CANVAS_TOOLS: ToolDefinition[] = [
           additionalProperties: true,
         },
       },
-      required: ['mermaidCode'],
+      required: ['mermaidCode', 'expectedRevision', 'requestId'],
       additionalProperties: true,
     },
   },
@@ -170,8 +190,10 @@ const AXHUB_CANVAS_TOOLS: ToolDefinition[] = [
       type: 'object',
       properties: {
         ...COMMON_TOOL_PROPERTIES,
+        expectedRevision: { type: 'string', description: 'Opaque persisted scene revision read before planning the mutation.' },
         updates: { type: 'array', items: { type: 'object' } },
       },
+      required: ['expectedRevision', 'requestId'],
       additionalProperties: true,
     },
   },
@@ -182,8 +204,10 @@ const AXHUB_CANVAS_TOOLS: ToolDefinition[] = [
       type: 'object',
       properties: {
         ...COMMON_TOOL_PROPERTIES,
+        expectedRevision: { type: 'string', description: 'Opaque persisted scene revision read before planning the mutation.' },
         elementIds: { type: 'array', items: { type: 'string' } },
       },
+      required: ['expectedRevision', 'requestId'],
       additionalProperties: true,
     },
   },
@@ -258,6 +282,13 @@ export async function handleAxhubCanvasMcp(
     return true;
   }
 
+  const requestUrl = new URL(req.url || AXHUB_CANVAS_MCP_PATH, 'http://localhost');
+  const scopedOptions: AxhubCanvasMcpOptions = {
+    ...options,
+    projectId: options.projectId || requestUrl.searchParams.get('projectId') || undefined,
+    workId: options.workId || requestUrl.searchParams.get('workId') || undefined,
+  };
+
   if (isJsonRpcNotification(request)) {
     res.statusCode = 202;
     res.setHeader('Cache-Control', 'no-store');
@@ -265,7 +296,7 @@ export async function handleAxhubCanvasMcp(
     return true;
   }
 
-  const response = await dispatchJsonRpcRequest(request, options);
+  const response = await dispatchJsonRpcRequest(request, scopedOptions);
   sendJson(res, response);
   return true;
 }
@@ -347,10 +378,45 @@ async function callTool(
   options: AxhubCanvasMcpOptions,
 ): Promise<Record<string, unknown>> {
   const { name, args } = readToolCall(params);
+  if (isPersistentCanvasMutation(name)) {
+    if (typeof args.expectedRevision !== 'string' || !args.expectedRevision.trim()) {
+      throw new CanvasBridgeError('CANVAS_REVISION_CONFLICT', 'expectedRevision is required for persistent canvas mutations.');
+    }
+    if (typeof args.requestId !== 'string' || !args.requestId.trim()) {
+      throw new CanvasBridgeError('invalid_tool_call', 'requestId is required for persistent canvas mutations.');
+    }
+  }
   const { payload, commandOptions } = splitBridgeArguments(args);
 
   try {
-    const result = await options.bridgeHub.sendCommand(name, payload, commandOptions);
+    let result: unknown;
+    if (isPersistentCanvasMutation(name) && options.writeCoordinator) {
+      const state = await options.bridgeHub.sendCommand('canvas_get_state', { includeElements: false }, {
+        ...(commandOptions.canvasName ? { canvasName: commandOptions.canvasName } : {}),
+        ...(commandOptions.timeoutMs ? { timeoutMs: commandOptions.timeoutMs } : {}),
+      });
+      const stateRecord = isRecord(state) ? state : {};
+      const resourcePath = resolveCanvasResourcePath(
+        stateRecord.canvasFilePath,
+        stateRecord.canvasName,
+        commandOptions.canvasName,
+      );
+      if (!resourcePath) {
+        throw new CanvasBridgeError('invalid_canvas_path', 'The connected canvas resource path is unavailable.');
+      }
+      result = await options.writeCoordinator.enqueue({
+        projectId: options.projectId || '',
+        resourcePath,
+        expectedRevision: String(args.expectedRevision || ''),
+        requestId: String(args.requestId || ''),
+        toolName: name,
+        payload,
+        canvasName: commandOptions.canvasName,
+        workId: options.workId,
+      });
+    } else {
+      result = await options.bridgeHub.sendCommand(name, payload, commandOptions);
+    }
     return createToolContent({ ok: true, payload: result });
   } catch (error) {
     const normalized = normalizeToolError(error);
@@ -359,6 +425,20 @@ async function callTool(
       ...createToolContent({ ok: false, error: normalized }),
     };
   }
+}
+
+function resolveCanvasResourcePath(...values: unknown[]): string | null {
+  for (const value of values) {
+    let raw = typeof value === 'string' ? value.trim().replace(/\\/gu, '/') : '';
+    if (!raw) continue;
+    const marker = raw.toLowerCase().indexOf('/src/resources/');
+    if (marker >= 0) raw = raw.slice(marker + '/src/resources/'.length);
+    else if (raw.toLowerCase().startsWith('src/resources/')) raw = raw.slice('src/resources/'.length);
+    else if (raw.toLowerCase().startsWith('resources/')) raw = raw.slice('resources/'.length);
+    const normalized = normalizeCanvasWorkResourcePath(raw);
+    if (normalized) return normalized;
+  }
+  return null;
 }
 
 function readToolCall(params: unknown): { name: CanvasToolName; args: Record<string, unknown> } {
@@ -390,6 +470,13 @@ function splitBridgeArguments(args: Record<string, unknown>): {
   };
 }
 
+function isPersistentCanvasMutation(name: CanvasToolName): boolean {
+  return name === 'canvas_insert_elements'
+    || name === 'canvas_insert_mermaid'
+    || name === 'canvas_update_elements'
+    || name === 'canvas_delete_elements';
+}
+
 function createToolContent(payload: unknown): Record<string, unknown> {
   return {
     content: [{
@@ -400,11 +487,17 @@ function createToolContent(payload: unknown): Record<string, unknown> {
 }
 
 function normalizeToolError(error: unknown): { code: string; message: string } {
+  if (error instanceof CanvasRevisionConflictError) {
+    return { code: error.code, message: error.message };
+  }
   if (error instanceof CanvasBridgeError) {
     return {
       code: error.code,
       message: error.message,
     };
+  }
+  if (isRecord(error) && typeof error.code === 'string' && typeof error.message === 'string') {
+    return { code: error.code, message: error.message };
   }
   if (error instanceof Error) {
     return {

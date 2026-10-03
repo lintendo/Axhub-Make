@@ -7,6 +7,8 @@
  * target elements with the Commentary.
  */
 
+import { resolveCspNonce } from '../ui/csp-nonce';
+
 const STYLE_TAG_ID = '__commentary_no_animations__';
 
 const DISABLE_ANIMATIONS_CSS = `
@@ -128,6 +130,8 @@ export function setPageAnimationsDisabled(disabled: boolean): void {
 
   const styleEl = document.createElement('style');
   styleEl.id = STYLE_TAG_ID;
+  const cspNonce = resolveCspNonce(document);
+  if (cspNonce) styleEl.nonce = cspNonce;
   styleEl.textContent = DISABLE_ANIMATIONS_CSS;
   document.head.appendChild(styleEl);
 

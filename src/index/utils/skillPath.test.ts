@@ -18,6 +18,9 @@ describe('normalizeSkillPath', () => {
     expect(normalizeSkillPath('.claude\\skills\\handle-comments\\SKILL.md')).toBe(
       '.claude/skills/handle-comments/SKILL.md',
     );
+    expect(normalizeSkillPath('.workbuddy\\skills\\handle-comments\\SKILL.md')).toBe(
+      '.workbuddy/skills/handle-comments/SKILL.md',
+    );
   });
 
   it('rejects invalid skill paths', () => {
@@ -29,6 +32,7 @@ describe('normalizeSkillPath', () => {
       '/skills/../escape.md',
       '.agents/skills/../escape.md',
       '.claude/skills/../../escape.md',
+      '.workbuddy/skills/../../escape.md',
       'C:/skills/file.md',
       'https://example.com/skills/file.md',
       '/skills/with\0nul.md',
@@ -47,6 +51,7 @@ describe('normalizeSkillSource', () => {
       normalizeSkillSource(`
         .agents/skills/explore-options/SKILL.md
         .claude\\skills\\explore-options\\SKILL.md
+        .workbuddy\\skills\\explore-options\\SKILL.md
         https://example.com/skills/remote.md
         .agents/skills/handle-comments/SKILL.md
       `),
@@ -54,6 +59,7 @@ describe('normalizeSkillSource', () => {
       [
         '.agents/skills/explore-options/SKILL.md',
         '.claude/skills/explore-options/SKILL.md',
+        '.workbuddy/skills/explore-options/SKILL.md',
         '.agents/skills/handle-comments/SKILL.md',
       ].join('\n'),
     );

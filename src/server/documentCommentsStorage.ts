@@ -26,6 +26,10 @@ export type PrototypeCommentStorage = {
   projectRelativeAssetRoot: string;
 };
 
+export type PrototypeCommentStorageOptions = {
+  publishedShareId?: string;
+};
+
 function isWindowsAbsolutePath(value: string): boolean {
   return /^[a-z]:[\\/]/iu.test(value) || /^\\\\/u.test(value);
 }
@@ -162,6 +166,7 @@ export function resolveDocumentCommentStorage(
 export function resolvePrototypeCommentStorage(
   projectRoot: string,
   targetPath: unknown,
+  _options: PrototypeCommentStorageOptions = {},
 ): PrototypeCommentStorage | null {
   const normalized = normalizePrototypeCommentTargetPath(targetPath);
   if (!normalized) return null;
@@ -185,22 +190,23 @@ export function resolvePrototypeCommentStorage(
   }
 
   const hash = prototypeCommentHash(normalized);
-  const commentsRoot = path.resolve(projectRoot, COMMENTS_ROOT);
-  const assetsRoot = path.resolve(projectRoot, ASSETS_ROOT);
-  const commentFilePath = path.join(commentsRoot, `${hash}.json`);
-  const assetDir = path.join(assetsRoot, hash);
+  const baseCommentsRoot = path.resolve(projectRoot, COMMENTS_ROOT);
+  const baseAssetsRoot = path.resolve(projectRoot, ASSETS_ROOT);
+  const commentFilePath = path.join(baseCommentsRoot, `${hash}.json`);
+  const assetDir = path.join(baseAssetsRoot, hash);
   if (
     !validateExistingDirectory(realProjectRoot, path.resolve(projectRoot, '.axhub'))
     || !validateExistingDirectory(realProjectRoot, path.resolve(projectRoot, '.axhub', 'make'))
-    || !validateExistingDirectory(realProjectRoot, commentsRoot)
-    || !validateExistingDirectory(realProjectRoot, assetsRoot)
+    || !validateExistingDirectory(realProjectRoot, baseCommentsRoot)
+    || !validateExistingDirectory(realProjectRoot, baseAssetsRoot)
+    || !validateExistingDirectory(realProjectRoot, baseCommentsRoot)
+    || !validateExistingDirectory(realProjectRoot, baseAssetsRoot)
     || !validateExistingDirectory(realProjectRoot, assetDir)
     || !validateExistingFile(realProjectRoot, commentFilePath)
   ) {
     return null;
   }
 
-  const projectRelativeAssetRoot = `${ASSETS_ROOT.split(path.sep).join('/')}/${hash}`;
   return {
     prototypeId,
     targetPath: normalized,
@@ -209,6 +215,6 @@ export function resolvePrototypeCommentStorage(
     commentFilePath,
     assetDir,
     projectRelativeCommentPath: `${COMMENTS_ROOT.split(path.sep).join('/')}/${hash}.json`,
-    projectRelativeAssetRoot,
+    projectRelativeAssetRoot: `${ASSETS_ROOT.split(path.sep).join('/')}/${hash}`,
   };
 }

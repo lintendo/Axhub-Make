@@ -32,25 +32,34 @@ var index_exports = {};
 __export(index_exports, {
   AXHUB_WEB_EDITOR_AGENT_REQUEST: () => AXHUB_WEB_EDITOR_AGENT_REQUEST,
   GLOBAL_COMMENTARY_TWEAK_PROTOCOL_KEY: () => GLOBAL_COMMENTARY_TWEAK_PROTOCOL_KEY,
+  PROMPT_CARD_SKILLS: () => PROMPT_CARD_SKILLS,
+  PROMPT_CARD_SKILL_OPTIONS: () => PROMPT_CARD_SKILL_OPTIONS,
   WEB_EDITOR_V1_ACTIONS: () => WEB_EDITOR_V1_ACTIONS,
   WEB_EDITOR_V2_ACTIONS: () => WEB_EDITOR_V2_ACTIONS,
   buildAcpConversationRuntimeUrl: () => buildAcpConversationRuntimeUrl,
   buildAcpRuntimeEventsUrl: () => buildAcpRuntimeEventsUrl,
+  buildExternalCommentsPromptSection: () => buildExternalCommentsPromptSection,
   createCommentary: () => createCommentary,
   createCommentaryTweakProtocol: () => createCommentaryTweakProtocol,
+  createCommentaryVoiceTarget: () => createCommentaryVoiceTarget,
   createWebEditorAgentRequestMessage: () => createWebEditorAgentRequestMessage,
   createWebEditorV2: () => createWebEditorV2,
   ensureGlobalCommentaryTweakProtocol: () => ensureGlobalCommentaryTweakProtocol,
   getGlobalCommentaryTweakProtocol: () => getGlobalCommentaryTweakProtocol,
+  groupExternalCommentsByAuthor: () => groupExternalCommentsByAuthor,
   installGlobalCommentaryReviewCommentProtocol: () => installGlobalCommentaryReviewCommentProtocol,
   isAcpRuntimeEventStatus: () => isAcpRuntimeEventStatus,
   isTerminalAcpRunState: () => isTerminalAcpRunState,
   isWebEditorAgentRequestMessage: () => isWebEditorAgentRequestMessage,
   matchesAcpRuntimeStatus: () => matchesAcpRuntimeStatus,
+  normalizePromptCardSkillIds: () => normalizePromptCardSkillIds,
   notifyGlobalCommentaryTweakProtocol: () => notifyGlobalCommentaryTweakProtocol,
   postWebEditorAgentRequest: () => postWebEditorAgentRequest,
   readAcpRuntimeStatusesFromSseChunk: () => readAcpRuntimeStatusesFromSseChunk,
   resolveCommentaryDiagramTarget: () => resolveCommentaryDiagramTarget,
+  resolveCommentaryElementIdentity: () => resolveCommentaryElementIdentity,
+  resolveCommentaryVoiceTargetElement: () => resolveCommentaryVoiceTargetElement,
+  sanitizeCommentaryVoiceTarget: () => sanitizeCommentaryVoiceTarget,
   subscribeAcpRuntimeStatuses: () => subscribeAcpRuntimeStatuses,
   waitForAcpRuntimeTerminalStatus: () => waitForAcpRuntimeTerminalStatus
 });
@@ -342,6 +351,905 @@ function postWebEditorAgentRequest(payload, options = {}) {
     options.targetOrigin ?? "*"
   );
   return true;
+}
+
+// src/core/element-key.ts
+var elementKeyCache = /* @__PURE__ */ new WeakMap();
+var shadowHostKeyCache = /* @__PURE__ */ new WeakMap();
+var autoKeyCounter = 0;
+var shadowHostCounter = 0;
+var cachedFrameContext;
+var LABEL_ATTR_PRIORITY = [
+  "data-testid",
+  "data-test-id",
+  "data-test",
+  "data-qa",
+  "data-cy",
+  "name",
+  "aria-label",
+  "title",
+  "alt"
+];
+var MAX_LABEL_ATTR_VALUE_LENGTH = 48;
+var MAX_TEXT_LABEL_LENGTH = 64;
+function normalizeTagName(element) {
+  const raw = element?.tagName ? String(element.tagName) : "";
+  const tag = raw.toLowerCase().trim();
+  return tag || "unknown";
+}
+function normalizeAttrValue(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function normalizeText2(value) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+function truncate(value, maxLength) {
+  const str = String(value ?? "");
+  if (str.length <= maxLength) return str;
+  return str.slice(0, Math.max(0, maxLength - 1)).trimEnd() + "\u2026";
+}
+function getFrameContextPrefix() {
+  if (cachedFrameContext !== void 0) return cachedFrameContext;
+  let context = "";
+  try {
+    const frameEl = window.frameElement;
+    if (frameEl instanceof HTMLIFrameElement) {
+      const tag = normalizeTagName(frameEl);
+      const id = normalizeAttrValue(frameEl.id || frameEl.getAttribute("id"));
+      if (id) {
+        context = `${tag}#${id}`;
+      } else {
+        const name = normalizeAttrValue(frameEl.name || frameEl.getAttribute("name"));
+        if (name) {
+          context = `${tag}[name="${truncate(name, MAX_LABEL_ATTR_VALUE_LENGTH)}"]`;
+        } else {
+          const src = normalizeAttrValue(frameEl.getAttribute("src") || frameEl.src);
+          context = src ? `${tag}[src="${truncate(src, MAX_LABEL_ATTR_VALUE_LENGTH)}"]` : tag;
+        }
+      }
+    }
+  } catch {
+    context = "";
+  }
+  cachedFrameContext = context;
+  return context;
+}
+function getStableShadowHostKey(host) {
+  const cached = shadowHostKeyCache.get(host);
+  if (cached) return cached;
+  const tag = normalizeTagName(host);
+  const id = normalizeAttrValue(host.id || host.getAttribute("id"));
+  const key = id ? `${tag}#${id}` : `${tag}_h${++shadowHostCounter}`;
+  shadowHostKeyCache.set(host, key);
+  return key;
+}
+function computeShadowContextPrefix(element, _shadowHostChain) {
+  const hasShadowRoot = typeof ShadowRoot !== "undefined";
+  const hasElementCtor = typeof Element !== "undefined";
+  const hosts = [];
+  let current = element;
+  while (true) {
+    let root;
+    try {
+      root = current.getRootNode?.();
+    } catch {
+      root = null;
+    }
+    if (!hasShadowRoot || !(root instanceof ShadowRoot)) break;
+    const host = root.host;
+    if (!hasElementCtor || !(host instanceof Element)) break;
+    hosts.unshift(getStableShadowHostKey(host));
+    current = host;
+  }
+  return hosts.length > 0 ? hosts.join(">") : "";
+}
+function readBestLabelAttribute(element) {
+  for (const attr of LABEL_ATTR_PRIORITY) {
+    const value = normalizeAttrValue(element.getAttribute(attr));
+    if (value) return { attr, value };
+  }
+  return null;
+}
+function generateStableElementKey(element, shadowHostChain) {
+  const cached = elementKeyCache.get(element);
+  if (cached) return cached;
+  const tag = normalizeTagName(element);
+  const id = normalizeAttrValue(element.id || element.getAttribute("id"));
+  const baseKey = id ? `${tag}#${id}` : `${tag}_${++autoKeyCounter}`;
+  const parts = [];
+  const frame = getFrameContextPrefix();
+  if (frame) parts.push(`frame:${frame}`);
+  const shadow = computeShadowContextPrefix(element, shadowHostChain);
+  if (shadow) parts.push(`shadow:${shadow}`);
+  parts.push(baseKey);
+  const fullKey = parts.join("|");
+  elementKeyCache.set(element, fullKey);
+  return fullKey;
+}
+function generateElementLabel(element) {
+  const tag = normalizeTagName(element);
+  const hasHtmlInputCtor = typeof HTMLInputElement !== "undefined";
+  const hasHtmlIFrameCtor = typeof HTMLIFrameElement !== "undefined";
+  const id = normalizeAttrValue(element.id || element.getAttribute("id"));
+  if (id) return `${tag}#${id}`;
+  const bestAttr = readBestLabelAttribute(element);
+  if (bestAttr) {
+    return `${tag}[${bestAttr.attr}="${truncate(bestAttr.value, MAX_LABEL_ATTR_VALUE_LENGTH)}"]`;
+  }
+  const role = normalizeAttrValue(element.getAttribute("role"));
+  if (role) {
+    return `${tag}[role="${truncate(role, MAX_LABEL_ATTR_VALUE_LENGTH)}"]`;
+  }
+  if (hasHtmlInputCtor && element instanceof HTMLInputElement) {
+    const type = normalizeAttrValue(element.getAttribute("type") || element.type);
+    if (type && type !== "text") {
+      return `${tag}[type="${truncate(type, MAX_LABEL_ATTR_VALUE_LENGTH)}"]`;
+    }
+    const placeholder = normalizeAttrValue(
+      element.getAttribute("placeholder") || element.placeholder
+    );
+    if (placeholder) {
+      return `${tag}[placeholder="${truncate(placeholder, MAX_LABEL_ATTR_VALUE_LENGTH)}"]`;
+    }
+  }
+  if (hasHtmlIFrameCtor && element instanceof HTMLIFrameElement) {
+    const src = normalizeAttrValue(element.getAttribute("src") || element.src);
+    if (src) {
+      return `${tag}[src="${truncate(src, MAX_LABEL_ATTR_VALUE_LENGTH)}"]`;
+    }
+  }
+  const text = normalizeText2(element.textContent ?? "");
+  if (text) return `${tag}("${truncate(text, MAX_TEXT_LABEL_LENGTH)}")`;
+  return tag;
+}
+function generateFullElementLabel(element, shadowHostChain) {
+  const baseLabel = generateElementLabel(element);
+  const shadow = computeShadowContextPrefix(element, shadowHostChain);
+  if (shadow) {
+    return `${shadow} >> ${baseLabel}`;
+  }
+  return baseLabel;
+}
+
+// src/core/debug-source.ts
+var MAX_DOM_DEPTH = 15;
+var MAX_FIBER_DEPTH = 40;
+function asRecord(value) {
+  if (value && typeof value === "object") {
+    return value;
+  }
+  return null;
+}
+function readString(value) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || void 0;
+  }
+  return void 0;
+}
+function readNumber(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isFinite(parsed) ? parsed : void 0;
+}
+function readComponentName(value) {
+  if (!value) return void 0;
+  if (typeof value === "function") {
+    const fn = value;
+    return readString(fn.displayName) ?? readString(fn.name);
+  }
+  const rec = asRecord(value);
+  if (rec) {
+    return readString(rec.displayName) ?? readString(rec.name);
+  }
+  return void 0;
+}
+function extractReactDebugSource(fiber) {
+  let current = fiber;
+  for (let i = 0; i < MAX_FIBER_DEPTH && current; i++) {
+    const rec = asRecord(current);
+    if (!rec) break;
+    const src = asRecord(rec._debugSource);
+    const file = readString(src?.fileName);
+    if (file) {
+      const componentName = readComponentName(rec.elementType) ?? readComponentName(rec.type);
+      return {
+        file,
+        line: readNumber(src?.lineNumber),
+        column: readNumber(src?.columnNumber),
+        componentName
+      };
+    }
+    const owner = asRecord(rec._debugOwner);
+    const ownerSrc = asRecord(owner?._debugSource);
+    const ownerFile = readString(ownerSrc?.fileName);
+    if (ownerFile) {
+      const componentName = readComponentName(owner?.elementType) ?? readComponentName(owner?.type);
+      return {
+        file: ownerFile,
+        line: readNumber(ownerSrc?.lineNumber),
+        column: readNumber(ownerSrc?.columnNumber),
+        componentName
+      };
+    }
+    current = rec.return;
+  }
+  return null;
+}
+function findReactDebugSource(element) {
+  try {
+    let node = element;
+    for (let depth = 0; depth < MAX_DOM_DEPTH && node; depth++) {
+      const rec = node;
+      for (const key of Object.keys(rec)) {
+        if (key.startsWith("__reactFiber$") || key.startsWith("__reactInternalInstance$")) {
+          const source = extractReactDebugSource(rec[key]);
+          if (source) return source;
+        }
+      }
+      node = node.parentElement;
+    }
+  } catch {
+  }
+  return null;
+}
+function parseVInspector(value) {
+  if (typeof value !== "string") return null;
+  const raw = value.trim();
+  if (!raw) return null;
+  const match = raw.match(/:(\d+)(?::(\d+))?$/);
+  if (!match) {
+    return { file: raw };
+  }
+  const file = raw.slice(0, match.index).trim();
+  if (!file) return null;
+  const line = Number.parseInt(match[1], 10);
+  const columnRaw = match[2] ? Number.parseInt(match[2], 10) : void 0;
+  return {
+    file,
+    line: Number.isFinite(line) && line > 0 ? line : void 0,
+    column: columnRaw !== void 0 && Number.isFinite(columnRaw) && columnRaw > 0 ? columnRaw : void 0
+  };
+}
+function findInspectorLocation(element) {
+  try {
+    let node = element;
+    for (let depth = 0; depth < MAX_DOM_DEPTH && node; depth++) {
+      if (typeof node.getAttribute === "function") {
+        const attr = node.getAttribute("data-v-inspector");
+        if (attr) {
+          const parsed = parseVInspector(attr);
+          if (parsed?.file) return parsed;
+        }
+      }
+      node = node.parentElement;
+    }
+  } catch {
+  }
+  return null;
+}
+function findVueDebugSource(element) {
+  try {
+    const inspector = findInspectorLocation(element);
+    if (inspector?.file) {
+      let componentName;
+      let node2 = element;
+      for (let depth = 0; depth < MAX_DOM_DEPTH && node2; depth++) {
+        const rec = node2;
+        const inst = asRecord(rec.__vueParentComponent);
+        const typeRec = asRecord(inst?.type);
+        componentName = readString(typeRec?.name);
+        if (componentName) break;
+        node2 = node2.parentElement;
+      }
+      return {
+        ...inspector,
+        componentName
+      };
+    }
+    let node = element;
+    for (let depth = 0; depth < MAX_DOM_DEPTH && node; depth++) {
+      const rec = node;
+      const inst = asRecord(rec.__vueParentComponent);
+      const typeRec = asRecord(inst?.type);
+      const file = readString(typeRec?.__file);
+      if (file) {
+        return {
+          file,
+          componentName: readString(typeRec?.name)
+        };
+      }
+      node = node.parentElement;
+    }
+  } catch {
+  }
+  return null;
+}
+function findDebugSource(element) {
+  const react = findReactDebugSource(element);
+  if (react) return react;
+  const vue = findVueDebugSource(element);
+  if (vue) return vue;
+  return null;
+}
+
+// src/core/text-fragment.ts
+var EDITABLE_TEXT_FRAGMENT_ATTRIBUTE = "data-axhub-commentary-text-fragment";
+function isNonEmptyTextNode(node) {
+  return node?.nodeType === 3 && Boolean(node.textContent?.trim());
+}
+function isEditableTextFragmentElement(element) {
+  return typeof HTMLElement !== "undefined" && element instanceof HTMLElement && element.hasAttribute(EDITABLE_TEXT_FRAGMENT_ATTRIBUTE);
+}
+function getEditableTextFragmentLocator(element) {
+  if (!isEditableTextFragmentElement(element)) return null;
+  const parent = element.parentElement;
+  if (!parent) return null;
+  const childNodeIndex = Array.prototype.indexOf.call(parent.childNodes, element);
+  if (childNodeIndex < 0) return null;
+  return {
+    parent,
+    fragment: { childNodeIndex }
+  };
+}
+function wrapEditableTextFragment(textNode) {
+  if (!isNonEmptyTextNode(textNode)) return null;
+  const parent = textNode.parentElement;
+  if (!(parent instanceof HTMLElement)) return null;
+  const wrapper = textNode.ownerDocument.createElement("span");
+  wrapper.setAttribute(EDITABLE_TEXT_FRAGMENT_ATTRIBUTE, "");
+  parent.replaceChild(wrapper, textNode);
+  wrapper.appendChild(textNode);
+  return wrapper;
+}
+function resolveEditableTextFragment(parent, fragment) {
+  const childNodeIndex = Number(fragment.childNodeIndex);
+  if (!Number.isSafeInteger(childNodeIndex) || childNodeIndex < 0) return null;
+  const child = parent.childNodes.item(childNodeIndex);
+  if (!child) return null;
+  if (child instanceof HTMLElement && isEditableTextFragmentElement(child)) {
+    return child;
+  }
+  return isNonEmptyTextNode(child) ? wrapEditableTextFragment(child) : null;
+}
+function resolveCaretNode(document2, clientX, clientY) {
+  const caretPositionFromPoint = document2.caretPositionFromPoint;
+  if (typeof caretPositionFromPoint === "function") {
+    const position = caretPositionFromPoint.call(document2, clientX, clientY);
+    if (position?.offsetNode) return position.offsetNode;
+  }
+  const caretRangeFromPoint = document2.caretRangeFromPoint;
+  if (typeof caretRangeFromPoint === "function") {
+    return caretRangeFromPoint.call(document2, clientX, clientY)?.startContainer ?? null;
+  }
+  return null;
+}
+function resolveEditableTextFragmentAtPoint(container, clientX, clientY) {
+  const caretNode = resolveCaretNode(container.ownerDocument, clientX, clientY);
+  if (!caretNode || !container.contains(caretNode)) return null;
+  if (isNonEmptyTextNode(caretNode)) {
+    const parent = caretNode.parentElement;
+    if (!(parent instanceof HTMLElement)) return null;
+    if (parent.childElementCount === 0) {
+      return parent;
+    }
+    return wrapEditableTextFragment(caretNode);
+  }
+  if (caretNode instanceof HTMLElement && caretNode.childElementCount === 0 && container.contains(caretNode)) {
+    return caretNode;
+  }
+  return null;
+}
+
+// src/core/locator.ts
+var DEFAULT_MAX_CANDIDATES = 5;
+var FINGERPRINT_TEXT_MAX_LENGTH = 32;
+var FINGERPRINT_MAX_CLASSES = 8;
+var UNIQUE_DATA_ATTRS = [
+  "data-axhub-annotation-comment-target-id",
+  "data-axhub-annotation-panel-node-id",
+  "data-testid",
+  "data-test-id",
+  "data-test",
+  "data-qa",
+  "data-cy",
+  "name",
+  "title",
+  "alt",
+  "aria-label"
+  // Phase 2.9: added for better accessibility-based matching
+];
+var MAX_CLASS_COMBO_DEPTH = 3;
+var ANCHOR_DATA_ATTRS = [
+  "data-axhub-annotation-comment-target-id",
+  "data-axhub-annotation-panel-node-id",
+  "data-testid",
+  "data-test-id",
+  "data-test",
+  "data-qa",
+  "data-cy"
+];
+var MAX_SELECTOR_CLASS_COUNT = 24;
+var MAX_ANCHOR_DEPTH = 20;
+function cssEscape(value) {
+  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+    return CSS.escape(value);
+  }
+  const str = String(value);
+  const len = str.length;
+  if (len === 0) return "";
+  let result = "";
+  const firstCodeUnit = str.charCodeAt(0);
+  for (let i = 0; i < len; i++) {
+    const codeUnit = str.charCodeAt(i);
+    if (codeUnit === 0) {
+      result += "\uFFFD";
+      continue;
+    }
+    if (codeUnit >= 1 && codeUnit <= 31 || codeUnit === 127 || i === 0 && codeUnit >= 48 && codeUnit <= 57 || i === 1 && codeUnit >= 48 && codeUnit <= 57 && firstCodeUnit === 45) {
+      result += `\\${codeUnit.toString(16)} `;
+      continue;
+    }
+    if (i === 0 && len === 1 && codeUnit === 45) {
+      result += `\\${str.charAt(i)}`;
+      continue;
+    }
+    const isAsciiAlnum = codeUnit >= 48 && codeUnit <= 57 || // 0-9
+    codeUnit >= 65 && codeUnit <= 90 || // A-Z
+    codeUnit >= 97 && codeUnit <= 122;
+    const isSafe = isAsciiAlnum || codeUnit === 45 || codeUnit === 95;
+    if (isSafe) {
+      result += str.charAt(i);
+    } else {
+      result += `\\${str.charAt(i)}`;
+    }
+  }
+  return result;
+}
+function getQueryRoot(element) {
+  const root = element.getRootNode?.();
+  return root instanceof ShadowRoot ? root : document;
+}
+function safeQuerySelector(root, selector) {
+  try {
+    return root.querySelector(selector);
+  } catch {
+    return null;
+  }
+}
+function isUnique(root, selector) {
+  try {
+    return root.querySelectorAll(selector).length === 1;
+  } catch {
+    return false;
+  }
+}
+function tryIdSelector(element, root) {
+  const id = element.id?.trim();
+  if (!id) return null;
+  const selector = `#${cssEscape(id)}`;
+  return isUnique(root, selector) ? selector : null;
+}
+function collectDataAttrSelectors(element, root, max) {
+  const out = [];
+  if (max <= 0) return out;
+  const tag = element.tagName.toLowerCase();
+  for (const attr of UNIQUE_DATA_ATTRS) {
+    if (out.length >= max) break;
+    const value = element.getAttribute(attr)?.trim();
+    if (!value) continue;
+    const attrOnly = `[${attr}="${cssEscape(value)}"]`;
+    if (isUnique(root, attrOnly)) {
+      out.push(attrOnly);
+      continue;
+    }
+    const withTag = `${tag}${attrOnly}`;
+    if (isUnique(root, withTag)) {
+      out.push(withTag);
+    }
+  }
+  return out;
+}
+function collectClassSelectors(element, root, max) {
+  const out = [];
+  if (max <= 0) return out;
+  const tag = element.tagName.toLowerCase();
+  const classes = Array.from(element.classList).filter((c) => c && /^[a-zA-Z_][a-zA-Z0-9_-]*$/.test(c)).slice(0, MAX_SELECTOR_CLASS_COUNT);
+  if (classes.length === 0) return out;
+  const uniqueSingle = /* @__PURE__ */ new Map();
+  for (const cls of classes) {
+    if (out.length >= max) return out;
+    const sel = `.${cssEscape(cls)}`;
+    const unique = isUnique(root, sel);
+    uniqueSingle.set(cls, unique);
+    if (unique) out.push(sel);
+  }
+  for (const cls of classes) {
+    if (out.length >= max) return out;
+    if (uniqueSingle.get(cls) === true) continue;
+    const sel = `${tag}.${cssEscape(cls)}`;
+    if (isUnique(root, sel)) out.push(sel);
+  }
+  const limit = Math.min(classes.length, MAX_CLASS_COMBO_DEPTH);
+  for (let i = 0; i < limit; i++) {
+    for (let j = i + 1; j < limit; j++) {
+      if (out.length >= max) return out;
+      const a = classes[i];
+      const b = classes[j];
+      const pair = `.${cssEscape(a)}.${cssEscape(b)}`;
+      if (isUnique(root, pair)) {
+        out.push(pair);
+        continue;
+      }
+      const withTag = `${tag}${pair}`;
+      if (isUnique(root, withTag)) out.push(withTag);
+    }
+  }
+  if (limit >= 3 && out.length < max) {
+    const triple = `.${cssEscape(classes[0])}.${cssEscape(classes[1])}.${cssEscape(classes[2])}`;
+    if (isUnique(root, triple)) {
+      out.push(triple);
+    } else {
+      const withTag = `${tag}${triple}`;
+      if (out.length < max && isUnique(root, withTag)) out.push(withTag);
+    }
+  }
+  return out;
+}
+function buildPathSelector(element, root) {
+  const segments = [];
+  let current = element;
+  const isDocument = root instanceof Document;
+  while (current && current.nodeType === Node.ELEMENT_NODE) {
+    const tag = current.tagName.toLowerCase();
+    if (isDocument && tag === "body") break;
+    let selector = tag;
+    const parent = current.parentElement;
+    const parentNode = current.parentNode;
+    let siblings;
+    if (parent) {
+      siblings = Array.from(parent.children);
+    } else if (parentNode instanceof ShadowRoot || parentNode instanceof Document) {
+      siblings = Array.from(parentNode.children);
+    } else {
+      siblings = [];
+    }
+    const sameTagSiblings = siblings.filter((s) => s.tagName === current.tagName);
+    if (sameTagSiblings.length > 1) {
+      const index = sameTagSiblings.indexOf(current) + 1;
+      selector += `:nth-of-type(${index})`;
+    }
+    segments.unshift(selector);
+    current = parent;
+    if (!parent && parentNode === root) break;
+  }
+  const path = segments.join(" > ");
+  return isDocument ? `body > ${path}` : path || "*";
+}
+function buildRelativePathSelector(ancestor, target, root) {
+  const segments = [];
+  let current = target;
+  for (let depth = 0; current && current !== ancestor && depth < MAX_ANCHOR_DEPTH; depth++) {
+    const tag = current.tagName.toLowerCase();
+    let selector = tag;
+    const parent = current.parentElement;
+    const parentNode = current.parentNode;
+    let siblings;
+    if (parent) {
+      siblings = Array.from(parent.children);
+    } else if (parentNode instanceof ShadowRoot || parentNode instanceof Document) {
+      siblings = Array.from(parentNode.children);
+    } else {
+      siblings = [];
+    }
+    const sameTagSiblings = siblings.filter((s) => s.tagName === current.tagName);
+    if (sameTagSiblings.length > 1) {
+      const index = sameTagSiblings.indexOf(current) + 1;
+      selector += `:nth-of-type(${index})`;
+    }
+    segments.unshift(selector);
+    if (!parent) {
+      if (parentNode === root) break;
+      break;
+    }
+    current = parent;
+  }
+  if (current !== ancestor) return null;
+  return segments.join(" > ") || null;
+}
+function tryAnchorSelector(element, root) {
+  const idSel = tryIdSelector(element, root);
+  if (idSel) return idSel;
+  const tag = element.tagName.toLowerCase();
+  for (const attr of ANCHOR_DATA_ATTRS) {
+    const value = element.getAttribute(attr)?.trim();
+    if (!value) continue;
+    const attrOnly = `[${attr}="${cssEscape(value)}"]`;
+    if (isUnique(root, attrOnly)) return attrOnly;
+    const withTag = `${tag}${attrOnly}`;
+    if (isUnique(root, withTag)) return withTag;
+  }
+  return null;
+}
+function buildAnchorRelPathSelector(element, root) {
+  let current = element.parentElement;
+  for (let depth = 0; current && depth < MAX_ANCHOR_DEPTH; depth++) {
+    const tag = current.tagName.toUpperCase();
+    if (tag === "HTML" || tag === "BODY") break;
+    const anchor = tryAnchorSelector(current, root);
+    if (anchor) {
+      const rel = buildRelativePathSelector(current, element, root);
+      if (!rel) {
+        current = current.parentElement;
+        continue;
+      }
+      const composed = `${anchor} ${rel}`;
+      if (!isUnique(root, composed)) {
+        current = current.parentElement;
+        continue;
+      }
+      const found = safeQuerySelector(root, composed);
+      if (found === element) return composed;
+    }
+    current = current.parentElement;
+  }
+  return null;
+}
+function getShadowHostChain(element) {
+  const chain = [];
+  let current = element;
+  while (true) {
+    const root = current.getRootNode?.();
+    if (!(root instanceof ShadowRoot)) break;
+    const host = root.host;
+    if (!(host instanceof Element)) break;
+    const hostRoot = getQueryRoot(host);
+    const hostSelector = generateCssSelector(host, { root: hostRoot });
+    if (!hostSelector) break;
+    chain.unshift(hostSelector);
+    current = host;
+  }
+  return chain.length > 0 ? chain : void 0;
+}
+function normalizeText3(text, maxLength) {
+  return text.replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+function computeFingerprint(element) {
+  const parts = [];
+  const tag = element.tagName?.toLowerCase() ?? "unknown";
+  parts.push(tag);
+  const id = element.id?.trim();
+  if (id) {
+    parts.push(`id=${id}`);
+  }
+  const classes = Array.from(element.classList).slice(0, FINGERPRINT_MAX_CLASSES);
+  if (classes.length > 0) {
+    parts.push(`class=${classes.join(".")}`);
+  }
+  const text = normalizeText3(element.textContent ?? "", FINGERPRINT_TEXT_MAX_LENGTH);
+  if (text) {
+    parts.push(`text=${text}`);
+  }
+  return parts.join("|");
+}
+function computeDomPath(element) {
+  const path = [];
+  let current = element;
+  while (current) {
+    const parent = current.parentElement;
+    if (parent) {
+      const siblings = Array.from(parent.children);
+      const index = siblings.indexOf(current);
+      if (index >= 0) path.unshift(index);
+      current = parent;
+      continue;
+    }
+    const parentNode = current.parentNode;
+    if (parentNode instanceof ShadowRoot || parentNode instanceof Document) {
+      const children = Array.from(parentNode.children);
+      const index = children.indexOf(current);
+      if (index >= 0) path.unshift(index);
+    }
+    break;
+  }
+  return path;
+}
+function generateSelectorCandidates(element, options = {}) {
+  const root = options.root ?? getQueryRoot(element);
+  const maxCandidates = Math.max(1, options.maxCandidates ?? DEFAULT_MAX_CANDIDATES);
+  const candidates = [];
+  const push = (selector, limit = maxCandidates) => {
+    if (!selector) return;
+    if (candidates.length >= limit) return;
+    const s = selector.trim();
+    if (!s || candidates.includes(s)) return;
+    candidates.push(s);
+  };
+  const anchorCandidate = maxCandidates >= DEFAULT_MAX_CANDIDATES ? buildAnchorRelPathSelector(element, root) : null;
+  const tailReserved = 1 + (anchorCandidate ? 1 : 0);
+  const headLimit = Math.max(1, maxCandidates - tailReserved);
+  push(tryIdSelector(element, root), headLimit);
+  for (const sel of collectDataAttrSelectors(element, root, headLimit - candidates.length)) {
+    push(sel, headLimit);
+  }
+  for (const sel of collectClassSelectors(element, root, headLimit - candidates.length)) {
+    push(sel, headLimit);
+  }
+  push(buildPathSelector(element, root));
+  push(anchorCandidate);
+  return candidates.slice(0, maxCandidates);
+}
+function generateCssSelector(element, options = {}) {
+  return generateSelectorCandidates(element, options)[0] ?? "";
+}
+function createElementLocator(element) {
+  const textFragment = getEditableTextFragmentLocator(element);
+  if (textFragment) {
+    return {
+      ...createElementLocator(textFragment.parent),
+      textFragment: textFragment.fragment
+    };
+  }
+  const root = getQueryRoot(element);
+  const debugSource = findDebugSource(element) ?? void 0;
+  return {
+    selectors: generateSelectorCandidates(element, { root, maxCandidates: DEFAULT_MAX_CANDIDATES }),
+    fingerprint: computeFingerprint(element),
+    path: computeDomPath(element),
+    shadowHostChain: getShadowHostChain(element),
+    debugSource
+  };
+}
+function isSelectorUnique(root, selector) {
+  try {
+    return root.querySelectorAll(selector).length === 1;
+  } catch {
+    return false;
+  }
+}
+function verifyFingerprint(element, fingerprint) {
+  const currentFingerprint = computeFingerprint(element);
+  const storedParts = fingerprint.split("|");
+  const currentParts = currentFingerprint.split("|");
+  if (storedParts[0] !== currentParts[0]) return false;
+  const storedId = storedParts.find((p) => p.startsWith("id="));
+  const currentId = currentParts.find((p) => p.startsWith("id="));
+  if (storedId && storedId !== currentId) return false;
+  return true;
+}
+function locateElement(locator, rootDocument = document) {
+  let doc = rootDocument;
+  if (locator.frameChain?.length) {
+    for (const frameSelector of locator.frameChain) {
+      const frame = safeQuerySelector(doc, frameSelector);
+      if (!(frame instanceof HTMLIFrameElement)) return null;
+      const contentDoc = frame.contentDocument;
+      if (!contentDoc) return null;
+      doc = contentDoc;
+    }
+  }
+  let queryRoot = doc;
+  if (locator.shadowHostChain?.length) {
+    for (const hostSelector of locator.shadowHostChain) {
+      if (!isSelectorUnique(queryRoot, hostSelector)) return null;
+      const host = safeQuerySelector(queryRoot, hostSelector);
+      if (!host) return null;
+      const shadowRoot = host.shadowRoot;
+      if (!shadowRoot) return null;
+      queryRoot = shadowRoot;
+    }
+  }
+  for (const selector of locator.selectors) {
+    if (!isSelectorUnique(queryRoot, selector)) continue;
+    const element = safeQuerySelector(queryRoot, selector);
+    if (!element) continue;
+    if (locator.fingerprint && !verifyFingerprint(element, locator.fingerprint)) {
+      continue;
+    }
+    return locator.textFragment ? resolveEditableTextFragment(element, locator.textFragment) : element;
+  }
+  return null;
+}
+function locatorKey(locator) {
+  const selectors = locator.selectors.join("|");
+  const shadow = locator.shadowHostChain?.join(">") ?? "";
+  const frame = locator.frameChain?.join(">") ?? "";
+  const textFragment = locator.textFragment ? `|text:${locator.textFragment.childNodeIndex}` : "";
+  return `frame:${frame}|shadow:${shadow}|sel:${selectors}${textFragment}`;
+}
+
+// src/voice/target.ts
+var MAX_ATTRIBUTES = 20;
+var MAX_LABEL_LENGTH = 256;
+var MAX_LOCATOR_PATH = 32;
+var MAX_LOCATOR_SELECTORS = 5;
+var MAX_TEXT_LENGTH = 512;
+var SENSITIVE_ATTRIBUTE_NAME = /(?:password|passcode|secret|token|authorization|cookie|api[-_]?key|access[-_]?key|private[-_]?key)/i;
+function resolveCommentaryVoiceTargetElement(selectedElement, getHoveredElement) {
+  if (selectedElement?.isConnected) {
+    return { element: selectedElement, source: "selected" };
+  }
+  let hoveredElement;
+  try {
+    hoveredElement = getHoveredElement();
+  } catch {
+    hoveredElement = null;
+  }
+  return hoveredElement?.isConnected ? { element: hoveredElement, source: "hovered" } : null;
+}
+function boundedText(value, maxLength) {
+  const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}\u2026`;
+}
+function sanitizeAttributes(attributes) {
+  const result = {};
+  for (const [name, value] of Object.entries(attributes).slice(0, MAX_ATTRIBUTES)) {
+    const normalizedName = boundedText(name, 128);
+    if (!normalizedName) continue;
+    result[normalizedName] = SENSITIVE_ATTRIBUTE_NAME.test(normalizedName) ? "[REDACTED]" : boundedText(value, MAX_LABEL_LENGTH);
+  }
+  return result;
+}
+function sanitizeLocator(locator) {
+  const selectors = Array.isArray(locator.selectors) ? locator.selectors.slice(0, MAX_LOCATOR_SELECTORS).map((selector) => boundedText(selector, MAX_LABEL_LENGTH)).filter(Boolean) : [];
+  const path = Array.isArray(locator.path) ? locator.path.slice(0, MAX_LOCATOR_PATH).filter((value) => Number.isInteger(value)) : [];
+  const sanitizeStringList = (value) => Array.isArray(value) ? value.slice(0, MAX_LOCATOR_SELECTORS).map((entry) => boundedText(entry, MAX_LABEL_LENGTH)) : void 0;
+  return {
+    fingerprint: boundedText(locator.fingerprint, MAX_LABEL_LENGTH),
+    path,
+    selectors,
+    ...locator.debugSource ? {
+      debugSource: {
+        componentName: locator.debugSource.componentName ? boundedText(locator.debugSource.componentName, MAX_LABEL_LENGTH) : void 0,
+        file: boundedText(locator.debugSource.file, MAX_LABEL_LENGTH),
+        ...typeof locator.debugSource.line === "number" ? { line: locator.debugSource.line } : {},
+        ...typeof locator.debugSource.column === "number" ? { column: locator.debugSource.column } : {}
+      }
+    } : {},
+    ...locator.frameChain ? { frameChain: sanitizeStringList(locator.frameChain) } : {},
+    ...locator.shadowHostChain ? { shadowHostChain: sanitizeStringList(locator.shadowHostChain) } : {}
+  };
+}
+function readAttributes(element) {
+  const attributes = {};
+  for (const attribute of Array.from(element.attributes ?? []).slice(0, MAX_ATTRIBUTES)) {
+    attributes[attribute.name] = attribute.value;
+  }
+  return attributes;
+}
+function sanitizeCommentaryVoiceTarget(candidate) {
+  if (!candidate || candidate.connected === false) return null;
+  return {
+    attributes: sanitizeAttributes(candidate.attributes),
+    elementKey: boundedText(candidate.elementKey, MAX_LABEL_LENGTH),
+    fullLabel: boundedText(candidate.fullLabel, MAX_LABEL_LENGTH),
+    label: boundedText(candidate.label, MAX_LABEL_LENGTH),
+    locator: sanitizeLocator(candidate.locator),
+    source: candidate.source,
+    tagName: boundedText(candidate.tagName, 64).toLowerCase() || "unknown",
+    text: boundedText(candidate.text, MAX_TEXT_LENGTH),
+    updatedAt: Number.isFinite(candidate.updatedAt) ? candidate.updatedAt : Date.now()
+  };
+}
+function createCommentaryVoiceTarget(element, source) {
+  if (!element?.isConnected) return null;
+  const locator = createElementLocator(element);
+  const tagName = boundedText(element.tagName, 64).toLowerCase() || "unknown";
+  const label = element.id ? `${tagName}#${element.id}` : tagName;
+  return sanitizeCommentaryVoiceTarget({
+    attributes: readAttributes(element),
+    elementKey: generateStableElementKey(element, locator.shadowHostChain),
+    fullLabel: generateFullElementLabel(element, locator.shadowHostChain),
+    label,
+    locator,
+    source,
+    tagName,
+    text: element.textContent ?? "",
+    updatedAt: Date.now()
+  });
 }
 
 // src/tweak/protocol.ts
@@ -686,6 +1594,352 @@ function resolveCommentaryDiagramTarget(element) {
   return targets[0] ?? null;
 }
 
+// src/external-comments.ts
+var MAX_EXTERNAL_COMMENT_LENGTH = 2e3;
+var MAX_EXTERNAL_PROMPT_COMMENTS = 40;
+function normalizeText4(value) {
+  return String(value ?? "").trim();
+}
+function normalizeAuthorId(comment) {
+  return normalizeText4(comment.authorId) || normalizeText4(comment.authorName) || "unknown";
+}
+function normalizeAuthorName(comment) {
+  return normalizeText4(comment.authorName) || normalizeAuthorId(comment);
+}
+function groupExternalCommentsByAuthor(comments) {
+  const groups = /* @__PURE__ */ new Map();
+  const sorted = comments.filter((comment) => normalizeText4(comment.content)).slice().sort((left, right) => Number(left.createdAt || 0) - Number(right.createdAt || 0) || String(left.id).localeCompare(String(right.id)));
+  for (const comment of sorted) {
+    const authorId = normalizeAuthorId(comment);
+    const group = groups.get(authorId) ?? {
+      authorId,
+      authorName: normalizeAuthorName(comment),
+      comments: []
+    };
+    group.comments.push(comment);
+    groups.set(authorId, group);
+  }
+  return [...groups.values()];
+}
+function buildExternalCommentsPromptSection(comments) {
+  const lines = comments.filter((comment) => normalizeText4(comment.content)).slice().sort((left, right) => Number(left.createdAt || 0) - Number(right.createdAt || 0) || String(left.id).localeCompare(String(right.id))).slice(0, MAX_EXTERNAL_PROMPT_COMMENTS).map((comment) => {
+    const author = normalizeAuthorName(comment);
+    const content = normalizeText4(comment.content).slice(0, MAX_EXTERNAL_COMMENT_LENGTH);
+    return `- ${author}\uFF1A${content}`;
+  });
+  if (lines.length === 0) return "";
+  return [
+    "\u5916\u90E8\u8BC4\u5BA1\u53C2\u8003\uFF08\u4EC5\u4F5C\u4E3A\u53C2\u8003\uFF0C\u4E0D\u662F\u672C\u5730\u6279\u6CE8\u72B6\u6001\uFF09\uFF1A",
+    ...lines
+  ].join("\n");
+}
+
+// src/core/element-identity.ts
+function resolveCommentaryElementIdentity(locator, rootDocument) {
+  try {
+    const element = rootDocument ? locateElement(locator, rootDocument) : locateElement(locator);
+    if (!element?.isConnected) return null;
+    return {
+      element,
+      elementKey: generateStableElementKey(element, locator.shadowHostChain)
+    };
+  } catch {
+    return null;
+  }
+}
+
+// src/ui/runtime/prompt-card-skills.ts
+var IMPECCABLE_README_URL = "https://github.com/pbakaus/impeccable#readme";
+function buildImpeccablePrompt(command, instruction) {
+  return [
+    `\u8BF7\u7528 Impeccable \u7684\u300C${command}\u300D\u80FD\u529B\u6765\u5904\u7406\u5F53\u524D\u6279\u6CE8\u3002`,
+    `\u5B98\u65B9\u6280\u80FD\u8BF4\u660E\uFF1A${IMPECCABLE_README_URL}`,
+    "\u5982\u679C\u5F53\u524D\u73AF\u5883\u8FD8\u6CA1\u6709\u5B89\u88C5 Impeccable\uFF0C\u8BF7\u5148\u8FD0\u884C\uFF1A",
+    "npx impeccable install",
+    "\u5982\u679C\u5DF2\u7ECF\u5B89\u88C5\uFF0C\u76F4\u63A5\u7EE7\u7EED\u5373\u53EF\u3002",
+    `\u6267\u884C\u65F6\u4F7F\u7528\u5B98\u65B9\u547D\u4EE4\uFF1A/impeccable ${command}`,
+    "\u5F00\u59CB\u524D\u8BF7\u5148\u9605\u8BFB\u5F53\u524D\u9879\u76EE\u7684 DESIGN.md\uFF0C\u6240\u6709\u89C6\u89C9\u51B3\u7B56\u90FD\u4EE5\u5B83\u4E3A\u51C6\u3002",
+    instruction
+  ].join("\n");
+}
+var PROMPT_CARD_SKILLS = [
+  {
+    id: "explore-options",
+    label: "\u591A\u65B9\u6848\u63A2\u7D22",
+    description: "\u540C\u65F6\u751F\u6210\u51E0\u79CD\u4E0D\u540C\u65B9\u6848\uFF0C\u6BD4\u8F83\u540E\u518D\u9009\u4E00\u5957",
+    keywords: "\u591A\u65B9\u6848\u751F\u6210 \u65B9\u6848\u5BF9\u6BD4 \u8BBE\u8BA1\u51B3\u7B56 \u591A\u65B9\u6848\u5BF9\u6BD4",
+    prompt: "\u8BF7\u5148\u56F4\u7ED5\u5F53\u524D\u6279\u6CE8\u548C\u9875\u9762\u76EE\u6807\uFF0C\u63D0\u51FA 2-3 \u4E2A\u65B9\u5411\u660E\u663E\u4E0D\u540C\u7684\u65B9\u6848\uFF0C\u7B80\u8981\u8BF4\u660E\u5404\u81EA\u53D6\u820D\uFF0C\u9009\u51FA\u6700\u9002\u5408\u7684\u4E00\u5957\u540E\u518D\u5F00\u59CB\u4FEE\u6539\u3002"
+  },
+  {
+    id: "prototype-annotation",
+    label: "\u539F\u578B\u6807\u6CE8",
+    description: "\u7ED3\u5408\u5F53\u524D\u539F\u578B\u6279\u6CE8\uFF0C\u51C6\u786E\u7406\u89E3\u8981\u6539\u54EA\u91CC\u3001\u4E3A\u4EC0\u4E48\u6539",
+    prompt: "\u8BF7\u5148\u7ED3\u5408\u5F53\u524D\u539F\u578B\u548C\u6279\u6CE8\uFF0C\u786E\u8BA4\u8981\u6539\u7684\u533A\u57DF\u3001\u5B58\u5728\u7684\u95EE\u9898\u548C\u60F3\u8FBE\u5230\u7684\u6548\u679C\uFF0C\u518D\u5904\u7406\u6279\u6CE8\u5BF9\u5E94\u7684\u5185\u5BB9\u3002"
+  },
+  {
+    id: "impeccable-polish",
+    label: "\u4F18\u5316",
+    description: "\u6574\u4F53\u6253\u78E8\u89C6\u89C9\u7EC6\u8282\uFF0C\u8BA9\u754C\u9762\u66F4\u7CBE\u81F4\uFF0C\u4F46\u4E0D\u6539\u53D8\u9875\u9762\u7ED3\u6784\u548C\u4E1A\u52A1\u542B\u4E49",
+    prompt: buildImpeccablePrompt(
+      "polish",
+      "\u8BF7\u628A\u5F53\u524D\u6279\u6CE8\u6307\u5411\u7684\u533A\u57DF\u6253\u78E8\u5F97\u66F4\u7CBE\u81F4\u3001\u7EDF\u4E00\u3001\u597D\u7528\uFF0C\u4E5F\u53EF\u4EE5\u987A\u624B\u5904\u7406\u7D27\u90BB\u7684\u5FC5\u8981\u7EC6\u8282\uFF1B\u4E0D\u8981\u6539\u53D8\u9875\u9762\u7ED3\u6784\u6216\u4E1A\u52A1\u542B\u4E49\uFF0C\u4E5F\u4E0D\u8981\u91CD\u505A\u6574\u9875\u3002"
+    )
+  },
+  {
+    id: "impeccable-layout",
+    label: "\u5E03\u5C40",
+    description: "\u8C03\u6574\u7A7A\u95F4\u3001\u5BF9\u9F50\u3001\u5C3A\u5BF8\u548C\u54CD\u5E94\u5F0F\u7ED3\u6784\uFF0C\u89E3\u51B3\u62E5\u6324\u3001\u9519\u4F4D\u6216\u6BD4\u4F8B\u5931\u8861",
+    prompt: buildImpeccablePrompt(
+      "layout",
+      "\u8BF7\u91CD\u70B9\u8C03\u6574\u5F53\u524D\u533A\u57DF\u7684\u7A7A\u95F4\u5173\u7CFB\uFF1A\u4F4D\u7F6E\u3001\u95F4\u8DDD\u3001\u5BF9\u9F50\u3001\u5C3A\u5BF8\u548C\u54CD\u5E94\u5F0F\u8868\u73B0\uFF1B\u53EA\u6539\u4E0E\u6279\u6CE8\u76F8\u5173\u7684\u8303\u56F4\uFF0C\u4E0D\u6539\u53D8\u4E1A\u52A1\u542B\u4E49\u3002"
+    )
+  },
+  {
+    id: "impeccable-typeset",
+    label: "\u6392\u7248",
+    description: "\u8C03\u6574\u5B57\u4F53\u3001\u5B57\u53F7\u3001\u884C\u9AD8\u3001\u5B57\u91CD\u548C\u6587\u5B57\u5C42\u7EA7\uFF0C\u8BA9\u5185\u5BB9\u66F4\u6613\u8BFB",
+    prompt: buildImpeccablePrompt(
+      "typeset",
+      "\u8BF7\u8BA9\u5F53\u524D\u533A\u57DF\u7684\u6587\u5B57\u66F4\u597D\u8BFB\uFF1A\u8C03\u6574\u5B57\u4F53\u3001\u5B57\u53F7\u3001\u884C\u9AD8\u3001\u5B57\u91CD\u548C\u4FE1\u606F\u5C42\u7EA7\uFF1B\u4E0D\u8981\u6539\u53D8\u6587\u6848\u542B\u4E49\u3002"
+    )
+  },
+  {
+    id: "impeccable-distill",
+    label: "\u7CBE\u7B80",
+    description: "\u53BB\u6389\u591A\u4F59\u88C5\u9970\u3001\u91CD\u590D\u4FE1\u606F\u548C\u89C6\u89C9\u566A\u97F3\uFF0C\u8BA9\u754C\u9762\u66F4\u6E05\u723D",
+    prompt: buildImpeccablePrompt(
+      "distill",
+      "\u8BF7\u5220\u6389\u5F53\u524D\u533A\u57DF\u91CC\u591A\u4F59\u7684\u88C5\u9970\u3001\u91CD\u590D\u4FE1\u606F\u548C\u89C6\u89C9\u566A\u97F3\uFF0C\u8BA9\u91CD\u70B9\u66F4\u7A81\u51FA\uFF1B\u4FDD\u7559\u4E1A\u52A1\u4FE1\u606F\u548C\u5FC5\u8981\u72B6\u6001\u3002"
+    )
+  },
+  {
+    id: "impeccable-clarify",
+    label: "\u6587\u6848",
+    description: "\u6539\u5199\u6309\u94AE\u3001\u63D0\u793A\u548C\u8BF4\u660E\uFF0C\u8BA9\u7528\u6237\u66F4\u5FEB\u7406\u89E3\u5E76\u77E5\u9053\u4E0B\u4E00\u6B65",
+    prompt: buildImpeccablePrompt(
+      "clarify",
+      "\u8BF7\u628A\u5F53\u524D\u533A\u57DF\u7684\u6309\u94AE\u3001\u63D0\u793A\u548C\u8BF4\u660E\u5199\u5F97\u66F4\u6E05\u695A\u3001\u66F4\u5177\u4F53\uFF0C\u8BA9\u7528\u6237\u77E5\u9053\u4E0B\u4E00\u6B65\u600E\u4E48\u505A\uFF1B\u4E0D\u8981\u6539\u53D8\u4E1A\u52A1\u542B\u4E49\u3002"
+    )
+  },
+  {
+    id: "impeccable-animate",
+    label: "\u52A8\u6548",
+    description: "\u8865\u5145\u52A0\u8F7D\u3001\u60AC\u505C\u3001\u5207\u6362\u548C\u53CD\u9988\u52A8\u753B\uFF0C\u8BA9\u4EA4\u4E92\u66F4\u6709\u56DE\u5E94",
+    prompt: buildImpeccablePrompt(
+      "animate",
+      "\u8BF7\u4E3A\u5F53\u524D\u533A\u57DF\u8865\u4E0A\u5FC5\u8981\u7684\u52A0\u8F7D\u3001\u5207\u6362\u548C\u64CD\u4F5C\u53CD\u9988\uFF0C\u8BA9\u4EA4\u4E92\u66F4\u81EA\u7136\uFF1B\u52A8\u6548\u8981\u514B\u5236\uFF0C\u5E76\u5C0A\u91CD\u7528\u6237\u7684\u51CF\u5C11\u52A8\u6548\u8BBE\u7F6E\u3002"
+    )
+  },
+  {
+    id: "impeccable-adapt",
+    label: "\u9002\u914D",
+    description: "\u68C0\u67E5\u684C\u9762\u3001\u5E73\u677F\u3001\u624B\u673A\u548C\u4E0D\u540C\u8F93\u5165\u65B9\u5F0F\u4E0B\u7684\u663E\u793A\u4E0E\u64CD\u4F5C",
+    prompt: buildImpeccablePrompt(
+      "adapt",
+      "\u8BF7\u68C0\u67E5\u5F53\u524D\u533A\u57DF\u5728\u684C\u9762\u3001\u5E73\u677F\u3001\u624B\u673A\u3001\u6A2A\u7AD6\u5C4F\u4EE5\u53CA\u4E0D\u540C\u8F93\u5165\u65B9\u5F0F\u4E0B\u662F\u5426\u597D\u7528\uFF0C\u5E76\u4FEE\u6B63\u660E\u663E\u95EE\u9898\u3002"
+    )
+  },
+  {
+    id: "impeccable-harden",
+    label: "\u5065\u58EE",
+    description: "\u8865\u9F50\u52A0\u8F7D\u3001\u7A7A\u6570\u636E\u3001\u9519\u8BEF\u3001\u7126\u70B9\u3001\u952E\u76D8\u548C\u65E0\u969C\u788D\u72B6\u6001\uFF0C\u907F\u514D\u8FB9\u754C\u60C5\u51B5\u5931\u63A7",
+    prompt: buildImpeccablePrompt(
+      "harden",
+      "\u8BF7\u8865\u9F50\u5F53\u524D\u533A\u57DF\u5728\u52A0\u8F7D\u3001\u7A7A\u6570\u636E\u3001\u9519\u8BEF\u3001\u7126\u70B9\u3001\u952E\u76D8\u64CD\u4F5C\u548C\u65E0\u969C\u788D\u4F7F\u7528\u65F6\u7684\u72B6\u6001\uFF0C\u907F\u514D\u7528\u6237\u9047\u5230\u6CA1\u6709\u53CD\u9988\u6216\u65E0\u6CD5\u7EE7\u7EED\u7684\u60C5\u51B5\u3002"
+    )
+  },
+  {
+    id: "impeccable-onboard",
+    label: "\u5F15\u5BFC",
+    description: "\u4F18\u5316\u9996\u6B21\u4F7F\u7528\u3001\u7A7A\u72B6\u6001\u548C\u5173\u952E\u6B65\u9AA4\uFF0C\u544A\u8BC9\u7528\u6237\u63A5\u4E0B\u6765\u8BE5\u505A\u4EC0\u4E48",
+    prompt: buildImpeccablePrompt(
+      "onboard",
+      "\u8BF7\u8BA9\u7B2C\u4E00\u6B21\u4F7F\u7528\u548C\u5173\u952E\u64CD\u4F5C\u66F4\u5BB9\u6613\u7406\u89E3\uFF0C\u5C24\u5176\u662F\u7A7A\u72B6\u6001\u548C\u4E0B\u4E00\u6B65\u63D0\u793A\uFF1B\u7528\u6237\u5E94\u8BE5\u80FD\u660E\u786E\u77E5\u9053\u63A5\u4E0B\u6765\u8BE5\u505A\u4EC0\u4E48\u3002"
+    )
+  },
+  {
+    id: "impeccable-colorize",
+    label: "\u8272\u5F69",
+    description: "\u8C03\u6574\u8272\u5F69\u5C42\u7EA7\u3001\u5BF9\u6BD4\u5EA6\u548C\u72B6\u6001\u8272\uFF0C\u540C\u65F6\u4FDD\u6301\u54C1\u724C\u4E00\u81F4",
+    prompt: buildImpeccablePrompt(
+      "colorize",
+      "\u8BF7\u8C03\u6574\u5F53\u524D\u533A\u57DF\u7684\u989C\u8272\u5C42\u7EA7\u3001\u5BF9\u6BD4\u5EA6\u548C\u72B6\u6001\u989C\u8272\uFF0C\u8BA9\u4FE1\u606F\u66F4\u5BB9\u6613\u5206\u8FA8\uFF0C\u540C\u65F6\u4FDD\u6301\u73B0\u6709\u54C1\u724C\u98CE\u683C\u3002"
+    )
+  },
+  {
+    id: "impeccable",
+    label: "UI \u8BC4\u5BA1",
+    description: "\u53EA\u627E\u95EE\u9898\u5E76\u7ED9\u51FA\u4F18\u5148\u7EA7\u548C\u5EFA\u8BAE\uFF0C\u4E0D\u76F4\u63A5\u8FDB\u884C\u5927\u8303\u56F4\u4FEE\u6539",
+    prompt: buildImpeccablePrompt(
+      "critique",
+      "\u8BF7\u53EA\u505A\u8BC4\u5BA1\uFF0C\u4E0D\u8981\u76F4\u63A5\u5927\u8303\u56F4\u4FEE\u6539\u3002\u8BF7\u5217\u51FA\u95EE\u9898\u3001\u4F18\u5148\u7EA7\u3001\u5F71\u54CD\u548C\u5177\u4F53\u4FEE\u590D\u5EFA\u8BAE\u3002"
+    )
+  },
+  {
+    id: "ui-design-image",
+    label: "UI \u8BBE\u8BA1\u56FE\u7247",
+    description: "\u751F\u6210\u754C\u9762\u56FE\u7247\u3001\u56FE\u6807\u3001\u5360\u4F4D\u56FE\u6216\u89C6\u89C9\u53C2\u8003\u7D20\u6750",
+    keywords: "\u751F\u56FE \u751F\u6210\u56FE\u7247 \u56FE\u7247\u751F\u6210 \u8BBE\u8BA1\u56FE UI\u56FE\u7247 UI\u7D20\u6750 \u56FE\u6807 \u5360\u4F4D\u56FE \u89C6\u89C9\u53C2\u8003\u56FE imagegen image generation",
+    prompt: "\u8BF7\u6839\u636E\u5F53\u524D\u6279\u6CE8\u3001\u9875\u9762\u4E0A\u4E0B\u6587\u548C\u53C2\u8003\u56FE\u7247\uFF0C\u751F\u6210\u5408\u9002\u7684\u754C\u9762\u56FE\u7247\u3001\u7D20\u6750\u3001\u56FE\u6807\u3001\u5360\u4F4D\u56FE\u6216\u89C6\u89C9\u53C2\u8003\u56FE\uFF1B\u5982\u679C\u7ED3\u679C\u9700\u8981\u653E\u56DE\u5F53\u524D\u753B\u5E03\u6216\u9879\u76EE\u7D20\u6750\uFF0C\u8BF7\u6309\u9879\u76EE\u89C4\u5219\u4FDD\u5B58\u5E76\u56DE\u5199\u3002"
+  },
+  {
+    id: "requirements-review",
+    label: "\u9700\u6C42\u8BC4\u5BA1",
+    description: "\u68C0\u67E5 PRD\u3001\u76EE\u5F55\u3001\u539F\u578B\u548C\u6279\u6CE8\u662F\u5426\u4E00\u81F4",
+    keywords: "\u9700\u6C42\u8BC4\u5BA1 PRD \u539F\u578B\u8BC4\u5BA1 axhub-prototype-context",
+    prompt: [
+      "\u8BF7\u4F7F\u7528 axhub-prototype-context \u6280\u80FD\u6765\u8BC4\u5BA1\u8FD9\u6761\u6279\u6CE8\u3002",
+      "\u6280\u80FD\u6587\u6863\uFF1Ahttps://github.com/lintendo/Axhub-Skills/blob/main/skills/axhub-prototype-context/SKILL.md",
+      "\u6253\u5F00\u5F53\u524D\u539F\u578B URL\uFF0C\u7B49\u9875\u9762\u52A0\u8F7D\u5B8C\u6210\u540E\u8BFB\u53D6 window.__AXHUB_ANNOTATION_SOURCE__\uFF0C\u53EA\u628A\u9875\u9762\u5F53\u4F5C\u8BC4\u5BA1\u4E0A\u4E0B\u6587\uFF0C\u4E0D\u8981\u76F4\u63A5\u4FEE\u6539\u5B83\u3002",
+      "\u91CD\u70B9\u68C0\u67E5\u76EE\u5F55\u548C PRD\u3001Markdown \u8282\u70B9\u3001\u6279\u6CE8\u8282\u70B9\u662F\u5426\u4E00\u81F4\uFF0C\u540C\u65F6\u53C2\u8003\u6E90\u7801\u4EA4\u63A5\u7EBF\u7D22\uFF0C\u6307\u51FA\u9700\u6C42\u4E0E\u539F\u578B\u4E4B\u95F4\u7684\u7F3A\u53E3\u3002"
+    ].join("\n"),
+    chromeOnly: true
+  }
+];
+var SKILL_TRIGGER_QUERY_PATTERN = /^[\p{Script=Han}\p{Letter}\p{Number}_-]*$/u;
+var CUSTOM_SKILL_ID_PATTERN = /^custom-[a-z0-9-]+$/u;
+var PROMPT_CARD_SKILL_OPTIONS = PROMPT_CARD_SKILLS.map(
+  ({ id, label, description, prompt }) => ({ id, label, description, prompt })
+);
+function mergePromptCardSkills(skillOptions = []) {
+  const merged = new Map(
+    PROMPT_CARD_SKILLS.map((skill) => [skill.id, { ...skill }])
+  );
+  for (const option of skillOptions) {
+    const id = String(option.id ?? "").trim();
+    const label = String(option.label ?? "").trim();
+    if (!id || !label) continue;
+    const existing = merged.get(id);
+    const prompt = String(option.prompt ?? existing?.prompt ?? "").trim();
+    if (!prompt) continue;
+    const description = String(option.description ?? "").trim() || existing?.description || prompt.replace(/\s+/gu, " ").slice(0, 80);
+    merged.set(id, {
+      ...existing ?? {},
+      id,
+      label,
+      description,
+      prompt,
+      ...option.keywords ? { keywords: String(option.keywords).trim() } : {},
+      ...option.chromeOnly === true ? { chromeOnly: true } : {},
+      ...option.custom === true ? { custom: true } : {}
+    });
+  }
+  return [...merged.values()];
+}
+function normalizeSkillQuery(value) {
+  return value.trim().toLocaleLowerCase().replace(/\s+/gu, "");
+}
+function findPromptCardSkillTrigger(text) {
+  const value = String(text ?? "");
+  const start = value.lastIndexOf("/");
+  if (start < 0) return null;
+  const query = value.slice(start + 1);
+  if (!SKILL_TRIGGER_QUERY_PATTERN.test(query)) return null;
+  const previousChar = start > 0 ? value[start - 1] : "";
+  const previousWhitespaceIndex = Math.max(
+    value.lastIndexOf(" ", start - 1),
+    value.lastIndexOf("\n", start - 1),
+    value.lastIndexOf("	", start - 1)
+  );
+  const currentTokenPrefix = value.slice(previousWhitespaceIndex + 1, start);
+  if (previousChar === "/") {
+    return null;
+  }
+  if (currentTokenPrefix.includes("/")) return null;
+  return {
+    query,
+    start,
+    end: value.length
+  };
+}
+function clearPromptCardSkillTrigger(text) {
+  const value = String(text ?? "");
+  const trigger = findPromptCardSkillTrigger(value);
+  if (!trigger) return value;
+  return value.slice(0, trigger.start).trimEnd();
+}
+function filterPromptCardSkills(query, enabledSkillIds, skills = PROMPT_CARD_SKILLS) {
+  const normalizedQuery = normalizeSkillQuery(query);
+  const enabledIds = Array.isArray(enabledSkillIds) ? new Set(enabledSkillIds.map((item) => String(item ?? "").trim()).filter(Boolean)) : null;
+  const availableSkills = skills.filter(
+    (skill) => enabledIds ? enabledIds.has(skill.id) : !skill.chromeOnly
+  );
+  if (!normalizedQuery) return [...availableSkills];
+  const exactMatches = availableSkills.filter(
+    (skill) => normalizeSkillQuery(skill.id) === normalizedQuery || normalizeSkillQuery(skill.label) === normalizedQuery
+  );
+  if (exactMatches.length > 0) return exactMatches;
+  return availableSkills.filter((skill) => {
+    const searchableText = normalizeSkillQuery(
+      `${skill.id} ${skill.label} ${skill.description} ${skill.keywords ?? ""}`
+    );
+    return searchableText.includes(normalizedQuery);
+  });
+}
+function addPromptCardSkillSelection(selectedSkills, skill) {
+  if (selectedSkills.some((selected) => selected.id === skill.id)) {
+    return [...selectedSkills];
+  }
+  return [...selectedSkills, skill];
+}
+function buildPromptCardSkillPrefix(selectedSkills) {
+  if (selectedSkills.length === 0) return "";
+  return [
+    "\u4F7F\u7528\u4EE5\u4E0B\u6280\u80FD\u6307\u4EE4\u5904\u7406\u8FD9\u6761\u6279\u6CE8\uFF1A",
+    ...selectedSkills.flatMap((skill, index) => ["", `${index + 1}. ${skill.label}`, skill.prompt])
+  ].join("\n");
+}
+function normalizePromptCardSkillIds(skillIds, skills = PROMPT_CARD_SKILLS) {
+  const result = [];
+  const seen = /* @__PURE__ */ new Set();
+  const knownSkillIds = new Set(skills.map((skill) => skill.id));
+  for (const skillId of skillIds) {
+    const normalizedId = String(skillId ?? "").trim();
+    if (!normalizedId || seen.has(normalizedId) || !knownSkillIds.has(normalizedId) && !CUSTOM_SKILL_ID_PATTERN.test(normalizedId)) {
+      continue;
+    }
+    seen.add(normalizedId);
+    result.push(normalizedId);
+  }
+  return result;
+}
+function buildPromptCardSkillSavePayload(note, selectedSkills) {
+  const normalizedNote = String(note ?? "").replace(/\r\n/g, "\n").trim();
+  return {
+    note: normalizedNote,
+    skillIds: normalizedNote ? selectedSkills.map((skill) => skill.id) : []
+  };
+}
+function deserializePromptCardSkillSelection(payload, enabledSkillIds, skillOptions = []) {
+  const skills = mergePromptCardSkills(skillOptions);
+  const skillById = new Map(skills.map((skill) => [skill.id, skill]));
+  const enabledIds = Array.isArray(enabledSkillIds) ? new Set(enabledSkillIds.map((item) => String(item ?? "").trim()).filter(Boolean)) : null;
+  return normalizePromptCardSkillIds(payload?.skillIds ?? [], skills).map((skillId) => skillById.get(skillId)).filter((skill) => Boolean(skill)).filter((skill) => enabledIds ? enabledIds.has(skill.id) : true);
+}
+function appendImplicitAnnotationSkillToPrompt(prompt, annotationSession, enabledSkillIds, skillOptions = []) {
+  const normalizedPrompt = String(prompt ?? "").trim();
+  if (!normalizedPrompt || !annotationSession) return normalizedPrompt;
+  const defaultSkill = mergePromptCardSkills(skillOptions).find(
+    (skill) => skill.id === "prototype-annotation"
+  );
+  if (!defaultSkill) return normalizedPrompt;
+  if (Array.isArray(enabledSkillIds) && !enabledSkillIds.some((skillId) => String(skillId ?? "").trim() === defaultSkill.id)) {
+    return normalizedPrompt;
+  }
+  if (normalizedPrompt.includes(defaultSkill.prompt)) return normalizedPrompt;
+  return `${normalizedPrompt}
+
+${buildPromptCardSkillPrefix([defaultSkill])}`;
+}
+function mergePromptCardSkillsIntoPromptNote(note, selectedSkills) {
+  const prefix = buildPromptCardSkillPrefix(selectedSkills);
+  const normalizedNote = String(note ?? "").replace(/\r\n/g, "\n").trim();
+  if (!prefix) return normalizedNote;
+  if (!normalizedNote) return prefix;
+  return `${normalizedNote}
+${prefix}`;
+}
+
 // src/constants.ts
 var WEB_EDITOR_V2_VERSION = 2;
 var WEB_EDITOR_V2_LOG_PREFIX = "[WebEditorV2]";
@@ -693,6 +1947,7 @@ var WEB_EDITOR_V2_HOST_ID = "__mcp_web_editor_v2_host__";
 var WEB_EDITOR_V2_OVERLAY_ID = "__mcp_web_editor_v2_overlay__";
 var WEB_EDITOR_V2_UI_ID = "__mcp_web_editor_v2_ui__";
 var WEB_EDITOR_V2_Z_INDEX = 2147483647;
+var WEB_EDITOR_V2_SELECTION_LINE_WIDTH = 2;
 var WEB_EDITOR_V2_COLORS = {
   /** Hover highlight color */
   hover: "#008F5D",
@@ -728,737 +1983,6 @@ var WEB_EDITOR_V2_DISTANCE_LABEL_PADDING_X = 6;
 var WEB_EDITOR_V2_DISTANCE_LABEL_PADDING_Y = 3;
 var WEB_EDITOR_V2_DISTANCE_LABEL_RADIUS = 4;
 var WEB_EDITOR_V2_DISTANCE_LABEL_OFFSET = 8;
-
-// src/core/debug-source.ts
-var MAX_DOM_DEPTH = 15;
-var MAX_FIBER_DEPTH = 40;
-function asRecord(value) {
-  if (value && typeof value === "object") {
-    return value;
-  }
-  return null;
-}
-function readString(value) {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed || void 0;
-  }
-  return void 0;
-}
-function readNumber(value) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  const parsed = Number.parseInt(String(value), 10);
-  return Number.isFinite(parsed) ? parsed : void 0;
-}
-function readComponentName(value) {
-  if (!value) return void 0;
-  if (typeof value === "function") {
-    const fn = value;
-    return readString(fn.displayName) ?? readString(fn.name);
-  }
-  const rec = asRecord(value);
-  if (rec) {
-    return readString(rec.displayName) ?? readString(rec.name);
-  }
-  return void 0;
-}
-function extractReactDebugSource(fiber) {
-  let current = fiber;
-  for (let i = 0; i < MAX_FIBER_DEPTH && current; i++) {
-    const rec = asRecord(current);
-    if (!rec) break;
-    const src = asRecord(rec._debugSource);
-    const file = readString(src?.fileName);
-    if (file) {
-      const componentName = readComponentName(rec.elementType) ?? readComponentName(rec.type);
-      return {
-        file,
-        line: readNumber(src?.lineNumber),
-        column: readNumber(src?.columnNumber),
-        componentName
-      };
-    }
-    const owner = asRecord(rec._debugOwner);
-    const ownerSrc = asRecord(owner?._debugSource);
-    const ownerFile = readString(ownerSrc?.fileName);
-    if (ownerFile) {
-      const componentName = readComponentName(owner?.elementType) ?? readComponentName(owner?.type);
-      return {
-        file: ownerFile,
-        line: readNumber(ownerSrc?.lineNumber),
-        column: readNumber(ownerSrc?.columnNumber),
-        componentName
-      };
-    }
-    current = rec.return;
-  }
-  return null;
-}
-function findReactDebugSource(element) {
-  try {
-    let node = element;
-    for (let depth = 0; depth < MAX_DOM_DEPTH && node; depth++) {
-      const rec = node;
-      for (const key of Object.keys(rec)) {
-        if (key.startsWith("__reactFiber$") || key.startsWith("__reactInternalInstance$")) {
-          const source = extractReactDebugSource(rec[key]);
-          if (source) return source;
-        }
-      }
-      node = node.parentElement;
-    }
-  } catch {
-  }
-  return null;
-}
-function parseVInspector(value) {
-  if (typeof value !== "string") return null;
-  const raw = value.trim();
-  if (!raw) return null;
-  const match = raw.match(/:(\d+)(?::(\d+))?$/);
-  if (!match) {
-    return { file: raw };
-  }
-  const file = raw.slice(0, match.index).trim();
-  if (!file) return null;
-  const line = Number.parseInt(match[1], 10);
-  const columnRaw = match[2] ? Number.parseInt(match[2], 10) : void 0;
-  return {
-    file,
-    line: Number.isFinite(line) && line > 0 ? line : void 0,
-    column: columnRaw !== void 0 && Number.isFinite(columnRaw) && columnRaw > 0 ? columnRaw : void 0
-  };
-}
-function findInspectorLocation(element) {
-  try {
-    let node = element;
-    for (let depth = 0; depth < MAX_DOM_DEPTH && node; depth++) {
-      if (typeof node.getAttribute === "function") {
-        const attr = node.getAttribute("data-v-inspector");
-        if (attr) {
-          const parsed = parseVInspector(attr);
-          if (parsed?.file) return parsed;
-        }
-      }
-      node = node.parentElement;
-    }
-  } catch {
-  }
-  return null;
-}
-function findVueDebugSource(element) {
-  try {
-    const inspector = findInspectorLocation(element);
-    if (inspector?.file) {
-      let componentName;
-      let node2 = element;
-      for (let depth = 0; depth < MAX_DOM_DEPTH && node2; depth++) {
-        const rec = node2;
-        const inst = asRecord(rec.__vueParentComponent);
-        const typeRec = asRecord(inst?.type);
-        componentName = readString(typeRec?.name);
-        if (componentName) break;
-        node2 = node2.parentElement;
-      }
-      return {
-        ...inspector,
-        componentName
-      };
-    }
-    let node = element;
-    for (let depth = 0; depth < MAX_DOM_DEPTH && node; depth++) {
-      const rec = node;
-      const inst = asRecord(rec.__vueParentComponent);
-      const typeRec = asRecord(inst?.type);
-      const file = readString(typeRec?.__file);
-      if (file) {
-        return {
-          file,
-          componentName: readString(typeRec?.name)
-        };
-      }
-      node = node.parentElement;
-    }
-  } catch {
-  }
-  return null;
-}
-function findDebugSource(element) {
-  const react = findReactDebugSource(element);
-  if (react) return react;
-  const vue = findVueDebugSource(element);
-  if (vue) return vue;
-  return null;
-}
-
-// src/core/locator.ts
-var DEFAULT_MAX_CANDIDATES = 5;
-var FINGERPRINT_TEXT_MAX_LENGTH = 32;
-var FINGERPRINT_MAX_CLASSES = 8;
-var UNIQUE_DATA_ATTRS = [
-  "data-axhub-annotation-comment-target-id",
-  "data-axhub-annotation-panel-node-id",
-  "data-testid",
-  "data-test-id",
-  "data-test",
-  "data-qa",
-  "data-cy",
-  "name",
-  "title",
-  "alt",
-  "aria-label"
-  // Phase 2.9: added for better accessibility-based matching
-];
-var MAX_CLASS_COMBO_DEPTH = 3;
-var ANCHOR_DATA_ATTRS = [
-  "data-axhub-annotation-comment-target-id",
-  "data-axhub-annotation-panel-node-id",
-  "data-testid",
-  "data-test-id",
-  "data-test",
-  "data-qa",
-  "data-cy"
-];
-var MAX_SELECTOR_CLASS_COUNT = 24;
-var MAX_ANCHOR_DEPTH = 20;
-function cssEscape(value) {
-  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
-    return CSS.escape(value);
-  }
-  const str = String(value);
-  const len = str.length;
-  if (len === 0) return "";
-  let result = "";
-  const firstCodeUnit = str.charCodeAt(0);
-  for (let i = 0; i < len; i++) {
-    const codeUnit = str.charCodeAt(i);
-    if (codeUnit === 0) {
-      result += "\uFFFD";
-      continue;
-    }
-    if (codeUnit >= 1 && codeUnit <= 31 || codeUnit === 127 || i === 0 && codeUnit >= 48 && codeUnit <= 57 || i === 1 && codeUnit >= 48 && codeUnit <= 57 && firstCodeUnit === 45) {
-      result += `\\${codeUnit.toString(16)} `;
-      continue;
-    }
-    if (i === 0 && len === 1 && codeUnit === 45) {
-      result += `\\${str.charAt(i)}`;
-      continue;
-    }
-    const isAsciiAlnum = codeUnit >= 48 && codeUnit <= 57 || // 0-9
-    codeUnit >= 65 && codeUnit <= 90 || // A-Z
-    codeUnit >= 97 && codeUnit <= 122;
-    const isSafe = isAsciiAlnum || codeUnit === 45 || codeUnit === 95;
-    if (isSafe) {
-      result += str.charAt(i);
-    } else {
-      result += `\\${str.charAt(i)}`;
-    }
-  }
-  return result;
-}
-function getQueryRoot(element) {
-  const root = element.getRootNode?.();
-  return root instanceof ShadowRoot ? root : document;
-}
-function safeQuerySelector(root, selector) {
-  try {
-    return root.querySelector(selector);
-  } catch {
-    return null;
-  }
-}
-function isUnique(root, selector) {
-  try {
-    return root.querySelectorAll(selector).length === 1;
-  } catch {
-    return false;
-  }
-}
-function tryIdSelector(element, root) {
-  const id = element.id?.trim();
-  if (!id) return null;
-  const selector = `#${cssEscape(id)}`;
-  return isUnique(root, selector) ? selector : null;
-}
-function collectDataAttrSelectors(element, root, max) {
-  const out = [];
-  if (max <= 0) return out;
-  const tag = element.tagName.toLowerCase();
-  for (const attr of UNIQUE_DATA_ATTRS) {
-    if (out.length >= max) break;
-    const value = element.getAttribute(attr)?.trim();
-    if (!value) continue;
-    const attrOnly = `[${attr}="${cssEscape(value)}"]`;
-    if (isUnique(root, attrOnly)) {
-      out.push(attrOnly);
-      continue;
-    }
-    const withTag = `${tag}${attrOnly}`;
-    if (isUnique(root, withTag)) {
-      out.push(withTag);
-    }
-  }
-  return out;
-}
-function collectClassSelectors(element, root, max) {
-  const out = [];
-  if (max <= 0) return out;
-  const tag = element.tagName.toLowerCase();
-  const classes = Array.from(element.classList).filter((c) => c && /^[a-zA-Z_][a-zA-Z0-9_-]*$/.test(c)).slice(0, MAX_SELECTOR_CLASS_COUNT);
-  if (classes.length === 0) return out;
-  const uniqueSingle = /* @__PURE__ */ new Map();
-  for (const cls of classes) {
-    if (out.length >= max) return out;
-    const sel = `.${cssEscape(cls)}`;
-    const unique = isUnique(root, sel);
-    uniqueSingle.set(cls, unique);
-    if (unique) out.push(sel);
-  }
-  for (const cls of classes) {
-    if (out.length >= max) return out;
-    if (uniqueSingle.get(cls) === true) continue;
-    const sel = `${tag}.${cssEscape(cls)}`;
-    if (isUnique(root, sel)) out.push(sel);
-  }
-  const limit = Math.min(classes.length, MAX_CLASS_COMBO_DEPTH);
-  for (let i = 0; i < limit; i++) {
-    for (let j = i + 1; j < limit; j++) {
-      if (out.length >= max) return out;
-      const a = classes[i];
-      const b = classes[j];
-      const pair = `.${cssEscape(a)}.${cssEscape(b)}`;
-      if (isUnique(root, pair)) {
-        out.push(pair);
-        continue;
-      }
-      const withTag = `${tag}${pair}`;
-      if (isUnique(root, withTag)) out.push(withTag);
-    }
-  }
-  if (limit >= 3 && out.length < max) {
-    const triple = `.${cssEscape(classes[0])}.${cssEscape(classes[1])}.${cssEscape(classes[2])}`;
-    if (isUnique(root, triple)) {
-      out.push(triple);
-    } else {
-      const withTag = `${tag}${triple}`;
-      if (out.length < max && isUnique(root, withTag)) out.push(withTag);
-    }
-  }
-  return out;
-}
-function buildPathSelector(element, root) {
-  const segments = [];
-  let current = element;
-  const isDocument = root instanceof Document;
-  while (current && current.nodeType === Node.ELEMENT_NODE) {
-    const tag = current.tagName.toLowerCase();
-    if (isDocument && tag === "body") break;
-    let selector = tag;
-    const parent = current.parentElement;
-    const parentNode = current.parentNode;
-    let siblings;
-    if (parent) {
-      siblings = Array.from(parent.children);
-    } else if (parentNode instanceof ShadowRoot || parentNode instanceof Document) {
-      siblings = Array.from(parentNode.children);
-    } else {
-      siblings = [];
-    }
-    const sameTagSiblings = siblings.filter((s) => s.tagName === current.tagName);
-    if (sameTagSiblings.length > 1) {
-      const index = sameTagSiblings.indexOf(current) + 1;
-      selector += `:nth-of-type(${index})`;
-    }
-    segments.unshift(selector);
-    current = parent;
-    if (!parent && parentNode === root) break;
-  }
-  const path = segments.join(" > ");
-  return isDocument ? `body > ${path}` : path || "*";
-}
-function buildRelativePathSelector(ancestor, target, root) {
-  const segments = [];
-  let current = target;
-  for (let depth = 0; current && current !== ancestor && depth < MAX_ANCHOR_DEPTH; depth++) {
-    const tag = current.tagName.toLowerCase();
-    let selector = tag;
-    const parent = current.parentElement;
-    const parentNode = current.parentNode;
-    let siblings;
-    if (parent) {
-      siblings = Array.from(parent.children);
-    } else if (parentNode instanceof ShadowRoot || parentNode instanceof Document) {
-      siblings = Array.from(parentNode.children);
-    } else {
-      siblings = [];
-    }
-    const sameTagSiblings = siblings.filter((s) => s.tagName === current.tagName);
-    if (sameTagSiblings.length > 1) {
-      const index = sameTagSiblings.indexOf(current) + 1;
-      selector += `:nth-of-type(${index})`;
-    }
-    segments.unshift(selector);
-    if (!parent) {
-      if (parentNode === root) break;
-      break;
-    }
-    current = parent;
-  }
-  if (current !== ancestor) return null;
-  return segments.join(" > ") || null;
-}
-function tryAnchorSelector(element, root) {
-  const idSel = tryIdSelector(element, root);
-  if (idSel) return idSel;
-  const tag = element.tagName.toLowerCase();
-  for (const attr of ANCHOR_DATA_ATTRS) {
-    const value = element.getAttribute(attr)?.trim();
-    if (!value) continue;
-    const attrOnly = `[${attr}="${cssEscape(value)}"]`;
-    if (isUnique(root, attrOnly)) return attrOnly;
-    const withTag = `${tag}${attrOnly}`;
-    if (isUnique(root, withTag)) return withTag;
-  }
-  return null;
-}
-function buildAnchorRelPathSelector(element, root) {
-  let current = element.parentElement;
-  for (let depth = 0; current && depth < MAX_ANCHOR_DEPTH; depth++) {
-    const tag = current.tagName.toUpperCase();
-    if (tag === "HTML" || tag === "BODY") break;
-    const anchor = tryAnchorSelector(current, root);
-    if (anchor) {
-      const rel = buildRelativePathSelector(current, element, root);
-      if (!rel) {
-        current = current.parentElement;
-        continue;
-      }
-      const composed = `${anchor} ${rel}`;
-      if (!isUnique(root, composed)) {
-        current = current.parentElement;
-        continue;
-      }
-      const found = safeQuerySelector(root, composed);
-      if (found === element) return composed;
-    }
-    current = current.parentElement;
-  }
-  return null;
-}
-function getShadowHostChain(element) {
-  const chain = [];
-  let current = element;
-  while (true) {
-    const root = current.getRootNode?.();
-    if (!(root instanceof ShadowRoot)) break;
-    const host = root.host;
-    if (!(host instanceof Element)) break;
-    const hostRoot = getQueryRoot(host);
-    const hostSelector = generateCssSelector(host, { root: hostRoot });
-    if (!hostSelector) break;
-    chain.unshift(hostSelector);
-    current = host;
-  }
-  return chain.length > 0 ? chain : void 0;
-}
-function normalizeText2(text, maxLength) {
-  return text.replace(/\s+/g, " ").trim().slice(0, maxLength);
-}
-function computeFingerprint(element) {
-  const parts = [];
-  const tag = element.tagName?.toLowerCase() ?? "unknown";
-  parts.push(tag);
-  const id = element.id?.trim();
-  if (id) {
-    parts.push(`id=${id}`);
-  }
-  const classes = Array.from(element.classList).slice(0, FINGERPRINT_MAX_CLASSES);
-  if (classes.length > 0) {
-    parts.push(`class=${classes.join(".")}`);
-  }
-  const text = normalizeText2(element.textContent ?? "", FINGERPRINT_TEXT_MAX_LENGTH);
-  if (text) {
-    parts.push(`text=${text}`);
-  }
-  return parts.join("|");
-}
-function computeDomPath(element) {
-  const path = [];
-  let current = element;
-  while (current) {
-    const parent = current.parentElement;
-    if (parent) {
-      const siblings = Array.from(parent.children);
-      const index = siblings.indexOf(current);
-      if (index >= 0) path.unshift(index);
-      current = parent;
-      continue;
-    }
-    const parentNode = current.parentNode;
-    if (parentNode instanceof ShadowRoot || parentNode instanceof Document) {
-      const children = Array.from(parentNode.children);
-      const index = children.indexOf(current);
-      if (index >= 0) path.unshift(index);
-    }
-    break;
-  }
-  return path;
-}
-function generateSelectorCandidates(element, options = {}) {
-  const root = options.root ?? getQueryRoot(element);
-  const maxCandidates = Math.max(1, options.maxCandidates ?? DEFAULT_MAX_CANDIDATES);
-  const candidates = [];
-  const push = (selector, limit = maxCandidates) => {
-    if (!selector) return;
-    if (candidates.length >= limit) return;
-    const s = selector.trim();
-    if (!s || candidates.includes(s)) return;
-    candidates.push(s);
-  };
-  const anchorCandidate = maxCandidates >= DEFAULT_MAX_CANDIDATES ? buildAnchorRelPathSelector(element, root) : null;
-  const tailReserved = 1 + (anchorCandidate ? 1 : 0);
-  const headLimit = Math.max(1, maxCandidates - tailReserved);
-  push(tryIdSelector(element, root), headLimit);
-  for (const sel of collectDataAttrSelectors(element, root, headLimit - candidates.length)) {
-    push(sel, headLimit);
-  }
-  for (const sel of collectClassSelectors(element, root, headLimit - candidates.length)) {
-    push(sel, headLimit);
-  }
-  push(buildPathSelector(element, root));
-  push(anchorCandidate);
-  return candidates.slice(0, maxCandidates);
-}
-function generateCssSelector(element, options = {}) {
-  return generateSelectorCandidates(element, options)[0] ?? "";
-}
-function createElementLocator(element) {
-  const root = getQueryRoot(element);
-  const debugSource = findDebugSource(element) ?? void 0;
-  return {
-    selectors: generateSelectorCandidates(element, { root, maxCandidates: DEFAULT_MAX_CANDIDATES }),
-    fingerprint: computeFingerprint(element),
-    path: computeDomPath(element),
-    shadowHostChain: getShadowHostChain(element),
-    debugSource
-  };
-}
-function isSelectorUnique(root, selector) {
-  try {
-    return root.querySelectorAll(selector).length === 1;
-  } catch {
-    return false;
-  }
-}
-function verifyFingerprint(element, fingerprint) {
-  const currentFingerprint = computeFingerprint(element);
-  const storedParts = fingerprint.split("|");
-  const currentParts = currentFingerprint.split("|");
-  if (storedParts[0] !== currentParts[0]) return false;
-  const storedId = storedParts.find((p) => p.startsWith("id="));
-  const currentId = currentParts.find((p) => p.startsWith("id="));
-  if (storedId && storedId !== currentId) return false;
-  return true;
-}
-function locateElement(locator, rootDocument = document) {
-  let doc = rootDocument;
-  if (locator.frameChain?.length) {
-    for (const frameSelector of locator.frameChain) {
-      const frame = safeQuerySelector(doc, frameSelector);
-      if (!(frame instanceof HTMLIFrameElement)) return null;
-      const contentDoc = frame.contentDocument;
-      if (!contentDoc) return null;
-      doc = contentDoc;
-    }
-  }
-  let queryRoot = doc;
-  if (locator.shadowHostChain?.length) {
-    for (const hostSelector of locator.shadowHostChain) {
-      if (!isSelectorUnique(queryRoot, hostSelector)) return null;
-      const host = safeQuerySelector(queryRoot, hostSelector);
-      if (!host) return null;
-      const shadowRoot = host.shadowRoot;
-      if (!shadowRoot) return null;
-      queryRoot = shadowRoot;
-    }
-  }
-  for (const selector of locator.selectors) {
-    if (!isSelectorUnique(queryRoot, selector)) continue;
-    const element = safeQuerySelector(queryRoot, selector);
-    if (!element) continue;
-    if (locator.fingerprint && !verifyFingerprint(element, locator.fingerprint)) {
-      continue;
-    }
-    return element;
-  }
-  return null;
-}
-function locatorKey(locator) {
-  const selectors = locator.selectors.join("|");
-  const shadow = locator.shadowHostChain?.join(">") ?? "";
-  const frame = locator.frameChain?.join(">") ?? "";
-  return `frame:${frame}|shadow:${shadow}|sel:${selectors}`;
-}
-
-// src/core/element-key.ts
-var elementKeyCache = /* @__PURE__ */ new WeakMap();
-var shadowHostKeyCache = /* @__PURE__ */ new WeakMap();
-var autoKeyCounter = 0;
-var shadowHostCounter = 0;
-var cachedFrameContext;
-var LABEL_ATTR_PRIORITY = [
-  "data-testid",
-  "data-test-id",
-  "data-test",
-  "data-qa",
-  "data-cy",
-  "name",
-  "aria-label",
-  "title",
-  "alt"
-];
-var MAX_LABEL_ATTR_VALUE_LENGTH = 48;
-var MAX_TEXT_LABEL_LENGTH = 64;
-function normalizeTagName(element) {
-  const raw = element?.tagName ? String(element.tagName) : "";
-  const tag = raw.toLowerCase().trim();
-  return tag || "unknown";
-}
-function normalizeAttrValue(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-function normalizeText3(value) {
-  return String(value ?? "").replace(/\s+/g, " ").trim();
-}
-function truncate(value, maxLength) {
-  const str = String(value ?? "");
-  if (str.length <= maxLength) return str;
-  return str.slice(0, Math.max(0, maxLength - 1)).trimEnd() + "\u2026";
-}
-function getFrameContextPrefix() {
-  if (cachedFrameContext !== void 0) return cachedFrameContext;
-  let context = "";
-  try {
-    const frameEl = window.frameElement;
-    if (frameEl instanceof HTMLIFrameElement) {
-      const tag = normalizeTagName(frameEl);
-      const id = normalizeAttrValue(frameEl.id || frameEl.getAttribute("id"));
-      if (id) {
-        context = `${tag}#${id}`;
-      } else {
-        const name = normalizeAttrValue(frameEl.name || frameEl.getAttribute("name"));
-        if (name) {
-          context = `${tag}[name="${truncate(name, MAX_LABEL_ATTR_VALUE_LENGTH)}"]`;
-        } else {
-          const src = normalizeAttrValue(frameEl.getAttribute("src") || frameEl.src);
-          context = src ? `${tag}[src="${truncate(src, MAX_LABEL_ATTR_VALUE_LENGTH)}"]` : tag;
-        }
-      }
-    }
-  } catch {
-    context = "";
-  }
-  cachedFrameContext = context;
-  return context;
-}
-function getStableShadowHostKey(host) {
-  const cached = shadowHostKeyCache.get(host);
-  if (cached) return cached;
-  const tag = normalizeTagName(host);
-  const id = normalizeAttrValue(host.id || host.getAttribute("id"));
-  const key = id ? `${tag}#${id}` : `${tag}_h${++shadowHostCounter}`;
-  shadowHostKeyCache.set(host, key);
-  return key;
-}
-function computeShadowContextPrefix(element, _shadowHostChain) {
-  const hasShadowRoot = typeof ShadowRoot !== "undefined";
-  const hasElementCtor = typeof Element !== "undefined";
-  const hosts = [];
-  let current = element;
-  while (true) {
-    let root;
-    try {
-      root = current.getRootNode?.();
-    } catch {
-      root = null;
-    }
-    if (!hasShadowRoot || !(root instanceof ShadowRoot)) break;
-    const host = root.host;
-    if (!hasElementCtor || !(host instanceof Element)) break;
-    hosts.unshift(getStableShadowHostKey(host));
-    current = host;
-  }
-  return hosts.length > 0 ? hosts.join(">") : "";
-}
-function readBestLabelAttribute(element) {
-  for (const attr of LABEL_ATTR_PRIORITY) {
-    const value = normalizeAttrValue(element.getAttribute(attr));
-    if (value) return { attr, value };
-  }
-  return null;
-}
-function generateStableElementKey(element, shadowHostChain) {
-  const cached = elementKeyCache.get(element);
-  if (cached) return cached;
-  const tag = normalizeTagName(element);
-  const id = normalizeAttrValue(element.id || element.getAttribute("id"));
-  const baseKey = id ? `${tag}#${id}` : `${tag}_${++autoKeyCounter}`;
-  const parts = [];
-  const frame = getFrameContextPrefix();
-  if (frame) parts.push(`frame:${frame}`);
-  const shadow = computeShadowContextPrefix(element, shadowHostChain);
-  if (shadow) parts.push(`shadow:${shadow}`);
-  parts.push(baseKey);
-  const fullKey = parts.join("|");
-  elementKeyCache.set(element, fullKey);
-  return fullKey;
-}
-function generateElementLabel(element) {
-  const tag = normalizeTagName(element);
-  const hasHtmlInputCtor = typeof HTMLInputElement !== "undefined";
-  const hasHtmlIFrameCtor = typeof HTMLIFrameElement !== "undefined";
-  const id = normalizeAttrValue(element.id || element.getAttribute("id"));
-  if (id) return `${tag}#${id}`;
-  const bestAttr = readBestLabelAttribute(element);
-  if (bestAttr) {
-    return `${tag}[${bestAttr.attr}="${truncate(bestAttr.value, MAX_LABEL_ATTR_VALUE_LENGTH)}"]`;
-  }
-  const role = normalizeAttrValue(element.getAttribute("role"));
-  if (role) {
-    return `${tag}[role="${truncate(role, MAX_LABEL_ATTR_VALUE_LENGTH)}"]`;
-  }
-  if (hasHtmlInputCtor && element instanceof HTMLInputElement) {
-    const type = normalizeAttrValue(element.getAttribute("type") || element.type);
-    if (type && type !== "text") {
-      return `${tag}[type="${truncate(type, MAX_LABEL_ATTR_VALUE_LENGTH)}"]`;
-    }
-    const placeholder = normalizeAttrValue(
-      element.getAttribute("placeholder") || element.placeholder
-    );
-    if (placeholder) {
-      return `${tag}[placeholder="${truncate(placeholder, MAX_LABEL_ATTR_VALUE_LENGTH)}"]`;
-    }
-  }
-  if (hasHtmlIFrameCtor && element instanceof HTMLIFrameElement) {
-    const src = normalizeAttrValue(element.getAttribute("src") || element.src);
-    if (src) {
-      return `${tag}[src="${truncate(src, MAX_LABEL_ATTR_VALUE_LENGTH)}"]`;
-    }
-  }
-  const text = normalizeText3(element.textContent ?? "");
-  if (text) return `${tag}("${truncate(text, MAX_TEXT_LABEL_LENGTH)}")`;
-  return tag;
-}
-function generateFullElementLabel(element, shadowHostChain) {
-  const baseLabel = generateElementLabel(element);
-  const shadow = computeShadowContextPrefix(element, shadowHostChain);
-  if (shadow) {
-    return `${shadow} >> ${baseLabel}`;
-  }
-  return baseLabel;
-}
 
 // src/core/transaction-aggregator.ts
 var TEXT_PREVIEW_MAX_LENGTH = 96;
@@ -1809,6 +2333,7 @@ var DEFAULT_WEB_EDITOR_UI_SETTINGS = {
   styleDesignEnabled: true,
   darkMode: false,
   disablePageAnimations: false,
+  captureTargetScreenshot: false,
   documentCommentMode: false,
   pageZoomEnabled: false,
   agentRunConcurrency: 5
@@ -1850,6 +2375,7 @@ function sanitizeWebEditorUiSettings(value) {
     styleDesignEnabled: record.styleDesignEnabled === void 0 ? DEFAULT_WEB_EDITOR_UI_SETTINGS.styleDesignEnabled : Boolean(record.styleDesignEnabled),
     darkMode: Boolean(record.darkMode),
     disablePageAnimations: Boolean(record.disablePageAnimations),
+    captureTargetScreenshot: record.captureTargetScreenshot === void 0 ? DEFAULT_WEB_EDITOR_UI_SETTINGS.captureTargetScreenshot : Boolean(record.captureTargetScreenshot),
     documentCommentMode: Boolean(record.documentCommentMode),
     pageZoomEnabled: Boolean(record.pageZoomEnabled)
   };
@@ -1926,6 +2452,13 @@ function resolveWebEditorOptions(options = {}) {
       showCopyPromptAction: true,
       hideExecutionControls: false,
       hideCurrentElementExecutionAction: false,
+      hideClearEditsAction: false,
+      hideToolbarCloseAction: false,
+      compactToolbar: false,
+      toolbarExtraContent: null,
+      externalAnnotationMode: false,
+      commenterName: "",
+      onCommenterNameChange: void 0,
       hostSurfaceVisibilityControl: null,
       aiExecutionConfigSummary: "",
       aiExecutionConfigConfigured: false,
@@ -1956,6 +2489,7 @@ function resolveWebEditorOptions(options = {}) {
     host: {
       getResourceContext: options.host?.getResourceContext ?? (() => null),
       buildCopyPrompt: options.host?.buildCopyPrompt ?? void 0,
+      getCurrentHoveredElement: options.host?.getCurrentHoveredElement ?? void 0,
       getElementTools: options.host?.getElementTools ?? void 0,
       onElementToolAction: options.host?.onElementToolAction ?? void 0,
       shouldAllowPageEvent: options.host?.shouldAllowPageEvent ?? void 0,
@@ -1964,6 +2498,7 @@ function resolveWebEditorOptions(options = {}) {
       conversationTaskTransport: options.host?.conversationTaskTransport ?? void 0,
       commentPersistenceMode: options.host?.commentPersistenceMode ?? "local",
       canEditAnnotationMarkdown: options.host?.canEditAnnotationMarkdown ?? void 0,
+      showAnnotationMarkdownEditor: options.host?.showAnnotationMarkdownEditor ?? true,
       getCreateAnnotationBlockReason: options.host?.getCreateAnnotationBlockReason ?? void 0,
       annotationMarkdownEditorKind: options.host?.annotationMarkdownEditorKind ?? "annotation",
       getAnnotationDocumentEditUrl: options.host?.getAnnotationDocumentEditUrl ?? void 0,
@@ -2028,12 +2563,14 @@ function createEditorRuntimeState() {
     tokensService: null,
     perfMonitor: null,
     perfHotkeyCleanup: null,
+    deleteElementHotkeyCleanup: null,
     selectionModeHotkeyCleanup: null,
     parentSelectHotkeyCleanup: null,
     commentShortcutCleanup: null,
     hoveredElement: null,
     pendingHoverTransition: false,
     selectedElement: null,
+    initialSelectionElement: null,
     selectionAnchor: null,
     commentEntryMode: "bubble-card",
     commentShortcutSettings: { ...DEFAULT_COMMENT_SHORTCUT_SETTINGS },
@@ -2041,6 +2578,7 @@ function createEditorRuntimeState() {
     propertyPanelPosition: null,
     uiResizeCleanup: null,
     editMetaByKey: /* @__PURE__ */ new Map(),
+    deleteElementAnnotationsByTransactionId: /* @__PURE__ */ new Map(),
     processedEditTimestampsByKey: /* @__PURE__ */ new Map(),
     pendingMarkerAnchors: /* @__PURE__ */ new Map(),
     markerLayer: null,
@@ -2068,11 +2606,13 @@ function clearAnnotationBridgeSelection(state2) {
 function resetEditorTransientState(state2) {
   clearAnnotationBridgeSelection(state2);
   state2.editMetaByKey.clear();
+  state2.deleteElementAnnotationsByTransactionId.clear();
   state2.processedEditTimestampsByKey.clear();
   state2.pendingMarkerAnchors.clear();
   state2.markerLayer = null;
   state2.hoveredElement = null;
   state2.selectedElement = null;
+  state2.initialSelectionElement = null;
   state2.selectionAnchor = null;
   state2.pendingHoverTransition = false;
   state2.commentShortcutDialogOpen = false;
@@ -2101,6 +2641,7 @@ function clearEditorRuntimeRefs(state2) {
   state2.tokensService = null;
   state2.perfMonitor = null;
   state2.perfHotkeyCleanup = null;
+  state2.deleteElementHotkeyCleanup = null;
   state2.selectionModeHotkeyCleanup = null;
   state2.parentSelectHotkeyCleanup = null;
   state2.commentShortcutCleanup = null;
@@ -2108,6 +2649,7 @@ function clearEditorRuntimeRefs(state2) {
   state2.markerLayer = null;
   state2.hoveredElement = null;
   state2.selectedElement = null;
+  state2.initialSelectionElement = null;
   state2.selectionAnchor = null;
   state2.pendingHoverTransition = false;
   state2.commentShortcutDialogOpen = false;
@@ -2121,6 +2663,7 @@ function clearEditorRuntimeRefs(state2) {
   state2.activeTextComment = null;
   state2.pendingMarkerAnchors.clear();
   state2.editMetaByKey.clear();
+  state2.deleteElementAnnotationsByTransactionId.clear();
   state2.processedEditTimestampsByKey.clear();
 }
 function getProcessedEditTimestamp(state2, elementKey) {
@@ -2268,185 +2811,22 @@ function resolveTextCommentElementMeta(state2, element) {
   };
 }
 
-// src/ui/runtime/prompt-card-skills.ts
-var PROMPT_CARD_SKILLS = [
-  {
-    id: "explore-options",
-    label: "\u591A\u65B9\u6848\u63A2\u7D22",
-    description: "\u4F7F\u7528 explore-options \u505A\u591A\u65B9\u6848\u63A2\u7D22",
-    keywords: "\u591A\u65B9\u6848\u751F\u6210 \u65B9\u6848\u5BF9\u6BD4 \u8BBE\u8BA1\u51B3\u7B56 \u591A\u65B9\u6848\u5BF9\u6BD4",
-    prompt: "\u4F7F\u7528\u672C\u5730 explore-options \u6280\u80FD\uFF0C\u6309\u591A\u65B9\u6848\u63A2\u7D22\u6D41\u7A0B\u5BF9\u9F50\u5F53\u524D\u6279\u6CE8\u3001\u9700\u6C42\u548C\u8BBE\u8BA1\u51B3\u7B56\uFF0C\u751F\u6210 2-3 \u4E2A\u771F\u5B9E\u4E0D\u540C\u7684\u53EF\u884C\u4FEE\u6539\u65B9\u6848\uFF0C\u5BF9\u6BD4\u540E\u9009\u62E9\u6700\u9002\u5408\u5F53\u524D\u9875\u9762\u7684\u4E00\u79CD\u518D\u6267\u884C\u3002"
-  },
-  {
-    id: "prototype-annotation",
-    label: "\u539F\u578B\u6807\u6CE8",
-    description: "\u4F7F\u7528 prototype-annotation \u7406\u89E3\u6279\u6CE8\u610F\u56FE",
-    prompt: "\u4F7F\u7528\u672C\u5730 prototype-annotation \u6280\u80FD\uFF0C\u7ED3\u5408\u5F53\u524D\u539F\u578B\u6807\u6CE8\u7406\u89E3\u4FEE\u6539\u610F\u56FE\uFF0C\u5904\u7406\u6279\u6CE8\u5BF9\u5E94\u533A\u57DF\u3002"
-  },
-  {
-    id: "impeccable",
-    label: "UI \u8BC4\u5BA1",
-    description: "\u4F7F\u7528 impeccable \u68C0\u67E5\u754C\u9762\u8D28\u91CF",
-    prompt: "\u4F7F\u7528\u672C\u5730 impeccable \u6280\u80FD\uFF0C\u6309 UI critique \u601D\u8DEF\u5BA1\u67E5\u5F53\u524D\u9875\u9762\u6216\u533A\u57DF\uFF0C\u7ED9\u51FA\u5173\u952E\u95EE\u9898\u548C\u4FEE\u590D\u65B9\u5411\u3002"
-  },
-  {
-    id: "ui-design-image",
-    label: "UI \u8BBE\u8BA1\u56FE\u7247",
-    description: "\u4F7F\u7528 ui-design-image \u751F\u6210 UI \u8BBE\u8BA1\u56FE\u7247",
-    keywords: "\u751F\u56FE \u751F\u6210\u56FE\u7247 \u56FE\u7247\u751F\u6210 \u8BBE\u8BA1\u56FE UI\u56FE\u7247 UI\u7D20\u6750 \u56FE\u6807 \u5360\u4F4D\u56FE \u89C6\u89C9\u53C2\u8003\u56FE imagegen image generation",
-    prompt: "\u4F7F\u7528\u672C\u5730 ui-design-image \u6280\u80FD\uFF0C\u7ED3\u5408\u5F53\u524D\u6279\u6CE8\u3001\u9875\u9762\u4E0A\u4E0B\u6587\u548C\u53C2\u8003\u56FE\u7247\uFF0C\u751F\u6210 UI \u8BBE\u8BA1\u56FE\u7247\u3001\u7D20\u6750\u3001\u56FE\u6807\u3001\u5360\u4F4D\u56FE\u6216\u89C6\u89C9\u53C2\u8003\u56FE\u3002\u9700\u8981\u628A\u7ED3\u679C\u66F4\u65B0\u5230\u5F53\u524D\u753B\u5E03\u6216\u76F8\u5173\u9879\u76EE\u7D20\u6750\u65F6\uFF0C\u6309\u5F53\u524D\u9879\u76EE\u89C4\u5219\u843D\u76D8\u5E76\u56DE\u5199\u3002"
-  },
-  {
-    id: "requirements-review",
-    label: "\u9700\u6C42\u8BC4\u5BA1",
-    description: "axhub-prototype-context\uFF1A\u9700\u6C42/PRD \u8BC4\u5BA1",
-    keywords: "\u9700\u6C42\u8BC4\u5BA1 PRD \u539F\u578B\u8BC4\u5BA1 axhub-prototype-context",
-    prompt: [
-      "\u4F7F\u7528 axhub-prototype-context \u6280\u80FD\u5904\u7406\u8FD9\u6761\u6279\u6CE8\u3002",
-      "\u6280\u80FD\u6587\u6863\uFF1Ahttps://github.com/lintendo/Axhub-Skills/blob/main/skills/axhub-prototype-context/SKILL.md",
-      "\u6253\u5F00\u5F53\u524D\u539F\u578B URL\uFF0C\u7B49\u5F85\u9875\u9762\u6E32\u67D3\u540E\u8BFB\u53D6 window.__AXHUB_ANNOTATION_SOURCE__\uFF0C\u5C06\u9875\u9762\u89C6\u4E3A\u53EA\u8BFB\u4E0A\u4E0B\u6587\u3002",
-      "\u8BC4\u5BA1 source.directory \u4E2D\u7684\u76EE\u5F55/PRD\u3001markdown \u8282\u70B9\u3001\u6279\u6CE8\u8282\u70B9\uFF0C\u4EE5\u53CA source.root/source.manifest \u4E2D\u7684\u6E90\u7801\u4EA4\u63A5\u7EBF\u7D22\u3002"
-    ].join("\n"),
-    chromeOnly: true
-  }
-];
-var SKILL_TRIGGER_QUERY_PATTERN = /^[\p{Script=Han}\p{Letter}\p{Number}_-]*$/u;
-var CUSTOM_SKILL_ID_PATTERN = /^custom-[a-z0-9-]+$/u;
-var PROMPT_CARD_SKILL_OPTIONS = PROMPT_CARD_SKILLS.map(
-  ({ id, label, description, prompt }) => ({ id, label, description, prompt })
-);
-function mergePromptCardSkills(skillOptions = []) {
-  const merged = new Map(
-    PROMPT_CARD_SKILLS.map((skill) => [skill.id, { ...skill }])
-  );
-  for (const option of skillOptions) {
-    const id = String(option.id ?? "").trim();
-    const label = String(option.label ?? "").trim();
-    if (!id || !label) continue;
-    const existing = merged.get(id);
-    const prompt = String(option.prompt ?? existing?.prompt ?? "").trim();
-    if (!prompt) continue;
-    const description = String(option.description ?? "").trim() || existing?.description || prompt.replace(/\s+/gu, " ").slice(0, 80);
-    merged.set(id, {
-      ...existing ?? {},
-      id,
-      label,
-      description,
-      prompt,
-      ...option.keywords ? { keywords: String(option.keywords).trim() } : {},
-      ...option.sourceUrl ? { sourceUrl: String(option.sourceUrl).trim() } : {},
-      ...option.chromeOnly === true ? { chromeOnly: true } : {},
-      ...option.custom === true ? { custom: true } : {}
-    });
-  }
-  return [...merged.values()];
+// src/ui/runtime/commenter-style.ts
+function normalizeCommenterName(value) {
+  return String(value ?? "").trim();
 }
-function normalizeSkillQuery(value) {
-  return value.trim().toLocaleLowerCase();
-}
-function findPromptCardSkillTrigger(text) {
-  const value = String(text ?? "");
-  const start = value.lastIndexOf("/");
-  if (start < 0) return null;
-  const query = value.slice(start + 1);
-  if (!SKILL_TRIGGER_QUERY_PATTERN.test(query)) return null;
-  const previousChar = start > 0 ? value[start - 1] : "";
-  const previousWhitespaceIndex = Math.max(
-    value.lastIndexOf(" ", start - 1),
-    value.lastIndexOf("\n", start - 1),
-    value.lastIndexOf("	", start - 1)
-  );
-  const currentTokenPrefix = value.slice(previousWhitespaceIndex + 1, start);
-  if (previousChar === "/") {
-    return null;
-  }
-  if (currentTokenPrefix.includes("/")) return null;
-  return {
-    query,
-    start,
-    end: value.length
-  };
-}
-function clearPromptCardSkillTrigger(text) {
-  const value = String(text ?? "");
-  const trigger = findPromptCardSkillTrigger(value);
-  if (!trigger) return value;
-  return value.slice(0, trigger.start).trimEnd();
-}
-function filterPromptCardSkills(query, enabledSkillIds, skills = PROMPT_CARD_SKILLS) {
-  const normalizedQuery = normalizeSkillQuery(query);
-  const enabledIds = Array.isArray(enabledSkillIds) ? new Set(enabledSkillIds.map((item) => String(item ?? "").trim()).filter(Boolean)) : null;
-  const availableSkills = skills.filter(
-    (skill) => enabledIds ? enabledIds.has(skill.id) : !skill.chromeOnly
-  );
-  if (!normalizedQuery) return [...availableSkills];
-  return availableSkills.filter((skill) => {
-    const searchableText = `${skill.id} ${skill.label} ${skill.description} ${skill.keywords ?? ""}`.toLocaleLowerCase();
-    return searchableText.includes(normalizedQuery);
-  });
-}
-function addPromptCardSkillSelection(selectedSkills, skill) {
-  if (selectedSkills.some((selected) => selected.id === skill.id)) {
-    return [...selectedSkills];
-  }
-  return [...selectedSkills, skill];
-}
-function buildPromptCardSkillPrefix(selectedSkills) {
-  if (selectedSkills.length === 0) return "";
-  return [
-    "\u4F7F\u7528\u4EE5\u4E0B\u6280\u80FD\u6307\u4EE4\u5904\u7406\u8FD9\u6761\u6279\u6CE8\uFF1A",
-    ...selectedSkills.flatMap((skill, index) => ["", `${index + 1}. ${skill.label}`, skill.prompt])
-  ].join("\n");
-}
-function normalizePromptCardSkillIds(skillIds, skills = PROMPT_CARD_SKILLS) {
-  const result = [];
-  const seen = /* @__PURE__ */ new Set();
-  const knownSkillIds = new Set(skills.map((skill) => skill.id));
-  for (const skillId of skillIds) {
-    const normalizedId = String(skillId ?? "").trim();
-    if (!normalizedId || seen.has(normalizedId) || !knownSkillIds.has(normalizedId) && !CUSTOM_SKILL_ID_PATTERN.test(normalizedId)) {
-      continue;
-    }
-    seen.add(normalizedId);
-    result.push(normalizedId);
-  }
-  return result;
-}
-function buildPromptCardSkillSavePayload(note, selectedSkills) {
-  const normalizedNote = String(note ?? "").replace(/\r\n/g, "\n").trim();
-  return {
-    note: normalizedNote,
-    skillIds: normalizedNote ? selectedSkills.map((skill) => skill.id) : []
-  };
-}
-function deserializePromptCardSkillSelection(payload, enabledSkillIds, skillOptions = []) {
-  const skills = mergePromptCardSkills(skillOptions);
-  const skillById = new Map(skills.map((skill) => [skill.id, skill]));
-  const enabledIds = Array.isArray(enabledSkillIds) ? new Set(enabledSkillIds.map((item) => String(item ?? "").trim()).filter(Boolean)) : null;
-  return normalizePromptCardSkillIds(payload?.skillIds ?? [], skills).map((skillId) => skillById.get(skillId)).filter((skill) => Boolean(skill)).filter((skill) => enabledIds ? enabledIds.has(skill.id) : true);
-}
-function appendImplicitAnnotationSkillToPrompt(prompt, annotationSession, enabledSkillIds, skillOptions = []) {
-  const normalizedPrompt = String(prompt ?? "").trim();
-  if (!normalizedPrompt || !annotationSession) return normalizedPrompt;
-  const defaultSkill = mergePromptCardSkills(skillOptions).find(
-    (skill) => skill.id === "prototype-annotation"
-  );
-  if (!defaultSkill) return normalizedPrompt;
-  if (Array.isArray(enabledSkillIds) && !enabledSkillIds.some((skillId) => String(skillId ?? "").trim() === defaultSkill.id)) {
-    return normalizedPrompt;
-  }
-  if (normalizedPrompt.includes(defaultSkill.prompt)) return normalizedPrompt;
-  return `${normalizedPrompt}
-
-${buildPromptCardSkillPrefix([defaultSkill])}`;
-}
-function mergePromptCardSkillsIntoPromptNote(note, selectedSkills) {
-  const prefix = buildPromptCardSkillPrefix(selectedSkills);
-  const normalizedNote = String(note ?? "").replace(/\r\n/g, "\n").trim();
-  if (!prefix) return normalizedNote;
-  if (!normalizedNote) return prefix;
-  return `${normalizedNote}
-${prefix}`;
+function buildCommenterColorMap(names) {
+  const uniqueNames = Array.from(new Set(names.map(normalizeCommenterName).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  const usedHues = /* @__PURE__ */ new Set();
+  return new Map(uniqueNames.map((name, index) => {
+    let hash = 0;
+    for (const character of name) hash = hash * 31 + character.codePointAt(0) >>> 0;
+    let hue = Math.round(hash * 137.508 % 360);
+    while (usedHues.has(hue)) hue = (hue + 29) % 360;
+    usedHues.add(hue);
+    const lightness = 42 + index % 4 * 4;
+    return [name, `hsl(${hue} 68% ${lightness}%)`];
+  }));
 }
 
 // src/core/editor/annotation-target.ts
@@ -2456,7 +2836,7 @@ var ANNOTATION_PANEL_TARGET_ATTR = "data-axhub-annotation-panel-target";
 var ANNOTATION_PANEL_NODE_ID_ATTR = "data-axhub-annotation-panel-node-id";
 var ANNOTATION_SOURCE_KEY = "__AXHUB_ANNOTATION_SOURCE__";
 var ANNOTATION_SOURCE_DOCUMENT_KEY = "__AXHUB_ANNOTATION_SOURCE_DOCUMENT__";
-function normalizeText4(value) {
+function normalizeText5(value) {
   return String(value ?? "").trim();
 }
 function isPlainObject(value) {
@@ -2474,7 +2854,7 @@ function cssEscape2(value) {
 }
 function readElementAttribute(element, attr) {
   try {
-    return normalizeText4(element?.getAttribute?.(attr));
+    return normalizeText5(element?.getAttribute?.(attr));
   } catch {
     return "";
   }
@@ -2496,7 +2876,7 @@ function readSourceNodesFromCandidate(candidate) {
   if (!isPlainObject(candidate) || !Array.isArray(candidate.nodes)) return [];
   return candidate.nodes.map((node) => {
     if (!isPlainObject(node)) return null;
-    const id = normalizeText4(node.id);
+    const id = normalizeText5(node.id);
     if (!id) return null;
     return {
       id,
@@ -2526,10 +2906,10 @@ function collectAnnotationSourceNodeIdsFromWindow() {
 }
 function extractAnnotationPanelNodeId(locator) {
   for (const selector of locator?.selectors ?? []) {
-    const normalized = normalizeText4(selector);
+    const normalized = normalizeText5(selector);
     if (!normalized) continue;
     const match = normalized.match(/\[data-axhub-annotation-panel-node-id=(?:"([^"]+)"|'([^']+)'|([^\]]+))\]/);
-    const nodeId = normalizeText4(match?.[1] ?? match?.[2] ?? match?.[3]);
+    const nodeId = normalizeText5(match?.[1] ?? match?.[2] ?? match?.[3]);
     if (nodeId) return nodeId;
   }
   return "";
@@ -2540,15 +2920,15 @@ function locatorsMatch(left, right) {
     if (locatorKey(left) && locatorKey(left) === locatorKey(right)) return true;
   } catch {
   }
-  const leftSelectors = (left.selectors ?? []).map(normalizeText4).filter(Boolean);
-  const rightSelectors = (right.selectors ?? []).map(normalizeText4).filter(Boolean);
+  const leftSelectors = (left.selectors ?? []).map(normalizeText5).filter(Boolean);
+  const rightSelectors = (right.selectors ?? []).map(normalizeText5).filter(Boolean);
   if (leftSelectors.length > 0 && rightSelectors.length > 0 && leftSelectors.length === rightSelectors.length && leftSelectors.every((selector, index) => selector === rightSelectors[index])) {
     return true;
   }
-  const leftFingerprint = normalizeText4(left.fingerprint);
-  const rightFingerprint = normalizeText4(right.fingerprint);
-  const leftPath = (left.path ?? []).map(normalizeText4).join(">");
-  const rightPath = (right.path ?? []).map(normalizeText4).join(">");
+  const leftFingerprint = normalizeText5(left.fingerprint);
+  const rightFingerprint = normalizeText5(right.fingerprint);
+  const leftPath = (left.path ?? []).map(normalizeText5).join(">");
+  const rightPath = (right.path ?? []).map(normalizeText5).join(">");
   return Boolean(
     leftFingerprint && leftFingerprint === rightFingerprint && leftPath && leftPath === rightPath
   );
@@ -2569,8 +2949,23 @@ function readAnnotationPanelNodeId(element) {
   if (panelNodeId) return panelNodeId;
   return readClosestElementAttribute(element, ANNOTATION_MARKER_NODE_ID_ATTR);
 }
+function readActiveAnnotationPanelNodeId() {
+  if (typeof document === "undefined") return "";
+  const selector = `[${ANNOTATION_PANEL_TARGET_ATTR}="true"][${ANNOTATION_PANEL_NODE_ID_ATTR}]`;
+  try {
+    const host = typeof document.getElementById === "function" ? document.getElementById(ANNOTATION_HOST_ID) : null;
+    const shadowRoot = host?.shadowRoot ?? null;
+    const shadowPanel = shadowRoot?.querySelector(selector) ?? null;
+    const shadowNodeId = readElementAttribute(shadowPanel, ANNOTATION_PANEL_NODE_ID_ATTR);
+    if (shadowNodeId) return shadowNodeId;
+    const documentPanel = typeof document.querySelector === "function" ? document.querySelector(selector) : null;
+    return readElementAttribute(documentPanel, ANNOTATION_PANEL_NODE_ID_ATTR);
+  } catch {
+    return "";
+  }
+}
 function buildAnnotationPanelLocator(nodeId) {
-  const normalizedNodeId = normalizeText4(nodeId);
+  const normalizedNodeId = normalizeText5(nodeId);
   return {
     selectors: [`[${ANNOTATION_PANEL_NODE_ID_ATTR}="${cssEscape2(normalizedNodeId)}"]`],
     fingerprint: `annotation-panel:${normalizedNodeId}`,
@@ -2579,7 +2974,7 @@ function buildAnnotationPanelLocator(nodeId) {
   };
 }
 function buildAnnotationPanelElementKey(nodeId) {
-  return `annotation-panel:${normalizeText4(nodeId)}`;
+  return `annotation-panel:${normalizeText5(nodeId)}`;
 }
 function resolveAnnotationElementIdentity(element) {
   if (!element) return null;
@@ -2593,7 +2988,10 @@ function resolveAnnotationElementIdentity(element) {
     };
   }
   const locator = createElementLocator(element);
-  const nodeId = resolveAnnotationNodeIdFromLocator(locator);
+  const sourceNodes = readAnnotationSourceNodes();
+  const activePanelNodeId = readActiveAnnotationPanelNodeId();
+  const activePanelNode = sourceNodes.find((node) => node.id === activePanelNodeId);
+  const nodeId = activePanelNode?.locator && locatorsMatch(locator, activePanelNode.locator) ? activePanelNode.id : resolveAnnotationNodeIdFromLocator(locator);
   if (!nodeId) return null;
   return {
     elementKey: buildAnnotationPanelElementKey(nodeId),
@@ -2605,18 +3003,18 @@ function resolveAnnotationElementIdentity(element) {
 function resolveAnnotationTargetIdentity(target) {
   const locator = target?.locator ?? null;
   const nodeIdFromLocator = resolveAnnotationNodeIdFromLocator(locator);
-  const nodeIdFromKey = normalizeText4(target?.elementKey).startsWith("annotation-panel:") ? normalizeText4(target?.elementKey).replace(/^annotation-panel:/, "") : "";
+  const nodeIdFromKey = normalizeText5(target?.elementKey).startsWith("annotation-panel:") ? normalizeText5(target?.elementKey).replace(/^annotation-panel:/, "") : "";
   const nodeId = nodeIdFromLocator || nodeIdFromKey;
   if (!nodeId) return null;
   return {
     elementKey: buildAnnotationPanelElementKey(nodeId),
     locator: buildAnnotationPanelLocator(nodeId),
-    label: normalizeText4(target?.label) || "Annotation Panel",
+    label: normalizeText5(target?.label) || "Annotation Panel",
     nodeId
   };
 }
 function findAnnotationMarkerByNodeId(nodeId) {
-  const normalizedNodeId = normalizeText4(nodeId);
+  const normalizedNodeId = normalizeText5(nodeId);
   if (!normalizedNodeId || typeof document === "undefined") {
     return null;
   }
@@ -2891,6 +3289,20 @@ function createChangesService(options) {
       label
     );
   }
+  function getCommenterDisplayMeta(element) {
+    const meta = getMetaForElement(element);
+    if (!meta) return null;
+    const externalComments = meta.externalComments ?? [];
+    if (externalComments.length === 0 && !meta.author) return null;
+    const name = String(meta.author ?? "").trim();
+    const names = Array.from(state2.editMetaByKey.values()).flatMap((item) => [item.author, ...(item.externalComments ?? []).map((comment) => comment.authorName)]).filter((item) => Boolean(String(item ?? "").trim()));
+    return {
+      name,
+      color: buildCommenterColorMap(names).get(name) ?? "#3B82F6",
+      readOnly: Boolean(meta.readOnly),
+      externalComments
+    };
+  }
   function getViewportMarkerPosition(anchor) {
     return getViewportPointFromMarkerAnchor(anchor, {
       scrollX: window.scrollX,
@@ -2956,14 +3368,17 @@ function createChangesService(options) {
   function buildMarkerDetailLines(meta) {
     const lines = [];
     const note = normalizeNote2(meta.note).trim();
+    const userImageCount = meta.images.filter((image) => image.source !== "target-screenshot").length;
     if (note) {
       lines.push(note);
     } else if ((meta.skillIds?.length ?? 0) > 0) {
       lines.push("\u5DF2\u9009\u62E9 AI \u6280\u80FD");
-    } else if (meta.images.length > 0) {
-      lines.push(`\u5DF2\u9644\u52A0 ${meta.images.length} \u5F20\u53C2\u8003\u56FE\u7247`);
+    } else if (userImageCount > 0) {
+      lines.push(`\u5DF2\u9644\u52A0 ${userImageCount} \u5F20\u53C2\u8003\u56FE\u7247`);
     } else if (meta.changeKinds.length > 0) {
       lines.push(`\u5DF2\u4FEE\u6539\uFF1A${meta.changeKinds.join(" / ")}`);
+    } else if ((meta.externalComments?.length ?? 0) > 0) {
+      lines.push(`\u5916\u90E8\u8BC4\u5BA1\u610F\u89C1 ${meta.externalComments?.length ?? 0} \u6761`);
     } else {
       lines.push("\u5DF2\u8BB0\u5F55\u4FEE\u6539");
     }
@@ -2997,6 +3412,7 @@ function createChangesService(options) {
     if (hasNote) return;
     if ((meta.skillIds?.length ?? 0) > 0) return;
     if (meta.images.length > 0) return;
+    if ((meta.externalComments?.length ?? 0) > 0) return;
     if (meta.dirtySince !== null) return;
     if (meta.changeKinds.length > 0) return;
     if (hasRecordedTweak(meta)) return;
@@ -3010,7 +3426,7 @@ function createChangesService(options) {
       layer.replaceChildren();
       return;
     }
-    const dirtyMetas = Array.from(state2.editMetaByKey.values()).filter((meta) => meta.dirtySince !== null && meta.anchor).sort((a, b) => {
+    const dirtyMetas = Array.from(state2.editMetaByKey.values()).filter((meta) => (meta.dirtySince !== null || (meta.externalComments?.length ?? 0) > 0) && meta.anchor).sort((a, b) => {
       const at = Number(a.dirtySince ?? 0);
       const bt = Number(b.dirtySince ?? 0);
       if (at !== bt) return at - bt;
@@ -3023,6 +3439,9 @@ function createChangesService(options) {
       return resolveEditableElementIdentity(selected).elementKey;
     })();
     const visibleMetas = filterVisibleChangeMarkerMetas(dirtyMetas, activeMarkerKey);
+    const commenterColors = buildCommenterColorMap(
+      visibleMetas.map((meta) => meta.author)
+    );
     if (visibleMetas.length === 0) {
       layer.hidden = true;
       layer.replaceChildren();
@@ -3047,6 +3466,12 @@ function createChangesService(options) {
       ].filter(Boolean).join(" ");
       marker.style.left = `${position.left}px`;
       marker.style.top = `${position.top}px`;
+      const commenterColor = commenterColors.get(String(meta.author ?? "").trim());
+      if (commenterColor) {
+        marker.style.setProperty("--we-commenter-color", commenterColor);
+        marker.style.backgroundColor = commenterColor;
+        marker.style.borderColor = commenterColor;
+      }
       marker.setAttribute("role", "button");
       marker.tabIndex = 0;
       marker.setAttribute(
@@ -3062,6 +3487,7 @@ function createChangesService(options) {
       const markerBody = document.createElement("span");
       markerBody.className = "we-change-marker__body";
       markerBody.textContent = markerText;
+      if (commenterColor) markerBody.style.backgroundColor = commenterColor;
       const taskGlyph = taskState === "completed" || taskState === "error" ? CHANGE_MARKER_TASK_GLYPHS[taskState] : null;
       const taskStatus = taskGlyph ? document.createElement("span") : null;
       if (taskStatus && taskState) {
@@ -3283,7 +3709,7 @@ function createChangesService(options) {
   }
   function setNoteForElement(element, note, options2 = {}) {
     const meta = getMetaForElement(element);
-    if (!meta) return;
+    if (!meta) return null;
     meta.note = normalizeNote2(note);
     const hasNote = Boolean(meta.note.trim());
     if (!hasNote) {
@@ -3304,8 +3730,16 @@ function createChangesService(options) {
       const fallbackElement = element && element.isConnected ? element : locateElement(meta.locator);
       meta.anchor = fallbackElement ? buildFallbackAnchor(fallbackElement) : null;
     }
+    const commentId = hasNote ? ensureElementEditCommentId(meta) : null;
     if (hasNote) {
-      ensureElementEditCommentId(meta);
+      const voiceCreateOperationId = String(options2.voiceCreateOperationId || "").trim();
+      if (voiceCreateOperationId) {
+        meta.voiceCreateOperationId = voiceCreateOperationId;
+        meta.voiceElementKey = meta.elementKey;
+        meta.voiceTargetRef = String(options2.voiceTargetRef || "").trim() || void 0;
+        meta.voiceTarget = options2.voiceTarget;
+        meta.anchorPlacement = options2.anchorPlacement;
+      }
       if (meta.dirtySince === null) {
         meta.dirtySince = Date.now();
       }
@@ -3322,9 +3756,24 @@ function createChangesService(options) {
     pruneIdleMeta(meta.elementKey);
     notifyCommentEdited(meta);
     notifyEditMetaChanged();
+    return commentId;
   }
   function getImagesForElement(element) {
     return getMetaForElement(element)?.images.slice() ?? [];
+  }
+  function removeExternalCommentForElement(element, commentId) {
+    const meta = getMetaForElement(element);
+    const normalizedCommentId = String(commentId ?? "").trim();
+    if (!meta || !normalizedCommentId || !Array.isArray(meta.externalComments)) return false;
+    const nextExternalComments = meta.externalComments.filter(
+      (comment) => String(comment.id ?? "").trim() !== normalizedCommentId
+    );
+    if (nextExternalComments.length === meta.externalComments.length) return false;
+    meta.externalComments = nextExternalComments;
+    pruneIdleMeta(meta.elementKey);
+    notifyCommentEdited(meta);
+    notifyEditMetaChanged();
+    return true;
   }
   function setImagesForElement(element, images) {
     const meta = getMetaForElement(element);
@@ -3460,13 +3909,14 @@ function createChangesService(options) {
     options.onStatusChange?.();
   }
   function buildModifiedElementsContext() {
-    const dirtyMetas = Array.from(state2.editMetaByKey.values()).filter((meta) => meta.dirtySince !== null).sort((a, b) => Number(a.dirtySince ?? 0) - Number(b.dirtySince ?? 0));
+    const dirtyMetas = Array.from(state2.editMetaByKey.values()).filter((meta) => meta.dirtySince !== null || (meta.externalComments?.length ?? 0) > 0).sort((a, b) => Number(a.dirtySince ?? 0) - Number(b.dirtySince ?? 0));
     return dirtyMetas.map((meta, index) => ({
       selector: formatSelectorPath(meta.locator),
       label: meta.label,
       note: meta.note,
       skillIds: meta.skillIds?.slice(),
       changeKinds: meta.changeKinds.slice(),
+      ...(meta.externalComments?.length ?? 0) > 0 ? { externalComments: meta.externalComments?.map((comment) => ({ ...comment })) } : {},
       marker: meta.anchor ? {
         index: index + 1,
         clientX: meta.anchor.clientX,
@@ -3482,7 +3932,8 @@ function createChangesService(options) {
     const sourceMetas = targetMeta ? [targetMeta] : Array.from(state2.editMetaByKey.values()).sort((a, b) => Number(a.dirtySince ?? 0) - Number(b.dirtySince ?? 0));
     return sourceMetas.map((meta) => {
       const note = normalizeNote2(meta.note).trim();
-      if (!note) return null;
+      const externalSection = buildExternalCommentsPromptSection(meta.externalComments ?? []);
+      if (!note && !externalSection) return null;
       let resolvedElement = null;
       try {
         resolvedElement = locateElement(meta.locator);
@@ -3493,7 +3944,7 @@ function createChangesService(options) {
         elementKey: meta.elementKey,
         selector: formatSelectorPath(meta.locator),
         label: meta.label,
-        note,
+        note: [note, externalSection].filter(Boolean).join("\n\n"),
         elementType: resolvedElement?.tagName ?? ""
       };
     }).filter((item) => Boolean(item));
@@ -3522,11 +3973,13 @@ function createChangesService(options) {
     normalizeNote: normalizeNote2,
     getOrCreateEditMeta,
     getMetaForElement,
+    getCommenterDisplayMeta,
     rememberSelectionAnchor,
     clearPendingSelectionAnchor,
     renderChangeMarkers,
     syncEditMetaWithTransactions,
     setNoteForElement,
+    removeExternalCommentForElement,
     getImagesForElement,
     setImagesForElement,
     recordTweakValuesForElement,
@@ -3551,11 +4004,26 @@ var import_antd = require("antd");
 
 // src/ui/feedback-bridge.ts
 var currentBridge = null;
+var pendingMessages = [];
 function setWebEditorFeedbackBridge(bridge) {
   currentBridge = bridge;
 }
 function getWebEditorFeedbackBridge() {
   return currentBridge;
+}
+function sendWebEditorFeedbackMessage(message) {
+  if (currentBridge) {
+    currentBridge.message(message);
+    return;
+  }
+  pendingMessages.push(message);
+}
+function flushWebEditorFeedbackMessages() {
+  if (!currentBridge || pendingMessages.length === 0) return;
+  const pending = pendingMessages.splice(0);
+  for (const message of pending) {
+    currentBridge.message(message);
+  }
 }
 
 // src/core/editor/feedback.ts
@@ -3625,10 +4093,7 @@ function resolveDialogContainer(uiRoot) {
   if (uiRoot) {
     return uiRoot;
   }
-  if (typeof document !== "undefined") {
-    return document.body;
-  }
-  throw new Error("No dialog container available");
+  throw new Error("No isolated dialog container available");
 }
 function showPromptModal(container, options) {
   const mountNode = document.createElement("div");
@@ -3662,6 +4127,7 @@ function showPromptModal(container, options) {
           maskClosable: true,
           destroyOnHidden: true,
           zIndex: 2147483647,
+          getContainer: () => container,
           cancelButtonProps: options.cancelText ? void 0 : { style: { display: "none" } },
           onOk: async () => {
             const nextValue = contentRef.current?.getValue() ?? options.defaultValue ?? "";
@@ -3828,21 +4294,12 @@ function createFeedbackService(options) {
   function toast(type, content) {
     if (typeof window === "undefined") return;
     try {
-      const uiRoot = options.getUiRoot();
       const bridge = getWebEditorFeedbackBridge();
-      if (uiRoot && bridge) {
-        bridge.message({
-          type,
-          content
-        });
-        return;
+      if (bridge) {
+        bridge.message({ type, content });
+      } else {
+        sendWebEditorFeedbackMessage({ type, content });
       }
-      if (uiRoot) {
-        import_antd.message.config({
-          getContainer: () => uiRoot
-        });
-      }
-      void import_antd.message.open({ type, content });
     } catch {
     }
   }
@@ -4027,11 +4484,11 @@ function buildAgentWsUrl(apiBaseUrl, apiKey) {
 }
 
 // src/core/editor/agent-bridge-internals/errors.ts
-function mapIntegrationErrorMessage(code, message3) {
+function mapIntegrationErrorMessage(code, message) {
   if (code === "FRONTEND_NOT_ONLINE") {
     return AGENT_PAGE_OFFLINE_MESSAGE;
   }
-  const normalizedMessage = typeof message3 === "string" ? message3.trim() : "";
+  const normalizedMessage = typeof message === "string" ? message.trim() : "";
   if (normalizedMessage) {
     return normalizedMessage;
   }
@@ -4040,27 +4497,27 @@ function mapIntegrationErrorMessage(code, message3) {
   }
   return "AI \u96C6\u6210\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002";
 }
-function mapAgentErrorMessage(message3) {
-  const normalizedMessage = typeof message3 === "string" ? message3.trim() : "";
+function mapAgentErrorMessage(message) {
+  const normalizedMessage = typeof message === "string" ? message.trim() : "";
   if (normalizedMessage) {
     return normalizedMessage;
   }
   return "AI \u6267\u884C\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002";
 }
-function readAgentErrorCode(message3) {
-  if (typeof message3.errorCode === "string" && message3.errorCode.trim()) {
-    return message3.errorCode.trim();
+function readAgentErrorCode(message) {
+  if (typeof message.errorCode === "string" && message.errorCode.trim()) {
+    return message.errorCode.trim();
   }
-  if (typeof message3.payload?.code === "string" && message3.payload.code.trim()) {
-    return message3.payload.code.trim();
+  if (typeof message.payload?.code === "string" && message.payload.code.trim()) {
+    return message.payload.code.trim();
   }
-  if (typeof message3.result?.errorCode === "string" && message3.result.errorCode.trim()) {
-    return message3.result.errorCode.trim();
+  if (typeof message.result?.errorCode === "string" && message.result.errorCode.trim()) {
+    return message.result.errorCode.trim();
   }
   return null;
 }
-function createBridgeError(message3, options = {}) {
-  const error = new Error(message3);
+function createBridgeError(message, options = {}) {
+  const error = new Error(message);
   error.code = options.code;
   error.silentToast = options.silentToast;
   return error;
@@ -4305,8 +4762,8 @@ function pickMostRecentFrontendClient(clients) {
     return rightTimestamp - leftTimestamp;
   })[0] ?? null;
 }
-function readFrontendClients(message3) {
-  const payload = message3.payload;
+function readFrontendClients(message) {
+  const payload = message.payload;
   if (!payload || typeof payload !== "object") return [];
   const frontend = payload.frontend;
   if (!isMessageRecord(frontend)) return [];
@@ -4324,8 +4781,8 @@ function readFrontendClients(message3) {
     }] : [];
   });
 }
-function readFrontendConnected(message3, targetClientId) {
-  const payload = message3.payload;
+function readFrontendConnected(message, targetClientId) {
+  const payload = message.payload;
   if (!payload || typeof payload !== "object") return false;
   const frontend = payload.frontend;
   if (!isMessageRecord(frontend)) return false;
@@ -4333,7 +4790,7 @@ function readFrontendConnected(message3, targetClientId) {
   if (typeof connected === "boolean") {
     return connected;
   }
-  const clients = readFrontendClients(message3);
+  const clients = readFrontendClients(message);
   const normalizedTargetClientId = normalizeString2(targetClientId);
   if (!normalizedTargetClientId) {
     return clients.length > 0;
@@ -4362,9 +4819,9 @@ function pickPreferredEditorClientForContext(items, targetCandidates, context) {
   }
   return pickPreferredEditorClient(items, []);
 }
-function readProjectPathFromAgentMessage(message3) {
+function readProjectPathFromAgentMessage(message) {
   return normalizeString2(
-    message3.projectPath ?? message3.result?.projectPath ?? message3.payload?.projectPath
+    message.projectPath ?? message.result?.projectPath ?? message.payload?.projectPath
   );
 }
 function createAgentBridgeService(options) {
@@ -4964,20 +5421,20 @@ function createAgentBridgeService(options) {
     };
     return setConversationState(scopeKey, nextConversation);
   }
-  function logInfo(message3, detail) {
-    void message3;
+  function logInfo(message, detail) {
+    void message;
     void detail;
   }
-  function logDebug(message3, detail) {
-    void message3;
+  function logDebug(message, detail) {
+    void message;
     void detail;
   }
-  function logWarn(message3, detail) {
+  function logWarn(message, detail) {
     if (detail === void 0) {
-      console.warn(`${AGENT_BRIDGE_LOG_PREFIX} ${message3}`);
+      console.warn(`${AGENT_BRIDGE_LOG_PREFIX} ${message}`);
       return;
     }
-    console.warn(`${AGENT_BRIDGE_LOG_PREFIX} ${message3}`, detail);
+    console.warn(`${AGENT_BRIDGE_LOG_PREFIX} ${message}`, detail);
   }
   function notifyStatusChange() {
     options.onAvailabilityChange?.(available);
@@ -5313,26 +5770,35 @@ function createAgentBridgeService(options) {
     const id = sanitizePromptImageAssetBaseName(image.id, `image-${index + 1}`);
     return `prototype-comment-assets/${id}.${inferPromptImageExtension(image.mimeType, image.name)}`;
   }
-  function appendPromptImageAssetPathsToMessage(message3, assetPaths) {
-    const paths = collectUniqueStrings(...assetPaths);
-    const missingPaths = paths.filter((assetPath) => !message3.includes(assetPath));
-    if (missingPaths.length === 0) return message3;
+  function appendPromptImageAssetPathsToMessage(message, images) {
+    const userPaths = collectUniqueStrings(
+      ...images.filter((image) => image.source !== "target-screenshot").map((image) => normalizeString2(image.assetPath))
+    ).filter((assetPath) => !message.includes(assetPath));
+    const targetPath = [...images].reverse().find((image) => image.source === "target-screenshot")?.assetPath;
+    const missingTargetPath = targetPath && !message.includes(targetPath) ? targetPath : "";
+    if (userPaths.length === 0 && !missingTargetPath) return message;
     return [
-      message3,
+      message,
       "",
-      "\u672C\u5730\u56FE\u7247\u7D20\u6750:",
-      ...missingPaths.map((assetPath) => `- ${assetPath}`)
+      ...userPaths.length > 0 ? ["\u672C\u5730\u56FE\u7247\u7D20\u6750:", ...userPaths.map((assetPath) => `- ${assetPath}`)] : [],
+      ...missingTargetPath ? [`\u76EE\u6807\u622A\u56FE\uFF08\u7528\u4E8E\u7CBE\u786E\u5B9A\u4F4D\u5F53\u524D\u6279\u6CE8\u5143\u7D20\uFF09\uFF1A${missingTargetPath}`] : []
     ].join("\n");
   }
   function collectPromptImagesForElements(elements) {
     return elements.flatMap(
-      (element) => options.changes.getImagesForElement(element).slice(0, 3).map((image, index) => ({
-        name: image.name,
-        data: image.data,
-        mimeType: image.mimeType,
-        size: image.size,
-        assetPath: inferPromptImageAssetPath2(image, index)
-      }))
+      (element) => (() => {
+        const images = options.changes.getImagesForElement(element);
+        const userImages = images.filter((image) => image.source !== "target-screenshot").slice(0, 3);
+        const targetScreenshot = [...images].reverse().find((image) => image.source === "target-screenshot");
+        return [...userImages, ...targetScreenshot ? [targetScreenshot] : []].map((image, index) => ({
+          name: image.name,
+          data: image.data,
+          mimeType: image.mimeType,
+          size: image.size,
+          ...image.source === "target-screenshot" ? { source: image.source } : {},
+          assetPath: inferPromptImageAssetPath2(image, index)
+        }));
+      })()
     );
   }
   function isTaskRunning(task) {
@@ -5371,6 +5837,7 @@ function createAgentBridgeService(options) {
     const selected = state2.selectedElement;
     if (selected && selected !== taskRoot && isWithinTaskSubtree(selected, taskRoot)) {
       state2.selectedElement = taskRoot;
+      state2.initialSelectionElement = taskRoot;
       state2.positionTracker?.setSelectionElement(taskRoot);
       state2.breadcrumbs?.setTarget(taskRoot);
       state2.propertyPanel?.setTarget(taskRoot);
@@ -6111,11 +6578,11 @@ function createAgentBridgeService(options) {
     pendingRequests.delete(requestId);
     pending.resolve();
   }
-  function rejectAllPendingRequests(message3) {
+  function rejectAllPendingRequests(message) {
     for (const [requestId, pending] of pendingRequests.entries()) {
       window.clearTimeout(pending.timeoutId);
       resetLinkedAbortRequest(requestId, pending);
-      pending.reject(createBridgeError(message3));
+      pending.reject(createBridgeError(message));
       pendingRequests.delete(requestId);
     }
   }
@@ -6147,12 +6614,12 @@ function createAgentBridgeService(options) {
       });
     });
   }
-  function sendSocketMessage(message3) {
+  function sendSocketMessage(message) {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       throw new Error(AGENT_BRIDGE_NOT_CONNECTED_ERROR);
     }
-    logDebug("Sending WS message", message3);
-    socket.send(JSON.stringify(message3));
+    logDebug("Sending WS message", message);
+    socket.send(JSON.stringify(message));
   }
   function scheduleReconnect() {
     if (!active || !hasRequiredConfig() || reconnectTimerId !== null) return;
@@ -6668,11 +7135,11 @@ function createAgentBridgeService(options) {
     }
     if (parsed.type === "integration.error") {
       const payload = parsed.payload;
-      const message3 = mapIntegrationErrorMessage(payload?.code, payload?.message);
+      const message = mapIntegrationErrorMessage(payload?.code, payload?.message);
       logWarn("Received integration error", {
         requestId: parsed.requestId,
         code: payload?.code,
-        message: message3,
+        message,
         payload
       });
       if (parsed.requestId === probeRequestId) {
@@ -6682,7 +7149,7 @@ function createAgentBridgeService(options) {
         scheduleProbeRetry(String(payload?.code ?? "integration_error"));
       }
       if (parsed.requestId) {
-        rejectPendingRequest(parsed.requestId, message3, payload?.code);
+        rejectPendingRequest(parsed.requestId, message, payload?.code);
       }
     }
   }
@@ -7079,9 +7546,9 @@ function createAgentBridgeService(options) {
         mode
       });
     } catch (error) {
-      const message3 = error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : String(error);
       logWarn("Failed to sync comment comments to Agent context", {
-        message: message3,
+        message,
         integrationChannel,
         targetClientId,
         mode
@@ -7130,13 +7597,13 @@ function createAgentBridgeService(options) {
       });
       options.feedback.toast("success", "\u5DF2\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD\u3002");
     } catch (error) {
-      const message3 = error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : String(error);
       logWarn("Failed to send selected element context", {
-        message: message3,
+        message,
         integrationChannel,
         targetClientId
       });
-      options.feedback.toast("error", `\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD\u5931\u8D25\uFF1A${message3}`);
+      options.feedback.toast("error", `\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD\u5931\u8D25\uFF1A${message}`);
     }
   }
   function resolveAgentRunConcurrency() {
@@ -7148,10 +7615,9 @@ function createAgentBridgeService(options) {
     const { element, prompt, scopeKey, reusableConversation, effectiveProvider } = params;
     const meta = resolveElementTaskMeta(element);
     const promptImages = collectPromptImagesForElements([element]);
-    const promptImageAssetPaths = promptImages.map((image) => normalizeString2(image.assetPath)).filter(Boolean);
     const messageWithImageAssets = appendPromptImageAssetPathsToMessage(
       prompt,
-      promptImageAssetPaths
+      promptImages
     );
     const sessionIdToReuse = reusableConversation?.sessionId ?? null;
     const startedAt = params.startedAt ?? Date.now();
@@ -7358,22 +7824,22 @@ function createAgentBridgeService(options) {
         }
       );
     } catch (error) {
-      const message3 = error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : String(error);
       if (isSilentBridgeError(error)) {
         logInfo("Prompt send ended without toast", {
-          message: message3,
+          message,
           integrationChannel,
           targetClientId
         });
       } else {
         logWarn("Failed to send prompt to Agent", {
-          message: message3,
+          message,
           integrationChannel,
           targetClientId
         });
       }
       if (!isSilentBridgeError(error)) {
-        options.feedback.toast("error", `\u53D1\u9001\u7ED9 AI \u5931\u8D25\uFF1A${message3}`);
+        options.feedback.toast("error", `\u53D1\u9001\u7ED9 AI \u5931\u8D25\uFF1A${message}`);
       }
       throw error;
     }
@@ -7461,13 +7927,13 @@ function createAgentBridgeService(options) {
     try {
       await request;
     } catch (error) {
-      const message3 = error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : String(error);
       logWarn("Failed to interrupt Agent prompt run", {
-        message: message3,
+        message,
         integrationChannel,
         targetClientId
       });
-      options.feedback.toast("error", `\u4E2D\u65AD AI \u6267\u884C\u5931\u8D25\uFF1A${message3}`);
+      options.feedback.toast("error", `\u4E2D\u65AD AI \u6267\u884C\u5931\u8D25\uFF1A${message}`);
       throw error;
     }
   }
@@ -7596,8 +8062,8 @@ var EDITOR_CAPABILITIES = [
   "editor.editing.set"
 ];
 var IntegrationProtocolError = class extends Error {
-  constructor(code, message3) {
-    super(message3);
+  constructor(code, message) {
+    super(message);
     this.code = code;
   }
 };
@@ -7667,14 +8133,14 @@ function mapError(error) {
   if (error instanceof IntegrationProtocolError) {
     return error;
   }
-  const message3 = error instanceof Error ? error.message : String(error);
-  if (message3.startsWith("NOT_FOUND:")) {
-    return new IntegrationProtocolError("NOT_FOUND", message3.replace(/^NOT_FOUND:\s*/, ""));
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.startsWith("NOT_FOUND:")) {
+    return new IntegrationProtocolError("NOT_FOUND", message.replace(/^NOT_FOUND:\s*/, ""));
   }
-  if (message3.startsWith("NOT_IMPLEMENTED:")) {
-    return new IntegrationProtocolError("NOT_IMPLEMENTED", message3.replace(/^NOT_IMPLEMENTED:\s*/, ""));
+  if (message.startsWith("NOT_IMPLEMENTED:")) {
+    return new IntegrationProtocolError("NOT_IMPLEMENTED", message.replace(/^NOT_IMPLEMENTED:\s*/, ""));
   }
-  return new IntegrationProtocolError("INTERNAL_ERROR", message3 || "Unknown integration failure");
+  return new IntegrationProtocolError("INTERNAL_ERROR", message || "Unknown integration failure");
 }
 function matchesStatusAlias(item, alias) {
   if (alias === "dirty") return item.changeState === "dirty";
@@ -7740,19 +8206,19 @@ function createEditorIntegrationWsService(options) {
       connectSocket();
     }, delayMs);
   }
-  function sendMessage(message3) {
+  function sendMessage(message) {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       throw new IntegrationProtocolError("INTERNAL_ERROR", "Integration WebSocket is not connected");
     }
-    socket.send(JSON.stringify(message3));
+    socket.send(JSON.stringify(message));
   }
-  function sendError(requestId, code, message3) {
+  function sendError(requestId, code, message) {
     sendMessage({
       type: "integration.error",
       requestId,
       payload: {
         code,
-        message: message3
+        message
       }
     });
   }
@@ -7772,9 +8238,9 @@ function createEditorIntegrationWsService(options) {
       throw new IntegrationProtocolError("INVALID_PAYLOAD", "requestId is required");
     }
   }
-  async function handleEditorSnapshotRequest(message3) {
-    const requestId = String(message3.requestId ?? "").trim();
-    const payload = message3.payload ?? {};
+  async function handleEditorSnapshotRequest(message) {
+    const requestId = String(message.requestId ?? "").trim();
+    const payload = message.payload ?? {};
     validateTarget(payload, requestId);
     sendMessage({
       type: "integration.editor.snapshot.result",
@@ -7782,9 +8248,9 @@ function createEditorIntegrationWsService(options) {
       payload: options.getEditedSnapshotPayload()
     });
   }
-  async function handleEditorNodesListRequest(message3) {
-    const requestId = String(message3.requestId ?? "").trim();
-    const payload = message3.payload ?? {};
+  async function handleEditorNodesListRequest(message) {
+    const requestId = String(message.requestId ?? "").trim();
+    const payload = message.payload ?? {};
     validateTarget(payload, requestId);
     const status = normalizeStatusAliases(payload.status);
     const elementKey = hasText(payload.elementKey) ? payload.elementKey.trim() : null;
@@ -7809,9 +8275,9 @@ function createEditorIntegrationWsService(options) {
       }
     });
   }
-  async function handleEditorNodeScreenshotRequest(message3) {
-    const requestId = String(message3.requestId ?? "").trim();
-    const payload = message3.payload ?? {};
+  async function handleEditorNodeScreenshotRequest(message) {
+    const requestId = String(message.requestId ?? "").trim();
+    const payload = message.payload ?? {};
     validateTarget(payload, requestId);
     const elementKey = hasText(payload.elementKey) ? payload.elementKey.trim() : "";
     if (!elementKey) {
@@ -7823,9 +8289,9 @@ function createEditorIntegrationWsService(options) {
       payload: await options.getNodeScreenshotPayload(elementKey)
     });
   }
-  async function handleEditorContextImagesRequest(message3) {
-    const requestId = String(message3.requestId ?? "").trim();
-    const payload = message3.payload ?? {};
+  async function handleEditorContextImagesRequest(message) {
+    const requestId = String(message.requestId ?? "").trim();
+    const payload = message.payload ?? {};
     validateTarget(payload, requestId);
     sendMessage({
       type: "integration.editor.context-images.result",
@@ -7833,9 +8299,9 @@ function createEditorIntegrationWsService(options) {
       payload: options.getContextImagesPayload()
     });
   }
-  async function handleEditorEditingSetRequest(message3) {
-    const requestId = String(message3.requestId ?? "").trim();
-    const payload = message3.payload ?? {};
+  async function handleEditorEditingSetRequest(message) {
+    const requestId = String(message.requestId ?? "").trim();
+    const payload = message.payload ?? {};
     validateTarget(payload, requestId);
     const elementKey = hasText(payload.elementKey) ? payload.elementKey.trim() : "";
     if (!elementKey) {
@@ -7860,29 +8326,29 @@ function createEditorIntegrationWsService(options) {
       )
     });
   }
-  async function dispatchMessage(message3) {
+  async function dispatchMessage(message) {
     try {
-      if (message3.type === "integration.editor.snapshot.get") {
-        await handleEditorSnapshotRequest(message3);
+      if (message.type === "integration.editor.snapshot.get") {
+        await handleEditorSnapshotRequest(message);
         return;
       }
-      if (message3.type === "integration.editor.nodes.list") {
-        await handleEditorNodesListRequest(message3);
+      if (message.type === "integration.editor.nodes.list") {
+        await handleEditorNodesListRequest(message);
         return;
       }
-      if (message3.type === "integration.editor.node.screenshot.get") {
-        await handleEditorNodeScreenshotRequest(message3);
+      if (message.type === "integration.editor.node.screenshot.get") {
+        await handleEditorNodeScreenshotRequest(message);
         return;
       }
-      if (message3.type === "integration.editor.context-images.get") {
-        await handleEditorContextImagesRequest(message3);
+      if (message.type === "integration.editor.context-images.get") {
+        await handleEditorContextImagesRequest(message);
         return;
       }
-      if (message3.type === "integration.editor.editing.set") {
-        await handleEditorEditingSetRequest(message3);
+      if (message.type === "integration.editor.editing.set") {
+        await handleEditorEditingSetRequest(message);
       }
     } catch (error) {
-      const requestId = String(message3.requestId ?? "").trim();
+      const requestId = String(message.requestId ?? "").trim();
       if (!requestId) return;
       const mappedError = mapError(error);
       sendError(requestId, mappedError.code, mappedError.message);
@@ -8109,6 +8575,7 @@ function createInteractionService(options) {
     state2.pendingHoverTransition = shouldAnimate;
     state2.positionTracker?.setHoverElement(element);
     state2.positionTracker?.forceUpdate();
+    if (prevElement !== element) options.onHoverChange?.();
   }
   function closeAnnotationBridgeSelection(nextTarget) {
     const selection = state2.annotationBridgeSelection;
@@ -8119,9 +8586,9 @@ function createInteractionService(options) {
     selection.bridge.closeTarget(selection.target);
     state2.annotationBridgeSelection = null;
   }
-  function selectResolvedElement(element, modifiers, selectionAnchor) {
-    if (agentBridge.isElementInteractionLocked(element)) {
-      return;
+  function selectResolvedElement(element, modifiers, selectionAnchor, initialSelectionElement) {
+    if (!element.isConnected || agentBridge.isElementInteractionLocked(element)) {
+      return false;
     }
     if (state2.activeTextComment) {
       state2.activeTextComment = null;
@@ -8134,6 +8601,7 @@ function createInteractionService(options) {
     }
     options.changes.rememberSelectionAnchor(element, selectionAnchor);
     state2.selectedElement = element;
+    state2.initialSelectionElement = initialSelectionElement ?? element;
     state2.hoveredElement = null;
     state2.positionTracker?.setHoverElement(null);
     state2.positionTracker?.setSelectionElement(element);
@@ -8144,10 +8612,17 @@ function createInteractionService(options) {
     state2.handlesController?.setTarget(element);
     state2.parentSelectController?.setTarget(element);
     options.onStatusChange?.();
+    options.onSelectionChange?.();
     const modInfo = modifiers.alt ? " (Alt: drill-up)" : "";
     console.log(`${options.logPrefix} Selected${modInfo}:`, element.tagName, element);
+    return true;
   }
-  async function handleSelect(element, modifiers, selectionAnchor) {
+  function activatePageTarget(element, selectionAnchor) {
+    if (!element.isConnected || agentBridge.isElementInteractionLocked(element)) return false;
+    closeAnnotationBridgeSelection(element);
+    return selectResolvedElement(element, DEFAULT_MODIFIERS, selectionAnchor);
+  }
+  async function handleSelect(element, modifiers, selectionAnchor, initialSelectionElement) {
     if (agentBridge.isElementInteractionLocked(element)) {
       return;
     }
@@ -8156,11 +8631,16 @@ function createInteractionService(options) {
       if (!bridgeSelection) return;
       closeAnnotationBridgeSelection(bridgeSelection.target);
       state2.annotationBridgeSelection = bridgeSelection;
-      selectResolvedElement(bridgeSelection.target, modifiers);
+      selectResolvedElement(
+        bridgeSelection.target,
+        modifiers,
+        void 0,
+        initialSelectionElement
+      );
       return;
     }
     closeAnnotationBridgeSelection(element);
-    selectResolvedElement(element, modifiers, selectionAnchor);
+    selectResolvedElement(element, modifiers, selectionAnchor, initialSelectionElement);
   }
   function handleDeselect() {
     closeAnnotationBridgeSelection(null);
@@ -8182,10 +8662,12 @@ function createInteractionService(options) {
       state2.handlesController?.setTarget(null);
       state2.parentSelectController?.setTarget(null);
       options.onStatusChange?.();
+      options.onSelectionChange?.();
       console.log(`${options.logPrefix} Deselected`);
       return;
     }
     state2.selectedElement = null;
+    state2.initialSelectionElement = null;
     options.changes.clearPendingSelectionAnchor();
     state2.positionTracker?.setSelectionElement(null);
     state2.positionTracker?.forceUpdate();
@@ -8195,6 +8677,7 @@ function createInteractionService(options) {
     state2.handlesController?.setTarget(null);
     state2.parentSelectController?.setTarget(null);
     options.onStatusChange?.();
+    options.onSelectionChange?.();
     console.log(`${options.logPrefix} Deselected`);
   }
   function handlePositionUpdate(rects) {
@@ -8231,7 +8714,7 @@ function createInteractionService(options) {
     options.changes.syncEditMetaWithTransactions();
     state2.propertyPanel?.setHistory(undoCount, redoCount);
     state2.breadcrumbs?.refresh();
-    if (action === "undo" || action === "redo") {
+    if (action === "undo" || action === "redo" || action === "restore") {
       state2.propertyPanel?.refresh();
     }
     state2.positionTracker?.forceUpdate(true);
@@ -8439,6 +8922,7 @@ function createInteractionService(options) {
       offsetY
     });
     state2.selectedElement = null;
+    state2.initialSelectionElement = null;
     state2.selectionAnchor = markerAnchor;
     state2.hoveredElement = null;
     state2.activeTextComment = comment;
@@ -8469,6 +8953,7 @@ function createInteractionService(options) {
   }
   return {
     handleHover,
+    activatePageTarget,
     handleSelect,
     handleDeselect,
     handlePositionUpdate,
@@ -8559,10 +9044,31 @@ var Disposer = class {
   }
 };
 
+// src/ui/csp-nonce.ts
+function resolveCspNonce(ownerDocument) {
+  const documentRef = ownerDocument ?? (typeof document !== "undefined" ? document : null);
+  if (!documentRef) return void 0;
+  const metaNonce = typeof documentRef.querySelector === "function" ? documentRef.querySelector('meta[name="csp-nonce"], meta[property="csp-nonce"]')?.getAttribute("content")?.trim() : void 0;
+  if (metaNonce) return metaNonce;
+  if (typeof documentRef.querySelectorAll === "function") {
+    for (const element of Array.from(documentRef.querySelectorAll("style"))) {
+      const nonce = element.nonce?.trim();
+      if (nonce) return nonce;
+    }
+  }
+  if (typeof documentRef.querySelectorAll === "function") {
+    for (const element of Array.from(documentRef.querySelectorAll("script"))) {
+      const nonce = element.nonce?.trim();
+      if (nonce) return nonce;
+    }
+  }
+  return void 0;
+}
+
 // src/ui/shadow-host.ts
 var SHADOW_HOST_FOCUS_TRAP_SELECTORS = [
   ".ant-modal-wrap",
-  '[role="dialog"][aria-modal="true"]',
+  '[role="dialog"]',
   '[aria-modal="true"]',
   "dialog[open]"
 ].join(", ");
@@ -8570,15 +9076,62 @@ function getDefaultMountPoint() {
   return document.documentElement ?? document.body;
 }
 function resolveShadowHostMountContainer(anchorElement) {
-  if (!(anchorElement instanceof Element) || !anchorElement.isConnected) return null;
-  const container = anchorElement.closest(SHADOW_HOST_FOCUS_TRAP_SELECTORS);
-  return container instanceof HTMLElement ? container : null;
+  if (typeof document === "undefined" || typeof Element === "undefined") return null;
+  if (anchorElement instanceof Element && anchorElement.isConnected) {
+    const container = anchorElement.closest(SHADOW_HOST_FOCUS_TRAP_SELECTORS);
+    if (container instanceof HTMLElement && isOpenFocusTrapContainer(container)) {
+      return container;
+    }
+  }
+  return findOpenFocusTrapContainer();
+}
+function isOpenFocusTrapContainer(element) {
+  if (!element.isConnected) return false;
+  if (element.matches("dialog") && !element.hasAttribute("open")) return false;
+  if (element.getAttribute("data-state") === "closed") return false;
+  if (element.getAttribute("aria-hidden") === "true") return false;
+  try {
+    const style = typeof window !== "undefined" ? window.getComputedStyle(element) : null;
+    if (!style) return true;
+    if (style.display === "none" || style.visibility === "hidden") return false;
+  } catch {
+  }
+  return true;
+}
+function findOpenFocusTrapContainer() {
+  if (typeof document === "undefined") return null;
+  let activeContainer = null;
+  try {
+    const candidates = document.querySelectorAll(SHADOW_HOST_FOCUS_TRAP_SELECTORS);
+    for (const candidate of candidates) {
+      if (candidate instanceof HTMLElement && isOpenFocusTrapContainer(candidate)) {
+        activeContainer = candidate;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return activeContainer;
+}
+function mutationTouchesFocusTrap(record) {
+  if (record.type === "attributes") {
+    return record.target instanceof Element && record.target.matches(SHADOW_HOST_FOCUS_TRAP_SELECTORS);
+  }
+  if (record.type !== "childList") return false;
+  const nodes = [record.target, ...Array.from(record.addedNodes), ...Array.from(record.removedNodes)];
+  return nodes.some((node) => {
+    if (!(node instanceof Element)) return false;
+    return node.matches(SHADOW_HOST_FOCUS_TRAP_SELECTORS) || node.querySelector(SHADOW_HOST_FOCUS_TRAP_SELECTORS) !== null;
+  });
 }
 var SHADOW_HOST_STYLES = (
   /* css */
   `
   :host {
-    all: initial;
+    /* Keep the component boundary explicit even when the host is mounted in a
+     * page that has a global reset (for example universal/body rules). The inline
+     * reset below wins over document-level author rules on the host itself. */
+    all: initial !important;
 
     /* Shared overlay tokens */
     --we-surface-bg: #0a0a0a;
@@ -9165,6 +9718,8 @@ function mountShadowHost(_options = {}) {
   const disposer = new Disposer();
   let elements = null;
   let currentMountParent = null;
+  let currentAnchorElement = null;
+  let mountSyncQueued = false;
   const existing = document.getElementById(WEB_EDITOR_V2_HOST_ID);
   if (existing) {
     try {
@@ -9176,6 +9731,8 @@ function mountShadowHost(_options = {}) {
   host.id = WEB_EDITOR_V2_HOST_ID;
   host.classList.add("data-fullscreen-prevent-event-capture");
   host.setAttribute("data-mcp-web-editor", "v2");
+  setImportantStyle(host, "all", "initial");
+  setImportantStyle(host, "display", "block");
   setImportantStyle(host, "position", "fixed");
   setImportantStyle(host, "inset", "0");
   setImportantStyle(host, "z-index", String(WEB_EDITOR_V2_Z_INDEX));
@@ -9189,6 +9746,8 @@ function mountShadowHost(_options = {}) {
   }
   const shadowRoot = host.attachShadow({ mode: "open" });
   const styleEl = document.createElement("style");
+  const cspNonce = resolveCspNonce(document);
+  if (cspNonce) styleEl.nonce = cspNonce;
   styleEl.textContent = SHADOW_HOST_STYLES;
   shadowRoot.append(styleEl);
   const overlayRoot = document.createElement("div");
@@ -9204,8 +9763,44 @@ function mountShadowHost(_options = {}) {
     nextMountParent.append(host);
     currentMountParent = nextMountParent;
   };
+  const scheduleMountSync = () => {
+    if (mountSyncQueued) return;
+    mountSyncQueued = true;
+    Promise.resolve().then(() => {
+      mountSyncQueued = false;
+      if (disposer.isDisposed) return;
+      ensureMountedAt(currentAnchorElement);
+    });
+  };
   ensureMountedAt(null);
   disposer.add(() => host.remove());
+  if (typeof MutationObserver !== "undefined") {
+    const mutationRoot = document.body ?? document.documentElement;
+    if (mutationRoot) {
+      disposer.observeMutation(
+        mutationRoot,
+        (records) => {
+          const shouldSync = records.some(mutationTouchesFocusTrap);
+          if (shouldSync) scheduleMountSync();
+        },
+        {
+          subtree: true,
+          childList: true,
+          attributes: true,
+          attributeFilter: [
+            "aria-hidden",
+            "aria-modal",
+            "class",
+            "data-open",
+            "data-state",
+            "hidden",
+            "open",
+            "style"
+          ]
+        }
+      );
+    }
+  }
   elements = { host, shadowRoot, overlayRoot, uiRoot };
   const blockedEvents = [
     "pointerdown",
@@ -9241,7 +9836,7 @@ function mountShadowHost(_options = {}) {
     disposer.listen(uiRoot, eventType, stopPropagation);
     disposer.listen(overlayRoot, eventType, stopPropagation);
   }
-  const isOverlayElement = (node) => {
+  const isOverlayElement2 = (node) => {
     if (!(node instanceof Node)) return false;
     if (node === host) return true;
     const root = typeof node.getRootNode === "function" ? node.getRootNode() : null;
@@ -9250,18 +9845,19 @@ function mountShadowHost(_options = {}) {
   const isEventFromUi = (event) => {
     try {
       if (typeof event.composedPath === "function") {
-        return event.composedPath().some((el) => isOverlayElement(el));
+        return event.composedPath().some((el) => isOverlayElement2(el));
       }
     } catch {
     }
-    return isOverlayElement(event.target);
+    return isOverlayElement2(event.target);
   };
   return {
     getElements: () => elements,
     setMountContainer: (anchorElement) => {
+      currentAnchorElement = anchorElement instanceof Element && anchorElement.isConnected ? anchorElement : null;
       ensureMountedAt(anchorElement);
     },
-    isOverlayElement,
+    isOverlayElement: isOverlayElement2,
     isEventFromUi,
     dispose: () => {
       elements = null;
@@ -9273,7 +9869,7 @@ function mountShadowHost(_options = {}) {
 // src/ui/runtime/create-web-editor-ui-runtime.tsx
 var import_react21 = __toESM(require("react"));
 var import_client = require("react-dom/client");
-var import_antd11 = require("antd");
+var import_antd10 = require("antd");
 var import_cssinjs = require("@ant-design/cssinjs");
 
 // src/ui/runtime/runtime-shell.tsx
@@ -11214,7 +11810,9 @@ var promptCardStyle = {
   position: "fixed",
   zIndex: POPUP_LAYER_Z_INDEX + 10,
   width: PROMPT_CARD_WIDTH,
-  maxWidth: "calc(100vw - 24px)",
+  minWidth: 0,
+  maxWidth: "min(420px, calc(100vw - 24px))",
+  maxHeight: "min(640px, calc(100vh - 120px))",
   padding: 10,
   borderRadius: 14,
   background: EDITOR_CHROME.surfaceOverlay,
@@ -11991,6 +12589,112 @@ async function prepareElementForScreenshot(rootElement) {
   await waitForPaint(2);
   await new Promise((resolve) => window.setTimeout(resolve, SCREENSHOT_SETTLE_DELAY_MS));
 }
+function isFinitePositive(value) {
+  return Number.isFinite(value) && value > 0;
+}
+function calculateTargetScreenshotBounds(targetRect, viewportWidth, viewportHeight) {
+  if (!isFinitePositive(targetRect.width) || !isFinitePositive(targetRect.height) || !isFinitePositive(viewportWidth) || !isFinitePositive(viewportHeight)) {
+    return null;
+  }
+  const visibleLeft = Math.max(0, targetRect.left);
+  const visibleTop = Math.max(0, targetRect.top);
+  const visibleRight = Math.min(viewportWidth, targetRect.right);
+  const visibleBottom = Math.min(viewportHeight, targetRect.bottom);
+  if (visibleRight <= visibleLeft || visibleBottom <= visibleTop) return null;
+  const padding = Math.max(32, Math.min(targetRect.width, targetRect.height) * 0.08);
+  const captureLeft = Math.max(0, targetRect.left - padding);
+  const captureTop = Math.max(0, targetRect.top - padding);
+  const captureRight = Math.min(viewportWidth, targetRect.right + padding);
+  const captureBottom = Math.min(viewportHeight, targetRect.bottom + padding);
+  return {
+    captureRect: {
+      left: captureLeft,
+      top: captureTop,
+      width: captureRight - captureLeft,
+      height: captureBottom - captureTop
+    },
+    targetRect: {
+      left: visibleLeft - captureLeft,
+      top: visibleTop - captureTop,
+      width: visibleRight - visibleLeft,
+      height: visibleBottom - visibleTop
+    }
+  };
+}
+async function captureTargetContextScreenshot(element, options = {}) {
+  if (!(element instanceof HTMLElement || element instanceof SVGElement)) {
+    throw new Error("\u5F53\u524D\u5143\u7D20\u4E0D\u652F\u6301\u622A\u56FE\u3002");
+  }
+  const rootElement = document.documentElement;
+  if (!(rootElement instanceof HTMLElement)) {
+    throw new Error("\u5F53\u524D\u9875\u9762\u4E0D\u652F\u6301\u622A\u56FE\u3002");
+  }
+  const bounds = calculateTargetScreenshotBounds(
+    element.getBoundingClientRect(),
+    window.innerWidth,
+    window.innerHeight
+  );
+  if (!bounds) {
+    throw new Error("\u5F53\u524D\u5143\u7D20\u4E0D\u5728\u53EF\u622A\u56FE\u533A\u57DF\u5185\u3002");
+  }
+  const width = roundDimension(bounds.captureRect.width);
+  const height = roundDimension(bounds.captureRect.height);
+  const pixelRatio = Math.max(1, Math.min(2, window.devicePixelRatio || 2));
+  const backgroundColor = resolveScreenshotBackgroundColor(element);
+  const restoreImageUrls = rewriteElementImageUrlsForScreenshot(rootElement);
+  const render = options.render ?? (async (node, renderOptions) => {
+    const htmlToImage = await import("html-to-image");
+    return htmlToImage.toCanvas(node, renderOptions);
+  });
+  try {
+    await prepareElementForScreenshot(rootElement);
+    const canvas = await render(rootElement, {
+      width,
+      height,
+      canvasWidth: width,
+      canvasHeight: height,
+      pixelRatio,
+      skipAutoScale: true,
+      backgroundColor,
+      skipFonts: false,
+      cacheBust: false,
+      includeQueryParams: true,
+      filter: (node) => !options.isEditorUi?.(node),
+      style: {
+        width: `${Math.max(rootElement.scrollWidth, window.innerWidth)}px`,
+        height: `${Math.max(rootElement.scrollHeight, window.innerHeight)}px`,
+        transform: `translate(-${window.scrollX + bounds.captureRect.left}px, -${window.scrollY + bounds.captureRect.top}px)`,
+        transformOrigin: "top left",
+        margin: "0"
+      }
+    });
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("\u65E0\u6CD5\u7ED8\u5236\u76EE\u6807\u5143\u7D20\u9009\u4E2D\u6846\u3002");
+    const lineWidth = WEB_EDITOR_V2_SELECTION_LINE_WIDTH;
+    const inset = lineWidth / 2;
+    context.save();
+    context.scale(pixelRatio, pixelRatio);
+    context.beginPath();
+    context.strokeStyle = WEB_EDITOR_V2_COLORS.selected;
+    context.lineWidth = lineWidth;
+    context.setLineDash([]);
+    context.strokeRect(
+      bounds.targetRect.left + inset,
+      bounds.targetRect.top + inset,
+      Math.max(0, bounds.targetRect.width - lineWidth),
+      Math.max(0, bounds.targetRect.height - lineWidth)
+    );
+    context.restore();
+    return {
+      name: "target-screenshot.png",
+      data: canvas.toDataURL("image/png"),
+      width,
+      height
+    };
+  } finally {
+    restoreImageUrls();
+  }
+}
 async function captureElementScreenshot(element, fileNameHint) {
   if (!(element instanceof HTMLElement || element instanceof SVGElement)) {
     throw new Error("\u5F53\u524D\u5143\u7D20\u4E0D\u652F\u6301\u622A\u56FE\u3002");
@@ -12279,7 +12983,7 @@ function MobileSelectionOverlay(props) {
 }
 
 // src/ui/runtime/prompt-card-view.tsx
-var import_icons4 = require("@ant-design/icons");
+var import_icons5 = require("@ant-design/icons");
 var import_antd5 = require("antd");
 
 // src/ui/prompt-card-position.ts
@@ -12434,11 +13138,12 @@ function getAgentPromptBubbleActionState(options) {
   const canWakeAgent = Boolean(options.canWakeAgent);
   const visualState = options.visualState === "awake" && (connected || pageTaskRunning) ? "awake" : "sleeping";
   const blockReason = options.getSendCurrentElementPromptToAgentBlockReason?.();
-  const title = blockReason ?? (!connected && !canWakeAgent ? "AI \u8FDE\u63A5\u672A\u5EFA\u7ACB\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002" : canAppendToCurrentSession ? "\u7EE7\u7EED\u8FFD\u52A0\u5230\u5F53\u524D AI \u5BF9\u8BDD" : waitingForCurrentSession ? resolveRunningConversationTitle(false) : "\u53D1\u9001\u7ED9 AI");
+  const title = blockReason ?? (currentTaskRunning ? resolveRunningConversationTitle(currentTaskSessionReady) : !connected && !canWakeAgent ? "AI \u8FDE\u63A5\u672A\u5EFA\u7ACB\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002" : canAppendToCurrentSession ? "\u7EE7\u7EED\u8FFD\u52A0\u5230\u5F53\u524D AI \u5BF9\u8BDD" : waitingForCurrentSession ? resolveRunningConversationTitle(false) : "\u53D1\u9001\u7ED9 AI");
   return {
     visible: Boolean(options.onSendCurrentElementPromptToAgent),
-    disabled: !options.onSendCurrentElementPromptToAgent || !connected && !canWakeAgent || waitingForCurrentSession || Boolean(blockReason),
-    loading: Boolean(options.sending),
+    disabled: !options.onSendCurrentElementPromptToAgent || !connected && !canWakeAgent || currentTaskRunning || waitingForCurrentSession || Boolean(blockReason),
+    loading: Boolean(options.sending || currentTaskRunning),
+    dismissBubble: currentTaskRunning,
     title,
     requiresConfirm: false
   };
@@ -12450,8 +13155,6 @@ async function executePromptCardCurrentElementAction(options) {
     currentTarget,
     onConfirmText,
     onConfirmNote,
-    onDismissSelection,
-    onDispatched,
     onSendCurrentElementPromptToAgent
   } = options;
   if (!currentTarget || !onSendCurrentElementPromptToAgent) {
@@ -12459,10 +13162,7 @@ async function executePromptCardCurrentElementAction(options) {
   }
   await onConfirmText();
   await onConfirmNote();
-  const sendPromise = Promise.resolve(onSendCurrentElementPromptToAgent(currentTarget));
-  onDismissSelection?.();
-  onDispatched?.();
-  await sendPromise;
+  await onSendCurrentElementPromptToAgent(currentTarget);
   return true;
 }
 
@@ -12481,23 +13181,74 @@ var import_icons = require("@ant-design/icons");
 // src/ui/runtime/popup-container.ts
 var SELECTION_LOCK_ROOT_SELECTOR = '[data-we-selection-lock-root="true"]';
 var POPUP_ROOT_SELECTOR = `[${WEB_EDITOR_POPUP_ROOT_ATTR}="true"]`;
+var SHADOW_HOST_SELECTOR = "[data-mcp-web-editor]";
+function isDomElement(value) {
+  return Boolean(
+    value && typeof value === "object" && value.nodeType === 1 && typeof value.appendChild === "function"
+  );
+}
 function queryPopupRoot(node) {
-  if (!node || typeof node !== "object" || !("querySelector" in node)) {
+  if (!node || typeof node !== "object" || typeof node.querySelector !== "function") {
     return null;
   }
-  const popupRoot = node.querySelector?.(POPUP_ROOT_SELECTOR);
-  return popupRoot instanceof HTMLElement ? popupRoot : null;
+  const popupRoot = node.querySelector(POPUP_ROOT_SELECTOR);
+  return isDomElement(popupRoot) ? popupRoot : null;
+}
+function queryIsolatedPopupRoot(ownerDocument) {
+  if (typeof ownerDocument.querySelectorAll !== "function") {
+    return null;
+  }
+  for (const host of Array.from(ownerDocument.querySelectorAll(SHADOW_HOST_SELECTOR))) {
+    const shadowRoot = host.shadowRoot;
+    const popupRoot = queryPopupRoot(shadowRoot);
+    if (popupRoot) return popupRoot;
+    const fallbackRoot = shadowRoot?.firstElementChild;
+    if (isDomElement(fallbackRoot)) return fallbackRoot;
+  }
+  return null;
+}
+function isShadowRootNode(node) {
+  return Boolean(
+    node && typeof node === "object" && node.nodeType === 11 && "host" in node
+  );
 }
 function resolveRuntimePopupContainer(trigger) {
-  const ownerDocument = trigger.ownerDocument ?? (typeof document !== "undefined" ? document : null);
+  const ownerDocument = trigger?.ownerDocument ?? (typeof document !== "undefined" ? document : null);
   if (!ownerDocument) {
-    return trigger;
+    if (trigger) return trigger;
+    throw new Error("No isolated popup container available");
   }
-  const popupRoot = trigger.closest(POPUP_ROOT_SELECTOR) ?? queryPopupRoot(typeof trigger.getRootNode === "function" ? trigger.getRootNode() : null) ?? queryPopupRoot(ownerDocument);
-  if (popupRoot instanceof HTMLElement) {
+  if (!trigger) {
+    const isolatedPopupRoot2 = queryIsolatedPopupRoot(ownerDocument);
+    if (isolatedPopupRoot2) return isolatedPopupRoot2;
+    if (typeof ownerDocument.createElement === "function") {
+      return ownerDocument.createElement("div");
+    }
+    throw new Error("No isolated popup container available");
+  }
+  const rootNode = typeof trigger.getRootNode === "function" ? trigger.getRootNode() : null;
+  const popupRoot = trigger.closest(POPUP_ROOT_SELECTOR) ?? queryPopupRoot(rootNode) ?? (isShadowRootNode(rootNode) ? null : queryPopupRoot(ownerDocument));
+  if (popupRoot) {
     return popupRoot;
   }
-  return trigger.closest(SELECTION_LOCK_ROOT_SELECTOR) ?? trigger.parentElement ?? ownerDocument.body ?? trigger;
+  if (isShadowRootNode(rootNode)) {
+    return trigger.parentElement ?? trigger;
+  }
+  const isolatedPopupRoot = queryIsolatedPopupRoot(ownerDocument);
+  if (isolatedPopupRoot) return isolatedPopupRoot;
+  const localContainer = trigger.closest(SELECTION_LOCK_ROOT_SELECTOR) ?? trigger.parentElement;
+  if (localContainer) return localContainer;
+  if (typeof ownerDocument.createElement === "function") {
+    return ownerDocument.createElement("div");
+  }
+  return trigger;
+}
+function resolveRuntimePopupContainerFromTrigger(trigger, fallbackContainer) {
+  if (trigger) {
+    return resolveRuntimePopupContainer(trigger);
+  }
+  const rootNode = typeof fallbackContainer.getRootNode === "function" ? fallbackContainer.getRootNode() : null;
+  return queryPopupRoot(fallbackContainer) ?? queryPopupRoot(rootNode) ?? (isShadowRootNode(rootNode) ? null : queryPopupRoot(fallbackContainer.ownerDocument)) ?? fallbackContainer;
 }
 
 // src/ui/runtime/action-buttons.tsx
@@ -12832,7 +13583,7 @@ var PREVIEW_WIDTH = 220;
 var PREVIEW_HEIGHT = 160;
 var IMAGE_RADIUS = 12;
 function PromptImageStrip(props) {
-  const { images, onRemoveImage } = props;
+  const { images, onRemoveImage, readOnly = false } = props;
   const [hoveredId, setHoveredId] = import_react6.default.useState(null);
   if (images.length === 0) return null;
   return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
@@ -12846,6 +13597,7 @@ function PromptImageStrip(props) {
       },
       children: images.map((image) => {
         const hovered = hoveredId === image.id;
+        const canRemove = !readOnly;
         return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
           "div",
           {
@@ -12898,7 +13650,7 @@ function PromptImageStrip(props) {
                 {
                   type: "button",
                   onClick: () => {
-                    if (hovered) {
+                    if (hovered && canRemove) {
                       onRemoveImage(image.id);
                     }
                   },
@@ -12907,16 +13659,16 @@ function PromptImageStrip(props) {
                     height: THUMB_SIZE,
                     borderRadius: IMAGE_RADIUS,
                     overflow: "hidden",
-                    border: `1px solid ${hovered ? EDITOR_CHROME.borderStrong : EDITOR_CHROME.border}`,
-                    background: hovered ? EDITOR_CHROME.surfaceElevated : EDITOR_CHROME.surfaceMuted,
+                    border: `1px solid ${hovered && canRemove ? EDITOR_CHROME.borderStrong : EDITOR_CHROME.border}`,
+                    background: hovered && canRemove ? EDITOR_CHROME.surfaceElevated : EDITOR_CHROME.surfaceMuted,
                     padding: 0,
-                    cursor: hovered ? "pointer" : "default",
+                    cursor: hovered && canRemove ? "pointer" : "default",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     boxShadow: hovered ? EDITOR_CHROME.shadow : "none"
                   },
-                  children: hovered ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(import_icons2.CloseOutlined, { style: { fontSize: 12, color: EDITOR_CHROME.textPrimary } }) : /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+                  children: hovered && canRemove ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(import_icons2.CloseOutlined, { style: { fontSize: 12, color: EDITOR_CHROME.textPrimary } }) : /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
                     "img",
                     {
                       src: image.data,
@@ -12941,6 +13693,7 @@ function PromptImageStrip(props) {
 
 // src/ui/runtime/prompt-card-design-editor.tsx
 var import_react9 = __toESM(require("react"));
+var import_icons4 = require("@ant-design/icons");
 var import_antd4 = require("antd");
 
 // src/ui/property-panel/react-design-panel.tsx
@@ -14991,7 +15744,6 @@ function normalizeLength(raw) {
 
 // src/ui/runtime/prompt-card-scroll-area.tsx
 var import_react8 = __toESM(require("react"));
-var import_overlayscrollbars = require("overlayscrollbars/styles/overlayscrollbars.css");
 var import_overlayscrollbars_react = require("overlayscrollbars-react");
 var import_jsx_runtime6 = require("react/jsx-runtime");
 var PROMPT_CARD_SCROLL_OPTIONS = {
@@ -15122,7 +15874,9 @@ var GROUPS = [
 ];
 var tabStripStyle = {
   display: "flex",
-  justifyContent: "flex-start",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 8,
   padding: "0 0 6px"
 };
 var editorShellStyle = {
@@ -15140,10 +15894,14 @@ function PromptCardDesignEditor(props) {
     disabled,
     refreshKey,
     onRefreshRequest,
+    onDeleteElement,
     defaultGroupId = "colors"
   } = props;
   const [activeGroupId, setActiveGroupId] = import_react9.default.useState(defaultGroupId);
-  const snapshot = import_react9.default.useMemo(() => target ? createStyleSnapshot(target) : null, [target, refreshKey]);
+  const snapshot = import_react9.default.useMemo(
+    () => target ? createStyleSnapshot(target) : null,
+    [target, refreshKey]
+  );
   import_react9.default.useEffect(() => {
     setActiveGroupId((current) => {
       if (GROUPS.some((group) => group.id === current)) {
@@ -15173,17 +15931,41 @@ function PromptCardDesignEditor(props) {
   const activeGroup = GROUPS.find((group) => group.id === activeGroupId) ?? GROUPS[0];
   const ActiveGroupPanel = activeGroup.render;
   return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { "data-we-prompt-primary-focus-exempt": "true", style: editorShellStyle, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: tabStripStyle, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-      import_antd4.Segmented,
-      {
-        value: activeGroup.id,
-        options: GROUPS.map((group) => ({
-          label: group.label,
-          value: group.id
-        })),
-        onChange: (value) => setActiveGroupId(String(value))
-      }
-    ) }),
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { style: tabStripStyle, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        import_antd4.Segmented,
+        {
+          value: activeGroup.id,
+          options: GROUPS.map((group) => ({
+            label: group.label,
+            value: group.id
+          })),
+          onChange: (value) => setActiveGroupId(String(value))
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        import_antd4.Popconfirm,
+        {
+          title: "\u5220\u9664\u5F53\u524D\u5143\u7D20",
+          description: "\u5220\u9664\u540E\u4F1A\u5728\u7236\u7EA7\u521B\u5EFA\u6279\u6CE8\uFF1B\u64A4\u9500\u6216\u6E05\u7A7A\u8BE5\u6279\u6CE8\u53EF\u6062\u590D\u5143\u7D20\u3002",
+          okText: "\u5220\u9664",
+          cancelText: "\u53D6\u6D88",
+          okButtonProps: { danger: true },
+          disabled: disabled || !onDeleteElement,
+          getPopupContainer: resolveRuntimePopupContainer,
+          onConfirm: () => onDeleteElement?.(target),
+          children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { style: { display: "inline-flex" }, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+            IconActionButton,
+            {
+              title: "\u5220\u9664\u5F53\u524D\u5143\u7D20\uFF08Delete / Backspace\uFF09",
+              icon: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(import_icons4.DeleteOutlined, {}),
+              tone: "dark",
+              disabled: disabled || !onDeleteElement
+            }
+          ) })
+        }
+      )
+    ] }),
     /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(PromptCardScrollArea, { style: contentStyle, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ActiveGroupPanel, { ...sectionProps }) })
   ] });
 }
@@ -15252,8 +16034,14 @@ function shouldRestorePromptPrimaryFocusFromTarget(target) {
   return !target.closest(PROMPT_PRIMARY_FOCUS_EXEMPT_SELECTOR);
 }
 var ANNOTATION_GENERATION_PLACEHOLDER = "\u8F93\u5165\u7ED9 AI \u7684\u6807\u6CE8\u9700\u6C42\uFF0C\u8BF4\u660E\u751F\u6210\u8981\u6C42";
-function resolvePromptCardNotePlaceholder(isAnnotationSession) {
-  return isAnnotationSession ? ANNOTATION_GENERATION_PLACEHOLDER : "\u8F93\u5165\u7ED9 AI \u7684\u9700\u6C42\uFF0C/ \u9009\u62E9\u6280\u80FD";
+var EXTERNAL_REVIEW_PLACEHOLDER = "\u586B\u5199\u4F60\u7684\u8BC4\u5BA1\u5EFA\u8BAE";
+function isExternalAuthorNetworkIdentifier(value) {
+  return /^(?:\d{1,3}\.){3}\d{1,3}$/u.test(value.trim()) || value.includes(":");
+}
+function resolvePromptCardNotePlaceholder(isAnnotationSession, externalAnnotationMode) {
+  if (isAnnotationSession && externalAnnotationMode) return EXTERNAL_REVIEW_PLACEHOLDER;
+  if (isAnnotationSession) return ANNOTATION_GENERATION_PLACEHOLDER;
+  return "\u8F93\u5165\u7ED9 AI \u7684\u9700\u6C42\uFF0C/ \u9009\u62E9\u6280\u80FD";
 }
 var ANNOTATION_PANEL_NODE_ID_ATTR2 = "data-axhub-annotation-panel-node-id";
 var ANNOTATION_MARKER_NODE_ID_ATTR2 = "data-axhub-annotation-node-id";
@@ -15266,6 +16054,20 @@ var annotationEditorShellStyle = {
   flexDirection: "column",
   gap: 4,
   padding: 0
+};
+var externalCommentsToolStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 0,
+  marginBottom: 8,
+  padding: "8px 10px 2px",
+  maxHeight: 280,
+  overflowX: "hidden",
+  overflowY: "auto",
+  overscrollBehavior: "contain",
+  borderLeft: `3px solid ${EDITOR_CHROME.accent}`,
+  borderRadius: 6,
+  background: "rgba(0, 143, 93, 0.07)"
 };
 var annotationEditorInputStyle = {
   overflow: "hidden",
@@ -15420,7 +16222,10 @@ var PromptCardView = import_react10.default.forwardRef(
       getExportSelectionToDesignToolBlockReason,
       hideExecutionControls = false,
       hideCurrentElementExecutionAction = false,
+      hideClearEditsAction = false,
+      canClearCurrentElementEdits = true,
       hideContextAppendAction = false,
+      externalAnnotationMode = false,
       enabledSkillIds,
       skillOptions,
       onHoverSelectionSuppressedChange,
@@ -15446,6 +16251,7 @@ var PromptCardView = import_react10.default.forwardRef(
       noteDirty,
       onDraftChange,
       onClearCurrentElementEdits,
+      onDeleteExternalComment,
       onConfirmNote,
       onDismissSelection,
       annotationEnabled,
@@ -15471,6 +16277,8 @@ var PromptCardView = import_react10.default.forwardRef(
     const [refreshKey, setRefreshKey] = import_react10.default.useState(0);
     const [selectedSkills, setSelectedSkills] = import_react10.default.useState([]);
     const [promptDismissed, setPromptDismissed] = import_react10.default.useState(false);
+    const [externalCommentsToolOpen, setExternalCommentsToolOpen] = import_react10.default.useState(true);
+    const [hoveredExternalCommentId, setHoveredExternalCommentId] = import_react10.default.useState(null);
     const [annotationEditorOpen, setAnnotationEditorOpen] = import_react10.default.useState(
       () => readAnnotationInputModePreference() === "edit"
     );
@@ -15480,6 +16288,18 @@ var PromptCardView = import_react10.default.forwardRef(
     }, []);
     const [runningElementToolId, setRunningElementToolId] = import_react10.default.useState(null);
     const [elementToolError, setElementToolError] = import_react10.default.useState("");
+    const externalComments = import_react10.default.useMemo(
+      () => savedNoteMeta?.externalComments ?? [],
+      [savedNoteMeta?.externalComments, refreshKey]
+    );
+    const externalCommentGroups = import_react10.default.useMemo(
+      () => groupExternalCommentsByAuthor(externalComments),
+      [externalComments, refreshKey]
+    );
+    const externalCommentEntries = import_react10.default.useMemo(
+      () => externalCommentGroups.flatMap((group) => group.comments.map((comment) => ({ group, comment }))),
+      [externalCommentGroups]
+    );
     const elementTools = options.getElementTools?.(currentTarget) ?? [];
     const hasElementTools = elementTools.length > 0;
     const skillTrigger = import_react10.default.useMemo(() => findPromptCardSkillTrigger(draftNote), [draftNote]);
@@ -15504,18 +16324,17 @@ var PromptCardView = import_react10.default.forwardRef(
     }, [inlineTextEditing]);
     import_react10.default.useEffect(() => {
       setSelectedSkills(
-        deserializePromptCardSkillSelection(
-          savedNoteMeta,
-          enabledSkillIds,
-          skillOptions ?? []
-        )
+        deserializePromptCardSkillSelection(savedNoteMeta, enabledSkillIds, skillOptions ?? [])
       );
       setRunningElementToolId(null);
       setElementToolError("");
     }, [enabledSkillIds, savedNoteMeta, currentTarget, skillOptions]);
-    import_react10.default.useEffect(() => {
+    import_react10.default.useLayoutEffect(() => {
       setPromptDismissed(false);
     }, [currentTarget]);
+    import_react10.default.useLayoutEffect(() => {
+      setExternalCommentsToolOpen(true);
+    }, [currentTarget, externalAnnotationMode]);
     import_react10.default.useEffect(() => {
       if (isAnnotationSession && bubbleStyleEditorOpen) {
         onBubbleStyleEditorOpenChange(false);
@@ -15537,8 +16356,8 @@ var PromptCardView = import_react10.default.forwardRef(
         refresh() {
           setRefreshKey((value) => value + 1);
         },
-        enterInlineTextEdit() {
-          onInlineTextEditingChange(true);
+        enterInlineTextEdit(element) {
+          onInlineTextEditingChange(true, element);
         }
       }),
       [onAnchorRectChange, onInlineTextEditingChange, onTargetChange]
@@ -15718,7 +16537,8 @@ var PromptCardView = import_react10.default.forwardRef(
       return () => onPromptCardVisibleChange?.(false);
     }, [onPromptCardVisibleChange]);
     import_react10.default.useEffect(() => {
-      if (!promptVisible || !currentTarget || toolMinimized || uiMode !== "bubble-card" || inlineTextEditing) return;
+      if (!promptVisible || !currentTarget || toolMinimized || uiMode !== "bubble-card" || inlineTextEditing)
+        return;
       if (!isMobileDevice()) {
         return ensurePromptPrimaryFocus();
       }
@@ -15948,12 +16768,10 @@ var PromptCardView = import_react10.default.forwardRef(
       getSendCurrentElementPromptToAgentBlockReason: () => currentElementBlockReason,
       hasReusableConversation
     });
-    import_react10.default.useEffect(() => {
-      if (!sendingCurrentElementPrompt) return;
-      if (currentTaskRunning && currentTaskSessionReady) {
-        setSendingCurrentElementPrompt(false);
-      }
-    }, [currentTaskRunning, currentTaskSessionReady, sendingCurrentElementPrompt]);
+    import_react10.default.useLayoutEffect(() => {
+      if (!currentElementPromptAction.dismissBubble) return;
+      setPromptDismissed(true);
+    }, [currentElementPromptAction.dismissBubble]);
     import_react10.default.useEffect(() => {
       if (!promptVisible || uiMode !== "bubble-card" || !currentTaskTerminal) return;
       const handleWindowKeyDown = (event) => {
@@ -16003,11 +16821,7 @@ var PromptCardView = import_react10.default.forwardRef(
           currentTarget,
           onConfirmText,
           onConfirmNote: onConfirmNoteWithSelectedSkills,
-          onDismissSelection,
-          onSendCurrentElementPromptToAgent,
-          onDispatched: () => {
-            setSendingCurrentElementPrompt(false);
-          }
+          onSendCurrentElementPromptToAgent
         });
         if (sent) {
           clearSelectedSkills();
@@ -16021,7 +16835,6 @@ var PromptCardView = import_react10.default.forwardRef(
       currentTarget,
       onConfirmNoteWithSelectedSkills,
       onConfirmText,
-      onDismissSelection,
       onSendCurrentElementPromptToAgent,
       selectedSkills,
       wakeAgentForCurrentElementAction
@@ -16054,8 +16867,8 @@ var PromptCardView = import_react10.default.forwardRef(
       try {
         await options.onElementToolAction?.(tool, promptTarget);
       } catch (error) {
-        const message3 = error instanceof Error ? error.message : String(error ?? "\u64CD\u4F5C\u5931\u8D25");
-        setElementToolError(message3.trim() || "\u64CD\u4F5C\u5931\u8D25");
+        const message = error instanceof Error ? error.message : String(error ?? "\u64CD\u4F5C\u5931\u8D25");
+        setElementToolError(message.trim() || "\u64CD\u4F5C\u5931\u8D25");
       } finally {
         setRunningElementToolId(null);
       }
@@ -16063,12 +16876,15 @@ var PromptCardView = import_react10.default.forwardRef(
     const showPromptTextInput = false;
     const isCurrentAnnotationPanelTarget = isAnnotationPanelTarget(currentTarget);
     const showAnnotationMarkdownEditorButton = Boolean(
-      annotationEnabled && canEditAnnotationMarkdown && currentTarget
+      options.showAnnotationMarkdownEditor !== false && annotationEnabled && canEditAnnotationMarkdown && currentTarget
+    );
+    const annotationMarkdownEditorOpen = Boolean(
+      annotationEditorOpen && showAnnotationMarkdownEditorButton
     );
     const showAnnotationDocumentEditButton = Boolean(currentTarget && annotationDocumentEditUrl);
-    const showNoteComposer = !annotationEditorOpen && !bubbleStyleEditorOpen;
+    const showNoteComposer = !annotationMarkdownEditorOpen && !bubbleStyleEditorOpen;
     const showAnnotationMarkdownEditor = Boolean(
-      annotationEditorOpen && showAnnotationMarkdownEditorButton && !bubbleStyleEditorOpen
+      annotationMarkdownEditorOpen && !bubbleStyleEditorOpen
     );
     const annotationModeLabel = annotationEditorOpen ? "\u7F16\u8F91" : "\u751F\u6210";
     const annotationManualEditLocatorState = showAnnotationMarkdownEditor ? documentSourceMarkdownEditor ? { disabled: false, message: "" } : getAnnotationManualEditLocatorState(
@@ -16089,8 +16905,11 @@ var PromptCardView = import_react10.default.forwardRef(
     const agentSelectionShortcutHint = agentSelectionShortcutLabels.length > 0 ? `\uFF0C\u957F\u6309 ${agentSelectionShortcutLabels.join(" / ")} \u4E5F\u53EF\u5524\u8D77` : "";
     const agentSelectionActionTitle = currentTaskRunning ? "\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD" : `\u6DFB\u52A0\u5230 AI \u5BF9\u8BDD${agentSelectionShortcutHint}`;
     const showContextAppendExecutionControls = !hideExecutionControls;
-    const showPromptCardExecutionActions = !isAnnotationSession || !annotationEditorOpen;
-    const notePlaceholder = resolvePromptCardNotePlaceholder(isAnnotationSession);
+    const showPromptCardExecutionActions = !isAnnotationSession || !annotationMarkdownEditorOpen;
+    const notePlaceholder = resolvePromptCardNotePlaceholder(
+      isAnnotationSession,
+      externalAnnotationMode
+    );
     const promptCardCloseActionTitle = resolvePromptCardCloseActionTitle(
       globalThis.navigator?.platform
     );
@@ -16111,7 +16930,7 @@ var PromptCardView = import_react10.default.forwardRef(
           IconActionButton,
           {
             title: "\u5220\u9664\u6807\u6CE8",
-            icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.DeleteOutlined, {}),
+            icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.DeleteOutlined, {}),
             tone: "dark",
             disabled: annotationLoading || annotationSaving || !onDeleteCurrentAnnotationNode
           }
@@ -16145,7 +16964,7 @@ var PromptCardView = import_react10.default.forwardRef(
           onHoverSelectionSuppressedChange(false);
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("style", { children: `
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("style", { nonce: resolveCspNonce(), children: `
             .we-runtime-prompt-card__textarea,
             .we-runtime-prompt-card__textarea:disabled,
             .we-runtime-prompt-card__textarea textarea,
@@ -16260,7 +17079,7 @@ var PromptCardView = import_react10.default.forwardRef(
                         IconActionButton,
                         {
                           title: documentSourceMarkdownEditor ? annotationEditorOpen ? "\u5173\u95ED Markdown \u6E90\u7801\u7F16\u8F91" : "Markdown \u6E90\u7801\u7F16\u8F91" : annotationEditorOpen ? "\u5173\u95ED\u6807\u6CE8\u7F16\u8F91" : "\u6807\u6CE8\u7F16\u8F91",
-                          icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.FileTextOutlined, {}),
+                          icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.FileTextOutlined, {}),
                           tone: annotationEditorOpen ? "accent" : "dark",
                           disabled: annotationLoading,
                           onClick: () => {
@@ -16276,7 +17095,7 @@ var PromptCardView = import_react10.default.forwardRef(
                         IconActionButton,
                         {
                           title: "\u6587\u6863\u7F16\u8F91",
-                          icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.FileTextOutlined, {}),
+                          icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.FileTextOutlined, {}),
                           tone: "dark",
                           onClick: () => {
                             window.open(annotationDocumentEditUrl, "_blank", "noopener,noreferrer");
@@ -16289,7 +17108,7 @@ var PromptCardView = import_react10.default.forwardRef(
                           IconActionButton,
                           {
                             title: running ? `${tool.label}\uFF08\u6B63\u5728\u6253\u5F00\uFF09` : tool.label,
-                            icon: tool.icon === "document" ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.FileTextOutlined, {}) : /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.ExportOutlined, {}),
+                            icon: tool.icon === "document" ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.FileTextOutlined, {}) : /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.ExportOutlined, {}),
                             tone: "dark",
                             loading: running,
                             disabled: Boolean(tool.disabled || runningElementToolId),
@@ -16299,11 +17118,20 @@ var PromptCardView = import_react10.default.forwardRef(
                           }
                         ) }, tool.id);
                       }),
+                      !isAnnotationSession && !externalAnnotationMode && externalCommentGroups.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { "data-we-external-comments-tool-toggle": "true", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                        IconActionButton,
+                        {
+                          title: externalCommentsToolOpen ? "\u5173\u95ED\u5916\u90E8\u6279\u6CE8" : "\u6253\u5F00\u5916\u90E8\u6279\u6CE8",
+                          icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.MessageOutlined, {}),
+                          tone: "dark",
+                          onClick: () => setExternalCommentsToolOpen((open) => !open)
+                        }
+                      ) }) : null,
                       propertyPanelEnabled && styleDesignEnabled && !hasElementTools && !isAnnotationSession && !textCommentMode && !isCurrentAnnotationPanelTarget ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
                         IconActionButton,
                         {
                           title: styleEditorToggleTitle,
-                          icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.FormatPainterOutlined, {}),
+                          icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.FormatPainterOutlined, {}),
                           tone: bubbleStyleEditorOpen ? "accent" : "dark",
                           onClick: () => {
                             const nextBubbleStyleEditorOpen = !bubbleStyleEditorOpen;
@@ -16318,7 +17146,7 @@ var PromptCardView = import_react10.default.forwardRef(
                         IconActionButton,
                         {
                           title: designToolExportAction.title,
-                          icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.ExportOutlined, {}),
+                          icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.ExportOutlined, {}),
                           tone: "dark",
                           disabled: designToolExportAction.disabled,
                           onClick: () => {
@@ -16359,7 +17187,7 @@ var PromptCardView = import_react10.default.forwardRef(
                         IconActionButton,
                         {
                           title: promptCardSendActionTitle,
-                          icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.CaretRightFilled, {}),
+                          icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.CaretRightFilled, {}),
                           tone: "accent",
                           loading: currentElementPromptAction.loading,
                           disabled: currentElementPromptAction.disabled,
@@ -16368,11 +17196,11 @@ var PromptCardView = import_react10.default.forwardRef(
                           }
                         }
                       ) : null,
-                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                      !hideClearEditsAction && canClearCurrentElementEdits ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
                         IconActionButton,
                         {
                           title: "\u6E05\u7A7A\u6279\u6CE8",
-                          icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.ClearOutlined, {}),
+                          icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.ClearOutlined, {}),
                           tone: "dark",
                           disabled: !currentTarget,
                           onClick: () => {
@@ -16380,7 +17208,7 @@ var PromptCardView = import_react10.default.forwardRef(
                             void onClearCurrentElementEdits();
                           }
                         }
-                      )
+                      ) : null
                     ]
                   }
                 ) : null,
@@ -16409,520 +17237,721 @@ var PromptCardView = import_react10.default.forwardRef(
               ]
             }
           ),
-          elementToolError ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-            "div",
-            {
-              role: "alert",
-              style: {
-                padding: "6px 10px",
-                borderRadius: 8,
-                background: "rgba(255, 77, 79, 0.12)",
-                color: EDITOR_CHROME.textDanger,
-                fontSize: 11,
-                lineHeight: 1.45,
-                overflowWrap: "anywhere"
-              },
-              children: elementToolError.slice(0, 240)
-            }
-          ) : null,
           /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
             "div",
             {
-              ref: noteComposerRef,
-              onFocusCapture: (event) => {
-                if (inlineTextEditing) return;
-                if (!shouldRestorePromptPrimaryFocusFromTarget(event.target)) return;
-                window.requestAnimationFrame(() => {
-                  ensurePromptPrimaryFocus(3);
-                });
-              },
-              onPointerDownCapture: (event) => {
-                if (inlineTextEditing) return;
-                if (!shouldRestorePromptPrimaryFocusFromTarget(event.target)) return;
-                window.requestAnimationFrame(() => {
-                  ensurePromptPrimaryFocus(3);
-                });
-              },
+              "data-we-prompt-card-content-scroll": "true",
               style: {
                 display: "flex",
+                flex: "1 1 auto",
                 flexDirection: "column",
-                gap: 8,
-                pointerEvents: inlineTextEditing ? "none" : "auto"
+                minHeight: 0,
+                overflowX: "hidden",
+                overflowY: "auto"
               },
               children: [
-                showPromptTextInput ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { ref: textComposerRef, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                  import_antd5.Input,
+                !isAnnotationSession && !externalAnnotationMode && externalCommentsToolOpen && externalCommentGroups.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                  "section",
                   {
-                    value: draftText,
-                    placeholder: TEXT_INPUT_PLACEHOLDER,
-                    size: "small",
-                    style: {
-                      borderRadius: 12,
-                      minHeight: 32,
-                      background: EDITOR_CHROME.surfaceMuted,
-                      borderColor: EDITOR_CHROME.borderStrong,
-                      boxShadow: "none",
-                      color: EDITOR_CHROME.textPrimary
-                    },
-                    onChange: (event) => {
-                      onTextDraftChange(event.target.value);
-                    },
-                    onPressEnter: (event) => {
-                      if (isMobileDevice()) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        return;
-                      }
-                      event.preventDefault();
-                      event.stopPropagation();
-                      void onConfirmText();
-                    },
-                    onKeyDown: (event) => {
-                      if (event.key !== "Escape") return;
-                      event.preventDefault();
-                      event.stopPropagation();
-                      if (dismissTerminalTaskAndSelection()) return;
-                      onCancelText();
-                    },
-                    onBlur: () => {
-                      if (!textDirty) return;
-                      void onConfirmText();
-                    }
-                  }
-                ) }) : null,
-                showNoteComposer ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_jsx_runtime8.Fragment, { children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                    import_antd5.Dropdown,
-                    {
-                      open: skillMenuOpen,
-                      trigger: [],
-                      placement: "bottomLeft",
-                      autoAdjustOverflow: { adjustX: 1, adjustY: 1 },
-                      destroyOnHidden: true,
-                      getPopupContainer: resolveRuntimePopupContainer,
-                      styles: { root: { zIndex: POPUP_LAYER_Z_INDEX + 40 } },
-                      popupRender: () => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                        "div",
-                        {
-                          "data-we-selection-lock-root": "true",
-                          "data-we-prompt-card-skill-menu": "true",
-                          style: {
-                            display: "flex",
-                            flexDirection: "column",
-                            maxHeight: "calc(100vh - 24px)",
-                            overflowX: "hidden",
-                            overflowY: "auto",
-                            borderRadius: 10,
-                            background: EDITOR_CHROME.surfaceElevated,
-                            border: `1px solid ${EDITOR_CHROME.borderStrong}`,
-                            boxShadow: EDITOR_CHROME.shadowCompact
-                          },
-                          onPointerDownCapture: () => onSelectionInteractionLockChange(true),
-                          onPointerEnter: () => {
-                            onHoverSelectionSuppressedChange(true);
-                          },
-                          onPointerLeave: () => {
-                            onHoverSelectionSuppressedChange(false);
-                          },
-                          children: filteredSkills.map((skill) => {
-                            const selected = selectedSkills.some(
-                              (selectedSkill) => selectedSkill.id === skill.id
-                            );
-                            return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-                              "button",
-                              {
-                                type: "button",
-                                disabled: selected,
-                                style: {
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  alignItems: "flex-start",
-                                  gap: 2,
-                                  border: 0,
-                                  background: selected ? EDITOR_CHROME.surfaceInteractive : "transparent",
-                                  color: selected ? EDITOR_CHROME.textMuted : EDITOR_CHROME.textPrimary,
-                                  padding: "8px 10px",
-                                  textAlign: "left",
-                                  cursor: selected ? "default" : "pointer"
-                                },
-                                onMouseDown: (event) => {
-                                  event.preventDefault();
-                                },
-                                onClick: () => {
-                                  if (!selected) {
-                                    handleSkillSelect(skill);
-                                  }
-                                },
-                                children: [
-                                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                                    "span",
-                                    {
-                                      style: {
-                                        fontSize: 12,
-                                        fontWeight: 600,
-                                        lineHeight: 1.35
-                                      },
-                                      children: skill.label
-                                    }
-                                  ),
-                                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                                    "span",
-                                    {
-                                      style: {
-                                        fontSize: 11,
-                                        lineHeight: 1.35,
-                                        color: EDITOR_CHROME.textMuted
-                                      },
-                                      children: skill.description
-                                    }
-                                  )
-                                ]
-                              },
-                              skill.id
-                            );
-                          })
-                        }
-                      ),
-                      children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-                        "div",
-                        {
-                          style: {
-                            position: "relative",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: selectedSkills.length > 0 ? 6 : 0,
-                            minHeight: selectedSkills.length > 0 ? 64 : 44,
-                            justifyContent: "center",
-                            borderRadius: 12,
-                            background: EDITOR_CHROME.surfaceMuted,
-                            border: `1px solid ${EDITOR_CHROME.borderStrong}`
-                          },
-                          children: [
-                            selectedSkills.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                              "div",
-                              {
-                                style: {
-                                  display: "flex",
-                                  flexWrap: "wrap",
-                                  gap: 6,
-                                  padding: "8px 8px 0"
-                                },
-                                children: selectedSkills.map((skill) => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-                                  "button",
-                                  {
-                                    type: "button",
-                                    "data-we-prompt-card-skill-tag": "true",
-                                    title: `\u79FB\u9664\u6280\u80FD\uFF1A${skill.label}`,
-                                    style: {
-                                      display: "inline-flex",
-                                      alignItems: "center",
-                                      gap: 5,
-                                      maxWidth: "100%",
-                                      border: `1px solid ${EDITOR_CHROME.border}`,
-                                      borderRadius: 999,
-                                      background: EDITOR_CHROME.surfaceInteractive,
-                                      color: EDITOR_CHROME.textSecondary,
-                                      padding: "3px 7px",
-                                      fontSize: 11,
-                                      lineHeight: 1.2,
-                                      cursor: "pointer"
-                                    },
-                                    onClick: () => handleSkillRemove(skill.id),
-                                    children: [
-                                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                                        "span",
-                                        {
-                                          style: {
-                                            minWidth: 0,
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                            whiteSpace: "nowrap"
-                                          },
-                                          children: skill.label
-                                        }
-                                      ),
-                                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.CloseOutlined, { style: { fontSize: 9, color: EDITOR_CHROME.textMuted } })
-                                    ]
-                                  },
-                                  skill.id
-                                ))
-                              }
-                            ) : null,
-                            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                              import_antd5.Input.TextArea,
-                              {
-                                className: "we-runtime-prompt-card__textarea",
-                                value: draftNote,
-                                disabled: !canEditNote,
-                                readOnly: inlineTextEditing,
-                                tabIndex: inlineTextEditing ? -1 : 0,
-                                allowClear: true,
-                                autoSize: { minRows: 1, maxRows: 4 },
-                                placeholder: notePlaceholder,
-                                variant: "borderless",
-                                styles: {
-                                  textarea: {
-                                    color: EDITOR_CHROME.textPrimary,
-                                    background: "transparent",
-                                    minHeight: 32,
-                                    padding: "6px 10px",
-                                    fontSize: 12.5,
-                                    lineHeight: 1.55,
-                                    caretColor: EDITOR_CHROME.textPrimary
-                                  }
-                                },
-                                style: {
-                                  borderRadius: 12,
-                                  background: "transparent",
-                                  borderColor: "transparent",
-                                  boxShadow: "none"
-                                },
-                                onChange: (event) => {
-                                  onDraftChange(event.target.value);
-                                },
-                                onFocus: (event) => {
-                                  if (!inlineTextEditing) return;
-                                  event.currentTarget.blur();
-                                },
-                                onPasteCapture: onNotePasteCapture,
-                                onKeyDown: handlePromptKeyDown,
-                                onBlur: (event) => {
-                                  const nextTarget = event.relatedTarget;
-                                  if (nextTarget instanceof Node && noteComposerRef.current?.contains(nextTarget)) {
-                                    return;
-                                  }
-                                  if (!noteDirty && !selectedSkillsDirty) return;
-                                  void onConfirmNoteWithSelectedSkills();
-                                }
-                              }
-                            )
-                          ]
-                        }
-                      )
-                    }
-                  ),
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                    PromptImageStrip,
-                    {
-                      images,
-                      onRemoveImage: (imageId) => {
-                        void onRemoveImage(imageId);
-                      }
-                    }
-                  )
-                ] }) : null,
-                showAnnotationMarkdownEditor ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-                  "div",
-                  {
-                    "data-we-prompt-primary-focus-exempt": "true",
-                    style: annotationEditorShellStyle,
-                    children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 8 }, children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                          "span",
-                          {
-                            style: {
-                              minWidth: 0,
-                              flex: 1,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              lineHeight: 1.4,
-                              color: EDITOR_CHROME.textSecondary
-                            },
-                            children: documentSourceMarkdownEditor ? "Markdown \u6E90\u7801" : "\u9700\u6C42\u6807\u6CE8"
-                          }
-                        ),
-                        annotationDeleteAction
-                      ] }),
-                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { "data-we-annotation-markdown-editor": "true", style: annotationEditorInputStyle, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                        import_antd5.Input.TextArea,
-                        {
-                          className: "we-runtime-prompt-card__textarea",
-                          value: annotationDraftMarkdown,
-                          disabled: annotationLoading || annotationManualEditDisabled,
-                          autoSize: { minRows: 4, maxRows: 10 },
-                          placeholder: documentSourceMarkdownEditor ? DOCUMENT_SOURCE_MARKDOWN_PLACEHOLDER : annotationManualEditDisabled ? annotationManualEditMessage : ANNOTATION_MARKDOWN_PLACEHOLDER,
-                          variant: "borderless",
-                          styles: {
-                            textarea: {
-                              color: EDITOR_CHROME.textPrimary,
-                              background: "transparent",
-                              minHeight: 96,
-                              padding: "10px 12px",
-                              fontSize: 12,
-                              lineHeight: 1.55,
-                              caretColor: EDITOR_CHROME.textPrimary
-                            }
-                          },
-                          style: {
-                            background: "transparent",
-                            borderColor: "transparent",
-                            boxShadow: "none"
-                          },
-                          onChange: (event) => {
-                            onAnnotationDraftChange(event.target.value);
-                          },
-                          onKeyDown: (event) => {
-                            if (event.nativeEvent.isComposing) return;
-                            if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              void saveAndCloseAnnotationMarkdownComposer();
-                              return;
-                            }
-                            if (event.key === "Escape") {
-                              event.stopPropagation();
-                            }
-                          }
-                        }
-                      ) })
-                    ]
-                  }
-                ) : null,
-                showPromptDesignEditor && transactionManager ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                  PromptCardDesignEditor,
-                  {
-                    target: currentTarget,
-                    transactionManager,
-                    tokensService,
-                    refreshKey,
-                    onRefreshRequest: () => {
-                      setRefreshKey((value) => value + 1);
-                    }
-                  }
-                ) : null,
-                !isAnnotationSession && !bubbleStyleEditorOpen && styleSummaryLines.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-                  "div",
-                  {
-                    style: {
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 4,
-                      padding: "8px 10px",
-                      borderRadius: 12,
-                      background: "rgba(255, 255, 255, 0.04)",
-                      border: `1px solid ${EDITOR_CHROME.border}`
-                    },
+                    "data-we-external-comments-tool": "true",
+                    "aria-label": "\u5916\u90E8\u6279\u6CE8",
+                    style: externalCommentsToolStyle,
                     children: [
                       /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                        "span",
+                        "div",
                         {
                           style: {
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            paddingBottom: 6,
+                            color: EDITOR_CHROME.textSecondary,
                             fontSize: 11,
                             fontWeight: 600,
-                            lineHeight: 1.4,
-                            color: EDITOR_CHROME.textSecondary
+                            lineHeight: "16px"
                           },
-                          children: "\u6837\u5F0F\u7F16\u8F91"
+                          children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                            "div",
+                            {
+                              style: {
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 5
+                              },
+                              children: [
+                                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.MessageOutlined, {}),
+                                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { children: "\u5916\u90E8\u6279\u6CE8" }),
+                                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { style: { color: EDITOR_CHROME.textMuted, fontWeight: 400 }, children: externalComments.length })
+                              ]
+                            }
+                          )
                         }
                       ),
-                      styleSummaryLines.map((line) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                        "span",
+                      externalCommentEntries.map(({ group, comment }, entryIndex) => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                        "div",
                         {
+                          "data-we-external-comments-entry": comment.id,
+                          "data-we-external-comments-author": group.authorId,
+                          onMouseEnter: () => setHoveredExternalCommentId(comment.id),
+                          onMouseLeave: () => setHoveredExternalCommentId(null),
                           style: {
-                            fontSize: 11,
-                            lineHeight: 1.45,
-                            color: EDITOR_CHROME.textMuted,
-                            wordBreak: "break-word"
+                            display: "flex",
+                            position: "relative",
+                            alignItems: "flex-start",
+                            padding: "8px 0",
+                            borderTop: `1px solid ${EDITOR_CHROME.border}`,
+                            ...entryIndex === externalCommentEntries.length - 1 ? { paddingBottom: 7 } : {}
                           },
-                          children: line
+                          children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: { flex: 1, minWidth: 0 }, children: [
+                              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                                "div",
+                                {
+                                  "data-we-external-comments-author-label": "true",
+                                  "data-we-external-comments-author-kind": isExternalAuthorNetworkIdentifier(group.authorName) ? "network" : "display",
+                                  style: {
+                                    marginBottom: 2,
+                                    paddingRight: onDeleteExternalComment ? 20 : 0,
+                                    color: EDITOR_CHROME.textMuted,
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    lineHeight: "14px",
+                                    letterSpacing: 0,
+                                    ...isExternalAuthorNetworkIdentifier(group.authorName) ? { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" } : {},
+                                    overflowWrap: "anywhere"
+                                  },
+                                  children: [
+                                    "\u8BC4\u5BA1\u8005 \xB7 ",
+                                    group.authorName
+                                  ]
+                                }
+                              ),
+                              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                                "div",
+                                {
+                                  style: {
+                                    color: EDITOR_CHROME.textPrimary,
+                                    fontSize: 11,
+                                    lineHeight: 1.55,
+                                    overflowWrap: "anywhere",
+                                    whiteSpace: "pre-wrap"
+                                  },
+                                  children: comment.content
+                                }
+                              )
+                            ] }),
+                            onDeleteExternalComment ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                              IconActionButton,
+                              {
+                                title: "\u5220\u9664\u8FD9\u6761\u5916\u90E8\u6279\u6CE8",
+                                icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.DeleteOutlined, {}),
+                                tone: "dark",
+                                onClick: () => {
+                                  void onDeleteExternalComment(comment.id);
+                                },
+                                style: {
+                                  width: 16,
+                                  minWidth: 16,
+                                  height: 16,
+                                  fontSize: 12,
+                                  position: "absolute",
+                                  top: 7,
+                                  right: 0,
+                                  background: "transparent",
+                                  opacity: hoveredExternalCommentId === comment.id ? 1 : 0,
+                                  pointerEvents: hoveredExternalCommentId === comment.id ? "auto" : "none",
+                                  transition: "opacity 160ms ease"
+                                }
+                              }
+                            ) : null
+                          ]
                         },
-                        line
+                        comment.id
                       ))
                     ]
                   }
                 ) : null,
-                currentAgentTask ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                elementToolError ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
                   "div",
                   {
+                    role: "alert",
+                    style: {
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      background: "rgba(255, 77, 79, 0.12)",
+                      color: EDITOR_CHROME.textDanger,
+                      fontSize: 11,
+                      lineHeight: 1.45,
+                      overflowWrap: "anywhere"
+                    },
+                    children: elementToolError.slice(0, 240)
+                  }
+                ) : null,
+                savedNoteMeta?.commenterName ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                  "div",
+                  {
+                    "data-we-prompt-card-commenter": "true",
                     style: {
                       display: "flex",
-                      alignItems: "flex-start",
+                      alignItems: "center",
                       gap: 6,
-                      padding: "2px 4px 0",
-                      marginTop: -2
+                      marginBottom: 6,
+                      padding: "5px 8px",
+                      borderLeft: `3px solid ${savedNoteMeta.commenterColor || EDITOR_CHROME.accent}`,
+                      borderRadius: 4,
+                      background: EDITOR_CHROME.surfaceMuted,
+                      color: EDITOR_CHROME.textSecondary,
+                      fontSize: 11,
+                      lineHeight: 1.35
                     },
                     children: [
-                      currentAgentTask.status === "completed" ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.CheckCircleFilled, { style: { color: "#22c55e", fontSize: 13, marginTop: 3 } }) : currentAgentTask.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.ExclamationCircleFilled, { style: { color: "#ef4444", fontSize: 13, marginTop: 3 } }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { marginTop: 2 }, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(AgentSparkleIcon, {}) }),
-                      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { style: { color: EDITOR_CHROME.textMuted }, children: "\u6279\u6CE8\u8005" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { style: { color: savedNoteMeta.commenterColor || EDITOR_CHROME.textPrimary, fontWeight: 600 }, children: savedNoteMeta.commenterName })
+                    ]
+                  }
+                ) : null,
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                  "div",
+                  {
+                    ref: noteComposerRef,
+                    onFocusCapture: (event) => {
+                      if (inlineTextEditing) return;
+                      if (!shouldRestorePromptPrimaryFocusFromTarget(event.target)) return;
+                      window.requestAnimationFrame(() => {
+                        ensurePromptPrimaryFocus(3);
+                      });
+                    },
+                    onPointerDownCapture: (event) => {
+                      if (inlineTextEditing) return;
+                      if (!shouldRestorePromptPrimaryFocusFromTarget(event.target)) return;
+                      window.requestAnimationFrame(() => {
+                        ensurePromptPrimaryFocus(3);
+                      });
+                    },
+                    style: {
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      pointerEvents: inlineTextEditing ? "none" : "auto"
+                    },
+                    children: [
+                      showPromptTextInput ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { ref: textComposerRef, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                        import_antd5.Input,
+                        {
+                          value: draftText,
+                          placeholder: TEXT_INPUT_PLACEHOLDER,
+                          size: "small",
+                          style: {
+                            borderRadius: 12,
+                            minHeight: 32,
+                            background: EDITOR_CHROME.surfaceMuted,
+                            borderColor: EDITOR_CHROME.borderStrong,
+                            boxShadow: "none",
+                            color: EDITOR_CHROME.textPrimary
+                          },
+                          onChange: (event) => {
+                            onTextDraftChange(event.target.value);
+                          },
+                          onPressEnter: (event) => {
+                            if (isMobileDevice()) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              return;
+                            }
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void onConfirmText();
+                          },
+                          onKeyDown: (event) => {
+                            if (event.key !== "Escape") return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (dismissTerminalTaskAndSelection()) return;
+                            onCancelText();
+                          },
+                          onBlur: () => {
+                            if (!textDirty) return;
+                            void onConfirmText();
+                          }
+                        }
+                      ) }) : null,
+                      showNoteComposer ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_jsx_runtime8.Fragment, { children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                          import_antd5.Dropdown,
+                          {
+                            open: skillMenuOpen,
+                            trigger: [],
+                            placement: "bottomLeft",
+                            autoAdjustOverflow: { adjustX: 1, adjustY: 1 },
+                            destroyOnHidden: true,
+                            getPopupContainer: resolveRuntimePopupContainer,
+                            styles: { root: { zIndex: POPUP_LAYER_Z_INDEX + 40 } },
+                            popupRender: () => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                              "div",
+                              {
+                                "data-we-selection-lock-root": "true",
+                                "data-we-prompt-card-skill-menu": "true",
+                                style: {
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "stretch",
+                                  gap: 8,
+                                  padding: 10,
+                                  width: "min(420px, calc(100vw - 24px))",
+                                  maxWidth: "calc(100vw - 24px)",
+                                  maxHeight: "min(420px, calc(100vh - 120px))",
+                                  overflowX: "hidden",
+                                  overflowY: "auto",
+                                  borderRadius: 10,
+                                  background: EDITOR_CHROME.surfaceElevated,
+                                  border: `1px solid ${EDITOR_CHROME.borderStrong}`,
+                                  boxShadow: EDITOR_CHROME.shadowCompact
+                                },
+                                onPointerDownCapture: () => onSelectionInteractionLockChange(true),
+                                onPointerEnter: () => {
+                                  onHoverSelectionSuppressedChange(true);
+                                },
+                                onPointerLeave: () => {
+                                  onHoverSelectionSuppressedChange(false);
+                                },
+                                children: [
+                                  /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                                    "div",
+                                    {
+                                      "data-we-prompt-card-skill-menu-header": "true",
+                                      style: {
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 2
+                                      },
+                                      children: [
+                                        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                                          "span",
+                                          {
+                                            style: {
+                                              color: EDITOR_CHROME.textPrimary,
+                                              fontSize: 12,
+                                              fontWeight: 600,
+                                              lineHeight: 1.35
+                                            },
+                                            children: "\u9009\u62E9\u5904\u7406\u65B9\u5F0F"
+                                          }
+                                        ),
+                                        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                                          "span",
+                                          {
+                                            style: {
+                                              color: EDITOR_CHROME.textMuted,
+                                              fontSize: 11,
+                                              lineHeight: 1.35
+                                            },
+                                            children: "\u70B9\u51FB\u6807\u7B7E\u5E94\u7528\uFF0C\u60AC\u505C\u67E5\u770B\u8BE6\u7EC6\u8BF4\u660E"
+                                          }
+                                        )
+                                      ]
+                                    }
+                                  ),
+                                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                                    "div",
+                                    {
+                                      "data-we-prompt-card-skill-options": "true",
+                                      style: {
+                                        display: "flex",
+                                        flexWrap: "wrap",
+                                        alignItems: "center",
+                                        gap: 6
+                                      },
+                                      children: filteredSkills.map((skill) => {
+                                        const selected = selectedSkills.some(
+                                          (selectedSkill) => selectedSkill.id === skill.id
+                                        );
+                                        return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                                          import_antd5.Tooltip,
+                                          {
+                                            title: skill.description,
+                                            placement: "topLeft",
+                                            mouseEnterDelay: 0.15,
+                                            getPopupContainer: resolveRuntimePopupContainer,
+                                            children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                                              "button",
+                                              {
+                                                type: "button",
+                                                "data-we-prompt-card-skill-tooltip": "true",
+                                                disabled: selected,
+                                                style: {
+                                                  display: "inline-flex",
+                                                  alignItems: "center",
+                                                  justifyContent: "center",
+                                                  minHeight: 30,
+                                                  border: `1px solid ${selected ? EDITOR_CHROME.borderStrong : EDITOR_CHROME.border}`,
+                                                  borderRadius: 999,
+                                                  background: selected ? EDITOR_CHROME.surfaceInteractive : "transparent",
+                                                  color: selected ? EDITOR_CHROME.textMuted : EDITOR_CHROME.textPrimary,
+                                                  padding: "6px 10px",
+                                                  fontSize: 12,
+                                                  lineHeight: 1.2,
+                                                  whiteSpace: "nowrap",
+                                                  cursor: selected ? "default" : "pointer"
+                                                },
+                                                onMouseDown: (event) => {
+                                                  event.preventDefault();
+                                                },
+                                                onClick: () => {
+                                                  if (!selected) {
+                                                    handleSkillSelect(skill);
+                                                  }
+                                                },
+                                                children: skill.label
+                                              }
+                                            )
+                                          },
+                                          skill.id
+                                        );
+                                      })
+                                    }
+                                  )
+                                ]
+                              }
+                            ),
+                            children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                              "div",
+                              {
+                                style: {
+                                  position: "relative",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: selectedSkills.length > 0 ? 6 : 0,
+                                  minHeight: selectedSkills.length > 0 ? 64 : 44,
+                                  justifyContent: "center",
+                                  borderRadius: 12,
+                                  background: EDITOR_CHROME.surfaceMuted,
+                                  border: `1px solid ${EDITOR_CHROME.borderStrong}`
+                                },
+                                children: [
+                                  selectedSkills.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                                    "div",
+                                    {
+                                      style: {
+                                        display: "flex",
+                                        flexWrap: "wrap",
+                                        gap: 6,
+                                        padding: "8px 8px 0"
+                                      },
+                                      children: selectedSkills.map((skill) => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                                        "button",
+                                        {
+                                          type: "button",
+                                          "data-we-prompt-card-skill-tag": "true",
+                                          title: `\u79FB\u9664\u6280\u80FD\uFF1A${skill.label}`,
+                                          style: {
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: 5,
+                                            maxWidth: "100%",
+                                            border: `1px solid ${EDITOR_CHROME.border}`,
+                                            borderRadius: 999,
+                                            background: EDITOR_CHROME.surfaceInteractive,
+                                            color: EDITOR_CHROME.textSecondary,
+                                            padding: "3px 7px",
+                                            fontSize: 11,
+                                            lineHeight: 1.2,
+                                            cursor: "pointer"
+                                          },
+                                          onClick: () => handleSkillRemove(skill.id),
+                                          children: [
+                                            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                                              "span",
+                                              {
+                                                style: {
+                                                  minWidth: 0,
+                                                  overflow: "hidden",
+                                                  textOverflow: "ellipsis",
+                                                  whiteSpace: "nowrap"
+                                                },
+                                                children: skill.label
+                                              }
+                                            ),
+                                            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.CloseOutlined, { style: { fontSize: 9, color: EDITOR_CHROME.textMuted } })
+                                          ]
+                                        },
+                                        skill.id
+                                      ))
+                                    }
+                                  ) : null,
+                                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                                    import_antd5.Input.TextArea,
+                                    {
+                                      className: "we-runtime-prompt-card__textarea",
+                                      value: draftNote,
+                                      disabled: !canEditNote,
+                                      readOnly: inlineTextEditing,
+                                      tabIndex: inlineTextEditing ? -1 : 0,
+                                      allowClear: true,
+                                      autoSize: { minRows: 1, maxRows: 4 },
+                                      placeholder: notePlaceholder,
+                                      variant: "borderless",
+                                      styles: {
+                                        textarea: {
+                                          color: EDITOR_CHROME.textPrimary,
+                                          background: "transparent",
+                                          minHeight: 32,
+                                          padding: "6px 10px",
+                                          fontSize: 12.5,
+                                          lineHeight: 1.55,
+                                          caretColor: EDITOR_CHROME.textPrimary
+                                        }
+                                      },
+                                      style: {
+                                        borderRadius: 12,
+                                        background: "transparent",
+                                        borderColor: "transparent",
+                                        boxShadow: "none"
+                                      },
+                                      onChange: (event) => {
+                                        onDraftChange(event.target.value);
+                                      },
+                                      onFocus: (event) => {
+                                        if (!inlineTextEditing) return;
+                                        event.currentTarget.blur();
+                                      },
+                                      onPasteCapture: onNotePasteCapture,
+                                      onKeyDown: handlePromptKeyDown,
+                                      onBlur: (event) => {
+                                        const nextTarget = event.relatedTarget;
+                                        if (nextTarget instanceof Node && noteComposerRef.current?.contains(nextTarget)) {
+                                          return;
+                                        }
+                                        if (!noteDirty && !selectedSkillsDirty) return;
+                                        void onConfirmNoteWithSelectedSkills();
+                                      }
+                                    }
+                                  )
+                                ]
+                              }
+                            )
+                          }
+                        ),
+                        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                          PromptImageStrip,
+                          {
+                            images,
+                            readOnly: Boolean(savedNoteMeta?.readOnly),
+                            onRemoveImage: (imageId) => {
+                              void onRemoveImage(imageId);
+                            }
+                          }
+                        )
+                      ] }) : null,
+                      showAnnotationMarkdownEditor ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { "data-we-prompt-primary-focus-exempt": "true", style: annotationEditorShellStyle, children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 8 }, children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                            "span",
+                            {
+                              style: {
+                                minWidth: 0,
+                                flex: 1,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                lineHeight: 1.4,
+                                color: EDITOR_CHROME.textSecondary
+                              },
+                              children: documentSourceMarkdownEditor ? "Markdown \u6E90\u7801" : "\u9700\u6C42\u6807\u6CE8"
+                            }
+                          ),
+                          annotationDeleteAction
+                        ] }),
+                        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { "data-we-annotation-markdown-editor": "true", style: annotationEditorInputStyle, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                          import_antd5.Input.TextArea,
+                          {
+                            className: "we-runtime-prompt-card__textarea",
+                            value: annotationDraftMarkdown,
+                            disabled: annotationLoading || annotationManualEditDisabled,
+                            autoSize: { minRows: 4, maxRows: 10 },
+                            placeholder: documentSourceMarkdownEditor ? DOCUMENT_SOURCE_MARKDOWN_PLACEHOLDER : annotationManualEditDisabled ? annotationManualEditMessage : ANNOTATION_MARKDOWN_PLACEHOLDER,
+                            variant: "borderless",
+                            styles: {
+                              textarea: {
+                                color: EDITOR_CHROME.textPrimary,
+                                background: "transparent",
+                                minHeight: 96,
+                                padding: "10px 12px",
+                                fontSize: 12,
+                                lineHeight: 1.55,
+                                caretColor: EDITOR_CHROME.textPrimary
+                              }
+                            },
+                            style: {
+                              background: "transparent",
+                              borderColor: "transparent",
+                              boxShadow: "none"
+                            },
+                            onChange: (event) => {
+                              onAnnotationDraftChange(event.target.value);
+                            },
+                            onKeyDown: (event) => {
+                              if (event.nativeEvent.isComposing) return;
+                              if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                void saveAndCloseAnnotationMarkdownComposer();
+                                return;
+                              }
+                              if (event.key === "Escape") {
+                                event.stopPropagation();
+                              }
+                            }
+                          }
+                        ) })
+                      ] }) : null,
+                      showPromptDesignEditor && transactionManager ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                        PromptCardDesignEditor,
+                        {
+                          target: currentTarget,
+                          transactionManager,
+                          tokensService,
+                          refreshKey,
+                          disabled: currentTaskRunning,
+                          onRefreshRequest: () => {
+                            setRefreshKey((value) => value + 1);
+                          },
+                          onDeleteElement: options.onDeleteCurrentElement
+                        }
+                      ) : null,
+                      !isAnnotationSession && !bubbleStyleEditorOpen && styleSummaryLines.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
                         "div",
                         {
                           style: {
                             display: "flex",
                             flexDirection: "column",
-                            flex: 1,
-                            minWidth: 0,
-                            overflow: "hidden"
+                            gap: 4,
+                            padding: "8px 10px",
+                            borderRadius: 12,
+                            background: "rgba(255, 255, 255, 0.04)",
+                            border: `1px solid ${EDITOR_CHROME.border}`
                           },
                           children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                              "span",
+                              {
+                                style: {
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  lineHeight: 1.4,
+                                  color: EDITOR_CHROME.textSecondary
+                                },
+                                children: "\u6837\u5F0F\u7F16\u8F91"
+                              }
+                            ),
+                            styleSummaryLines.map((line) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                              "span",
+                              {
+                                style: {
+                                  fontSize: 11,
+                                  lineHeight: 1.45,
+                                  color: EDITOR_CHROME.textMuted,
+                                  wordBreak: "break-word"
+                                },
+                                children: line
+                              },
+                              line
+                            ))
+                          ]
+                        }
+                      ) : null,
+                      currentAgentTask ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                        "div",
+                        {
+                          style: {
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 6,
+                            padding: "2px 4px 0",
+                            marginTop: -2
+                          },
+                          children: [
+                            currentAgentTask.status === "completed" ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.CheckCircleFilled, { style: { color: "#22c55e", fontSize: 13, marginTop: 3 } }) : currentAgentTask.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.ExclamationCircleFilled, { style: { color: "#ef4444", fontSize: 13, marginTop: 3 } }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { style: { marginTop: 2 }, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(AgentSparkleIcon, {}) }),
                             /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
                               "div",
                               {
                                 style: {
                                   display: "flex",
-                                  alignItems: "center",
-                                  gap: 4,
-                                  minWidth: 0
+                                  flexDirection: "column",
+                                  flex: 1,
+                                  minWidth: 0,
+                                  overflow: "hidden"
                                 },
                                 children: [
-                                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                                  /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                                    "div",
+                                    {
+                                      style: {
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                        minWidth: 0
+                                      },
+                                      children: [
+                                        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                                          "span",
+                                          {
+                                            style: {
+                                              fontSize: 12,
+                                              fontWeight: 500,
+                                              color: currentAgentTask.status === "error" ? "#ef4444" : EDITOR_CHROME.textPrimary
+                                            },
+                                            children: currentAgentTask.status === "pending" ? "AI \u51C6\u5907\u4E2D" : currentAgentTask.status === "created" ? "AI \u6B63\u5728\u4FEE\u6539" : currentAgentTask.status === "completed" ? "AI \u4FEE\u6539\u5B8C\u6210" : "AI \u4FEE\u6539\u5931\u8D25"
+                                          }
+                                        ),
+                                        currentAgentTask.status === "error" && currentTaskErrorMessage ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                                          IconActionButton,
+                                          {
+                                            title: "\u590D\u5236\u9519\u8BEF\u4FE1\u606F",
+                                            icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons5.CopyOutlined, {}),
+                                            tone: "danger",
+                                            style: {
+                                              width: 20,
+                                              minWidth: 20,
+                                              height: 20,
+                                              fontSize: 12,
+                                              marginLeft: 1
+                                            },
+                                            onClick: () => {
+                                              void copyPromptCardTextToClipboard(currentTaskErrorMessage).catch(
+                                                () => void 0
+                                              );
+                                            }
+                                          }
+                                        ) : null
+                                      ]
+                                    }
+                                  ),
+                                  currentTaskDescription ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
                                     "span",
                                     {
                                       style: {
-                                        fontSize: 12,
-                                        fontWeight: 500,
-                                        color: currentAgentTask.status === "error" ? "#ef4444" : EDITOR_CHROME.textPrimary
+                                        fontSize: 11,
+                                        lineHeight: 1.5,
+                                        color: EDITOR_CHROME.textMuted,
+                                        marginTop: 1,
+                                        whiteSpace: "nowrap",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis"
                                       },
-                                      children: currentAgentTask.status === "pending" ? "AI \u51C6\u5907\u4E2D" : currentAgentTask.status === "created" ? "AI \u6B63\u5728\u4FEE\u6539" : currentAgentTask.status === "completed" ? "AI \u4FEE\u6539\u5B8C\u6210" : "AI \u4FEE\u6539\u5931\u8D25"
-                                    }
-                                  ),
-                                  currentAgentTask.status === "error" && currentTaskErrorMessage ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                                    IconActionButton,
-                                    {
-                                      title: "\u590D\u5236\u9519\u8BEF\u4FE1\u606F",
-                                      icon: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(import_icons4.CopyOutlined, {}),
-                                      tone: "danger",
-                                      style: {
-                                        width: 20,
-                                        minWidth: 20,
-                                        height: 20,
-                                        fontSize: 12,
-                                        marginLeft: 1
-                                      },
-                                      onClick: () => {
-                                        void copyPromptCardTextToClipboard(currentTaskErrorMessage).catch(
-                                          () => void 0
-                                        );
-                                      }
+                                      children: [
+                                        currentTaskDescription,
+                                        currentAgentTask.sessionId ? ` \xB7 Session ${currentAgentTask.sessionId}` : ""
+                                      ]
                                     }
                                   ) : null
                                 ]
                               }
-                            ),
-                            currentTaskDescription ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-                              "span",
-                              {
-                                style: {
-                                  fontSize: 11,
-                                  lineHeight: 1.5,
-                                  color: EDITOR_CHROME.textMuted,
-                                  marginTop: 1,
-                                  whiteSpace: "nowrap",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis"
-                                },
-                                children: [
-                                  currentTaskDescription,
-                                  currentAgentTask.sessionId ? ` \xB7 Session ${currentAgentTask.sessionId}` : ""
-                                ]
-                              }
-                            ) : null
+                            )
                           ]
                         }
-                      )
+                      ) : null
                     ]
                   }
-                ) : null
+                )
               ]
             }
           )
@@ -16958,7 +17987,7 @@ var PromptCardView = import_react10.default.forwardRef(
 
 // src/ui/runtime/property-panel-view.tsx
 var import_react14 = __toESM(require("react"));
-var import_icons7 = require("@ant-design/icons");
+var import_icons8 = require("@ant-design/icons");
 
 // src/utils/page-animation-toggle.ts
 var STYLE_TAG_ID = "__commentary_no_animations__";
@@ -17051,6 +18080,8 @@ function setPageAnimationsDisabled(disabled) {
   }
   const styleEl = document.createElement("style");
   styleEl.id = STYLE_TAG_ID;
+  const cspNonce = resolveCspNonce(document);
+  if (cspNonce) styleEl.nonce = cspNonce;
   styleEl.textContent = DISABLE_ANIMATIONS_CSS;
   document.head.appendChild(styleEl);
   pauseAllVideos();
@@ -17058,7 +18089,7 @@ function setPageAnimationsDisabled(disabled) {
 }
 
 // src/ui/runtime/property-panel-view.tsx
-var import_antd9 = require("antd");
+var import_antd8 = require("antd");
 
 // src/utils/page-zoom-toggle.ts
 var state = {
@@ -17712,12 +18743,12 @@ function dockFloatingPanelRight(options) {
 
 // src/ui/property-panel/react-page-tweak-panel.tsx
 var import_react12 = __toESM(require("react"));
-var import_icons6 = require("@ant-design/icons");
+var import_icons7 = require("@ant-design/icons");
 var import_antd7 = require("antd");
 
 // src/ui/property-panel/react-tweak-panel.tsx
 var import_react11 = __toESM(require("react"));
-var import_icons5 = require("@ant-design/icons");
+var import_icons6 = require("@ant-design/icons");
 var import_antd6 = require("antd");
 var import_jsx_runtime9 = require("react/jsx-runtime");
 function InfoTooltipIcon(props) {
@@ -17729,7 +18760,7 @@ function InfoTooltipIcon(props) {
       placement: "left",
       arrow: { pointAtCenter: true },
       getPopupContainer: resolveRuntimePopupContainer,
-      children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_icons5.InfoCircleOutlined, { className: "we-runtime-config-panel__info-icon" })
+      children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(import_icons6.InfoCircleOutlined, { className: "we-runtime-config-panel__info-icon" })
     }
   );
 }
@@ -17773,7 +18804,7 @@ function AttrLabel(props) {
       onClick,
       children: [
         canCollapse ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-          import_icons5.CaretRightOutlined,
+          import_icons6.CaretRightOutlined,
           {
             rotate: collapsed ? 0 : 90,
             className: "we-runtime-config-panel__collapse-icon"
@@ -18273,7 +19304,7 @@ function CollapseHeaderLabel(props) {
             HeaderActionButton,
             {
               title: "\u6E05\u7A7A\u5F53\u524D\u5206\u7EC4\u7F16\u8F91",
-              icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_icons6.DeleteOutlined, {}),
+              icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_icons7.DeleteOutlined, {}),
               disabled: disabled || !onClear,
               onClick: onClear
             }
@@ -18282,7 +19313,7 @@ function CollapseHeaderLabel(props) {
             HeaderActionButton,
             {
               title: "\u5B9A\u4F4D\u5F53\u524D\u5143\u7D20",
-              icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_icons6.LinkOutlined, {}),
+              icon: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(import_icons7.LinkOutlined, {}),
               disabled: disabled || !onLocate,
               onClick: onLocate
             }
@@ -18448,14 +19479,11 @@ var ShortcutCaptureCard = import_react13.default.forwardRef(
 );
 
 // src/ui/runtime/runtime-feedback.ts
-var import_antd8 = require("antd");
 function notifyRuntimeMessage(type, content) {
-  const bridge = getWebEditorFeedbackBridge();
-  if (bridge) {
-    bridge.message({ type, content });
-    return;
-  }
-  void import_antd8.message.open({ type, content });
+  sendWebEditorFeedbackMessage({ type, content });
+}
+function flushRuntimeMessages() {
+  flushWebEditorFeedbackMessages();
 }
 
 // src/ui/runtime/ai-workspace-picker.ts
@@ -18559,7 +19587,34 @@ var PROPERTY_PANEL_HELP_TOOLTIP = "\u53EF\u4EE5\u76F4\u63A5\u628A\u9700\u6C42\u5
 var SELECTION_MODE_TOGGLE_SHORTCUT_LABEL = "Ctrl / Cmd + S";
 var PARENT_SELECT_SHORTCUT_LABEL = "\u2191";
 var PARENT_RETURN_SHORTCUT_LABEL = "\u2193";
+var DELETE_ELEMENT_SHORTCUT_LABEL = "Delete / Backspace";
 var PARENT_SELECT_INPUT_TOUCHED_ATTR2 = "data-we-parent-select-input-touched";
+function CommenterNameSettingsInput({
+  value,
+  onChange
+}) {
+  const [draft, setDraft] = import_react14.default.useState(value);
+  import_react14.default.useEffect(() => {
+    setDraft(value);
+  }, [value]);
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+    import_antd8.Input,
+    {
+      "aria-label": "\u6279\u6CE8\u8005\u540D\u79F0",
+      size: "small",
+      value: draft,
+      maxLength: 120,
+      placeholder: "\u8BF7\u8F93\u5165\u79F0\u547C",
+      style: { width: 132 },
+      onClick: (event) => event.stopPropagation(),
+      onChange: (event) => {
+        const nextValue = event.target.value;
+        setDraft(nextValue);
+        onChange(nextValue);
+      }
+    }
+  );
+}
 function buildCommentarySkillGuidancePrompt(skillInstallSource) {
   const resolvedSkillInstallSource = typeof skillInstallSource === "string" && skillInstallSource.trim() ? skillInstallSource.trim() : "";
   return [
@@ -18755,7 +19810,10 @@ var PropertyPanelView = import_react14.default.forwardRef(
     } = props;
     const toolbarMode = props.toolbarMode ?? options.toolbarMode ?? "inline";
     const isHostToolbarMode = toolbarMode === "host";
+    const compactToolbar = Boolean(options.compactToolbar);
+    const toolbarExtraContent = options.toolbarExtraContent ?? null;
     const hideExecutionControls = Boolean(options.hideExecutionControls);
+    const externalAnnotationMode = Boolean(options.externalAnnotationMode);
     const hostSurfaceVisibilityControl = options.hostSurfaceVisibilityControl;
     const selectionModeAvailable = interactionProfile !== "text-comment";
     const rootRef = import_react14.default.useRef(null);
@@ -19086,8 +20144,8 @@ var PropertyPanelView = import_react14.default.forwardRef(
           if (result === false) throw new Error("\u5F53\u524D\u5BBF\u4E3B\u65E0\u6CD5\u4FDD\u5B58 HTML \u6587\u4EF6");
         });
         const record = result && typeof result === "object" ? result : {};
-        const message3 = typeof record.message === "string" && record.message.trim() ? record.message.trim() : "HTML \u6587\u672C\u548C\u6837\u5F0F\u5DF2\u4FDD\u5B58";
-        notifyRuntimeMessage(record.changed === false ? "info" : "success", message3);
+        const message = typeof record.message === "string" && record.message.trim() ? record.message.trim() : "HTML \u6587\u672C\u548C\u6837\u5F0F\u5DF2\u4FDD\u5B58";
+        notifyRuntimeMessage(record.changed === false ? "info" : "success", message);
       } catch (error) {
         notifyRuntimeMessage(
           "error",
@@ -19531,6 +20589,8 @@ var PropertyPanelView = import_react14.default.forwardRef(
     }, [capturingShortcutIndex]);
     const copyReason = options.getCopyPromptBlockReason?.();
     const copyBlocked = !options.onCopyPrompt || !!copyReason;
+    const liveCopyPromptText = options.getCopyPromptText?.();
+    const copyPromptUnavailable = typeof options.getCopyPromptText === "function" && !liveCopyPromptText?.trim();
     const agentPromptToolbarAction = getAgentPromptToolbarActionState({
       toolMinimized,
       visualState: effectiveVisualState,
@@ -19579,7 +20639,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
         },
         children: [
           /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 8 }, children: [
-            currentAgentTask.status === "completed" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.CheckCircleFilled, { style: { color: "#22c55e" } }) : currentAgentTask.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.ExclamationCircleFilled, { style: { color: "#ef4444" } }) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(AgentSparkleIcon, {}),
+            currentAgentTask.status === "completed" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.CheckCircleFilled, { style: { color: "#22c55e" } }) : currentAgentTask.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.ExclamationCircleFilled, { style: { color: "#ef4444" } }) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(AgentSparkleIcon, {}),
             /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
               "span",
               {
@@ -19609,13 +20669,13 @@ var PropertyPanelView = import_react14.default.forwardRef(
               ]
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(import_antd9.Space, { size: 8, wrap: true, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(import_antd8.Space, { size: 8, wrap: true, children: [
             !hideExecutionControls && currentTaskRunning ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-              import_antd9.Button,
+              import_antd8.Button,
               {
                 size: "small",
                 danger: true,
-                icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.StopOutlined, {}),
+                icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.StopOutlined, {}),
                 disabled: !agentPromptCanInterrupt || agentPromptInterrupting,
                 loading: agentPromptInterrupting,
                 onClick: () => {
@@ -19625,10 +20685,10 @@ var PropertyPanelView = import_react14.default.forwardRef(
               }
             ) : null,
             !hideExecutionControls && currentAgentTask.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-              import_antd9.Button,
+              import_antd8.Button,
               {
                 size: "small",
-                icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.ReloadOutlined, {}),
+                icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.ReloadOutlined, {}),
                 disabled: agentPromptToolbarAction.sendDisabled || actionBusy,
                 onClick: () => {
                   void handleConfirmSendPromptToAgent();
@@ -19636,8 +20696,8 @@ var PropertyPanelView = import_react14.default.forwardRef(
                 children: "\u91CD\u8BD5"
               }
             ) : null,
-            currentTaskSessionHref ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_antd9.Button, { size: "small", icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.LinkOutlined, {}), onClick: handleOpenCurrentTaskSession, children: "\u6253\u5F00\u4F1A\u8BDD" }) : null,
-            currentTaskTerminal ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_antd9.Button, { size: "small", icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CloseToolIcon, {}), onClick: handleDismissCurrentTaskState, children: "\u5173\u95ED\u63D0\u793A" }) : null
+            currentTaskSessionHref ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_antd8.Button, { size: "small", icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.LinkOutlined, {}), onClick: handleOpenCurrentTaskSession, children: "\u6253\u5F00\u4F1A\u8BDD" }) : null,
+            currentTaskTerminal ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_antd8.Button, { size: "small", icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CloseToolIcon, {}), onClick: handleDismissCurrentTaskState, children: "\u5173\u95ED\u63D0\u793A" }) : null
           ] })
         ]
       }
@@ -19743,12 +20803,12 @@ var PropertyPanelView = import_react14.default.forwardRef(
     const hasPrototypeClearableEdits = Boolean(options.hasPrototypeComments?.());
     const hasClearableEdits = modifiedCount + visibleTerminalTaskCount > 0 || hasPrototypeClearableEdits;
     const clearAllEditsDisabled = actionBusy || !hasClearableEdits || !options.onClearEdits;
-    const copyPromptDisabled = clearAllEditsDisabled || copyBlocked;
+    const copyPromptDisabled = clearAllEditsDisabled || copyBlocked || copyPromptUnavailable;
     const copyToolbarButton = showCopyPromptAction ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
       AgentToolbarIconButton,
       {
         title: copyReason ?? "\u590D\u5236 Prompt",
-        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.CopyOutlined, {}),
+        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.CopyOutlined, {}),
         awake: agentShellAwake,
         disabled: copyPromptDisabled,
         onClick: () => {
@@ -19793,11 +20853,11 @@ var PropertyPanelView = import_react14.default.forwardRef(
                   }
                 ),
                 !hideExecutionControls && currentTaskRunning ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                  import_antd9.Button,
+                  import_antd8.Button,
                   {
                     size: "small",
                     danger: true,
-                    icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.StopOutlined, {}),
+                    icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.StopOutlined, {}),
                     disabled: !agentPromptCanInterrupt || agentPromptInterrupting,
                     loading: agentPromptInterrupting,
                     onClick: () => {
@@ -19810,7 +20870,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
             }
           ),
           visibleSessionActivities.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-            import_antd9.Timeline,
+            import_antd8.Timeline,
             {
               items: visibleSessionActivities.map((item) => ({
                 key: item.id,
@@ -19872,17 +20932,43 @@ var PropertyPanelView = import_react14.default.forwardRef(
       }
     );
     const agentPrimaryMenuLabel = agentPromptToolbarAction.sendTitle.includes("\u8FFD\u52A0") ? "\u8FFD\u52A0" : "\u5FEB\u901F\u6267\u884C";
-    const clearEditsTitle = hasPrototypeClearableEdits ? "\u6E05\u7A7A\u6279\u6CE8" : "\u6E05\u7A7A\u5168\u90E8\u7F16\u8F91";
-    const clearAllEditsToolbarButton = clearAllEditsDisabled ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+    const clearEditsTitle = externalAnnotationMode ? "\u6E05\u7A7A\u6211\u7684\u5916\u90E8\u6279\u6CE8" : hasPrototypeClearableEdits ? "\u6E05\u7A7A\u6279\u6CE8" : "\u6E05\u7A7A\u5168\u90E8\u7F16\u8F91";
+    const clearAllEditsToolbarButton = options.hideClearEditsAction ? null : clearAllEditsDisabled ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
       AgentToolbarIconButton,
       {
         title: clearEditsTitle,
-        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.DeleteOutlined, {}),
+        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.DeleteOutlined, {}),
         awake: agentShellAwake,
         disabled: true
       }
+    ) : externalAnnotationMode ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+      import_antd8.Popconfirm,
+      {
+        title: "\u6E05\u7A7A\u6211\u7684\u5916\u90E8\u6279\u6CE8",
+        description: "\u786E\u8BA4\u540E\u53EA\u4F1A\u6E05\u7A7A\u5F53\u524D\u8BC4\u8BBA\u8005\u81EA\u5DF1\u5199\u7684\u5916\u90E8\u6279\u6CE8\uFF0C\u4E0D\u5F71\u54CD\u5176\u4ED6\u8BC4\u8BBA\u8005\u3002",
+        arrow: { pointAtCenter: true },
+        getPopupContainer: resolveRuntimePopupContainer,
+        okText: "\u6E05\u7A7A",
+        cancelText: "\u53D6\u6D88",
+        okButtonProps: { danger: true },
+        onConfirm: () => runAction(
+          () => options.onClearEdits?.({
+            skipConfirm: true,
+            scope: "prototype",
+            target: "all"
+          })
+        ),
+        children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { style: { display: "inline-flex" }, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          AgentToolbarIconButton,
+          {
+            title: clearEditsTitle,
+            icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.DeleteOutlined, {}),
+            awake: agentShellAwake
+          }
+        ) })
+      }
     ) : hasPrototypeClearableEdits ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-      import_antd9.Popconfirm,
+      import_antd8.Popconfirm,
       {
         title: "\u6E05\u7A7A\u5F53\u524D\u539F\u578B\u6279\u6CE8",
         description: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(import_jsx_runtime12.Fragment, { children: [
@@ -19915,13 +21001,13 @@ var PropertyPanelView = import_react14.default.forwardRef(
           AgentToolbarIconButton,
           {
             title: clearEditsTitle,
-            icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.DeleteOutlined, {}),
+            icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.DeleteOutlined, {}),
             awake: agentShellAwake
           }
         ) })
       }
     ) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-      import_antd9.Popconfirm,
+      import_antd8.Popconfirm,
       {
         title: "\u6E05\u7A7A\u5168\u90E8\u7F16\u8F91",
         description: "\u786E\u8BA4\u540E\u4F1A\u6E05\u7A7A\u6240\u6709\u5F85\u4FEE\u6539\u5185\u5BB9\uFF0C\u5DF2\u4FDD\u5B58\u7684\u4FEE\u6539\u4E0D\u53D7\u5F71\u54CD\u3002",
@@ -19935,7 +21021,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
           AgentToolbarIconButton,
           {
             title: clearEditsTitle,
-            icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.DeleteOutlined, {}),
+            icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.DeleteOutlined, {}),
             awake: agentShellAwake
           }
         ) })
@@ -19946,7 +21032,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
       {
         title: "\u4FDD\u5B58\u6587\u672C\u548C\u6837\u5F0F",
         ariaLabel: "\u4FDD\u5B58\u6587\u672C\u548C\u6837\u5F0F",
-        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.SaveOutlined, {}),
+        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.SaveOutlined, {}),
         awake: agentShellAwake,
         disabled: actionBusy,
         onClick: () => {
@@ -19955,7 +21041,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
       }
     ) : null;
     const agentExecutionToolbarButton = hideExecutionControls ? null : inlineInterruptVisible ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-      import_antd9.Popconfirm,
+      import_antd8.Popconfirm,
       {
         title: "\u7EC8\u6B62\u5168\u90E8\u4FEE\u6539",
         description: "\u786E\u8BA4\u540E\u4F1A\u7EC8\u6B62\u5F53\u524D\u9875\u9762\u6240\u6709\u6B63\u5728\u8FDB\u884C\u7684 AI \u4FEE\u6539\u3002",
@@ -19972,7 +21058,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
           {
             title: agentPromptToolbarAction.interruptTitle,
             ariaLabel: "\u7EC8\u6B62\u5168\u90E8\u4FEE\u6539",
-            icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.PoweroffOutlined, {}),
+            icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.PoweroffOutlined, {}),
             awake: agentShellAwake,
             active: !agentPromptToolbarAction.interruptDisabled,
             disabled: agentPromptToolbarAction.interruptDisabled,
@@ -19985,7 +21071,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
       {
         title: agentPromptToolbarAction.sendDisabled ? agentPromptToolbarAction.sendTitle : agentPrimaryMenuLabel,
         ariaLabel: agentPrimaryMenuLabel,
-        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.CaretRightFilled, {}),
+        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.CaretRightFilled, {}),
         awake: agentShellAwake,
         active: inlineSendVisible && !agentPromptToolbarAction.sendDisabled,
         disabled: !inlineSendVisible || agentPromptToolbarAction.sendDisabled || actionBusy,
@@ -20000,7 +21086,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
       {
         title: hostSurfaceVisible ? hostSurfaceVisibilityControl.hideTitle || "\u9690\u85CF\u7A97\u53E3" : hostSurfaceVisibilityControl.showTitle || "\u663E\u793A\u7A97\u53E3",
         ariaLabel: hostSurfaceVisible ? hostSurfaceVisibilityControl.hideTitle || "\u9690\u85CF\u7A97\u53E3" : hostSurfaceVisibilityControl.showTitle || "\u663E\u793A\u7A97\u53E3",
-        icon: hostSurfaceVisible ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.EyeOutlined, {}) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.EyeInvisibleOutlined, {}),
+        icon: hostSurfaceVisible ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.EyeOutlined, {}) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.EyeInvisibleOutlined, {}),
         awake: agentShellAwake,
         active: hostSurfaceVisible,
         disabled: actionBusy,
@@ -20075,9 +21161,9 @@ var PropertyPanelView = import_react14.default.forwardRef(
           setDirectoryPickerPathInput(nextState.path);
           return nextState;
         } catch (error) {
-          const message3 = error instanceof Error ? error.message : String(error);
-          setDirectoryPickerError(message3);
-          notifyRuntimeMessage("error", message3);
+          const message = error instanceof Error ? error.message : String(error);
+          setDirectoryPickerError(message);
+          notifyRuntimeMessage("error", message);
           return null;
         } finally {
           setDirectoryPickerBusy(false);
@@ -20265,17 +21351,13 @@ var PropertyPanelView = import_react14.default.forwardRef(
         setDirectoryPickerOpen(false);
         notifyRuntimeMessage("success", "\u5DF2\u9009\u62E9 AI \u5DE5\u4F5C\u76EE\u5F55");
       } catch (error) {
-        const message3 = error instanceof Error ? error.message : String(error);
-        setDirectoryPickerError(message3);
-        notifyRuntimeMessage("error", message3);
+        const message = error instanceof Error ? error.message : String(error);
+        setDirectoryPickerError(message);
+        notifyRuntimeMessage("error", message);
       } finally {
         setDirectoryPickerBusy(false);
       }
-    }, [
-      directoryPickerRecentWorkspaces,
-      directoryPickerState?.path,
-      options
-    ]);
+    }, [directoryPickerRecentWorkspaces, directoryPickerState?.path, options]);
     const aiExecutionWorkspaceDisplayName = getPathDisplayName(aiExecutionWorkspacePath);
     const toggleSelectionMode = import_react14.default.useCallback(() => {
       const nextSelectionModeActive = !selectionModeActive;
@@ -20306,7 +21388,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
         /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "we-runtime-settings-card__recommended-badge", children: "\u63A8\u8350" })
       ] }),
       control: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-        import_antd9.Tooltip,
+        import_antd8.Tooltip,
         {
           title: skillInstallPromptCopied ? "\u5B89\u88C5\u63D0\u793A\u8BCD\u5DF2\u590D\u5236" : "\u590D\u5236\u5B89\u88C5\u63D0\u793A\u8BCD",
           placement: "bottomRight",
@@ -20327,7 +21409,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
         }
       )
     };
-    const aiWorkspaceSettingsItem = !options.onHostToolbarAction ? null : {
+    const aiWorkspaceSettingsItem = externalAnnotationMode || !options.onHostToolbarAction ? null : {
       key: "ai-workspace",
       label: "AI \u5DE5\u4F5C\u76EE\u5F55",
       action: handleOpenDirectoryPicker,
@@ -20338,16 +21420,16 @@ var PropertyPanelView = import_react14.default.forwardRef(
           title: aiExecutionWorkspacePath || void 0,
           children: [
             /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "we-runtime-settings-card__workspace-value-text", children: aiExecutionWorkspaceDisplayName || "\u672A\u914D\u7F6E" }),
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.RightOutlined, { style: { fontSize: 10 } })
+            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.RightOutlined, { style: { fontSize: 10 } })
           ]
         }
       )
     };
-    const propertyPanelSettingsItem = showPropertyPanelSettingsItem ? {
+    const propertyPanelSettingsItem = !externalAnnotationMode && showPropertyPanelSettingsItem ? {
       key: "property-panel",
       label: "\u8BBE\u8BA1\u51B3\u7B56",
       control: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-        import_antd9.Switch,
+        import_antd8.Switch,
         {
           checked: propertyPanelOpen,
           onChange: (checked) => {
@@ -20357,15 +21439,48 @@ var PropertyPanelView = import_react14.default.forwardRef(
       )
     } : null;
     const settingsItems = [
-      commentarySkillInstallSettingsItem,
+      ...externalAnnotationMode && options.onCommenterNameChange ? [
+        {
+          key: "commenter-name",
+          label: "\u6279\u6CE8\u8005",
+          control: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+            CommenterNameSettingsInput,
+            {
+              value: options.commenterName ?? "",
+              onChange: (name) => {
+                void options.onCommenterNameChange?.(name);
+              }
+            }
+          )
+        }
+      ] : [],
+      ...!externalAnnotationMode ? [commentarySkillInstallSettingsItem] : [],
       ...aiWorkspaceSettingsItem ? [aiWorkspaceSettingsItem] : [],
       ...propertyPanelSettingsItem ? [propertyPanelSettingsItem] : [],
+      ...externalAnnotationMode || interactionProfile === "text-comment" ? [] : [
+        {
+          key: "capture-target-screenshot",
+          label: "\u9644\u5E26\u76EE\u6807\u622A\u56FE",
+          control: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+            import_antd8.Switch,
+            {
+              checked: uiSettings.captureTargetScreenshot,
+              onChange: (checked) => {
+                onUiSettingsChange({
+                  ...uiSettings,
+                  captureTargetScreenshot: checked
+                });
+              }
+            }
+          )
+        }
+      ],
       ...pageEditingSettingsAvailable ? [
         {
           key: "disable-page-animations",
           label: "\u5173\u95ED\u9875\u9762\u52A8\u753B",
           control: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-            import_antd9.Switch,
+            import_antd8.Switch,
             {
               checked: uiSettings.disablePageAnimations,
               onChange: (checked) => {
@@ -20382,7 +21497,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
             key: "document-comment-mode",
             label: "\u6587\u6863\u6279\u6CE8\u6A21\u5F0F",
             control: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-              import_antd9.Switch,
+              import_antd8.Switch,
               {
                 checked: uiSettings.documentCommentMode,
                 onChange: (checked) => {
@@ -20415,7 +21530,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
             },
             children: [
               /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { children: "\u67E5\u770B" }),
-              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.RightOutlined, { style: { fontSize: 10 } })
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.RightOutlined, { style: { fontSize: 10 } })
             ]
           }
         )
@@ -20430,19 +21545,19 @@ var PropertyPanelView = import_react14.default.forwardRef(
           /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "we-runtime-settings-card__header", children: [
             /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "we-runtime-settings-card__title", children: "Axhub \u6279\u6CE8" }),
             /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-              import_antd9.Tooltip,
+              import_antd8.Tooltip,
               {
                 title: uiSettings.darkMode ? "\u5173\u95ED\u6DF1\u8272\u6A21\u5F0F" : "\u5F00\u542F\u6DF1\u8272\u6A21\u5F0F",
                 placement: "bottomRight",
                 getPopupContainer: resolveRuntimePopupContainer,
                 children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                  import_antd9.Button,
+                  import_antd8.Button,
                   {
                     type: "text",
                     size: "small",
                     className: "we-runtime-settings-dark-mode-button",
                     "aria-label": uiSettings.darkMode ? "\u5173\u95ED\u6DF1\u8272\u6A21\u5F0F" : "\u5F00\u542F\u6DF1\u8272\u6A21\u5F0F",
-                    icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.MoonOutlined, { style: { fontSize: 18 } }),
+                    icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.MoonOutlined, { style: { fontSize: 18 } }),
                     onClick: (event) => {
                       event.stopPropagation();
                       onUiSettingsChange({
@@ -20489,7 +21604,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
       }
     );
     const settingsToolbarButton = /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-      import_antd9.Popover,
+      import_antd8.Popover,
       {
         trigger: "click",
         placement: "bottomRight",
@@ -20508,7 +21623,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
           AgentToolbarIconButton,
           {
             title: "\u8BBE\u7F6E",
-            icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.SettingOutlined, {}),
+            icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.SettingOutlined, {}),
             awake: agentShellAwake,
             disabled: actionBusy
           }
@@ -20520,7 +21635,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
       AgentToolbarIconButton,
       {
         title: selectionModeToolbarTitle,
-        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.SelectOutlined, {}),
+        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.SelectOutlined, {}),
         ariaLabel: selectionModeActive ? "\u5173\u95ED\u9009\u62E9\u5143\u7D20" : "\u5F00\u542F\u9009\u62E9\u5143\u7D20",
         awake: agentShellAwake,
         active: selectionModeActive,
@@ -20532,7 +21647,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
       AgentToolbarIconButton,
       {
         title: markdownSourceEditorOpen ? "\u9690\u85CF Markdown \u539F\u6587" : "\u663E\u793A Markdown \u539F\u6587",
-        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.FileTextOutlined, {}),
+        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.FileTextOutlined, {}),
         ariaLabel: markdownSourceEditorOpen ? "\u9690\u85CF Markdown \u539F\u6587" : "\u663E\u793A Markdown \u539F\u6587",
         awake: agentShellAwake,
         active: markdownSourceEditorOpen,
@@ -20571,7 +21686,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
         disabled: actionBusy,
         onClick: () => {
           if (options.onRequestFullExit) {
-            void options.onRequestFullExit();
+            void runAction(options.onRequestFullExit);
             return;
           }
           minimizeTool();
@@ -20590,7 +21705,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
         },
         children: [
           /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-            import_antd9.Typography.Text,
+            import_antd8.Typography.Text,
             {
               style: {
                 color: EDITOR_CHROME.textMuted,
@@ -20601,11 +21716,11 @@ var PropertyPanelView = import_react14.default.forwardRef(
             }
           ),
           showCopyPromptAction ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-            import_antd9.Button,
+            import_antd8.Button,
             {
               type: "default",
               size: "small",
-              icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.CopyOutlined, {}),
+              icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.CopyOutlined, {}),
               onClick: () => {
                 void handleCopyGlobalPanelPrompt();
               },
@@ -20620,7 +21735,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
       AgentToolbarIconButton,
       {
         title: propertyPanelOpen ? "\u5173\u95ED\u8BBE\u8BA1\u51B3\u7B56" : "\u6253\u5F00\u8BBE\u8BA1\u51B3\u7B56",
-        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.SlidersOutlined, {}),
+        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.SlidersOutlined, {}),
         ariaLabel: "\u8BBE\u8BA1\u51B3\u7B56",
         awake: agentShellAwake,
         active: propertyPanelOpen,
@@ -20637,6 +21752,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
       }
       onUiSettingsChange({ ...uiSettings, pageZoomEnabled: nextPageZoomEnabled });
     }, [dockPagePanelRight, onDismissSelection, onTargetChange, onUiSettingsChange, uiSettings]);
+    const annotationSaveStatus = options.getAnnotationSaveStatus?.() ?? "saved";
     const hostToolbarState = import_react14.default.useMemo(() => {
       const agentOptions = [
         { value: null, label: "\u9ED8\u8BA4" },
@@ -20677,6 +21793,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
         propertyPanelTitle: propertyPanelOpen ? "\u5173\u95ED\u8BBE\u8BA1\u51B3\u7B56" : "\u6253\u5F00\u8BBE\u8BA1\u51B3\u7B56",
         modifiedCount,
         terminalTaskCount: visibleTerminalTaskCount,
+        annotationSaveStatus,
         selectedAgent: hideExecutionControls ? null : uiSettings.agentProvider,
         agentOptions: hideExecutionControls ? [] : agentOptions,
         aiExecutionConfigSummary: options.aiExecutionConfigSummary ?? "",
@@ -20687,6 +21804,8 @@ var PropertyPanelView = import_react14.default.forwardRef(
         aiExecutionProviderOptions: options.aiExecutionProviderOptions ?? [],
         darkMode: uiSettings.darkMode,
         disablePageAnimations: uiSettings.disablePageAnimations,
+        captureTargetScreenshotAvailable: interactionProfile !== "text-comment",
+        captureTargetScreenshot: uiSettings.captureTargetScreenshot,
         pageZoomEnabled: uiSettings.pageZoomEnabled,
         copySkillInstallPromptDisabled: actionBusy,
         selectionModeActive: selectionModeAvailable && selectionModeActive,
@@ -20701,6 +21820,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
       };
     }, [
       actionBusy,
+      annotationSaveStatus,
       annotationToolbarTick,
       clearAllEditsDisabled,
       clearEditsTitle,
@@ -20730,6 +21850,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
       selectionModeActive,
       toolbarMode,
       uiSettings.disablePageAnimations,
+      uiSettings.captureTargetScreenshot,
       uiSettings.darkMode,
       uiSettings.agentProvider,
       uiSettings.pageZoomEnabled,
@@ -20832,6 +21953,13 @@ var PropertyPanelView = import_react14.default.forwardRef(
               disablePageAnimations: !uiSettings.disablePageAnimations
             });
             return true;
+          case "toggle-target-screenshot":
+            if (interactionProfile === "text-comment") return false;
+            onUiSettingsChange({
+              ...uiSettings,
+              captureTargetScreenshot: action.enabled ?? !uiSettings.captureTargetScreenshot
+            });
+            return true;
           case "toggle-page-zoom":
             handleTogglePageZoom();
             return true;
@@ -20883,6 +22011,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
         handleInterruptSendPromptToAgent,
         handleTogglePageZoom,
         hostSendVisible,
+        interactionProfile,
         onDismissSelection,
         onAgentVisualStateChange,
         onHoverSelectionSuppressedChange,
@@ -20935,11 +22064,11 @@ var PropertyPanelView = import_react14.default.forwardRef(
           onUiModeChange(mode);
           onRefreshNoteState();
         },
-        enterInlineTextEdit() {
+        enterInlineTextEdit(element) {
           if (toolMinimized) {
             restoreTool();
           }
-          onInlineTextEditingChange?.(true);
+          onInlineTextEditingChange?.(true, element);
         },
         getHostToolbarState() {
           return hostToolbarState;
@@ -20977,21 +22106,21 @@ var PropertyPanelView = import_react14.default.forwardRef(
           /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "we-runtime-prop-panel__header-title-group", children: [
             /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "we-runtime-prop-panel__header-title", children: "\u8BBE\u8BA1\u51B3\u7B56" }),
             /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-              import_antd9.Tooltip,
+              import_antd8.Tooltip,
               {
                 title: PROPERTY_PANEL_HELP_TOOLTIP,
                 placement: "bottomRight",
                 arrow: { pointAtCenter: true },
                 getPopupContainer: resolveRuntimePopupContainer,
                 children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                  import_antd9.Button,
+                  import_antd8.Button,
                   {
                     type: "text",
                     size: "small",
                     className: "we-runtime-prop-panel__header-action we-runtime-prop-panel__header-help",
                     "aria-label": "\u8BBE\u8BA1\u51B3\u7B56\u8BF4\u660E",
                     title: "\u8BBE\u8BA1\u51B3\u7B56\u8BF4\u660E",
-                    icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.QuestionCircleOutlined, {})
+                    icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.QuestionCircleOutlined, {})
                   }
                 )
               }
@@ -21003,14 +22132,14 @@ var PropertyPanelView = import_react14.default.forwardRef(
               className: "we-runtime-prop-panel__header-actions",
               onPointerDownCapture: (event) => event.stopPropagation(),
               children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                import_antd9.Button,
+                import_antd8.Button,
                 {
                   type: "text",
                   size: "small",
                   className: "we-runtime-prop-panel__header-action",
                   "aria-label": "\u590D\u5236\u63D0\u793A\u8BCD",
                   title: "\u590D\u5236\u63D0\u793A\u8BCD",
-                  icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.CopyOutlined, {}),
+                  icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.CopyOutlined, {}),
                   onClick: () => {
                     void handleCopyGlobalPanelPrompt();
                   }
@@ -21044,16 +22173,18 @@ var PropertyPanelView = import_react14.default.forwardRef(
               width: "auto",
               minWidth: 0
             },
-            children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(import_antd9.Space, { size: 4, style: { minWidth: 0, flex: "0 0 auto" }, children: [
+            children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(import_antd8.Space, { size: 4, style: { minWidth: 0, flex: "0 0 auto" }, children: [
               selectionModeToolbarButton,
-              markdownSourceEditorToolbarButton,
-              hostSurfaceVisibilityToolbarButton ?? agentExecutionToolbarButton,
-              copyToolbarButton,
-              propertyPanelToggleButton,
-              clearAllEditsToolbarButton,
-              htmlFileSaveToolbarButton,
-              settingsToolbarButton,
-              closeToolbarButton
+              compactToolbar ? toolbarExtraContent : /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(import_jsx_runtime12.Fragment, { children: [
+                markdownSourceEditorToolbarButton,
+                hostSurfaceVisibilityToolbarButton ?? agentExecutionToolbarButton,
+                copyToolbarButton,
+                propertyPanelToggleButton,
+                clearAllEditsToolbarButton,
+                htmlFileSaveToolbarButton,
+                settingsToolbarButton
+              ] }),
+              options.hideToolbarCloseAction ? null : closeToolbarButton
             ] })
           }
         )
@@ -21254,10 +22385,10 @@ var PropertyPanelView = import_react14.default.forwardRef(
           },
           onPointerLeave: () => onHoverSelectionSuppressedChange(false),
           children: [
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("style", { children: PROPERTY_PANEL_LOCAL_STYLES }),
+            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("style", { nonce: resolveCspNonce(), children: PROPERTY_PANEL_LOCAL_STYLES }),
             isHostToolbarMode ? null : toolMinimized ? minimizedToolbar : expandedToolbar,
             /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-              import_antd9.Modal,
+              import_antd8.Modal,
               {
                 title: "\u8BED\u97F3\u5FEB\u6377\u952E",
                 open: shortcutDialogOpen,
@@ -21266,9 +22397,9 @@ var PropertyPanelView = import_react14.default.forwardRef(
                 maskClosable: true,
                 onCancel: closeShortcutDialog,
                 footer: [
-                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_antd9.Button, { onClick: closeShortcutDialog, children: "\u53D6\u6D88" }, "cancel"),
+                  /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_antd8.Button, { onClick: closeShortcutDialog, children: "\u53D6\u6D88" }, "cancel"),
                   /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                    import_antd9.Button,
+                    import_antd8.Button,
                     {
                       type: "primary",
                       disabled: Boolean(shortcutValidationError),
@@ -21305,7 +22436,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
                           /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: shortcutCaptureHintStyle, children: "\u5F00\u542F\u540E\u624D\u4F1A\u54CD\u5E94\u957F\u6309\u4FEE\u9970\u952E\u548C\u9F20\u6807\u4E2D\u952E\u3002" })
                         ] }),
                         /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                          import_antd9.Switch,
+                          import_antd8.Switch,
                           {
                             checked: shortcutDraft.enabled,
                             onChange: (checked) => {
@@ -21347,7 +22478,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
                           /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { style: shortcutCaptureHintStyle, children: "\u9F20\u6807\u4E2D\u952E\u5355\u51FB\u4F1A\u76F4\u63A5\u8FDB\u5165\u6279\u6CE8\u6C14\u6CE1\u5361\u7247\u3002" })
                         ] }),
                         /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                          import_antd9.Switch,
+                          import_antd8.Switch,
                           {
                             checked: shortcutDraft.middleClickEnabled,
                             onChange: (checked) => {
@@ -21420,7 +22551,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
               }
             ),
             /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-              import_antd9.Modal,
+              import_antd8.Modal,
               {
                 title: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "we-runtime-directory-picker__title", children: [
                   /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { children: "\u9009\u62E9 AI \u5DE5\u4F5C\u76EE\u5F55" }),
@@ -21432,12 +22563,12 @@ var PropertyPanelView = import_react14.default.forwardRef(
                 className: "we-runtime-directory-picker-modal",
                 getContainer: false,
                 closeIcon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                  import_antd9.Tooltip,
+                  import_antd8.Tooltip,
                   {
                     title: "\u5173\u95ED\u76EE\u5F55\u9009\u62E9\u5668",
                     placement: "bottomRight",
                     getPopupContainer: resolveRuntimePopupContainer,
-                    children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.CloseOutlined, { "aria-label": "\u5173\u95ED\u76EE\u5F55\u9009\u62E9\u5668" })
+                    children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.CloseOutlined, { "aria-label": "\u5173\u95ED\u76EE\u5F55\u9009\u62E9\u5668" })
                   }
                 ),
                 keyboard: !directoryPickerBusy && !directoryPickerRecentOpen,
@@ -21450,7 +22581,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
                 },
                 footer: [
                   /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                    import_antd9.Button,
+                    import_antd8.Button,
                     {
                       disabled: directoryPickerBusy,
                       onClick: () => setDirectoryPickerOpen(false),
@@ -21459,7 +22590,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
                     "cancel"
                   ),
                   /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                    import_antd9.Button,
+                    import_antd8.Button,
                     {
                       type: "primary",
                       loading: directoryPickerBusy,
@@ -21500,7 +22631,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
                                 className: "we-runtime-directory-picker__path-field",
                                 children: [
                                   /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                                    import_antd9.Input,
+                                    import_antd8.Input,
                                     {
                                       size: "large",
                                       value: directoryPickerPathInput,
@@ -21556,7 +22687,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
                                                     onMouseDown: (event) => event.preventDefault(),
                                                     onClick: () => handleDirectoryPickerRecentBrowse(workspace.path),
                                                     children: [
-                                                      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.HistoryOutlined, { "aria-hidden": "true" }),
+                                                      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.HistoryOutlined, { "aria-hidden": "true" }),
                                                       /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: "we-runtime-directory-picker__recent-copy", children: [
                                                         /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "we-runtime-directory-picker__recent-name", children: workspaceName }),
                                                         /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
@@ -21572,19 +22703,19 @@ var PropertyPanelView = import_react14.default.forwardRef(
                                                   }
                                                 ),
                                                 /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                                                  import_antd9.Tooltip,
+                                                  import_antd8.Tooltip,
                                                   {
                                                     title: "\u4ECE\u6700\u8FD1\u9879\u76EE\u4E2D\u79FB\u9664",
                                                     placement: "left",
                                                     getPopupContainer: resolveRuntimePopupContainer,
                                                     children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                                                      import_antd9.Button,
+                                                      import_antd8.Button,
                                                       {
                                                         type: "text",
                                                         size: "small",
                                                         className: "we-runtime-directory-picker__recent-remove",
                                                         "aria-label": `\u4ECE\u6700\u8FD1\u9879\u76EE\u4E2D\u79FB\u9664\uFF1A${workspaceName}`,
-                                                        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.DeleteOutlined, {}),
+                                                        icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.DeleteOutlined, {}),
                                                         onMouseDown: (event) => event.preventDefault(),
                                                         onClick: (event) => {
                                                           event.stopPropagation();
@@ -21606,7 +22737,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
                               }
                             ),
                             /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                              import_antd9.Button,
+                              import_antd8.Button,
                               {
                                 size: "large",
                                 htmlType: "submit",
@@ -21630,14 +22761,14 @@ var PropertyPanelView = import_react14.default.forwardRef(
                             className: "we-runtime-directory-picker__breadcrumbs",
                             children: directoryPickerBreadcrumbs.map((breadcrumb, index) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(import_react14.default.Fragment, { children: [
                               index > 0 ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                                import_icons7.RightOutlined,
+                                import_icons8.RightOutlined,
                                 {
                                   className: "we-runtime-directory-picker__breadcrumb-separator",
                                   "aria-hidden": "true"
                                 }
                               ) : null,
                               /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                                import_antd9.Button,
+                                import_antd8.Button,
                                 {
                                   type: "text",
                                   size: "small",
@@ -21656,18 +22787,18 @@ var PropertyPanelView = import_react14.default.forwardRef(
                         /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "we-runtime-directory-picker__divider" }),
                         /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "we-runtime-directory-picker__location-actions", children: [
                           /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                            import_antd9.Tooltip,
+                            import_antd8.Tooltip,
                             {
                               title: "\u8FD4\u56DE\u4E3B\u76EE\u5F55",
                               placement: "bottomRight",
                               getPopupContainer: resolveRuntimePopupContainer,
                               children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                                import_antd9.Button,
+                                import_antd8.Button,
                                 {
                                   type: "text",
                                   size: "small",
                                   "aria-label": "\u8FD4\u56DE\u4E3B\u76EE\u5F55",
-                                  icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.HomeOutlined, {}),
+                                  icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.HomeOutlined, {}),
                                   disabled: directoryPickerBusy || !directoryPickerState?.home,
                                   onClick: () => {
                                     void browseAiExecutionDirectories(directoryPickerState?.home);
@@ -21677,18 +22808,18 @@ var PropertyPanelView = import_react14.default.forwardRef(
                             }
                           ),
                           /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                            import_antd9.Tooltip,
+                            import_antd8.Tooltip,
                             {
                               title: "\u8FD4\u56DE\u4E0A\u4E00\u7EA7",
                               placement: "bottomRight",
                               getPopupContainer: resolveRuntimePopupContainer,
                               children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                                import_antd9.Button,
+                                import_antd8.Button,
                                 {
                                   type: "text",
                                   size: "small",
                                   "aria-label": "\u8FD4\u56DE\u4E0A\u4E00\u7EA7",
-                                  icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.ArrowUpOutlined, {}),
+                                  icon: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.ArrowUpOutlined, {}),
                                   disabled: directoryPickerBusy || !directoryPickerState?.parent,
                                   onClick: () => {
                                     void browseAiExecutionDirectories(
@@ -21707,7 +22838,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
                       ] }) : null,
                       directoryPickerError ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "we-runtime-directory-picker__error", role: "alert", children: directoryPickerError }) : null,
                       /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "we-runtime-directory-picker__list", children: directoryPickerBusy ? /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "we-runtime-directory-picker__empty", children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.ReloadOutlined, { spin: true }),
+                        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.ReloadOutlined, { spin: true }),
                         /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { children: "\u6B63\u5728\u8BFB\u53D6\u76EE\u5F55..." })
                       ] }) : directoryPickerState?.directories.length ? directoryPickerState.directories.map((directory) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
                         "button",
@@ -21719,10 +22850,10 @@ var PropertyPanelView = import_react14.default.forwardRef(
                             void browseAiExecutionDirectories(directory.path);
                           },
                           children: [
-                            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons7.FolderOpenOutlined, { "aria-hidden": "true" }),
+                            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(import_icons8.FolderOpenOutlined, { "aria-hidden": "true" }),
                             /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "we-runtime-directory-picker__row-name", children: directory.name }),
                             /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                              import_icons7.RightOutlined,
+                              import_icons8.RightOutlined,
                               {
                                 className: "we-runtime-directory-picker__row-arrow",
                                 "aria-hidden": "true"
@@ -21738,7 +22869,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
               }
             ),
             /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-              import_antd9.Modal,
+              import_antd8.Modal,
               {
                 title: "\u5FEB\u6377\u952E",
                 open: keyboardShortcutsDialogOpen,
@@ -21749,7 +22880,7 @@ var PropertyPanelView = import_react14.default.forwardRef(
                 onCancel: () => setKeyboardShortcutsDialogOpen(false),
                 footer: [
                   /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-                    import_antd9.Button,
+                    import_antd8.Button,
                     {
                       type: "primary",
                       onClick: () => setKeyboardShortcutsDialogOpen(false),
@@ -21780,7 +22911,14 @@ var PropertyPanelView = import_react14.default.forwardRef(
                     keys: [PARENT_SELECT_SHORTCUT_LABEL, PARENT_RETURN_SHORTCUT_LABEL],
                     label: "\u9009\u62E9\u4E0A / \u4E0B\u7EA7\u5143\u7D20",
                     desc: "\u2191 \u5207\u6362\u5230\u5F53\u524D\u5143\u7D20\u7684\u4E0A\u4E00\u7EA7\uFF0C\u2193 \u8FD4\u56DE\u521A\u624D\u9009\u4E2D\u7684\u4E0B\u4E00\u7EA7"
-                  }
+                  },
+                  ...selectionModeAvailable ? [
+                    {
+                      keys: [DELETE_ELEMENT_SHORTCUT_LABEL],
+                      label: "\u5220\u9664\u5F53\u524D\u5143\u7D20",
+                      desc: "\u7126\u70B9\u4E0D\u5728\u8F93\u5165\u6846\u6216\u6587\u672C\u7F16\u8F91\u533A\u65F6\uFF0C\u5220\u9664\u5DF2\u9009\u5143\u7D20\u5E76\u5728\u7236\u7EA7\u521B\u5EFA\u53EF\u6062\u590D\u6279\u6CE8"
+                    }
+                  ] : []
                 ].map((item) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
                   "div",
                   {
@@ -21881,7 +23019,9 @@ function syncDraftAgainstSaved(prev, nextSaved, resetDraft) {
 
 // src/ui/runtime/runtime-effects/use-feedback-bridge.ts
 var import_react15 = __toESM(require("react"));
-var import_antd10 = require("antd");
+var import_antd9 = require("antd");
+var HOST_TOAST_EVENT_NAME = "axhub-commentary-host-toast";
+var MESSAGE_TYPES = /* @__PURE__ */ new Set(["success", "info", "warning", "error"]);
 var PromptBridgeContent = import_react15.default.forwardRef(
   (props, ref) => {
     const [value, setValue] = import_react15.default.useState(props.defaultValue ?? "");
@@ -21907,7 +23047,7 @@ var PromptBridgeContent = import_react15.default.forwardRef(
         setError("");
       }
     };
-    const field = props.multiline ? import_react15.default.createElement(import_antd10.Input.TextArea, {
+    const field = props.multiline ? import_react15.default.createElement(import_antd9.Input.TextArea, {
       ref: (instance) => {
         inputElementRef.current = instance?.resizableTextArea?.textArea ?? null;
       },
@@ -21916,7 +23056,7 @@ var PromptBridgeContent = import_react15.default.forwardRef(
       readOnly: props.readOnly,
       placeholder: props.placeholder,
       onChange: handleChange
-    }) : import_react15.default.createElement(import_antd10.Input, {
+    }) : import_react15.default.createElement(import_antd9.Input, {
       ref: (instance) => {
         inputElementRef.current = instance?.input ?? null;
       },
@@ -21945,7 +23085,7 @@ var PromptBridgeContent = import_react15.default.forwardRef(
 );
 PromptBridgeContent.displayName = "PromptBridgeContent";
 function useFeedbackBridge() {
-  const app = import_antd10.App.useApp();
+  const app = import_antd9.App.useApp();
   import_react15.default.useEffect(() => {
     setWebEditorFeedbackBridge({
       confirm: ({
@@ -21977,7 +23117,7 @@ function useFeedbackBridge() {
             import_react15.default.Fragment,
             null,
             import_react15.default.createElement(
-              import_antd10.Button,
+              import_antd9.Button,
               {
                 key: "secondary",
                 onClick: () => {
@@ -22073,7 +23213,21 @@ function useFeedbackBridge() {
         });
       }
     });
+    const handleHostToast = (event) => {
+      const detail = event.detail;
+      if (!detail || !MESSAGE_TYPES.has(String(detail.type)) || typeof detail.content !== "string") {
+        return;
+      }
+      app.message.open({
+        type: detail.type,
+        content: detail.content,
+        duration: typeof detail.duration === "number" ? detail.duration : 2
+      });
+    };
+    window.addEventListener(HOST_TOAST_EVENT_NAME, handleHostToast);
+    flushRuntimeMessages();
     return () => {
+      window.removeEventListener(HOST_TOAST_EVENT_NAME, handleHostToast);
       setWebEditorFeedbackBridge(null);
     };
   }, [app]);
@@ -22328,7 +23482,8 @@ async function createPromptImageAttachment(blob, index = 0, fallbackName) {
     data: await blobToDataUrl(blob),
     mimeType,
     size: Number(blob.size ?? 0),
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    source: "user"
   };
 }
 function isStandardSvgText(value) {
@@ -22376,6 +23531,26 @@ function mergePromptImageAttachments(existing, incoming, maxCount = MAX_PROMPT_I
     acceptedCount: accepted.length,
     droppedCount: Math.max(0, incoming.length - accepted.length)
   };
+}
+function isTargetScreenshotImage(image) {
+  return image.source === "target-screenshot";
+}
+function splitPromptImageAttachments(images) {
+  const userImages = [];
+  let targetScreenshot = null;
+  for (const image of images) {
+    if (isTargetScreenshotImage(image)) {
+      targetScreenshot = image;
+    } else {
+      userImages.push(image);
+    }
+  }
+  return { userImages, targetScreenshot };
+}
+function replaceUserPromptImageAttachments(existing, nextUserImages, maxCount = MAX_PROMPT_IMAGE_ATTACHMENTS) {
+  const { targetScreenshot } = splitPromptImageAttachments(existing);
+  const userImages = nextUserImages.filter((image) => !isTargetScreenshotImage(image)).slice(0, maxCount);
+  return targetScreenshot ? [...userImages, targetScreenshot] : userImages;
 }
 function buildPromptImageAttachmentSignature(elementKey, image) {
   return [
@@ -23021,23 +24196,26 @@ function isPromptTextChangeAllowed(previous, next) {
 }
 
 // src/ui/runtime/plain-text-selection.ts
-function insertPlainTextAtSelection(element, text) {
+function resolveSelectionRange(element) {
   const ownerDocument = element.ownerDocument;
   const selection = ownerDocument.getSelection?.();
-  if (!selection || selection.rangeCount < 1) return false;
+  if (!selection || selection.rangeCount < 1) return null;
   const range = selection.getRangeAt(0);
-  if (!element.contains(range.commonAncestorContainer)) return false;
-  try {
-    if (ownerDocument.execCommand?.("insertText", false, text)) {
-      return true;
-    }
-  } catch {
-  }
+  if (!element.contains(range.commonAncestorContainer)) return null;
+  return { ownerDocument, selection, range };
+}
+function insertNodesAtSelection(ownerDocument, selection, range, nodes) {
+  if (nodes.length === 0) return false;
   try {
     range.deleteContents();
-    const textNode = ownerDocument.createTextNode(text);
-    range.insertNode(textNode);
-    range.setStartAfter(textNode);
+    if (nodes.length === 1) {
+      range.insertNode(nodes[0]);
+    } else {
+      const fragment = ownerDocument.createDocumentFragment();
+      nodes.forEach((node) => fragment.appendChild(node));
+      range.insertNode(fragment);
+    }
+    range.setStartAfter(nodes[nodes.length - 1]);
     range.collapse(true);
     selection.removeAllRanges();
     selection.addRange(range);
@@ -23045,6 +24223,82 @@ function insertPlainTextAtSelection(element, text) {
   } catch {
     return false;
   }
+}
+function insertPlainTextAtSelection(element, text) {
+  const resolved = resolveSelectionRange(element);
+  if (!resolved) return false;
+  const { ownerDocument, selection, range } = resolved;
+  const normalizedText = String(text ?? "").replace(/\r\n?/g, "\n");
+  if (!normalizedText.includes("\n")) {
+    try {
+      if (ownerDocument.execCommand?.("insertText", false, normalizedText)) {
+        return true;
+      }
+    } catch {
+    }
+  }
+  const nodes = [];
+  normalizedText.split("\n").forEach((line, index) => {
+    if (index > 0) nodes.push(ownerDocument.createElement("br"));
+    if (line) nodes.push(ownerDocument.createTextNode(line));
+  });
+  return insertNodesAtSelection(ownerDocument, selection, range, nodes);
+}
+function insertLineBreakAtSelection(element) {
+  const resolved = resolveSelectionRange(element);
+  if (!resolved) return false;
+  const { ownerDocument, selection, range } = resolved;
+  return insertNodesAtSelection(ownerDocument, selection, range, [
+    ownerDocument.createElement("br")
+  ]);
+}
+
+// src/core/text-content.ts
+function normalizeEditableText(value) {
+  return String(value ?? "").replace(/\r\n?/g, "\n").split("\n").map((line) => line.replace(/[^\S\n]+/g, " ").trim()).join("\n").replace(/^\n+|\n+$/g, "");
+}
+function normalizeEditableTextFragment(value) {
+  const raw = String(value ?? "");
+  const normalized = raw.replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  const leadingSpace = /^\s/.test(raw) ? " " : "";
+  const trailingSpace = /\s$/.test(raw) ? " " : "";
+  return `${leadingSpace}${normalized}${trailingSpace}`;
+}
+function normalizeTextNodeValue(value) {
+  return String(value ?? "").replace(/\r\n?/g, "\n").replace(/\n+/g, " ").replace(/[^\S\n]+/g, " ");
+}
+function readEditableText(element) {
+  if (isEditableTextFragmentElement(element)) {
+    return normalizeEditableTextFragment(element.textContent ?? "");
+  }
+  const childNodes = Array.from(element.childNodes ?? []);
+  if (childNodes.length === 0) {
+    return normalizeEditableText(element.textContent ?? "");
+  }
+  const value = childNodes.map((node) => {
+    if (node.nodeType === 3) return normalizeTextNodeValue(node.textContent);
+    if (node.nodeType === 1 && node.tagName === "BR") return "\n";
+    return "";
+  }).join("");
+  return normalizeEditableText(value);
+}
+function writeEditableText(element, value) {
+  if (isEditableTextFragmentElement(element)) {
+    element.textContent = normalizeEditableTextFragment(value);
+    return;
+  }
+  const normalized = normalizeEditableText(value);
+  if (!normalized.includes("\n")) {
+    element.textContent = normalized;
+    return;
+  }
+  const nodes = [];
+  normalized.split("\n").forEach((line, index) => {
+    if (index > 0) nodes.push(element.ownerDocument.createElement("br"));
+    if (line) nodes.push(element.ownerDocument.createTextNode(line));
+  });
+  element.replaceChildren(...nodes);
 }
 
 // src/ui/runtime/runtime-shell.tsx
@@ -23120,7 +24374,6 @@ function normalizeRuntimeSkillOptions(value) {
       id,
       label,
       ...item.description?.trim() ? { description: item.description.trim() } : {},
-      ...item.sourceUrl?.trim() ? { sourceUrl: item.sourceUrl.trim() } : {},
       ...item.prompt?.trim() ? { prompt: item.prompt.trim() } : {},
       ...item.custom === true ? { custom: true } : {}
     });
@@ -23159,6 +24412,7 @@ function WebEditorUiApp(props) {
   const [propertyPanelOpen, setPropertyPanelOpen] = import_react20.default.useState(initialPropertyPanelOpen);
   const [bubbleStyleEditorOpen, setBubbleStyleEditorOpen] = import_react20.default.useState(false);
   const [inlineTextEditing, setInlineTextEditing] = import_react20.default.useState(false);
+  const [inlineTextTarget, setInlineTextTarget] = import_react20.default.useState(null);
   const [blockingLayerOpen, setBlockingLayerOpen] = import_react20.default.useState(false);
   const [commentarySkillOptions, setCommentarySkillOptions] = import_react20.default.useState(() => normalizeRuntimeSkillOptions(propertyPanelOptions?.commentarySkillOptions));
   const commentarySkillSelectionManaged = commentarySkillOptions.length > 0;
@@ -23204,6 +24458,7 @@ function WebEditorUiApp(props) {
     annotationSaving: false
   });
   const currentTargetRef = import_react20.default.useRef(null);
+  const inlineTextTargetRef = import_react20.default.useRef(null);
   const uiModeRef = import_react20.default.useRef(initialUiMode);
   const noteStateRef = import_react20.default.useRef(noteState);
   const textStateRef = import_react20.default.useRef(textState);
@@ -23218,6 +24473,12 @@ function WebEditorUiApp(props) {
   const promptSelectionInteractionLockChangeRef = import_react20.default.useRef(
     selectionGuards.handlePromptSelectionInteractionLockChange
   );
+  const finishInlineTextEditing = import_react20.default.useCallback(() => {
+    promptSelectionInteractionLockChangeRef.current(false);
+    inlineTextTargetRef.current = null;
+    setInlineTextTarget(null);
+    setInlineTextEditing(false);
+  }, []);
   useFeedbackBridge();
   import_react20.default.useEffect(() => {
     promptSelectionInteractionLockChangeRef.current = selectionGuards.handlePromptSelectionInteractionLockChange;
@@ -23228,6 +24489,9 @@ function WebEditorUiApp(props) {
   import_react20.default.useEffect(() => {
     textStateRef.current = textState;
   }, [textState]);
+  import_react20.default.useEffect(() => {
+    inlineTextTargetRef.current = inlineTextTarget;
+  }, [inlineTextTarget]);
   import_react20.default.useEffect(() => {
     imageStateRef.current = imageState;
   }, [imageState]);
@@ -23314,6 +24578,7 @@ function WebEditorUiApp(props) {
     (element, resetDraft) => {
       const nextSavedNote = propertyPanelOptions?.getAiNote?.(element) ?? "";
       const nextSkillIds = propertyPanelOptions?.getAiNoteSkillIds?.(element) ?? [];
+      const nextNoteMeta = propertyPanelOptions?.getAiNoteMeta?.(element) ?? null;
       const prev = noteStateRef.current;
       const next = syncDraftAgainstSaved(
         {
@@ -23328,7 +24593,10 @@ function WebEditorUiApp(props) {
         savedNote: next.saved,
         draftNote: next.draft,
         noteDirty: next.dirty,
-        savedNoteMeta: { skillIds: nextSkillIds.slice() }
+        savedNoteMeta: {
+          skillIds: nextSkillIds.slice(),
+          ...nextNoteMeta ?? {}
+        }
       };
       noteStateRef.current = nextState;
       setNoteState(nextState);
@@ -23366,11 +24634,11 @@ function WebEditorUiApp(props) {
         setImageState({ images: [] });
         return;
       }
+      const { userImages } = splitPromptImageAttachments(
+        propertyPanelOptions?.getAiNoteImages?.(element) ?? []
+      );
       setImageState({
-        images: (propertyPanelOptions?.getAiNoteImages?.(element) ?? []).slice(
-          0,
-          MAX_PROMPT_IMAGE_ATTACHMENTS
-        )
+        images: userImages.slice(0, MAX_PROMPT_IMAGE_ATTACHMENTS)
       });
     },
     [imageAttachmentsEnabled, propertyPanelOptions]
@@ -23432,6 +24700,7 @@ function WebEditorUiApp(props) {
     async (elementOverride, options2 = {}) => {
       const element = elementOverride ?? currentTargetRef.current;
       if (!propertyPanelOptions?.onAiNoteChange) return false;
+      if (!(propertyPanelOptions.canEditAiNote?.(element) ?? true)) return false;
       const nextValue = noteStateRef.current.draftNote;
       const nextSkillIds = options2.skillIds?.slice() ?? noteStateRef.current.savedNoteMeta?.skillIds ?? [];
       const skillsDirty = nextSkillIds.join("\0") !== (noteStateRef.current.savedNoteMeta?.skillIds ?? []).join("\0");
@@ -23444,7 +24713,10 @@ function WebEditorUiApp(props) {
           savedNote: nextValue,
           draftNote: nextValue,
           noteDirty: false,
-          savedNoteMeta: { skillIds: nextSkillIds.slice() }
+          savedNoteMeta: {
+            skillIds: nextSkillIds.slice(),
+            ...propertyPanelOptions.getAiNoteMeta?.(element) ?? {}
+          }
         };
         noteStateRef.current = nextState;
         setNoteState(nextState);
@@ -23455,7 +24727,7 @@ function WebEditorUiApp(props) {
   );
   const commitDraftText = import_react20.default.useCallback(
     async (elementOverride) => {
-      const element = elementOverride ?? currentTargetRef.current;
+      const element = elementOverride ?? inlineTextTargetRef.current ?? currentTargetRef.current;
       if (!element || !propertyPanelOptions?.onTextValueChange) return false;
       if (!(propertyPanelOptions?.canEditText?.(element) ?? false)) return false;
       if (!textStateRef.current.textDirty) return false;
@@ -23465,7 +24737,7 @@ function WebEditorUiApp(props) {
         nextValue,
         textStateRef.current.savedText
       );
-      if (currentTargetRef.current === element) {
+      if (currentTargetRef.current === element || inlineTextTargetRef.current === element) {
         const nextState = {
           savedText: nextValue,
           draftText: nextValue,
@@ -23531,12 +24803,13 @@ function WebEditorUiApp(props) {
     (element) => {
       if (currentTargetRef.current === element) return;
       const previousTarget = currentTargetRef.current;
-      setInlineTextEditing(false);
+      const previousTextTarget = inlineTextTargetRef.current ?? previousTarget;
+      finishInlineTextEditing();
       if (noteStateRef.current.noteDirty) {
         void commitDraftNote(previousTarget);
       }
-      if (previousTarget && textStateRef.current.textDirty) {
-        void commitDraftText(previousTarget);
+      if (previousTextTarget && textStateRef.current.textDirty) {
+        void commitDraftText(previousTextTarget);
       }
       currentTargetRef.current = element;
       setCurrentTarget(element);
@@ -23555,6 +24828,7 @@ function WebEditorUiApp(props) {
     [
       commitDraftNote,
       commitDraftText,
+      finishInlineTextEditing,
       selectionGuards,
       syncSavedAnnotationMarkdown,
       syncSavedImages,
@@ -23580,7 +24854,7 @@ function WebEditorUiApp(props) {
   );
   const handleRefreshNoteState = import_react20.default.useCallback(() => {
     syncSavedNote(currentTargetRef.current, false);
-    syncSavedText(currentTargetRef.current, false);
+    syncSavedText(inlineTextTargetRef.current ?? currentTargetRef.current, false);
     syncSavedImages(currentTargetRef.current);
     syncSavedAnnotationMarkdown(currentTargetRef.current, false);
   }, [syncSavedAnnotationMarkdown, syncSavedImages, syncSavedNote, syncSavedText]);
@@ -23615,7 +24889,8 @@ function WebEditorUiApp(props) {
   );
   const currentAgentTask = taskStateProvider.getCurrentTask(currentTarget);
   const currentTaskRunning = currentAgentTask?.status === "pending" || currentAgentTask?.status === "created";
-  const canEditNote = Boolean(propertyPanelOptions?.onAiNoteChange);
+  const canEditNote = propertyPanelOptions?.canEditAiNote?.(currentTarget) ?? Boolean(propertyPanelOptions?.onAiNoteChange);
+  const canClearCurrentElementEdits = propertyPanelOptions?.canClearCurrentElementEdits?.(currentTarget) ?? Boolean(propertyPanelOptions?.onClearCurrentElementEdits);
   const annotationDocumentEditUrl = import_react20.default.useMemo(() => {
     const resolver = breadcrumbsOptions?.getAnnotationDocumentEditUrl ?? propertyPanelOptions?.getAnnotationDocumentEditUrl;
     return String(resolver?.(currentTarget) ?? "").trim();
@@ -23625,12 +24900,14 @@ function WebEditorUiApp(props) {
       if (!element || !element.isConnected) return false;
       if (!propertyPanelOptions?.onTextValueChange) return false;
       if (!(propertyPanelOptions?.canEditText?.(element) ?? false)) return false;
-      const task = taskStateProvider.getCurrentTask(element);
-      return task?.status !== "pending" && task?.status !== "created";
+      const targetTask = taskStateProvider.getCurrentTask(element);
+      const selectionTask = taskStateProvider.getCurrentTask(currentTargetRef.current);
+      return targetTask?.status !== "pending" && targetTask?.status !== "created" && selectionTask?.status !== "pending" && selectionTask?.status !== "created";
     },
     [propertyPanelOptions, taskStateProvider]
   );
-  const canEditText = canStartInlineTextEditing(currentTarget);
+  const activeTextTarget = inlineTextTarget ?? currentTarget;
+  const canEditText = canStartInlineTextEditing(activeTextTarget);
   const handleDraftChange = import_react20.default.useCallback((value) => {
     const prev = noteStateRef.current;
     if (!isPromptTextChangeAllowed(prev.draftNote, value)) {
@@ -23682,7 +24959,7 @@ function WebEditorUiApp(props) {
     setTextState(nextState);
   }, []);
   const handleConfirmText = import_react20.default.useCallback(async () => {
-    await commitDraftText();
+    await commitDraftText(inlineTextTargetRef.current);
   }, [commitDraftText]);
   const handleAnnotationDraftChange = import_react20.default.useCallback((value) => {
     const prev = annotationStateRef.current;
@@ -23704,25 +24981,38 @@ function WebEditorUiApp(props) {
     [commitDraftAnnotationMarkdown]
   );
   const handleInlineTextEditingChange = import_react20.default.useCallback(
-    (editing) => {
+    (editing, element) => {
       if (!editing) {
-        selectionGuards.handlePromptSelectionInteractionLockChange(false);
-        setInlineTextEditing(false);
+        finishInlineTextEditing();
         return;
       }
-      const allowed = canStartInlineTextEditing(currentTargetRef.current);
-      selectionGuards.handlePromptSelectionInteractionLockChange(allowed);
-      setInlineTextEditing(allowed);
+      const requestedTarget = element ?? currentTargetRef.current;
+      const textTarget = requestedTarget instanceof HTMLElement ? requestedTarget : null;
+      const allowed = canStartInlineTextEditing(textTarget);
+      if (!allowed || !textTarget) {
+        finishInlineTextEditing();
+        return;
+      }
+      selectionGuards.handlePromptSelectionInteractionLockChange(true);
+      inlineTextTargetRef.current = textTarget;
+      setInlineTextTarget(textTarget);
+      syncSavedText(textTarget, true);
+      setInlineTextEditing(true);
     },
-    [canStartInlineTextEditing, selectionGuards]
+    [canStartInlineTextEditing, finishInlineTextEditing, selectionGuards, syncSavedText]
   );
   const handleImagesChange = import_react20.default.useCallback(
     async (images) => {
       const element = currentTargetRef.current;
       if (!imageAttachmentsEnabled) return;
       if (!element || !propertyPanelOptions?.onAiNoteImagesChange) return;
-      const clippedImages = images.slice(0, MAX_PROMPT_IMAGE_ATTACHMENTS);
-      await propertyPanelOptions.onAiNoteImagesChange(element, clippedImages);
+      if (!(propertyPanelOptions.canEditAiNote?.(element) ?? true)) return;
+      const clippedImages = images.filter((image) => image.source !== "target-screenshot").slice(0, MAX_PROMPT_IMAGE_ATTACHMENTS);
+      const nextImages = replaceUserPromptImageAttachments(
+        propertyPanelOptions.getAiNoteImages?.(element) ?? [],
+        clippedImages
+      );
+      await propertyPanelOptions.onAiNoteImagesChange(element, nextImages);
       if (currentTargetRef.current === element) {
         setImageState({ images: clippedImages.slice() });
       }
@@ -23744,27 +25034,29 @@ function WebEditorUiApp(props) {
       if (!incomingImages.length || !propertyPanelOptions?.onAiNoteImagesChange) {
         return { acceptedCount: 0, droppedCount: 0 };
       }
+      if (!(propertyPanelOptions.canEditAiNote?.(element) ?? true)) {
+        return { acceptedCount: 0, droppedCount: incomingImages.length };
+      }
       let preparedImages = incomingImages;
       try {
         preparedImages = propertyPanelOptions.onPrepareAiNoteImages ? await propertyPanelOptions.onPrepareAiNoteImages(element, incomingImages) : incomingImages;
       } catch (error) {
-        const message3 = error instanceof Error ? error.message : String(error);
-        notifyRuntimeMessage("error", message3 || "\u56FE\u7247\u4FDD\u5B58\u5931\u8D25\uFF0C\u8BF7\u91CD\u65B0\u7C98\u8D34\u540E\u518D\u8BD5\u3002");
+        const message = error instanceof Error ? error.message : String(error);
+        notifyRuntimeMessage("error", message || "\u56FE\u7247\u4FDD\u5B58\u5931\u8D25\uFF0C\u8BF7\u91CD\u65B0\u7C98\u8D34\u540E\u518D\u8BD5\u3002");
         return { acceptedCount: 0, droppedCount: incomingImages.length };
       }
       if (!preparedImages.length) {
         return { acceptedCount: 0, droppedCount: incomingImages.length };
       }
-      const currentImages = (propertyPanelOptions.getAiNoteImages?.(element) ?? []).slice(
-        0,
-        MAX_PROMPT_IMAGE_ATTACHMENTS
-      );
+      const currentImages = propertyPanelOptions.getAiNoteImages?.(element) ?? [];
+      const { userImages: currentUserImages } = splitPromptImageAttachments(currentImages);
       const merged = mergePromptImageAttachments(
-        currentImages,
+        currentUserImages,
         preparedImages,
         MAX_PROMPT_IMAGE_ATTACHMENTS
       );
-      await propertyPanelOptions.onAiNoteImagesChange(element, merged.images);
+      const nextImages = replaceUserPromptImageAttachments(currentImages, merged.images);
+      await propertyPanelOptions.onAiNoteImagesChange(element, nextImages);
       if (currentTargetRef.current === element) {
         setImageState({ images: merged.images.slice() });
       }
@@ -23852,21 +25144,41 @@ function WebEditorUiApp(props) {
   const handleClearCurrentElementEdits = import_react20.default.useCallback(async () => {
     const element = currentTargetRef.current;
     if (!element || !propertyPanelOptions?.onClearCurrentElementEdits) return;
+    if (!(propertyPanelOptions.canClearCurrentElementEdits?.(element) ?? true)) return;
     const didClear = await propertyPanelOptions.onClearCurrentElementEdits(element);
-    if (!didClear) return;
+    if (!didClear) {
+      const currentNoteState = noteStateRef.current;
+      if (currentNoteState.noteDirty && currentNoteState.savedNote.trim() === "") {
+        handleCancelNote();
+      }
+      return;
+    }
     syncSavedNote(element, true);
     syncSavedText(element, true);
     syncSavedImages(element);
     syncSavedAnnotationMarkdown(element, true);
-    setInlineTextEditing(false);
+    finishInlineTextEditing();
     propertyPanelOptions.onDismissSelection?.();
   }, [
+    finishInlineTextEditing,
+    handleCancelNote,
     propertyPanelOptions,
     syncSavedAnnotationMarkdown,
     syncSavedImages,
     syncSavedNote,
     syncSavedText
   ]);
+  const handleDeleteExternalComment = import_react20.default.useCallback(
+    async (commentId) => {
+      const element = currentTargetRef.current;
+      if (!element || !propertyPanelOptions?.onDeleteExternalComment) return;
+      const didDelete = await propertyPanelOptions.onDeleteExternalComment(element, commentId);
+      if (didDelete && currentTargetRef.current === element) {
+        syncSavedNote(element, true);
+      }
+    },
+    [propertyPanelOptions, syncSavedNote]
+  );
   const handleDeleteCurrentAnnotationNode = import_react20.default.useCallback(async () => {
     const element = currentTargetRef.current;
     if (!element || !propertyPanelOptions?.onDeleteCurrentAnnotationNode) return;
@@ -23875,9 +25187,10 @@ function WebEditorUiApp(props) {
     syncSavedText(element, true);
     syncSavedImages(element);
     syncSavedAnnotationMarkdown(element, true);
-    setInlineTextEditing(false);
+    finishInlineTextEditing();
     propertyPanelOptions.onDismissSelection?.();
   }, [
+    finishInlineTextEditing,
     propertyPanelOptions,
     syncSavedAnnotationMarkdown,
     syncSavedImages,
@@ -23910,21 +25223,29 @@ function WebEditorUiApp(props) {
   });
   import_react20.default.useEffect(() => {
     if (!inlineTextEditing) return;
-    if (canEditText && currentTarget?.isConnected) return;
-    setInlineTextEditing(false);
-  }, [canEditText, currentTarget, inlineTextEditing]);
+    if (canEditText && activeTextTarget?.isConnected) return;
+    const previousTextTarget = inlineTextTargetRef.current;
+    if (previousTextTarget?.isConnected && textStateRef.current.textDirty) {
+      writeEditableText(previousTextTarget, textStateRef.current.savedText);
+    }
+    handleCancelText();
+    finishInlineTextEditing();
+  }, [
+    activeTextTarget,
+    canEditText,
+    finishInlineTextEditing,
+    handleCancelText,
+    inlineTextEditing
+  ]);
   import_react20.default.useEffect(() => {
-    const editableElement = inlineTextEditing && canEditText && currentTarget instanceof HTMLElement ? currentTarget : null;
+    const editableElement = inlineTextEditing && canEditText && activeTextTarget instanceof HTMLElement ? activeTextTarget : null;
     propertyPanelOptions?.onInlineTextEditingElementChange?.(editableElement);
     if (!editableElement) {
       return () => {
         propertyPanelOptions?.onInlineTextEditingElementChange?.(null);
       };
     }
-    const exitInlineTextEditing = () => {
-      promptSelectionInteractionLockChangeRef.current(false);
-      setInlineTextEditing(false);
-    };
+    const exitInlineTextEditing = finishInlineTextEditing;
     const previousContentEditableAttr = editableElement.getAttribute("contenteditable");
     const previousSpellcheck = editableElement.spellcheck;
     const previousOutline = snapshotInlineStyle(editableElement, "outline");
@@ -23938,7 +25259,7 @@ function WebEditorUiApp(props) {
     editableElement.style.setProperty("box-shadow", "none", "important");
     editableElement.style.setProperty("cursor", "text", "important");
     const syncDraftFromDom = () => {
-      const nextValue = editableElement.textContent ?? "";
+      const nextValue = propertyPanelOptions?.getTextValue?.(editableElement) ?? editableElement.textContent ?? "";
       const prev = textStateRef.current;
       const nextState = {
         ...prev,
@@ -23965,21 +25286,34 @@ function WebEditorUiApp(props) {
       if (event.key === "Enter" && !isMobileDevice()) {
         event.preventDefault();
         event.stopPropagation();
-        syncDraftFromDom();
-        void (async () => {
-          await commitDraftText(editableElement);
-          exitInlineTextEditing();
-          editableElement.blur();
-        })();
+        if (event.metaKey || event.ctrlKey) {
+          syncDraftFromDom();
+          void (async () => {
+            await commitDraftText(editableElement);
+            exitInlineTextEditing();
+            editableElement.blur();
+          })();
+        } else if (insertLineBreakAtSelection(editableElement)) {
+          syncDraftFromDom();
+        }
         return;
       }
       if (event.key !== "Escape") return;
       event.preventDefault();
       event.stopPropagation();
-      editableElement.textContent = textStateRef.current.savedText;
+      writeEditableText(editableElement, textStateRef.current.savedText);
       handleCancelText();
       exitInlineTextEditing();
       editableElement.blur();
+    };
+    const handleBeforeInput = (event) => {
+      if (!isMobileDevice()) return;
+      if (event.inputType !== "insertParagraph" && event.inputType !== "insertLineBreak") return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (insertLineBreakAtSelection(editableElement)) {
+        syncDraftFromDom();
+      }
     };
     const handleBlur = () => {
       syncDraftFromDom();
@@ -23991,6 +25325,7 @@ function WebEditorUiApp(props) {
       })();
     };
     editableElement.addEventListener("input", handleInput);
+    editableElement.addEventListener("beforeinput", handleBeforeInput);
     editableElement.addEventListener("paste", handlePaste);
     editableElement.addEventListener("keydown", handleKeyDown);
     editableElement.addEventListener("blur", handleBlur);
@@ -24038,6 +25373,7 @@ function WebEditorUiApp(props) {
         window.cancelAnimationFrame(restoreFocusRafId);
       }
       editableElement.removeEventListener("input", handleInput);
+      editableElement.removeEventListener("beforeinput", handleBeforeInput);
       editableElement.removeEventListener("paste", handlePaste);
       editableElement.removeEventListener("keydown", handleKeyDown);
       editableElement.removeEventListener("blur", handleBlur);
@@ -24058,15 +25394,16 @@ function WebEditorUiApp(props) {
       propertyPanelOptions?.onInlineTextEditingElementChange?.(null);
     };
   }, [
+    activeTextTarget,
     canEditText,
     commitDraftText,
-    currentTarget,
+    finishInlineTextEditing,
     handleCancelText,
     inlineTextEditing,
     propertyPanelOptions
   ]);
   return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { style: panelContainerStyle, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("style", { children: WEB_EDITOR_POPUP_ROOT_STYLES }),
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("style", { nonce: resolveCspNonce(), children: WEB_EDITOR_POPUP_ROOT_STYLES }),
     /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
       ElementAgentTaskOverlays,
       {
@@ -24099,9 +25436,11 @@ function WebEditorUiApp(props) {
         hideCurrentElementExecutionAction: Boolean(
           propertyPanelOptions?.hideCurrentElementExecutionAction
         ),
+        hideClearEditsAction: Boolean(propertyPanelOptions?.hideClearEditsAction),
         hideContextAppendAction: Boolean(
           breadcrumbsOptions.hideExecutionControls ?? propertyPanelOptions?.hideExecutionControls
         ),
+        externalAnnotationMode: Boolean(propertyPanelOptions?.externalAnnotationMode),
         enabledSkillIds: commentarySkillSelectionManaged ? enabledCommentarySkillIds : void 0,
         skillOptions: commentarySkillOptions,
         onBubbleStyleEditorOpenChange: setBubbleStyleEditorOpen,
@@ -24134,12 +25473,14 @@ function WebEditorUiApp(props) {
         onCancelText: handleCancelText,
         onConfirmText: handleConfirmText,
         canEditNote,
+        canClearCurrentElementEdits,
         savedNote: noteState.savedNote,
         savedNoteMeta: noteState.savedNoteMeta,
         draftNote: noteState.draftNote,
         noteDirty: noteState.noteDirty,
         onDraftChange: handleDraftChange,
         onClearCurrentElementEdits: handleClearCurrentElementEdits,
+        onDeleteExternalComment: handleDeleteExternalComment,
         onCancelNote: handleCancelNote,
         onConfirmNote: handleConfirmNote,
         onDismissSelection: propertyPanelOptions?.onDismissSelection,
@@ -24199,12 +25540,14 @@ function WebEditorUiApp(props) {
         onCancelText: handleCancelText,
         onConfirmText: handleConfirmText,
         canEditNote,
+        canClearCurrentElementEdits,
         savedNote: noteState.savedNote,
         savedNoteMeta: noteState.savedNoteMeta,
         draftNote: noteState.draftNote,
         noteDirty: noteState.noteDirty,
         onDraftChange: handleDraftChange,
         onClearCurrentElementEdits: handleClearCurrentElementEdits,
+        onDeleteExternalComment: handleDeleteExternalComment,
         onCancelNote: handleCancelNote,
         onConfirmNote: handleConfirmNote,
         onDismissSelection: propertyPanelOptions?.onDismissSelection,
@@ -24363,6 +25706,8 @@ function createWebEditorUiRuntime(options) {
     aiExecutionProviderOptions: [],
     darkMode: false,
     disablePageAnimations: false,
+    captureTargetScreenshotAvailable: false,
+    captureTargetScreenshot: false,
     pageZoomEnabled: false,
     copySkillInstallPromptDisabled: true,
     selectionModeActive: options.initialSelectionModeActive ?? true,
@@ -24375,6 +25720,7 @@ function createWebEditorUiRuntime(options) {
   });
   function RuntimeMount() {
     const styleCache = import_react21.default.useMemo(() => (0, import_cssinjs.createCache)(), []);
+    const cspNonce = import_react21.default.useMemo(() => resolveCspNonce(), []);
     const popupContainerRef = import_react21.default.useRef(null);
     const [themeMode, setThemeMode] = import_react21.default.useState(
       () => options.propertyPanelOptions?.getUiSettings?.()?.darkMode ? "dark" : "light"
@@ -24384,12 +25730,16 @@ function createWebEditorUiRuntime(options) {
       breadcrumbsBridge?.flush();
     });
     return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(import_cssinjs.StyleProvider, { cache: styleCache, container: options.shadowRoot, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
-      import_antd11.ConfigProvider,
+      import_antd10.ConfigProvider,
       {
         componentSize: "small",
-        getPopupContainer: () => popupContainerRef.current ?? options.container,
+        csp: cspNonce ? { nonce: cspNonce } : void 0,
+        getPopupContainer: (trigger) => resolveRuntimePopupContainerFromTrigger(
+          trigger,
+          popupContainerRef.current ?? options.container
+        ),
         theme: createRuntimeAntdTheme(themeMode),
-        children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(import_antd11.App, { children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(
+        children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(import_antd10.App, { children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(
           "div",
           {
             style: {
@@ -24447,8 +25797,8 @@ function createWebEditorUiRuntime(options) {
       enterCommentInput(mode) {
         propertyPanelBridge.runOrQueue((api) => api.enterCommentInput?.(mode));
       },
-      enterInlineTextEdit() {
-        propertyPanelBridge.runOrQueue((api) => api.enterInlineTextEdit?.());
+      enterInlineTextEdit(element) {
+        propertyPanelBridge.runOrQueue((api) => api.enterInlineTextEdit?.(element));
       },
       getHostToolbarState() {
         return propertyPanelRef.current?.getHostToolbarState() ?? getFallbackHostToolbarState();
@@ -24478,8 +25828,8 @@ function createWebEditorUiRuntime(options) {
       refresh() {
         breadcrumbsBridge.runOrQueue((api) => api.refresh());
       },
-      enterInlineTextEdit() {
-        breadcrumbsBridge.runOrQueue((api) => api.enterInlineTextEdit?.());
+      enterInlineTextEdit(element) {
+        breadcrumbsBridge.runOrQueue((api) => api.enterInlineTextEdit?.(element));
       },
       dispose
     } : null,
@@ -24502,7 +25852,7 @@ var OVERLAY_BOX_STYLES = {
   selection: {
     strokeColor: WEB_EDITOR_V2_COLORS.selected,
     fillColor: "transparent",
-    lineWidth: 2,
+    lineWidth: WEB_EDITOR_V2_SELECTION_LINE_WIDTH,
     dashPattern: []
   },
   inlineEditing: {
@@ -24518,12 +25868,12 @@ var OVERLAY_BOX_STYLES = {
     dashPattern: [8, 6]
   }
 };
-function isFinitePositive(value) {
+function isFinitePositive2(value) {
   return Number.isFinite(value) && value > 0;
 }
 function isValidRect(rect) {
   if (!rect) return false;
-  return Number.isFinite(rect.left) && Number.isFinite(rect.top) && isFinitePositive(rect.width) && isFinitePositive(rect.height);
+  return Number.isFinite(rect.left) && Number.isFinite(rect.top) && isFinitePositive2(rect.width) && isFinitePositive2(rect.height);
 }
 function isValidLine(line) {
   if (!line) return false;
@@ -26459,13 +27809,44 @@ function readShadowElementsFromPoint(shadowRoot, x, y) {
   }
   return [];
 }
+function containsPoint(element, x, y) {
+  const rect = readRect(element);
+  if (!rect || rect.width <= 0 || rect.height <= 0) return false;
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
+function isAnnotationHostTopmostAtPoint(x, y) {
+  if (typeof document.elementFromPoint !== "function") return true;
+  try {
+    const host = document.getElementById(AXHUB_ANNOTATION_HOST_ID);
+    return Boolean(host && document.elementFromPoint(x, y) === host);
+  } catch {
+    return false;
+  }
+}
+function readDeclaredShadowTargetsAtPoint(shadowRoot, x, y) {
+  if (typeof shadowRoot.querySelectorAll !== "function") return [];
+  if (!isAnnotationHostTopmostAtPoint(x, y)) return [];
+  try {
+    const candidates = shadowRoot.querySelectorAll([
+      `[${AXHUB_ANNOTATION_COMMENT_TARGET_ATTR}="true"]`,
+      `[${AXHUB_ANNOTATION_DIRECT_ACTION_ATTR}="true"]`
+    ].join(", "));
+    return Array.from(candidates).filter(
+      (element) => !isPointerPassthroughElement(element) && containsPoint(element, x, y)
+    );
+  } catch {
+    return [];
+  }
+}
 function readAxhubAnnotationShadowHitElementsAtPoint(x, y) {
   if (!isFinitePoint(x, y)) return [];
   const shadowRoot = getAnnotationShadowRoot();
   if (!shadowRoot) return [];
-  return readShadowElementsFromPoint(shadowRoot, x, y).filter(
+  const pointHits = readShadowElementsFromPoint(shadowRoot, x, y).filter(
     (element) => !isAnnotationShellElement(element) && !isPointerPassthroughElement(element)
   );
+  if (pointHits.length > 0) return pointHits;
+  return readDeclaredShadowTargetsAtPoint(shadowRoot, x, y);
 }
 function getAxhubAnnotationShadowHitElementsAtPoint(x, y) {
   const hitElements = readAxhubAnnotationShadowHitElementsAtPoint(x, y);
@@ -26744,10 +28125,10 @@ function compareMeta(a, b) {
 }
 function createSelectionEngine(options) {
   const disposer = new Disposer();
-  const { isOverlayElement } = options;
+  const { isOverlayElement: isOverlayElement2 } = options;
   function scoreElement(element, styleCache, viewportArea) {
     if (!element.isConnected) return null;
-    if (isOverlayElement(element)) return null;
+    if (isOverlayElement2(element)) return null;
     const tag = element.tagName.toUpperCase();
     if (tag === "HTML" || tag === "BODY") return null;
     const rect = readRect2(element);
@@ -26797,7 +28178,7 @@ function createSelectionEngine(options) {
     if (hit.length === 0) return [];
     const map = /* @__PURE__ */ new Map();
     function addCandidate(element, meta) {
-      if (isOverlayElement(element)) return;
+      if (isOverlayElement2(element)) return;
       if (map.size >= MAX_CANDIDATES && !map.has(element)) return;
       const prev = map.get(element);
       if (!prev || compareMeta(meta, prev) < 0) {
@@ -26835,7 +28216,7 @@ function createSelectionEngine(options) {
     if (!parent) return null;
     const styleCache = /* @__PURE__ */ new Map();
     while (parent) {
-      if (isOverlayElement(parent)) return null;
+      if (isOverlayElement2(parent)) return null;
       const tag = parent.tagName.toUpperCase();
       if (tag === "HTML" || tag === "BODY") return null;
       const rect = readRect2(parent);
@@ -26877,7 +28258,7 @@ function createSelectionEngine(options) {
       const elements = [];
       for (const node of path) {
         if (!(node instanceof Element)) continue;
-        if (isOverlayElement(node)) continue;
+        if (isOverlayElement2(node)) continue;
         const tag = node.tagName.toUpperCase();
         if (tag === "HTML" || tag === "BODY") continue;
         elements.push(node);
@@ -27066,6 +28447,8 @@ function ensureHighlightStyle() {
   if (document.getElementById(TEXT_COMMENT_HIGHLIGHT_STYLE_ID)) return;
   const style = document.createElement("style");
   style.id = TEXT_COMMENT_HIGHLIGHT_STYLE_ID;
+  const cspNonce = resolveCspNonce(document);
+  if (cspNonce) style.nonce = cspNonce;
   style.textContent = `
     ::highlight(${TEXT_COMMENT_HIGHLIGHT_NAME}) {
       background: rgba(0, 143, 93, 0.18);
@@ -27085,7 +28468,7 @@ function updateCssHighlight(range) {
   return true;
 }
 function createTextCommentManager(options) {
-  const { isOverlayElement } = options;
+  const { isOverlayElement: isOverlayElement2 } = options;
   const comments = /* @__PURE__ */ new Map();
   function commitSelection() {
     const selection = window.getSelection();
@@ -27093,7 +28476,7 @@ function createTextCommentManager(options) {
     const range = selection.getRangeAt(0);
     const text = selection.toString().trim();
     if (!text) return null;
-    if (isOverlayElement(range.startContainer) || isOverlayElement(range.endContainer)) {
+    if (isOverlayElement2(range.startContainer) || isOverlayElement2(range.endContainer)) {
       return null;
     }
     if (isTextCommentDisabledNode(range.startContainer) || isTextCommentDisabledNode(range.endContainer)) {
@@ -27188,9 +28571,34 @@ var NON_PRIMARY_BUTTON_BYPASS_EVENTS = /* @__PURE__ */ new Set([
   "dblclick",
   "auxclick"
 ]);
+var PAGE_FOCUS_TRAP_SELECTOR = [
+  ".ant-modal-wrap",
+  '[role="dialog"]',
+  '[aria-modal="true"]',
+  "dialog[open]"
+].join(", ");
+var PAGE_FOCUS_TRAP_CONTROL_SELECTOR = [
+  "button",
+  "input",
+  "textarea",
+  "select",
+  "option",
+  "label",
+  "a[href]",
+  '[contenteditable="true"]',
+  '[role="button"]',
+  '[role="checkbox"]',
+  '[role="combobox"]',
+  '[role="tab"]',
+  '[role="menuitem"]',
+  '[role="option"]',
+  '[role="switch"]',
+  '[role="slider"]',
+  "[data-axhub-review-interactive]"
+].join(", ");
 function createEventController(options) {
   const {
-    isOverlayElement,
+    isOverlayElement: isOverlayElement2,
     shouldAllowPageEvent,
     onHover,
     onSelect,
@@ -27226,11 +28634,57 @@ function createEventController(options) {
   function isEventFromEditorUi(event) {
     try {
       if (typeof event.composedPath === "function") {
-        return event.composedPath().some((node) => isOverlayElement(node));
+        return event.composedPath().some((node) => isOverlayElement2(node));
       }
     } catch {
     }
-    return isOverlayElement(event.target);
+    return isOverlayElement2(event.target);
+  }
+  function isPageFocusTrapControlEvent(event) {
+    let path = [];
+    try {
+      path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    } catch {
+      path = [];
+    }
+    if (event.target && !path.includes(event.target)) path.push(event.target);
+    let inFocusTrap = false;
+    let isControl = false;
+    for (const candidate of path) {
+      if (!(candidate instanceof Element) || typeof candidate.matches !== "function") continue;
+      if (candidate.matches(PAGE_FOCUS_TRAP_SELECTOR)) {
+        if (candidate.getAttribute("data-state") === "closed") continue;
+        if (candidate.getAttribute("aria-hidden") === "true") continue;
+        if (candidate.matches("dialog") && !candidate.hasAttribute("open")) continue;
+        inFocusTrap = true;
+      }
+      if (candidate.matches(PAGE_FOCUS_TRAP_CONTROL_SELECTOR)) isControl = true;
+    }
+    return inFocusTrap && isControl;
+  }
+  function getPageElementPath(event, fallback) {
+    try {
+      if (typeof event.composedPath === "function") {
+        const elements = event.composedPath().filter(
+          (node) => node instanceof Element && node.isConnected && !isOverlayElement2(node)
+        );
+        if (elements.length > 0) return elements;
+      }
+    } catch {
+    }
+    return [fallback];
+  }
+  function getInitialSelectionElement(event, target) {
+    try {
+      if (typeof event.composedPath === "function") {
+        const initialElement = event.composedPath().find(
+          (node) => node instanceof Element && node.isConnected && !isOverlayElement2(node)
+        );
+        if (initialElement && initialElement !== target) return initialElement;
+      }
+    } catch {
+    }
+    return void 0;
   }
   function blockPageEvent(event) {
     if (shouldEventBypassPageBlock(event)) {
@@ -27256,6 +28710,9 @@ function createEventController(options) {
       return true;
     }
     if (isAxhubAnnotationDirectActionEvent(event)) {
+      return true;
+    }
+    if (isPageFocusTrapControlEvent(event)) {
       return true;
     }
     if (!shouldAllowPageEvent) {
@@ -27341,6 +28798,7 @@ function createEventController(options) {
       setMode("selecting");
       onSelect({
         element: candidate.target,
+        ...candidate.initialElement ? { initialElement: candidate.initialElement } : {},
         modifiers: candidate.modifiers,
         clientX: candidate.startClientX,
         clientY: candidate.startClientY
@@ -27374,9 +28832,9 @@ function createEventController(options) {
     }
     const element = getAxhubAnnotationShadowHitElementAtPoint(clientX, clientY) ?? document.elementFromPoint(clientX, clientY);
     if (!element) return null;
-    if (isOverlayElement(element)) return null;
+    if (isOverlayElement2(element)) return null;
     const resolved = resolveTargetForHover ? resolveTargetForHover(element) : element;
-    if (!resolved || isOverlayElement(resolved)) return null;
+    if (!resolved || isOverlayElement2(resolved)) return null;
     if (isElementInteractionLocked?.(resolved) ?? false) return null;
     return resolved;
   }
@@ -27386,7 +28844,7 @@ function createEventController(options) {
     }
     if (findTargetForSelect) {
       const target = findTargetForSelect(clientX, clientY, modifiers, event);
-      if (target && isOverlayElement(target)) return null;
+      if (target && isOverlayElement2(target)) return null;
       if (target && (isElementInteractionLocked?.(target) ?? false)) return null;
       return target;
     }
@@ -27557,9 +29015,11 @@ function createEventController(options) {
       const modifiers2 = extractModifiers(event);
       const target2 = getTargetElementForSelection(event, event.clientX, event.clientY, modifiers2);
       if (!target2) return;
+      const initialElement2 = getInitialSelectionElement(event, target2);
       nativeTextSelectionClickCandidate = {
         pointerId: getEventPointerId(event),
         target: target2,
+        ...initialElement2 ? { initialElement: initialElement2 } : {},
         modifiers: modifiers2,
         startClientX: event.clientX,
         startClientY: event.clientY,
@@ -27577,7 +29037,14 @@ function createEventController(options) {
       if (target2 && target2 !== selected) {
         dragCandidate = null;
         if (isTouch) {
-          touchTapCandidate = { target: target2, modifiers, clientX: event.clientX, clientY: event.clientY };
+          const initialElement2 = getInitialSelectionElement(event, target2);
+          touchTapCandidate = {
+            target: target2,
+            ...initialElement2 ? { initialElement: initialElement2 } : {},
+            modifiers,
+            clientX: event.clientX,
+            clientY: event.clientY
+          };
           return;
         }
         setMode("hover");
@@ -27585,11 +29052,20 @@ function createEventController(options) {
       }
       if (target2 && selected && target2 === selected && !onStartDrag) {
         if (isTouch) {
-          touchTapCandidate = { target: target2, modifiers, clientX: event.clientX, clientY: event.clientY };
+          const initialElement3 = getInitialSelectionElement(event, target2);
+          touchTapCandidate = {
+            target: target2,
+            ...initialElement3 ? { initialElement: initialElement3 } : {},
+            modifiers,
+            clientX: event.clientX,
+            clientY: event.clientY
+          };
           return;
         }
+        const initialElement2 = getInitialSelectionElement(event, target2);
         onSelect({
           element: target2,
+          ...initialElement2 ? { initialElement: initialElement2 } : {},
           modifiers,
           clientX: event.clientX,
           clientY: event.clientY
@@ -27620,12 +29096,22 @@ function createEventController(options) {
     const target = getTargetElementForSelection(event, event.clientX, event.clientY, modifiers);
     if (!target) return;
     if (isTouch) {
-      touchTapCandidate = { target, modifiers, clientX: event.clientX, clientY: event.clientY, nextMode: "selecting" };
+      const initialElement2 = getInitialSelectionElement(event, target);
+      touchTapCandidate = {
+        target,
+        ...initialElement2 ? { initialElement: initialElement2 } : {},
+        modifiers,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        nextMode: "selecting"
+      };
       return;
     }
     setMode("selecting");
+    const initialElement = getInitialSelectionElement(event, target);
     onSelect({
       element: target,
+      ...initialElement ? { initialElement } : {},
       modifiers,
       clientX: event.clientX,
       clientY: event.clientY
@@ -27647,6 +29133,7 @@ function createEventController(options) {
     if (target !== selected) return;
     onDoubleClickSelected({
       element: selected,
+      pathElements: getPageElementPath(event, selected),
       modifiers,
       clientX: event.clientX,
       clientY: event.clientY
@@ -27696,6 +29183,7 @@ function createEventController(options) {
         }
         onSelect({
           element: tap.target,
+          ...tap.initialElement ? { initialElement: tap.initialElement } : {},
           modifiers: tap.modifiers,
           clientX: tap.clientX,
           clientY: tap.clientY
@@ -28550,7 +30038,7 @@ function applyTransaction(tx, direction) {
     return true;
   }
   if (tx.type === "text") {
-    target.textContent = snapshot.text ?? "";
+    writeEditableText(target, snapshot.text ?? "");
     return true;
   }
   return true;
@@ -28611,7 +30099,7 @@ function createTransactionManager(options = {}) {
     const locator = createElementLocator(target);
     const timestamp = now();
     const id = generateTransactionId(timestamp);
-    const elementKey = generateStableElementKey(target, locator.shadowHostChain);
+    const elementKey = locator.textFragment ? locatorKey(locator) : generateStableElementKey(target, locator.shadowHostChain);
     const tx = createTextTransaction(id, locator, before, after, timestamp, elementKey);
     pushTransaction(tx, false);
     return tx;
@@ -28986,6 +30474,23 @@ function createTransactionManager(options = {}) {
     emit("redo", tx);
     return tx;
   }
+  function restoreDeletedElement(transactionId) {
+    if (disposer.isDisposed) return null;
+    const normalizedId = String(transactionId ?? "").trim();
+    if (!normalizedId) return null;
+    const transactionIndex = undoStack.findIndex((tx2) => tx2.id === normalizedId);
+    if (transactionIndex < 0) return null;
+    const tx = undoStack[transactionIndex];
+    if (tx.type !== "structure" || tx.structureData?.action !== "delete") return null;
+    if (!applyTransaction(tx, "undo")) {
+      options.onApplyError?.(new Error(`Failed to restore deleted element: ${tx.id}`));
+      return null;
+    }
+    undoStack.splice(transactionIndex, 1);
+    redoStack.length = 0;
+    emit("restore", tx);
+    return tx;
+  }
   function canUndo() {
     return undoStack.length > 0;
   }
@@ -29047,6 +30552,7 @@ function createTransactionManager(options = {}) {
     applyStructure,
     undo,
     redo,
+    restoreDeletedElement,
     canUndo,
     canRedo,
     getUndoStack,
@@ -29819,9 +31325,9 @@ function isClipboardPermissionError(error) {
   if (!error || typeof error !== "object") {
     return false;
   }
-  const { name, message: message3 } = error;
+  const { name, message } = error;
   const normalizedName = String(name || "").trim();
-  const normalizedMessage = String(message3 || "").trim();
+  const normalizedMessage = String(message || "").trim();
   return normalizedName === "NotAllowedError" || /Document is not focused/i.test(normalizedMessage) || /permission/i.test(normalizedMessage) || /denied/i.test(normalizedMessage) || /not allowed/i.test(normalizedMessage);
 }
 function normalizeClipboardWriteError(error) {
@@ -29866,6 +31372,204 @@ async function exportSelectionToDesignTool(tool, element) {
   await copyAxurePayload(payload);
 }
 
+// src/core/editor/text-session.ts
+function normalizeTextForEditorInput(value) {
+  return normalizeEditableText(value);
+}
+function normalizeTextForTarget(element, value) {
+  return isEditableTextFragmentElement(element) ? normalizeEditableTextFragment(value) : normalizeTextForEditorInput(value);
+}
+function hasOnlyTextBreakChildren(element) {
+  return Array.from(element.children).every((child) => child.tagName === "BR");
+}
+var NON_TEXT_LEAF_TAG_NAMES = /* @__PURE__ */ new Set([
+  "AUDIO",
+  "CANVAS",
+  "EMBED",
+  "HR",
+  "IFRAME",
+  "IMG",
+  "OBJECT",
+  "PICTURE",
+  "SOURCE",
+  "TRACK",
+  "VIDEO",
+  "WBR"
+]);
+function isEditableTextTarget(element) {
+  if (!(element instanceof HTMLElement)) return false;
+  if (element instanceof HTMLInputElement) return false;
+  if (element instanceof HTMLTextAreaElement) return false;
+  if (NON_TEXT_LEAF_TAG_NAMES.has(element.tagName)) return false;
+  if (element.childElementCount > 0 && !hasOnlyTextBreakChildren(element)) return false;
+  if (!(element.textContent ?? "").trim() && (element.tagName === "I" || element.getAttribute("aria-hidden") === "true" || element.getAttribute("role") === "img")) {
+    return false;
+  }
+  return true;
+}
+function getComposedParentElement(element) {
+  if (element.assignedSlot) return element.assignedSlot;
+  if (element.parentElement) return element.parentElement;
+  const rootNode = typeof element.getRootNode === "function" ? element.getRootNode() : null;
+  if (typeof ShadowRoot !== "undefined" && rootNode instanceof ShadowRoot && rootNode.host instanceof Element) {
+    return rootNode.host;
+  }
+  return null;
+}
+function isElementWithinComposedSubtree(element, ancestor) {
+  if (!element || !ancestor) return false;
+  let current = element;
+  while (current) {
+    if (current === ancestor) return true;
+    current = getComposedParentElement(current);
+  }
+  return false;
+}
+function resolveInlineTextTarget(selectionTarget, pathElements, isEditable = isEditableTextTarget) {
+  if (!selectionTarget?.isConnected) return null;
+  for (const element of pathElements) {
+    if (!element.isConnected) continue;
+    if (!isElementWithinComposedSubtree(element, selectionTarget)) continue;
+    if (isEditable(element)) return element;
+    if (element === selectionTarget) return null;
+  }
+  return isEditable(selectionTarget) ? selectionTarget : null;
+}
+function resolveInlineTextFragmentTargetAtPoint(selectionTarget, clientX, clientY) {
+  if (!selectionTarget?.isConnected) return null;
+  return resolveEditableTextFragmentAtPoint(selectionTarget, clientX, clientY);
+}
+function createTextSessionService(options) {
+  const { state: state2 } = options;
+  function commitText(element, value, previousValue) {
+    if (!isEditableTextTarget(element) || !element.isConnected) return false;
+    const liveBeforeText = readEditableText(element);
+    const beforeText = previousValue ?? liveBeforeText;
+    const normalizedBefore = normalizeTextForTarget(element, beforeText);
+    const nextText = normalizeTextForTarget(element, value);
+    const selectedElement = state2.selectedElement;
+    const selectionOwnsTextTarget = Boolean(selectedElement?.isConnected) && isElementWithinComposedSubtree(element, selectedElement);
+    if (!selectionOwnsTextTarget) {
+      options.ensureSelected(element, DEFAULT_MODIFIERS);
+    }
+    if (normalizedBefore === nextText) {
+      return false;
+    }
+    if (liveBeforeText !== nextText || nextText === "" && element.childElementCount > 0) {
+      writeEditableText(element, nextText);
+    }
+    state2.transactionManager?.recordText(element, normalizedBefore, nextText);
+    state2.positionTracker?.forceUpdate(true);
+    if (state2.selectedElement === element) {
+      state2.breadcrumbs?.setTarget(element);
+      state2.propertyPanel?.refresh();
+    }
+    console.log(`${options.logPrefix} Text edit committed`);
+    return true;
+  }
+  return {
+    isEditable: isEditableTextTarget,
+    normalizeText: normalizeTextForEditorInput,
+    getText(element) {
+      if (!isEditableTextTarget(element)) return "";
+      return readEditableText(element);
+    },
+    commitText
+  };
+}
+
+// src/core/editor/target-screenshot.ts
+function estimateDataUrlBytes(data) {
+  const separatorIndex = data.indexOf(",");
+  if (separatorIndex < 0) return 0;
+  const header = data.slice(0, separatorIndex);
+  const payload = data.slice(separatorIndex + 1);
+  if (!header.includes(";base64")) {
+    return new TextEncoder().encode(decodeURIComponent(payload)).byteLength;
+  }
+  const padding = payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor(payload.length * 3 / 4) - padding);
+}
+async function captureTargetScreenshot(element, commentId, options = {}) {
+  const normalizedCommentId = String(commentId ?? "").trim();
+  if (!normalizedCommentId) throw new Error("\u76EE\u6807\u622A\u56FE\u7F3A\u5C11\u6279\u6CE8 ID\u3002");
+  const capture = options.capture ?? ((target, captureOptions) => captureTargetContextScreenshot(target, captureOptions));
+  const screenshot = await capture(element, { isEditorUi: options.isEditorUi });
+  return {
+    id: `${normalizedCommentId}:target-screenshot`,
+    name: "target-screenshot.png",
+    data: screenshot.data,
+    mimeType: "image/png",
+    size: estimateDataUrlBytes(screenshot.data),
+    createdAt: options.now?.() ?? Date.now(),
+    source: "target-screenshot"
+  };
+}
+
+// src/core/editor/target-screenshot-coordinator.ts
+function isTargetScreenshot(image) {
+  return image.source === "target-screenshot";
+}
+function replaceTargetScreenshot(images, targetScreenshot) {
+  const userImages = images.filter((image) => !isTargetScreenshot(image));
+  return targetScreenshot ? [...userImages, targetScreenshot] : userImages;
+}
+function createTargetScreenshotCoordinator(options) {
+  const versionByElement = /* @__PURE__ */ new WeakMap();
+  let generation = 0;
+  function begin(element) {
+    const version = (versionByElement.get(element) ?? 0) + 1;
+    versionByElement.set(element, version);
+    return { version, generation };
+  }
+  function isLatest(element, operation, commentId) {
+    return operation.generation === generation && versionByElement.get(element) === operation.version && options.getCommentId(element) === commentId && element.isConnected !== false;
+  }
+  async function syncAfterNoteSave(element, note, initialSelectionElement) {
+    const operation = begin(element);
+    if (!String(note ?? "").trim()) {
+      const currentImages = options.getImages(element);
+      if (currentImages.some(isTargetScreenshot)) {
+        options.setImages(element, replaceTargetScreenshot(currentImages, null));
+      }
+      return;
+    }
+    if (!options.isEnabled()) return;
+    const commentId = String(options.getCommentId(element) ?? "").trim();
+    if (!commentId) return;
+    try {
+      const screenshotElement = initialSelectionElement && initialSelectionElement.isConnected !== false ? initialSelectionElement : element;
+      const captureElement = options.resolveCaptureElement ? options.resolveCaptureElement(screenshotElement) : screenshotElement;
+      if (!captureElement) throw new Error("\u76EE\u6807\u5143\u7D20\u5DF2\u4E0D\u53EF\u7528\u3002");
+      const captured = await options.capture(captureElement, commentId);
+      const preparedImages = await options.prepare(element, [captured]);
+      const prepared = preparedImages[0];
+      if (!prepared) throw new Error("\u76EE\u6807\u622A\u56FE\u4FDD\u5B58\u5931\u8D25\u3002");
+      if (!isLatest(element, operation, commentId)) return;
+      const targetScreenshot = {
+        ...prepared,
+        id: `${commentId}:target-screenshot`,
+        name: "target-screenshot.png",
+        source: "target-screenshot"
+      };
+      options.setImages(
+        element,
+        replaceTargetScreenshot(options.getImages(element), targetScreenshot)
+      );
+    } catch (error) {
+      if (isLatest(element, operation, commentId)) {
+        options.onError?.(error);
+      }
+    }
+  }
+  return {
+    syncAfterNoteSave,
+    invalidate() {
+      generation += 1;
+    }
+  };
+}
+
 // src/core/editor/lifecycle.ts
 var SELECTION_MODE_HOTKEY_SHORTCUT_LABEL = "Ctrl / Cmd + S";
 function createLifecycleService(deps) {
@@ -29879,6 +31583,27 @@ function createLifecycleService(deps) {
   let pendingCommentContextSync = false;
   let routeChangeCleanup = null;
   let interactionProfileRestartQueued = false;
+  const targetScreenshotCoordinator = createTargetScreenshotCoordinator({
+    isEnabled: () => state2.uiSettings.captureTargetScreenshot && resolveActiveInteractionProfile() !== "text-comment",
+    capture: (element, commentId) => captureTargetScreenshot(element, commentId, {
+      isEditorUi: (node) => Boolean(state2.shadowHost?.isOverlayElement(node))
+    }),
+    resolveCaptureElement: (element) => {
+      try {
+        const textCommentMeta = resolveTextCommentElementMeta(state2, element);
+        return textCommentMeta ? textCommentMeta.sourceElement : element;
+      } catch {
+        return element;
+      }
+    },
+    prepare: options.ui.onPrepareImageAttachments,
+    getCommentId: (element) => services.changes.getMetaForElement(element)?.commentId ?? null,
+    getImages: (element) => services.changes.getImagesForElement(element),
+    setImages: (element, images) => services.changes.setImagesForElement(element, images),
+    onError: () => {
+      services.feedback.toast("warning", "\u76EE\u6807\u622A\u56FE\u672A\u80FD\u66F4\u65B0\uFF0C\u5DF2\u4FDD\u7559\u4E0A\u4E00\u6B21\u622A\u56FE\u3002");
+    }
+  });
   function resolveActiveInteractionProfile() {
     if (options.interactionProfile === "annotation") {
       return "annotation";
@@ -29931,6 +31656,7 @@ function createLifecycleService(deps) {
     const promptText = element ? buildSaveRunPromptForAgentElement(element) : "";
     return meta?.elementKey ? {
       type: "send-to-agent",
+      ...meta.commentId ? { commentId: meta.commentId } : {},
       elementKey: meta.elementKey,
       locator: meta.locator,
       label: meta.label,
@@ -29952,12 +31678,19 @@ function createLifecycleService(deps) {
   }
   function buildSaveRunPromptForAgentElement(element) {
     const prompt = canReuseAgentConversationForElement(element) ? services.summaries.buildAppendSaveRunPromptForElement(element) : services.summaries.buildSaveRunPromptForElement(element);
-    return appendImplicitAnnotationSkillToPrompt(
+    const promptWithSkills = appendImplicitAnnotationSkillToPrompt(
       prompt,
       options.interactionProfile === "annotation",
       options.ui.commentarySkillSettingsConfigured ? options.ui.commentarySelectedSkillIds : void 0,
       options.ui.commentarySkillOptions
     );
+    if (!promptWithSkills) return promptWithSkills;
+    const externalSection = buildExternalCommentsPromptSection(
+      services.changes.getMetaForElement(element)?.externalComments ?? []
+    );
+    return externalSection ? `${promptWithSkills}
+
+${externalSection}` : promptWithSkills;
   }
   function createHostExternalEditingTaskRef() {
     return {
@@ -30037,10 +31770,10 @@ function createLifecycleService(deps) {
     try {
       return Boolean(await options.ui.onHostToolbarAction(action));
     } catch (error) {
-      const message3 = error instanceof Error ? error.message : String(error);
-      lastHostAiActionError = message3 || "AI \u6267\u884C\u8BF7\u6C42\u5931\u8D25\u3002";
-      if (message3) {
-        services.feedback.toast("error", `AI \u6267\u884C\u5931\u8D25\uFF1A${message3}`);
+      const message = error instanceof Error ? error.message : String(error);
+      lastHostAiActionError = message || "AI \u6267\u884C\u8BF7\u6C42\u5931\u8D25\u3002";
+      if (message) {
+        services.feedback.toast("error", `AI \u6267\u884C\u5931\u8D25\uFF1A${message}`);
       }
       return false;
     }
@@ -30084,8 +31817,8 @@ function createLifecycleService(deps) {
       }
     }).catch((error) => {
       pendingCommentContextSync = true;
-      const message3 = error instanceof Error ? error.message : String(error);
-      console.warn(`${WEB_EDITOR_V2_LOG_PREFIX} Failed to sync comment context:`, message3);
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`${WEB_EDITOR_V2_LOG_PREFIX} Failed to sync comment context:`, message);
     });
   }
   function hasCommentContextToSync() {
@@ -30253,6 +31986,7 @@ function createLifecycleService(deps) {
   }
   function cleanupMountedRuntime() {
     inlineTextEditingElement = null;
+    targetScreenshotCoordinator.invalidate();
     services.conversationTaskMonitor?.stop();
     services.integrationWs?.stop();
     services.agentBridge.stop();
@@ -30282,6 +32016,8 @@ function createLifecycleService(deps) {
     state2.parentSelectController = null;
     state2.parentSelectHotkeyCleanup?.();
     state2.parentSelectHotkeyCleanup = null;
+    state2.deleteElementHotkeyCleanup?.();
+    state2.deleteElementHotkeyCleanup = null;
     state2.transactionManager?.dispose();
     state2.transactionManager = null;
     state2.positionTracker?.dispose();
@@ -30337,7 +32073,7 @@ function createLifecycleService(deps) {
     if (event.key === "ArrowDown") return "return-previous";
     return null;
   }
-  const PARENT_SELECT_EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
+  const PARENT_SELECT_EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]';
   const PARENT_SELECT_INPUT_TOUCHED_ATTR3 = "data-we-parent-select-input-touched";
   function isTextualInputType(type) {
     const normalizedType = (type || "text").toLowerCase();
@@ -30389,7 +32125,175 @@ function createLifecycleService(deps) {
     }
     return getParentSelectEditableControlFromNode(event.target);
   }
+  function isDeleteElementShortcut(event) {
+    if (event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+      return false;
+    }
+    return event.key === "Delete" || event.key === "Backspace";
+  }
+  function canDeleteElement(element) {
+    if (!element?.isConnected || !state2.transactionManager) return false;
+    if (services.agentBridge.isElementInteractionLocked(element)) return false;
+    const tagName = element.tagName?.toUpperCase();
+    if (tagName === "HTML" || tagName === "BODY" || tagName === "HEAD") return false;
+    const parent = element.parentElement;
+    if (!parent?.isConnected || !Array.from(parent.children).includes(element)) return false;
+    return String(element.outerHTML ?? "").trim().length > 0;
+  }
+  function buildDeleteElementAnnotationNote(element, transaction, deletedElementLabel) {
+    const truncate3 = (value, maxLength) => {
+      const normalized = String(value ?? "").replace(/\s+/gu, " ").trim();
+      if (normalized.length <= maxLength) return normalized;
+      return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}\u2026`;
+    };
+    const tagName = String(element.tagName ?? "element").toLowerCase();
+    const label = truncate3(deletedElementLabel, 120) || tagName;
+    const fingerprint = truncate3(transaction.before.locator.fingerprint ?? "", 240);
+    const selector = truncate3(
+      services.summaries.formatSelectorPath(transaction.before.locator),
+      500
+    );
+    const textPreview = truncate3(element.textContent ?? "", 180);
+    const insertIndex = transaction.structureData?.position?.insertIndex;
+    const lines = [`\u8BF7\u5220\u9664\u8FD9\u4E2A\u7236\u7EA7\u8282\u70B9\u4E0B\u539F\u6765\u7684\u5B50\u5143\u7D20\u300C${label}\u300D\u3002`];
+    if (fingerprint) {
+      lines.push(`\u6838\u5FC3\u8282\u70B9\uFF1A${fingerprint}`);
+    }
+    if (Number.isInteger(insertIndex) && Number(insertIndex) >= 0) {
+      lines.push(`\u539F\u4F4D\u7F6E\uFF1A\u7236\u7EA7\u7684\u7B2C ${Number(insertIndex) + 1} \u4E2A\u5B50\u5143\u7D20\u3002`);
+    }
+    if (selector) {
+      lines.push(`\u539F\u59CB\u5B9A\u4F4D\uFF1A${selector}`);
+    }
+    if (textPreview) {
+      lines.push(`\u5185\u90E8\u6587\u672C\uFF1A${textPreview}`);
+    }
+    return lines.join("\n");
+  }
+  function getDeleteElementAnnotationLinks(parentElementKey) {
+    return Array.from(state2.deleteElementAnnotationsByTransactionId.values()).filter((link) => link.parentElementKey === parentElementKey).sort((left, right) => left.createdAt - right.createdAt);
+  }
+  function resolveDeleteElementAnnotationParent(parentElementKey) {
+    const links = getDeleteElementAnnotationLinks(parentElementKey);
+    const directParent = links.find((link) => link.parentElement.isConnected)?.parentElement ?? null;
+    if (directParent) return directParent;
+    for (const link of links) {
+      const locatedParent = locateElement(link.parentLocator);
+      if (!locatedParent?.isConnected) continue;
+      for (const relatedLink of links) {
+        relatedLink.parentElement = locatedParent;
+      }
+      return locatedParent;
+    }
+    return null;
+  }
+  function syncDeleteElementAnnotation(parentElementKey) {
+    const links = getDeleteElementAnnotationLinks(parentElementKey);
+    if (links.length === 0) return;
+    const parent = resolveDeleteElementAnnotationParent(parentElementKey);
+    if (!parent) return;
+    const activeNotes = links.filter((link) => link.active).map((link) => link.annotationNote);
+    const nextNote = [links[0].baseNote.trim(), ...activeNotes].filter(Boolean).join("\n\n");
+    services.changes.setNoteForElement(parent, nextNote);
+  }
+  function handleDeleteElementTransactionChange(event) {
+    if (event.action === "clear") {
+      state2.deleteElementAnnotationsByTransactionId.clear();
+      return;
+    }
+    const transactionId = event.transaction?.id;
+    if (!transactionId) return;
+    const link = state2.deleteElementAnnotationsByTransactionId.get(transactionId);
+    if (!link) return;
+    if (event.action === "undo" || event.action === "restore") {
+      link.active = false;
+    } else if (event.action === "redo") {
+      link.active = true;
+    } else {
+      return;
+    }
+    syncDeleteElementAnnotation(link.parentElementKey);
+    if (event.action === "restore") {
+      state2.deleteElementAnnotationsByTransactionId.delete(transactionId);
+    }
+  }
+  function handleDeleteCurrentElement(element) {
+    if (!canDeleteElement(element)) return false;
+    const transactionManager = state2.transactionManager;
+    if (!transactionManager) return false;
+    const parent = element.parentElement;
+    if (!parent) return false;
+    const parentMeta = services.changes.getMetaForElement(parent);
+    if (!parentMeta) return false;
+    const deletedElementLabel = services.changes.getMetaForElement(element)?.label ?? "";
+    services.agentBridge.dismissElementTaskState(element, {
+      includeRunning: true
+    });
+    const transaction = transactionManager.applyStructure(element, {
+      action: "delete"
+    });
+    if (!transaction) {
+      services.feedback.toast("warning", "\u5F53\u524D\u5143\u7D20\u65E0\u6CD5\u5220\u9664\u3002");
+      return false;
+    }
+    const existingLinks = getDeleteElementAnnotationLinks(parentMeta.elementKey);
+    const baseNote = existingLinks[0]?.baseNote ?? parentMeta.note;
+    const transactionElementKey = String(transaction.elementKey ?? "").trim();
+    const annotationNote = buildDeleteElementAnnotationNote(
+      element,
+      transaction,
+      deletedElementLabel
+    );
+    state2.deleteElementAnnotationsByTransactionId.set(transaction.id, {
+      transactionId: transaction.id,
+      transactionElementKey,
+      parentElementKey: parentMeta.elementKey,
+      parentElement: parent,
+      parentLocator: parentMeta.locator,
+      baseNote,
+      annotationNote,
+      createdAt: Number(transaction.timestamp ?? Date.now()),
+      active: true
+    });
+    if (transactionElementKey) {
+      const previousProcessedAt = state2.processedEditTimestampsByKey.get(transactionElementKey) ?? 0;
+      state2.processedEditTimestampsByKey.set(
+        transactionElementKey,
+        Math.max(previousProcessedAt, Number(transaction.timestamp ?? Date.now()))
+      );
+    }
+    services.changes.rememberSelectionAnchor(parent);
+    syncDeleteElementAnnotation(parentMeta.elementKey);
+    services.interaction.handleHover(null);
+    services.interaction.clearSelection();
+    return true;
+  }
+  function installDeleteElementHotkey() {
+    state2.deleteElementHotkeyCleanup?.();
+    state2.deleteElementHotkeyCleanup = null;
+    const handler = (event) => {
+      if (!state2.active || !isDeleteElementShortcut(event)) return;
+      if (state2.shadowHost?.isEventFromUi(event)) return;
+      if (getParentSelectEditableControl(event)) return;
+      const element = state2.selectedElement;
+      if (!element || !handleDeleteCurrentElement(element)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    };
+    const hotkeyOptions = {
+      capture: true,
+      passive: false
+    };
+    window.addEventListener("keydown", handler, hotkeyOptions);
+    state2.deleteElementHotkeyCleanup = () => {
+      window.removeEventListener("keydown", handler, hotkeyOptions);
+    };
+  }
   function shouldBlockParentSelectEvent(event, eventFromEditorUi) {
+    if (state2.inlineTextEditingActive && shouldAllowInlineEditingPageEvent(event)) {
+      return true;
+    }
     const editableControl = getParentSelectEditableControl(event);
     if (editableControl) {
       if (!isTextEntryControl(editableControl)) return true;
@@ -30527,9 +32431,7 @@ function createLifecycleService(deps) {
         debug.lastAction = action;
       }
       void Promise.resolve(
-        state2.propertyPanel?.runHostToolbarAction?.({
-          type: "toggle-selection-mode"
-        }) ?? false
+        state2.propertyPanel?.runHostToolbarAction?.({ type: "toggle-selection-mode" }) ?? false
       ).then((result) => {
         action.pending = false;
         action.result = Boolean(result);
@@ -30809,7 +32711,10 @@ function createLifecycleService(deps) {
         isEventFromEditorUi: (event) => {
           return Boolean(state2.shadowHost?.isEventFromUi(event));
         },
-        onChange: services.interaction.handleTransactionChange,
+        onChange: (event) => {
+          handleDeleteElementTransactionChange(event);
+          services.interaction.handleTransactionChange(event);
+        },
         onApplyError: handleTransactionError
       });
       void Promise.resolve(services.persistence.restoreCachedChanges()).then((deletedElementKeys) => {
@@ -30859,16 +32764,35 @@ function createLifecycleService(deps) {
         onSelect: (event) => {
           const target = services.agentBridge.resolveSelectableElement(event.element);
           if (!target?.isConnected) return;
-          void services.interaction.handleSelect(target, event.modifiers, {
+          const selectionAnchor = {
             clientX: event.clientX,
             clientY: event.clientY
-          });
+          };
+          if (event.initialElement) {
+            void services.interaction.handleSelect(
+              target,
+              event.modifiers,
+              selectionAnchor,
+              event.initialElement
+            );
+          } else {
+            void services.interaction.handleSelect(target, event.modifiers, selectionAnchor);
+          }
         },
         onDoubleClickSelected: isTextComment ? void 0 : (event) => {
-          if (!services.textSession.isEditable(event.element)) return;
           if (services.agentBridge.isElementInteractionLocked(event.element)) return;
-          state2.breadcrumbs?.enterInlineTextEdit?.();
-          state2.propertyPanel?.enterInlineTextEdit?.();
+          const textTarget = resolveInlineTextTarget(
+            event.element,
+            event.pathElements,
+            services.textSession.isEditable
+          ) ?? resolveInlineTextFragmentTargetAtPoint(
+            event.element,
+            event.clientX,
+            event.clientY
+          );
+          if (!textTarget) return;
+          state2.breadcrumbs?.enterInlineTextEdit?.(textTarget);
+          state2.propertyPanel?.enterInlineTextEdit?.(textTarget);
         },
         onDeselect: services.interaction.handleDeselect,
         resolveTargetForHover: isTextComment ? void 0 : (target) => services.agentBridge.resolveSelectableElement(target),
@@ -30880,9 +32804,7 @@ function createLifecycleService(deps) {
         isElementInteractionLocked: (element) => services.agentBridge.isElementInteractionLocked(element)
       });
       if (!initialSelectionModeActive) {
-        state2.eventController.setMode("interaction", {
-          allowPageInteraction: true
-        });
+        state2.eventController.setMode("interaction", { allowPageInteraction: true });
         state2.selectionChromeVisible = false;
       }
       if (isTextComment && state2.textCommentManager) {
@@ -31002,9 +32924,9 @@ function createLifecycleService(deps) {
             try {
               return await services.agentBridge.requestWake();
             } catch (error) {
-              const message3 = error instanceof Error ? error.message : String(error);
-              if (message3) {
-                services.feedback.toast("warning", message3);
+              const message = error instanceof Error ? error.message : String(error);
+              if (message) {
+                services.feedback.toast("warning", message);
               }
               return false;
             }
@@ -31015,9 +32937,9 @@ function createLifecycleService(deps) {
               const editingRun = beginHostExternalEditing(targetRefs);
               const handled = await runHostAiAction(buildHostSendToAgentAction(element));
               if (!handled) {
-                const message3 = lastHostAiActionError || "\u5BBF\u4E3B\u6682\u672A\u5904\u7406 AI \u6267\u884C\u8BF7\u6C42\u3002";
-                markHostExternalEditingError(editingRun, message3);
-                throw new Error(message3);
+                const message = lastHostAiActionError || "\u5BBF\u4E3B\u6682\u672A\u5904\u7406 AI \u6267\u884C\u8BF7\u6C42\u3002";
+                markHostExternalEditingError(editingRun, message);
+                throw new Error(message);
               }
               return;
             }
@@ -31040,9 +32962,9 @@ function createLifecycleService(deps) {
               const editingRun = beginHostExternalEditing(targetRef ? [targetRef] : []);
               const handled = await runHostAiAction(buildHostSendToAgentAction(element));
               if (!handled) {
-                const message3 = lastHostAiActionError || "\u5BBF\u4E3B\u6682\u672A\u5904\u7406 AI \u6267\u884C\u8BF7\u6C42\u3002";
-                markHostExternalEditingError(editingRun, message3);
-                throw new Error(message3);
+                const message = lastHostAiActionError || "\u5BBF\u4E3B\u6682\u672A\u5904\u7406 AI \u6267\u884C\u8BF7\u6C42\u3002";
+                markHostExternalEditingError(editingRun, message);
+                throw new Error(message);
               }
               return;
             }
@@ -31062,9 +32984,7 @@ function createLifecycleService(deps) {
           onAbortAgentPrompt: async (element) => {
             if (shouldDelegateAiActionToHost()) {
               const locallyInterrupted = element === null ? await interruptVisibleTasksLocally() : false;
-              const handled = await runHostAiAction({
-                type: "interrupt-agent"
-              });
+              const handled = await runHostAiAction({ type: "interrupt-agent" });
               if (!handled && !locallyInterrupted) {
                 throw new Error(lastHostAiActionError || "\u5BBF\u4E3B\u6682\u672A\u5904\u7406 AI \u7EC8\u6B62\u8BF7\u6C42\u3002");
               }
@@ -31101,6 +33021,7 @@ function createLifecycleService(deps) {
           },
           hasPrototypeComments,
           onClearCurrentElementEdits: async (element) => {
+            if (services.changes.getMetaForElement(element)?.readOnly) return false;
             const didClear = await services.localActions.handleClearElementEdits(element);
             if (didClear) {
               services.agentBridge.dismissElementTaskState(element, {
@@ -31111,10 +33032,18 @@ function createLifecycleService(deps) {
           },
           onDeleteCurrentAnnotationNode: options.host.onDeleteAnnotationNode || options.host.onAnnotationMarkdownChange ? handleDeleteCurrentAnnotationNode : void 0,
           getCopyPromptBlockReason: services.summaries.getCopyPromptBlockReason,
+          getCopyPromptText: services.summaries.buildCopyPrompt,
           showCopyPromptAction: options.ui.showCopyPromptAction,
           toolbarMode: options.ui.toolbarMode,
           hideExecutionControls: options.ui.hideExecutionControls,
           hideCurrentElementExecutionAction: options.ui.hideCurrentElementExecutionAction,
+          hideClearEditsAction: options.ui.hideClearEditsAction,
+          hideToolbarCloseAction: options.ui.hideToolbarCloseAction,
+          compactToolbar: options.ui.compactToolbar,
+          toolbarExtraContent: options.ui.toolbarExtraContent,
+          externalAnnotationMode: options.ui.externalAnnotationMode,
+          commenterName: options.ui.commenterName,
+          onCommenterNameChange: options.ui.onCommenterNameChange,
           hostSurfaceVisibilityControl: options.ui.hostSurfaceVisibilityControl,
           aiExecutionConfigSummary: options.ui.aiExecutionConfigSummary,
           aiExecutionConfigConfigured: options.ui.aiExecutionConfigConfigured,
@@ -31174,8 +33103,8 @@ function createLifecycleService(deps) {
               await exportSelectionToDesignTool(tool, targetElement);
               services.feedback.toast("success", `\u5DF2\u5BFC\u51FA\u5230 ${tool}`);
             } catch (error) {
-              const message3 = error instanceof Error ? error.message : String(error);
-              services.feedback.toast("error", message3 || `\u5BFC\u51FA\u5230 ${tool} \u5931\u8D25`);
+              const message = error instanceof Error ? error.message : String(error);
+              services.feedback.toast("error", message || `\u5BFC\u51FA\u5230 ${tool} \u5931\u8D25`);
             }
           },
           getExportSelectionToDesignToolBlockReason: (_tool, element) => {
@@ -31221,6 +33150,21 @@ function createLifecycleService(deps) {
           subscribeTweak: (listener) => getTweakProtocol()?.subscribe(listener) ?? (() => void 0),
           getAiNote: (element) => services.changes.getMetaForElement(element)?.note ?? "",
           getAiNoteSkillIds: (element) => services.changes.getMetaForElement(element)?.skillIds?.slice() ?? [],
+          getAiNoteMeta: (element) => {
+            const meta = services.changes.getCommenterDisplayMeta?.(element);
+            return meta ? {
+              ...meta.name ? { commenterName: meta.name } : {},
+              commenterColor: meta.color,
+              readOnly: meta.readOnly,
+              externalComments: meta.externalComments
+            } : null;
+          },
+          canEditAiNote: (element) => !Boolean(services.changes.getMetaForElement(element)?.readOnly),
+          canClearCurrentElementEdits: (element) => !Boolean(services.changes.getMetaForElement(element)?.readOnly),
+          onDeleteExternalComment: (element, commentId) => {
+            if (services.changes.getMetaForElement(element)?.readOnly) return false;
+            return services.changes.removeExternalCommentForElement(element, commentId);
+          },
           enableImageAttachments: options.ui.enableImageAttachments,
           onPrepareAiNoteImages: options.ui.onPrepareImageAttachments,
           getAiNoteImages: (element) => services.changes.getImagesForElement(element),
@@ -31228,16 +33172,46 @@ function createLifecycleService(deps) {
           onRememberSelectionAnchor: (element, selectionAnchor) => {
             services.changes.rememberSelectionAnchor(element, selectionAnchor);
           },
-          onAiNoteChange: (element, note, noteOptions) => {
+          onAiNoteChange: async (element, note, noteOptions) => {
+            if (services.changes.getMetaForElement(element)?.readOnly) return;
+            if (options.ui.externalAnnotationMode && element) {
+              const meta = services.changes.getMetaForElement(element);
+              if (meta) {
+                const existing = meta.externalComments?.[0];
+                meta.externalComments = note.trim() ? [{
+                  id: existing?.id || `review-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                  authorId: existing?.authorId || "pending-reviewer",
+                  authorName: existing?.authorName || options.ui.commenterName || "\u8BC4\u5BA1\u8005",
+                  content: note.trim(),
+                  createdAt: existing?.createdAt || Date.now(),
+                  updatedAt: Date.now()
+                }] : [];
+              }
+            }
             if (noteOptions) {
               services.changes.setNoteForElement(element, note, noteOptions);
             } else {
               services.changes.setNoteForElement(element, note);
             }
+            if (element) {
+              const shouldCaptureTargetScreenshot = state2.uiSettings.captureTargetScreenshot && resolveActiveInteractionProfile() !== "text-comment";
+              const initialSelectionElement = state2.selectedElement === element ? state2.initialSelectionElement : void 0;
+              const targetScreenshotSync = targetScreenshotCoordinator.syncAfterNoteSave(
+                element,
+                note,
+                initialSelectionElement ?? void 0
+              );
+              if (shouldCaptureTargetScreenshot) {
+                await targetScreenshotSync;
+              } else {
+                void targetScreenshotSync;
+              }
+            }
             state2.positionTracker?.forceUpdate(true);
             syncCommentContextAfterNoteSave(element, note);
           },
           onAiNoteImagesChange: (element, images) => {
+            if (services.changes.getMetaForElement(element)?.readOnly) return;
             services.changes.setImagesForElement(element, images);
             state2.positionTracker?.forceUpdate(true);
           },
@@ -31252,6 +33226,7 @@ function createLifecycleService(deps) {
           getChangeMarkersVisible: () => state2.changeMarkersVisible,
           onChangeMarkersVisible: services.changes.setChangeMarkersVisible,
           getModifiedElementCount: getClearableElementCount,
+          getAnnotationSaveStatus: () => services.persistence.getSaveStatus(),
           onSelectionChromeVisibleChange: (visible) => {
             state2.selectionChromeVisible = visible;
             if (!visible) {
@@ -31319,6 +33294,7 @@ function createLifecycleService(deps) {
             getElementTools: options.host.getElementTools,
             onElementToolAction: options.host.onElementToolAction,
             canEditAnnotationMarkdown,
+            showAnnotationMarkdownEditor: options.host.showAnnotationMarkdownEditor,
             resolveAnnotationTarget: resolveAnnotationHostTarget,
             getCreateAnnotationBlockReason,
             annotationMarkdownEditorKind: options.host.annotationMarkdownEditorKind,
@@ -31326,6 +33302,7 @@ function createLifecycleService(deps) {
             getAnnotationMarkdown,
             onAnnotationMarkdownChange,
             onDeleteCurrentAnnotationNode: options.host.onDeleteAnnotationNode || options.host.onAnnotationMarkdownChange ? handleDeleteCurrentAnnotationNode : void 0,
+            onDeleteCurrentElement: handleDeleteCurrentElement,
             onSelectParent: (element) => {
               const parent = state2.selectionEngine?.getParentCandidate(element) ?? null;
               if (parent) {
@@ -31349,6 +33326,7 @@ function createLifecycleService(deps) {
         state2.propertyPanel.refresh();
       }
       services.changes.renderChangeMarkers();
+      installDeleteElementHotkey();
       installParentSelectHotkey();
       if (!isTextComment) {
         installSelectionModeHotkey();
@@ -31372,6 +33350,7 @@ function createLifecycleService(deps) {
   }
   function cleanupInteractionComponents() {
     inlineTextEditingElement = null;
+    targetScreenshotCoordinator.invalidate();
     services.conversationTaskMonitor?.stop();
     services.integrationWs?.stop();
     services.agentBridge.stop();
@@ -31397,6 +33376,8 @@ function createLifecycleService(deps) {
     state2.parentSelectController = null;
     state2.parentSelectHotkeyCleanup?.();
     state2.parentSelectHotkeyCleanup = null;
+    state2.deleteElementHotkeyCleanup?.();
+    state2.deleteElementHotkeyCleanup = null;
     state2.transactionManager?.dispose();
     state2.transactionManager = null;
     state2.positionTracker?.dispose();
@@ -31427,6 +33408,7 @@ function createLifecycleService(deps) {
         state2.panelOnlyMode = true;
         state2.hoveredElement = null;
         state2.selectedElement = null;
+        state2.initialSelectionElement = null;
         state2.selectionAnchor = null;
         state2.pendingHoverTransition = false;
         state2.inlineTextEditingActive = false;
@@ -31532,11 +33514,22 @@ function createLifecycleService(deps) {
           onClearEdits: async () => {
           },
           onClearCurrentElementEdits: async () => false,
+          getAiNoteMeta: () => null,
+          canEditAiNote: () => false,
+          canClearCurrentElementEdits: () => false,
           getCopyPromptBlockReason: services.summaries.getCopyPromptBlockReason,
+          getCopyPromptText: services.summaries.buildCopyPrompt,
           showCopyPromptAction: options.ui.showCopyPromptAction,
           toolbarMode: options.ui.toolbarMode,
           hideExecutionControls: options.ui.hideExecutionControls,
           hideCurrentElementExecutionAction: options.ui.hideCurrentElementExecutionAction,
+          hideClearEditsAction: options.ui.hideClearEditsAction,
+          hideToolbarCloseAction: options.ui.hideToolbarCloseAction,
+          compactToolbar: options.ui.compactToolbar,
+          toolbarExtraContent: options.ui.toolbarExtraContent,
+          externalAnnotationMode: options.ui.externalAnnotationMode,
+          commenterName: options.ui.commenterName,
+          onCommenterNameChange: options.ui.onCommenterNameChange,
           hostSurfaceVisibilityControl: options.ui.hostSurfaceVisibilityControl,
           aiExecutionConfigSummary: options.ui.aiExecutionConfigSummary,
           aiExecutionConfigConfigured: options.ui.aiExecutionConfigConfigured,
@@ -31615,6 +33608,7 @@ function createLifecycleService(deps) {
           onChangeMarkersVisible: () => {
           },
           getModifiedElementCount: () => 0,
+          getAnnotationSaveStatus: () => services.persistence.getSaveStatus(),
           onSelectionChromeVisibleChange: () => {
           },
           onPromptCardVisibleChange: () => {
@@ -31790,6 +33784,7 @@ function createLocalActionsService(options) {
     const hasTransactionChanges = Boolean(
       meta?.changeKinds.some((kind) => kind === "text" || kind === "style" || kind === "class")
     );
+    const deleteElementAnnotationLinks = meta ? Array.from(options.state.deleteElementAnnotationsByTransactionId.values()).filter((link) => link.parentElementKey === meta.elementKey && link.active).reverse() : [];
     if (!hasNote && !hasImages && !hasRecordedChanges && !hasStaleDirtyMarker) {
       options.feedback.toast("info", "\u5F53\u524D\u9879\u6CA1\u6709\u53EF\u6E05\u7A7A\u7684\u5F85\u4FEE\u6539\u5185\u5BB9\u3002");
       return false;
@@ -31798,6 +33793,26 @@ function createLocalActionsService(options) {
     }
     if (hasTweakChanges) {
       await options.changes.revertRecordedTweakForElement(element);
+    }
+    if (deleteElementAnnotationLinks.length > 0) {
+      const restoreDeletedElement = options.state.transactionManager?.restoreDeletedElement;
+      if (!restoreDeletedElement) {
+        await options.feedback.alert({
+          title: "\u8FD8\u539F\u5143\u7D20",
+          content: "\u5F53\u524D\u65E0\u6CD5\u8FD8\u539F\u5DF2\u5220\u9664\u7684\u5143\u7D20\uFF0C\u8BF7\u4F7F\u7528 Cmd/Ctrl + Z \u540E\u518D\u8BD5\u3002",
+          confirmText: "\u77E5\u9053\u4E86"
+        });
+        return false;
+      }
+      for (const link of deleteElementAnnotationLinks) {
+        if (restoreDeletedElement(link.transactionId)) continue;
+        await options.feedback.alert({
+          title: "\u8FD8\u539F\u5143\u7D20",
+          content: "\u5DF2\u5220\u9664\u5143\u7D20\u7684\u539F\u4F4D\u7F6E\u5931\u6548\uFF0C\u6682\u65F6\u65E0\u6CD5\u8FD8\u539F\u3002",
+          confirmText: "\u77E5\u9053\u4E86"
+        });
+        return false;
+      }
     }
     if (hasTransactionChanges && meta) {
       const result = await options.interaction.revertElement(meta.elementKey);
@@ -31922,8 +33937,52 @@ function createPersistenceService(options) {
   let currentAdapterDocument = null;
   let lastAdapterDocument = null;
   let preserveMissingCurrentScopeRecordsOnNextWrite = false;
+  let saveStatus = "saved";
+  let pendingAdapterWriteCount = 0;
+  let adapterWriteSequence = 0;
+  let latestSettledAdapterWriteSequence = 0;
+  let latestSettledAdapterWriteSucceeded = true;
   const commentStateByCommentId = /* @__PURE__ */ new Map();
   const clearedCommentIds = /* @__PURE__ */ new Set();
+  function setSaveStatus(nextStatus) {
+    if (saveStatus === nextStatus) return;
+    saveStatus = nextStatus;
+    try {
+      options.onSaveStatusChange?.(nextStatus);
+    } catch {
+    }
+  }
+  function beginAdapterWrite() {
+    pendingAdapterWriteCount += 1;
+    adapterWriteSequence += 1;
+    setSaveStatus("saving");
+    return adapterWriteSequence;
+  }
+  function finishAdapterWrite(sequence, succeeded) {
+    pendingAdapterWriteCount = Math.max(0, pendingAdapterWriteCount - 1);
+    if (sequence >= latestSettledAdapterWriteSequence) {
+      latestSettledAdapterWriteSequence = sequence;
+      latestSettledAdapterWriteSucceeded = succeeded;
+    }
+    if (pendingAdapterWriteCount > 0) {
+      setSaveStatus("saving");
+      return;
+    }
+    setSaveStatus(latestSettledAdapterWriteSucceeded ? "saved" : "unsaved");
+  }
+  function getSaveStatus() {
+    return saveStatus;
+  }
+  async function enqueueTrackedAdapterWrite(scope, write) {
+    const writeSequence = beginAdapterWrite();
+    try {
+      await enqueueAdapterWrite(scope, write);
+      finishAdapterWrite(writeSequence, true);
+    } catch (error) {
+      finishAdapterWrite(writeSequence, false);
+      throw error;
+    }
+  }
   function readResourceMetaString2(key) {
     try {
       const resource = getResourceContext();
@@ -32173,6 +34232,9 @@ function createPersistenceService(options) {
     return false;
   }
   function hasPersistedEditPayload(record) {
+    if (Array.isArray(record?.externalComments) && record.externalComments.length > 0) {
+      return true;
+    }
     const textChange = record?.textChange;
     if (textChange && typeof textChange === "object" && String(textChange.before ?? "") !== String(textChange.after ?? "")) {
       return true;
@@ -32260,7 +34322,7 @@ function createPersistenceService(options) {
     });
   }
   function buildDocumentImages() {
-    return Array.from(state2.editMetaByKey.values()).flatMap(
+    return Array.from(state2.editMetaByKey.values()).filter((meta) => !meta.readOnly).flatMap(
       (meta) => meta.images.map((image) => {
         const commentId = ensureElementEditCommentId(meta);
         return withCurrentPageScope({
@@ -32270,6 +34332,7 @@ function createPersistenceService(options) {
           mimeType: image.mimeType,
           size: image.size,
           createdAt: image.createdAt,
+          ...image.source ? { source: image.source } : {},
           ...image.data ? { data: image.data } : {},
           ..."assetPath" in image && typeof image.assetPath === "string" ? { assetPath: image.assetPath } : {}
         });
@@ -32277,12 +34340,14 @@ function createPersistenceService(options) {
     );
   }
   function cacheEntryToCommentEntry(entry) {
-    const { note, commentId, elementKey: _elementKey, ...rest } = entry;
+    const { note, commentId, ...rest } = entry;
     return {
       ...rest,
+      elementKey: entry.elementKey,
       id: normalizeCommentId(commentId),
       state: isPrototypeEditCommentStatus(entry.state) ? entry.state : "idle",
-      ...note ? { comment: note } : {}
+      ...note ? { comment: note } : {},
+      ...Array.isArray(entry.externalComments) ? { externalComments: entry.externalComments.map((comment) => ({ ...comment })) } : {}
     };
   }
   function commentEntryToCacheEntry(entry) {
@@ -32290,7 +34355,8 @@ function createPersistenceService(options) {
     return {
       ...rest,
       commentId: id,
-      ...comment ? { note: comment } : {}
+      ...comment ? { note: comment } : {},
+      ...Array.isArray(entry.externalComments) ? { externalComments: entry.externalComments.map((comment2) => ({ ...comment2 })) } : {}
     };
   }
   function buildAdapterDocument(entries, reason = "changes", clearScope = "page", clearTarget = "all") {
@@ -32298,6 +34364,15 @@ function createPersistenceService(options) {
     if (!scope) return null;
     const documentKind = scope.documentKind === "document" ? "document-edit-comments" : "prototype-edit-comments";
     if (reason === "clear" && clearScope === "prototype" && clearTarget === "all") {
+      const preservedExternalComments = (lastAdapterDocument?.comments ?? []).map((entry) => ({
+        ...entry,
+        comment: void 0,
+        textChange: void 0,
+        styleChanges: void 0,
+        tweak: void 0,
+        skillIds: void 0
+      })).filter((entry) => (entry.externalComments?.length ?? 0) > 0);
+      const preservedExternalCommentIds = new Set(preservedExternalComments.map((entry) => entry.id));
       return {
         schemaVersion: 3,
         kind: documentKind,
@@ -32306,14 +34381,19 @@ function createPersistenceService(options) {
           targetPath: scope.targetPath,
           filePath: scope.filePath || `src/${scope.targetPath}/.spec/prototype-comments.json`
         },
-        comments: [],
-        images: []
+        comments: preservedExternalComments,
+        images: (lastAdapterDocument?.images ?? []).filter((image) => preservedExternalCommentIds.has(image.commentId))
       };
     }
     const currentPageScope = resolveCurrentPageScope();
-    const currentComments = entries.map(
-      (entry) => withCurrentPageScope(cacheEntryToCommentEntry(entry))
-    ).filter((entry) => Boolean(normalizeCommentId(entry.id)));
+    const previousCommentsById = new Map(
+      (lastAdapterDocument?.comments ?? []).map((entry) => [normalizeCommentId(entry.id), entry])
+    );
+    const currentComments = entries.map((entry) => {
+      const current = withCurrentPageScope(cacheEntryToCommentEntry(entry));
+      const previous = previousCommentsById.get(normalizeCommentId(current.id));
+      return previous ? { ...previous, ...current } : current;
+    }).filter((entry) => Boolean(normalizeCommentId(entry.id)));
     const currentImages = buildDocumentImages();
     const currentCommentIds = new Set(currentComments.map((entry) => entry.id));
     const currentImageIds = new Set(currentImages.map((image) => image.id));
@@ -32434,7 +34514,7 @@ function createPersistenceService(options) {
     if (!document2) return;
     lastAdapterDocument = document2;
     preserveMissingCurrentScopeRecordsOnNextWrite = false;
-    await enqueueAdapterWrite(
+    await enqueueTrackedAdapterWrite(
       scope,
       () => persistenceAdapter.write(scope, document2, reason)
     );
@@ -32451,6 +34531,7 @@ function createPersistenceService(options) {
     state2.processedEditTimestampsByKey.clear();
     state2.selectionAnchor = null;
     state2.selectedElement = null;
+    state2.initialSelectionElement = null;
     commentStateByCommentId.clear();
   }
   function removeStorageKey(key) {
@@ -32679,13 +34760,15 @@ function createPersistenceService(options) {
     const commentId = state2.editMetaByKey.get(normalizedElementKey)?.commentId;
     return commentId ? commentStateByCommentId.get(commentId)?.state ?? null : null;
   }
-  function resetCompletedCommentStateForElement(elementKey) {
+  function resetTerminalCommentStateForElement(elementKey) {
     const normalizedElementKey = normalizeElementRecordKey(elementKey);
-    if (!normalizedElementKey) return;
+    if (!normalizedElementKey) return false;
     const meta = state2.editMetaByKey.get(normalizedElementKey);
     const commentId = normalizeCommentId(meta?.commentId);
-    if (!commentId || commentStateByCommentId.get(commentId)?.state !== "completed") return;
+    const commentState = commentId ? commentStateByCommentId.get(commentId)?.state : null;
+    if (commentState !== "completed" && commentState !== "error") return false;
     recordCommentTaskState(normalizedElementKey, "idle");
+    return true;
   }
   async function waitForPendingWrites() {
     const storageScope = String(resolvePersistenceScope()?.storageScope ?? "").trim();
@@ -32741,7 +34824,7 @@ function createPersistenceService(options) {
     commentStateByCommentId.set(commentId, normalizeCommentState(nextComment));
     lastAdapterDocument = nextDocument;
     currentAdapterDocument = nextDocument;
-    await enqueueAdapterWrite(
+    await enqueueTrackedAdapterWrite(
       scope,
       () => persistenceAdapter.write(scope, nextDocument, "state")
     );
@@ -32769,7 +34852,7 @@ function createPersistenceService(options) {
   function buildCacheEntriesFromTransactions() {
     const tm = state2.transactionManager;
     if (!tm) {
-      return Array.from(state2.editMetaByKey.values()).filter((meta) => meta.note || (meta.skillIds?.length ?? 0) > 0 || meta.anchor).map((meta) => ({
+      return Array.from(state2.editMetaByKey.values()).filter((meta) => (!meta.readOnly || (meta.externalComments?.length ?? 0) > 0) && (meta.note || (meta.skillIds?.length ?? 0) > 0 || meta.anchor || (meta.externalComments?.length ?? 0) > 0)).map((meta) => ({
         commentId: ensureElementEditCommentId(meta),
         elementKey: meta.elementKey,
         label: meta.label,
@@ -32779,7 +34862,15 @@ function createPersistenceService(options) {
         marker: meta.anchor ? {
           ...meta.anchor,
           dirtySince: meta.dirtySince
-        } : null
+        } : null,
+        voiceCreateOperationId: meta.voiceCreateOperationId,
+        voiceElementKey: meta.voiceElementKey,
+        voiceTargetRef: meta.voiceTargetRef,
+        voiceTarget: meta.voiceTarget,
+        anchorPlacement: meta.anchorPlacement,
+        author: meta.author,
+        externalComments: meta.externalComments?.map((comment) => ({ ...comment })),
+        readOnly: meta.readOnly
       }));
     }
     const txs = filterUnprocessedTransactions(state2, tm.getUndoStack()).slice();
@@ -32866,6 +34957,7 @@ function createPersistenceService(options) {
         );
       }
       if (meta) entry.commentId = ensureElementEditCommentId(meta);
+      if (meta?.readOnly && !(meta.externalComments?.length ?? 0)) continue;
       if (meta?.elementKey) entry.elementKey = meta.elementKey;
       if (meta?.label) entry.label = meta.label;
       if ((meta?.tweakSummaryLines?.length ?? 0) > 0) {
@@ -32877,23 +34969,27 @@ function createPersistenceService(options) {
       }
       if (meta?.note) entry.note = meta.note;
       if ((meta?.skillIds?.length ?? 0) > 0) entry.skillIds = meta?.skillIds?.slice();
+      if ((meta?.externalComments?.length ?? 0) > 0) {
+        entry.externalComments = meta?.externalComments?.map((comment) => ({ ...comment }));
+      }
       if (meta?.anchor) {
         entry.marker = {
           ...meta.anchor,
           dirtySince: meta.dirtySince
         };
       }
-      if (!entry.textChange && !entry.styleChanges && !entry.tweak && !entry.note && !(entry.skillIds?.length ?? 0)) continue;
+      if (!entry.textChange && !entry.styleChanges && !entry.tweak && !entry.note && !(entry.skillIds?.length ?? 0) && !(entry.externalComments?.length ?? 0)) continue;
       entries.push(entry);
       if (elementKey) {
         appendedKeys.add(elementKey);
       }
     }
     for (const meta of state2.editMetaByKey.values()) {
+      if (meta.readOnly && !(meta.externalComments?.length ?? 0)) continue;
       if (appendedKeys.has(meta.elementKey)) continue;
       const hasRecordedTweak = (meta.tweakSummaryLines?.length ?? 0) > 0;
       const hasImages = meta.images.length > 0;
-      if (!meta.note && !hasRecordedTweak && !hasImages && !(meta.skillIds?.length ?? 0)) continue;
+      if (!meta.note && !hasRecordedTweak && !hasImages && !(meta.skillIds?.length ?? 0) && !(meta.externalComments?.length ?? 0)) continue;
       entries.push({
         commentId: ensureElementEditCommentId(meta),
         elementKey: meta.elementKey,
@@ -32909,7 +35005,15 @@ function createPersistenceService(options) {
         marker: meta.anchor ? {
           ...meta.anchor,
           dirtySince: meta.dirtySince
-        } : null
+        } : null,
+        voiceCreateOperationId: meta.voiceCreateOperationId,
+        voiceElementKey: meta.voiceElementKey,
+        voiceTargetRef: meta.voiceTargetRef,
+        voiceTarget: meta.voiceTarget,
+        anchorPlacement: meta.anchorPlacement,
+        author: meta.author,
+        externalComments: meta.externalComments?.map((comment) => ({ ...comment })),
+        readOnly: meta.readOnly
       });
     }
     return entries;
@@ -32955,6 +35059,14 @@ function createPersistenceService(options) {
       if (!commentId) continue;
       const entryNote = changes.normalizeNote(entry.note ?? "");
       const entrySkillIds = normalizePromptCardSkillIds(entry.skillIds ?? []);
+      const externalComments = Array.isArray(entry.externalComments) ? entry.externalComments.filter((comment) => comment && typeof comment === "object" && String(comment.content ?? "").trim()).map((comment) => ({
+        id: String(comment.id ?? "").trim(),
+        authorId: String(comment.authorId ?? "").trim(),
+        authorName: String(comment.authorName ?? "").trim() || "\u8BC4\u5BA1\u8005",
+        content: String(comment.content ?? "").trim(),
+        createdAt: Number(comment.createdAt) > 0 ? Number(comment.createdAt) : Date.now(),
+        ...Number(comment.updatedAt) > 0 ? { updatedAt: Number(comment.updatedAt) } : {}
+      })).filter((comment) => Boolean(comment.id && comment.authorId && comment.content)) : [];
       const documentImages = currentAdapterDocument?.images?.filter(
         (image) => image.commentId === commentId && isCurrentPageScopedRecord(image)
       ) ?? [];
@@ -32973,10 +35085,11 @@ function createPersistenceService(options) {
         continue;
       }
       const entryLocator = annotationPanelIdentity?.locator ?? entry.locator;
-      const element = locateElement(entryLocator);
+      const liveIdentity = resolveCommentaryElementIdentity(entryLocator);
+      const element = liveIdentity?.element ?? null;
       const canRestoreWithoutLiveElement = Boolean(annotationPanelIdentity) && Boolean(entry.marker);
       if ((!element || !element.isConnected) && !canRestoreWithoutLiveElement) continue;
-      const resolvedElementKey = annotationPanelIdentity?.elementKey ?? (element ? generateStableElementKey(element, entryLocator.shadowHostChain) : locatorKey(entryLocator));
+      const resolvedElementKey = annotationPanelIdentity?.elementKey ?? liveIdentity?.elementKey ?? locatorKey(entryLocator);
       const resolvedLabel = String(entry.label ?? "").trim() || (element ? generateFullElementLabel(element, entryLocator.shadowHostChain) : "Annotation Panel");
       const meta = changes.getOrCreateEditMeta(
         resolvedElementKey,
@@ -32984,17 +35097,31 @@ function createPersistenceService(options) {
         resolvedLabel
       );
       meta.commentId = commentId;
+      meta.author = typeof entry.author === "string" ? entry.author.trim() || null : null;
+      meta.readOnly = Boolean(entry.readOnly);
       meta.locator = entryLocator;
       meta.label = resolvedLabel;
       meta.note = changes.normalizeNote(entry.note ?? meta.note);
+      meta.externalComments = Array.isArray(entry.externalComments) ? externalComments : void 0;
       if (meta.note.trim() && entrySkillIds.length > 0) {
         meta.skillIds = entrySkillIds;
       } else {
         delete meta.skillIds;
       }
       meta.anchor = entry.marker ? normalizeMarkerAnchor(entry.marker) ?? meta.anchor : meta.anchor;
+      meta.voiceCreateOperationId = entry.voiceCreateOperationId;
+      meta.voiceElementKey = entry.voiceElementKey;
+      meta.voiceTargetRef = entry.voiceTargetRef;
+      meta.voiceTarget = entry.voiceTarget;
+      meta.anchorPlacement = entry.anchorPlacement;
       if (entry.marker && Number.isFinite(Number(entry.marker.dirtySince))) {
         meta.dirtySince = Number(entry.marker.dirtySince);
+      }
+      if (externalComments.length > 0 && meta.dirtySince === null) {
+        meta.dirtySince = Math.min(...externalComments.map((comment) => comment.createdAt || Date.now()));
+      }
+      if (meta.readOnly && meta.dirtySince === null) {
+        meta.dirtySince = Number.isFinite(Number(entry.updatedAt)) && Number(entry.updatedAt) > 0 ? Number(entry.updatedAt) : Date.now();
       }
       if (documentImages.length > 0) {
         const hydratedImages = documentImages.filter((image) => typeof image.data === "string" && image.data.trim()).map((image) => ({
@@ -33004,6 +35131,7 @@ function createPersistenceService(options) {
           mimeType: String(image.mimeType ?? "").trim() || "image/png",
           size: Number(image.size ?? 0),
           createdAt: Number(image.createdAt ?? Date.now()),
+          ...image.source === "user" || image.source === "target-screenshot" ? { source: image.source } : {},
           ...typeof image.assetPath === "string" && image.assetPath.trim() ? { assetPath: image.assetPath.trim() } : {}
         }));
         if (hydratedImages.length > 0) {
@@ -33022,7 +35150,7 @@ function createPersistenceService(options) {
           meta.dirtySince = Date.now();
         }
       }
-      if (entry.styleChanges) {
+      if (entry.styleChanges && !meta.readOnly) {
         const afterStyles = entry.styleChanges.after ?? {};
         const beforeStyles = entry.styleChanges.before ?? {};
         for (const prop of Object.keys(afterStyles)) {
@@ -33040,7 +35168,7 @@ function createPersistenceService(options) {
           tm.recordStyle(entryLocator, prop, beforeValue, afterValue, { merge: false });
         }
       }
-      if (entry.textChange && element) {
+      if (entry.textChange && element && !meta.readOnly) {
         const before = String(entry.textChange.before ?? "");
         const after = String(entry.textChange.after ?? "");
         if (before !== after && element instanceof HTMLElement) {
@@ -33117,7 +35245,7 @@ function createPersistenceService(options) {
       if (scope) {
         try {
           const documentToCompact = adapterDocument;
-          await enqueueAdapterWrite(
+          await enqueueTrackedAdapterWrite(
             scope,
             () => persistenceAdapter.write(scope, documentToCompact, "restore", {
               observedTombstones: adapterResult.observedTombstones
@@ -33218,13 +35346,14 @@ function createPersistenceService(options) {
       if (entry.tweak) next.tweak = entry.tweak;
       if (entry.note) next.note = entry.note;
       if (entry.skillIds) next.skillIds = entry.skillIds;
+      if (entry.externalComments) next.externalComments = entry.externalComments;
       if (entry.marker) next.marker = entry.marker;
       if (kind === "text") {
         if (entry.styleChanges) next.styleChanges = entry.styleChanges;
       } else {
         if (entry.textChange) next.textChange = entry.textChange;
       }
-      if (!next.textChange && !next.styleChanges && !next.tweak && !next.note && !(next.skillIds?.length ?? 0)) continue;
+      if (!next.textChange && !next.styleChanges && !next.tweak && !next.note && !(next.skillIds?.length ?? 0) && !(next.externalComments?.length ?? 0)) continue;
       nextEntries.push(next);
     }
     cacheRestoreInProgress = true;
@@ -33267,8 +35396,9 @@ function createPersistenceService(options) {
     pruneExpiredAgentTaskStates,
     recordCommentTaskState,
     getCommentTaskState,
-    resetCompletedCommentStateForElement,
+    resetTerminalCommentStateForElement,
     waitForPendingWrites,
+    getSaveStatus,
     listEditingConversationTasks,
     transitionConversationTaskTerminal,
     clearCommentRecord,
@@ -33284,18 +35414,18 @@ function createPersistenceService(options) {
 
 // src/core/editor/conversation-task-monitor.ts
 var RETRY_DELAYS_MS = [1e3, 3e3, 1e4, 3e4];
-function normalizeText5(value) {
+function normalizeText6(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 function normalizeProvider2(value) {
-  const normalized = normalizeText5(value).toLowerCase();
+  const normalized = normalizeText6(value).toLowerCase();
   return normalized === "openai" ? "codex" : normalized;
 }
 function taskKey(task) {
   return [task.commentId, task.provider, task.sessionId, task.requestId].join("\0");
 }
 function matchesStatus(task, status) {
-  return normalizeText5(status.threadId) === task.sessionId && normalizeProvider2(status.provider) === normalizeProvider2(task.provider);
+  return normalizeText6(status.threadId) === task.sessionId && normalizeProvider2(status.provider) === normalizeProvider2(task.provider);
 }
 function toTerminalTransition(task, status) {
   if (status.runState === "completed") {
@@ -33305,7 +35435,7 @@ function toTerminalTransition(task, status) {
     return {
       ...task,
       state: "error",
-      error: normalizeText5(status.error) || "ACP run aborted",
+      error: normalizeText6(status.error) || "ACP run aborted",
       code: "ACP_RUN_ABORTED"
     };
   }
@@ -33313,7 +35443,7 @@ function toTerminalTransition(task, status) {
     return {
       ...task,
       state: "error",
-      error: normalizeText5(status.error) || "ACP run failed",
+      error: normalizeText6(status.error) || "ACP run failed",
       code: "ACP_RUN_FAILED"
     };
   }
@@ -33502,8 +35632,18 @@ function inferPromptImageAssetPath(image, index) {
 }
 function collectPromptImageAssetPaths(images) {
   return dedupeStrings(
-    (images ?? []).map((image, index) => inferPromptImageAssetPath(image, index))
+    (images ?? []).filter((image) => image.source !== "target-screenshot").map((image, index) => inferPromptImageAssetPath(image, index))
   );
+}
+function collectPromptTargetScreenshotAssetPath(images) {
+  const entries = images ?? [];
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const image = entries[index];
+    if (image.source === "target-screenshot") {
+      return inferPromptImageAssetPath(image, 0);
+    }
+  }
+  return "";
 }
 function collectPersistedImageAssetPathsForComment(images, comment) {
   const commentId = normalizePathValue2(comment.id);
@@ -33512,6 +35652,7 @@ function collectPersistedImageAssetPathsForComment(images, comment) {
   return dedupeStrings(
     images.filter((image) => {
       if (normalizePathValue2(image.commentId) !== commentId) return false;
+      if (image.source === "target-screenshot") return false;
       const imagePageScope = normalizePathValue2(image.pageScope);
       return !pageScope || !imagePageScope || imagePageScope === pageScope;
     }).map(
@@ -33525,6 +35666,28 @@ function collectPersistedImageAssetPathsForComment(images, comment) {
       )
     )
   );
+}
+function collectPersistedTargetScreenshotAssetPathForComment(images, comment) {
+  const commentId = normalizePathValue2(comment.id);
+  const pageScope = normalizePathValue2(comment.pageScope);
+  if (!commentId) return "";
+  let target;
+  for (let index = images.length - 1; index >= 0; index -= 1) {
+    const image = images[index];
+    if (image.source !== "target-screenshot") continue;
+    if (normalizePathValue2(image.commentId) !== commentId) continue;
+    const imagePageScope = normalizePathValue2(image.pageScope);
+    if (!pageScope || !imagePageScope || imagePageScope === pageScope) {
+      target = image;
+      break;
+    }
+  }
+  if (!target) return "";
+  return normalizePathValue2(target.assetPath) || inferPromptImageAssetPath({
+    id: normalizePathValue2(target.id),
+    name: normalizePathValue2(target.name),
+    mimeType: normalizePathValue2(target.mimeType)
+  }, 0);
 }
 function readElementAttr(element, attr) {
   if (!element) return "";
@@ -33951,9 +36114,10 @@ ${lines.join("\n")}
       skillIds: meta.skillIds?.slice(),
       actions: buildMetaActionLines(meta),
       imageAssetPaths: collectPromptImageAssetPaths(meta.images),
+      targetScreenshotAssetPath: collectPromptTargetScreenshotAssetPath(meta.images),
       dirtySince: Number(meta.dirtySince ?? 0)
     })).filter(
-      (meta) => !summarizedKeys.has(meta.elementKey) && (Boolean(meta.note) || (meta.skillIds?.length ?? 0) > 0 || meta.actions.length > 0 || meta.imageAssetPaths.length > 0)
+      (meta) => !summarizedKeys.has(meta.elementKey) && (Boolean(meta.note) || (meta.skillIds?.length ?? 0) > 0 || meta.actions.length > 0 || meta.imageAssetPaths.length > 0 || Boolean(meta.targetScreenshotAssetPath))
     ).sort((a, b) => b.dirtySince - a.dirtySince || a.label.localeCompare(b.label));
   }
   function collectSaveRunCommentOnlyMetas(summarizedKeys) {
@@ -33964,11 +36128,12 @@ ${lines.join("\n")}
       note: buildPromptNote(meta.note, meta),
       skillIds: meta.skillIds?.slice(),
       actions: buildMetaActionLines(meta),
-      imageCount: Array.isArray(meta.images) ? meta.images.length : 0,
+      imageCount: Array.isArray(meta.images) ? meta.images.filter((image) => image.source !== "target-screenshot").length : 0,
       imageAssetPaths: collectPromptImageAssetPaths(meta.images),
+      targetScreenshotAssetPath: collectPromptTargetScreenshotAssetPath(meta.images),
       dirtySince: Number(meta.dirtySince ?? 0)
     })).filter(
-      (meta) => !summarizedKeys.has(meta.elementKey) && (Boolean(meta.note) || (meta.skillIds?.length ?? 0) > 0 || meta.imageCount > 0 || meta.actions.length > 0)
+      (meta) => !summarizedKeys.has(meta.elementKey) && (Boolean(meta.note) || (meta.skillIds?.length ?? 0) > 0 || meta.imageCount > 0 || Boolean(meta.targetScreenshotAssetPath) || meta.actions.length > 0)
     ).sort((a, b) => b.dirtySince - a.dirtySince || a.label.localeCompare(b.label));
   }
   function readElementSnapshot(locator, options2 = {}) {
@@ -34064,6 +36229,10 @@ ${lines.join("\n")}
     if (params.pageScope) lines.push(`  - \u9875\u9762\u8303\u56F4: ${params.pageScope}`);
     if (params.debugFileHint) lines.push(`  - \u53EF\u80FD\u76F8\u5173\u6587\u4EF6: ${params.debugFileHint}`);
     const imageAssetPaths = dedupeStrings(params.imageAssetPaths ?? []);
+    const targetScreenshotAssetPath = normalizePathValue2(params.targetScreenshotAssetPath);
+    if (targetScreenshotAssetPath) {
+      lines.push(`  - \u76EE\u6807\u622A\u56FE\uFF08\u7528\u4E8E\u7CBE\u786E\u5B9A\u4F4D\u5F53\u524D\u6279\u6CE8\u5143\u7D20\uFF09\uFF1A${targetScreenshotAssetPath}`);
+    }
     if (imageAssetPaths.length > 0) {
       lines.push(`  - \u672C\u5730\u56FE\u7247\u7D20\u6750: ${imageAssetPaths.join(", ")}`);
     }
@@ -34193,10 +36362,14 @@ ${lines.join("\n")}
         note: buildPromptNote(comment.comment ?? "", comment),
         skillIds: comment.skillIds?.slice(),
         actions: buildPersistedCommentActionLines(comment),
-        imageAssetPaths: collectPersistedImageAssetPathsForComment(images, comment)
+        imageAssetPaths: collectPersistedImageAssetPathsForComment(images, comment),
+        targetScreenshotAssetPath: collectPersistedTargetScreenshotAssetPathForComment(
+          images,
+          comment
+        )
       };
     }).filter(
-      (comment) => Boolean(comment.locator) && (Boolean(comment.note) || (comment.skillIds?.length ?? 0) > 0 || comment.actions.length > 0 || comment.imageAssetPaths.length > 0)
+      (comment) => Boolean(comment.locator) && (Boolean(comment.note) || (comment.skillIds?.length ?? 0) > 0 || comment.actions.length > 0 || comment.imageAssetPaths.length > 0 || Boolean(comment.targetScreenshotAssetPath))
     );
   }
   function isPersistedCurrentPageMeta(meta, currentPageScope) {
@@ -34258,6 +36431,7 @@ ${lines.join("\n")}
         actions: meta.actions,
         pageScope: meta.pageScope,
         imageAssetPaths: meta.imageAssetPaths,
+        targetScreenshotAssetPath: meta.targetScreenshotAssetPath,
         note: meta.note
       });
       itemIndex += 1;
@@ -34267,6 +36441,7 @@ ${lines.join("\n")}
       const note = buildPromptNote(meta?.note ?? "", meta);
       const actions = [...buildMetaActionLines(meta), ...buildSummaryActionLines(summary)];
       const imageAssetPaths = collectPromptImageAssetPaths(meta?.images);
+      const targetScreenshotAssetPath = collectPromptTargetScreenshotAssetPath(meta?.images);
       appendChangeItem(lines, {
         index: itemIndex,
         locator: summary.netEffect.locator,
@@ -34275,6 +36450,7 @@ ${lines.join("\n")}
         debugFileHint: includeDebugFileHint ? formatDebugSource(summary.debugSource) : "",
         pageScope: currentPageScope,
         imageAssetPaths,
+        targetScreenshotAssetPath,
         actions,
         note
       });
@@ -34288,7 +36464,7 @@ ${lines.join("\n")}
           comment,
           note: meta.note
         });
-      } else if (meta.note || (meta.skillIds?.length ?? 0) > 0 || meta.actions.length > 0 || meta.imageAssetPaths.length > 0) {
+      } else if (meta.note || (meta.skillIds?.length ?? 0) > 0 || meta.actions.length > 0 || meta.imageAssetPaths.length > 0 || Boolean(meta.targetScreenshotAssetPath)) {
         appendChangeItem(lines, {
           index: itemIndex,
           locator: meta.locator,
@@ -34296,6 +36472,7 @@ ${lines.join("\n")}
           actions: meta.actions,
           pageScope: currentPageScope,
           imageAssetPaths: meta.imageAssetPaths,
+          targetScreenshotAssetPath: meta.targetScreenshotAssetPath,
           note: meta.note
         });
       }
@@ -34331,12 +36508,13 @@ ${lines.join("\n")}
     return Array.from(state2.editMetaByKey.values()).filter(
       (meta) => meta.dirtySince !== null && !isCompletedCurrentPageComment(meta.elementKey)
     ).map((meta) => ({
+      ...meta.commentId ? { commentId: meta.commentId } : {},
       elementKey: meta.elementKey,
       locator: stripLocatorDebugSource2(meta.locator),
       label: meta.label,
       note: buildPromptNote(meta.note, meta),
       skillIds: meta.skillIds?.slice(),
-      imageCount: meta.images.length,
+      imageCount: meta.images.filter((image) => image.source !== "target-screenshot").length,
       changeKinds: meta.changeKinds.slice()
     }));
   }
@@ -34411,6 +36589,7 @@ ${lines.join("\n")}
       const note = buildPromptNote(meta?.note ?? "", meta);
       const actions = [...buildMetaActionLines(meta), ...buildSummaryActionLines(summary)];
       const imageAssetPaths = collectPromptImageAssetPaths(meta?.images);
+      const targetScreenshotAssetPath = collectPromptTargetScreenshotAssetPath(meta?.images);
       appendChangeItem(lines, {
         index: itemIndex,
         locator: summary.netEffect.locator,
@@ -34418,6 +36597,7 @@ ${lines.join("\n")}
         fallbackText: summary.netEffect.textChange?.after ?? summary.netEffect.textChange?.before ?? "",
         debugFileHint: includeDebugFileHint ? formatDebugSource(summary.debugSource) : "",
         imageAssetPaths,
+        targetScreenshotAssetPath,
         actions,
         note
       });
@@ -34438,6 +36618,7 @@ ${lines.join("\n")}
           locator: meta.locator,
           fallbackLabel: meta.label,
           imageAssetPaths: meta.imageAssetPaths,
+          targetScreenshotAssetPath: meta.targetScreenshotAssetPath,
           actions,
           note: meta.note
         });
@@ -34611,68 +36792,241 @@ ${lines.join("\n")}
   };
 }
 
-// src/core/editor/text-session.ts
-function normalizeTextForEditorInput(value) {
-  return String(value ?? "").replace(/\r\n?/g, "\n").replace(/\n+/g, " ").replace(/\s+/g, " ").trim();
+// src/voice/page-tools.ts
+var MAX_TEXT_LENGTH2 = 120;
+var DEFAULT_SEARCH_LIMIT = 20;
+var DEFAULT_STRUCTURE_LIMIT = 30;
+var MAX_LIMIT = 100;
+var STALE_TARGET_ERROR = "\u9875\u9762\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u67E5\u627E";
+function isPageElement(value) {
+  return Boolean(value && typeof value.tagName === "string");
 }
-function hasOnlyEditableCaretBreaks(element) {
-  const contentEditable = element.getAttribute("contenteditable");
-  if (contentEditable !== "" && contentEditable !== "true" && contentEditable !== "plaintext-only") {
-    return false;
+function createNonce() {
+  const random = globalThis.crypto?.getRandomValues?.(new Uint32Array(2));
+  if (random) return Array.from(random, (value) => value.toString(36)).join("");
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+}
+function normalizeText7(value) {
+  return value.replace(/\s+/g, " ").trim();
+}
+function excerpt(value) {
+  const normalized = normalizeText7(value);
+  return normalized.slice(0, MAX_TEXT_LENGTH2);
+}
+function getChildren(element) {
+  return Array.from(element.children ?? []);
+}
+function getVisibleText(element) {
+  const nodes = Array.from(element.childNodes ?? []);
+  if (nodes.length === 0) return String(element.textContent ?? "");
+  return nodes.map((node) => {
+    if (node.nodeType === 3) return node.textContent ?? "";
+    if (node.nodeType !== 1) return "";
+    const child = node;
+    return isIncludedElement(child) ? getVisibleText(child) : "";
+  }).join("");
+}
+function getRole(element) {
+  const explicitRole = element.getAttribute?.("role")?.trim();
+  if (explicitRole) return explicitRole.toLowerCase();
+  const tagName = element.tagName.toLowerCase();
+  if (tagName === "button") return "button";
+  if (tagName === "textarea") return "textbox";
+  if (tagName === "select") return "combobox";
+  if (tagName === "img") return "img";
+  if (tagName === "nav") return "navigation";
+  if (tagName === "main") return "main";
+  if (tagName === "a" && element.getAttribute?.("href")) return "link";
+  if (/^h[1-6]$/.test(tagName)) return "heading";
+  if (tagName !== "input") return null;
+  const type = element.getAttribute?.("type")?.toLowerCase() ?? "text";
+  if (type === "checkbox" || type === "radio" || type === "button" || type === "submit") {
+    return type;
   }
-  if ((element.textContent ?? "") !== "") return false;
-  return Array.from(element.children).every((child) => child.tagName === "BR");
+  return "textbox";
 }
-function isEditableTextTarget(element) {
-  if (!(element instanceof HTMLElement)) return false;
-  if (element instanceof HTMLInputElement) return false;
-  if (element instanceof HTMLTextAreaElement) return false;
-  if (element.childElementCount > 0 && !hasOnlyEditableCaretBreaks(element)) return false;
-  return true;
+function isOverlayElement(element) {
+  const id = element.getAttribute?.("id") ?? "";
+  return id === WEB_EDITOR_V2_HOST_ID || id === WEB_EDITOR_V2_OVERLAY_ID || id.startsWith("__mcp_web_editor_v2_") || element.getAttribute?.("data-axhub-commentary-overlay") === "true";
 }
-function createTextSessionService(options) {
-  const { state: state2 } = options;
-  function commitText(element, value, previousValue) {
-    if (!isEditableTextTarget(element) || !element.isConnected) return false;
-    const liveBeforeText = element.textContent ?? "";
-    const beforeText = previousValue ?? liveBeforeText;
-    const normalizedBefore = normalizeTextForEditorInput(beforeText);
-    const nextText = normalizeTextForEditorInput(value);
-    if (state2.selectedElement !== element) {
-      options.ensureSelected(element, DEFAULT_MODIFIERS);
+function isIncludedElement(element) {
+  if (!element.isConnected) return false;
+  if (isOverlayElement(element)) return false;
+  if (element.hidden || element.getAttribute?.("hidden") !== null) return false;
+  if (element.getAttribute?.("aria-hidden") === "true") return false;
+  const tagName = element.tagName.toLowerCase();
+  if (tagName === "script" || tagName === "style") return false;
+  const computedStyle = globalThis.getComputedStyle?.(element);
+  return computedStyle?.display !== "none" && computedStyle?.visibility !== "hidden";
+}
+function elementPath(element, root) {
+  const parts = [];
+  let current = element;
+  const rootElement = isPageElement(root) ? root : null;
+  while (current) {
+    parts.unshift(current.tagName.toLowerCase());
+    if (current === rootElement) break;
+    current = current.parentElement;
+  }
+  return parts.join(" > ");
+}
+function collectElements(root) {
+  const roots = isPageElement(root) ? [root] : Array.from(root.children ?? []);
+  const elements = [];
+  const visit = (element) => {
+    if (!isIncludedElement(element)) return;
+    elements.push(element);
+    for (const child of getChildren(element)) visit(child);
+  };
+  roots.forEach(visit);
+  return elements;
+}
+function boundedLimit(value, defaultValue) {
+  if (!Number.isFinite(value)) return defaultValue;
+  return Math.min(MAX_LIMIT, Math.max(1, Math.floor(value)));
+}
+function createCommentaryVoicePageTools(options = {}) {
+  const root = options.root ?? document;
+  const createLocator = options.createElementLocator ?? createElementLocator;
+  const locate = options.locateElement ?? locateElement;
+  const nonce = createNonce();
+  const locators = /* @__PURE__ */ new Map();
+  let nextTargetId = 0;
+  let pageRevision = 0;
+  let destroyed = false;
+  function assertAvailable() {
+    if (destroyed) throw new Error(STALE_TARGET_ERROR);
+  }
+  function makeTargetRef() {
+    nextTargetId += 1;
+    return `${nonce}.${pageRevision}.${nextTargetId}`;
+  }
+  function summarizeElement(element, targetRef) {
+    const tagName = element.tagName.toLowerCase();
+    return {
+      targetRef,
+      label: tagName,
+      textExcerpt: excerpt(getVisibleText(element)),
+      tagName,
+      role: getRole(element),
+      path: elementPath(element, root),
+      childCount: getChildren(element).filter(isIncludedElement).length
+    };
+  }
+  function createSummary(element) {
+    const targetRef = makeTargetRef();
+    locators.set(targetRef, createLocator(element));
+    return summarizeElement(element, targetRef);
+  }
+  function resolveTarget(targetRef) {
+    assertAvailable();
+    const [cursorNonce, revision] = String(targetRef).split(".", 3);
+    const locator = locators.get(targetRef);
+    if (cursorNonce !== nonce || Number(revision) !== pageRevision || !locator) {
+      throw new Error(STALE_TARGET_ERROR);
     }
-    if (normalizedBefore === nextText) {
-      return false;
+    const element = locate(locator);
+    if (!element?.isConnected || !isIncludedElement(element)) throw new Error(STALE_TARGET_ERROR);
+    return element;
+  }
+  function summarizeTarget(targetRef) {
+    return summarizeElement(resolveTarget(targetRef), targetRef);
+  }
+  function createCursor(offset) {
+    return `${nonce}.${pageRevision}.${offset}`;
+  }
+  function parseCursor(cursor) {
+    if (!cursor) return 0;
+    const [cursorNonce, revision, offset] = cursor.split(".", 3);
+    if (cursorNonce !== nonce || Number(revision) !== pageRevision || !/^\d+$/.test(offset ?? "")) {
+      throw new Error(STALE_TARGET_ERROR);
     }
-    if (liveBeforeText !== nextText || nextText === "" && element.childElementCount > 0) {
-      element.textContent = nextText;
-    }
-    state2.transactionManager?.recordText(element, beforeText, nextText);
-    state2.positionTracker?.forceUpdate(true);
-    if (state2.selectedElement === element) {
-      state2.breadcrumbs?.setTarget(element);
-      state2.propertyPanel?.refresh();
-    }
-    console.log(`${options.logPrefix} Text edit committed`);
-    return true;
+    return Number(offset);
+  }
+  function getTargets() {
+    assertAvailable();
+    const selected = options.getSelectedElement?.() ?? null;
+    const hovered = options.getHoveredElement?.() ?? null;
+    const selectedSummary = selected && isIncludedElement(selected) ? createSummary(selected) : null;
+    const hoveredSummary = hovered && isIncludedElement(hovered) ? createSummary(hovered) : null;
+    return {
+      selected: selectedSummary,
+      hovered: hoveredSummary,
+      preferred: selectedSummary ?? hoveredSummary
+    };
+  }
+  function findElements(query) {
+    assertAvailable();
+    const parent = query.parentTargetRef ? resolveTarget(query.parentTargetRef) : null;
+    const term = normalizeText7(query.text ?? "").toLowerCase();
+    const role = normalizeText7(query.role ?? "").toLowerCase();
+    const tagName = normalizeText7(query.tagName ?? "").toLowerCase();
+    const matches = collectElements(parent ?? root).filter((element) => {
+      if (term && !normalizeText7(getVisibleText(element)).toLowerCase().includes(term)) return false;
+      if (role && getRole(element) !== role) return false;
+      return !tagName || element.tagName.toLowerCase() === tagName;
+    });
+    const offset = parseCursor(query.cursor);
+    const limit = boundedLimit(query.limit, DEFAULT_SEARCH_LIMIT);
+    const page = matches.slice(offset, offset + limit);
+    const nextOffset = offset + page.length;
+    return {
+      elements: page.map(createSummary),
+      nextCursor: nextOffset < matches.length ? createCursor(nextOffset) : null
+    };
+  }
+  function getStructure(query) {
+    assertAvailable();
+    const structureRoot = query.targetRef ? resolveTarget(query.targetRef) : root;
+    const maxDepth = Math.max(0, Math.floor(query.depth ?? 1));
+    const elements = [];
+    const visit = (element, depth) => {
+      if (!isIncludedElement(element)) return;
+      elements.push(element);
+      if (depth >= maxDepth) return;
+      getChildren(element).forEach((child) => visit(child, depth + 1));
+    };
+    if (isPageElement(structureRoot)) visit(structureRoot, 0);
+    else Array.from(structureRoot.children ?? []).forEach((child) => visit(child, 0));
+    const offset = parseCursor(query.cursor);
+    const limit = boundedLimit(query.limit, DEFAULT_STRUCTURE_LIMIT);
+    const page = elements.slice(offset, offset + limit);
+    const nextOffset = offset + page.length;
+    return {
+      elements: page.map(createSummary),
+      nextCursor: nextOffset < elements.length ? createCursor(nextOffset) : null
+    };
+  }
+  function invalidate() {
+    if (destroyed) return;
+    pageRevision += 1;
+    locators.clear();
+  }
+  function destroy() {
+    if (destroyed) return;
+    destroyed = true;
+    locators.clear();
   }
   return {
-    isEditable: isEditableTextTarget,
-    normalizeText: normalizeTextForEditorInput,
-    getText(element) {
-      if (!isEditableTextTarget(element)) return "";
-      return normalizeTextForEditorInput(element.textContent ?? "");
-    },
-    commitText
+    getTargets,
+    findElements,
+    getStructure,
+    resolveTarget,
+    summarizeTarget,
+    invalidate,
+    destroy
   };
 }
 
 // src/core/editor/index.ts
+var VOICE_HOVER_STABILITY_MS = 250;
+var VOICE_TARGET_UNAVAILABLE_ERROR = "\u76EE\u6807\u5F53\u524D\u4E0D\u53EF\u4EA4\u4E92\uFF0C\u8BF7\u91CD\u65B0\u67E5\u627E";
 function createCommentary(options = {}) {
   const resolvedOptions = resolveWebEditorOptions(options);
   const cleanupMobileModeOverride = pushMobileModeOverride(resolvedOptions.mobileMode);
   const state2 = createEditorRuntimeState();
   const statusListeners = /* @__PURE__ */ new Set();
+  const voiceTargetListeners = /* @__PURE__ */ new Set();
   const initialHostResource = (() => {
     try {
       return resolvedOptions.host.getResourceContext?.() ?? null;
@@ -34702,6 +37056,72 @@ function createCommentary(options = {}) {
   let interaction = null;
   let agentBridge = null;
   let destroyed = false;
+  let voiceHoverTimer = null;
+  let voiceMutationObserver = null;
+  const voicePageTools = createCommentaryVoicePageTools({
+    getSelectedElement: () => state2.selectedElement,
+    getHoveredElement: () => resolvedOptions.host.getCurrentHoveredElement?.() ?? state2.hoveredElement
+  });
+  function getVoiceTargets() {
+    return voicePageTools.getTargets();
+  }
+  function notifyVoiceTargets() {
+    if (destroyed) return;
+    const targets = getVoiceTargets();
+    for (const listener of voiceTargetListeners) {
+      try {
+        listener(targets);
+      } catch (error) {
+        console.error("[Commentary] Voice target listener failed:", error);
+      }
+    }
+  }
+  function notifyVoiceSelectionChange() {
+    if (voiceHoverTimer !== null) {
+      clearTimeout(voiceHoverTimer);
+      voiceHoverTimer = null;
+    }
+    notifyVoiceTargets();
+  }
+  function notifyVoiceHoverChange() {
+    if (voiceHoverTimer !== null) clearTimeout(voiceHoverTimer);
+    voiceHoverTimer = setTimeout(() => {
+      voiceHoverTimer = null;
+      notifyVoiceTargets();
+    }, VOICE_HOVER_STABILITY_MS);
+  }
+  function isCommentaryOverlayNode(node) {
+    let element = node;
+    while (element && typeof element.getAttribute === "function") {
+      const id = element.getAttribute("id") ?? "";
+      if (id === WEB_EDITOR_V2_HOST_ID || id === WEB_EDITOR_V2_OVERLAY_ID || id === WEB_EDITOR_V2_UI_ID || element.getAttribute("data-axhub-commentary-overlay") === "true") {
+        return true;
+      }
+      element = element.parentElement;
+    }
+    return false;
+  }
+  function mutationOnlyTouchesCommentaryOverlay(record) {
+    if (isCommentaryOverlayNode(record.target)) return true;
+    const changedNodes = [...Array.from(record.addedNodes), ...Array.from(record.removedNodes)];
+    return changedNodes.length > 0 && changedNodes.every(isCommentaryOverlayNode);
+  }
+  if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
+    const mutationRoot = document.documentElement;
+    if (mutationRoot) {
+      voiceMutationObserver = new MutationObserver((records) => {
+        if (records.some((record) => !mutationOnlyTouchesCommentaryOverlay(record))) {
+          voicePageTools.invalidate();
+        }
+      });
+      voiceMutationObserver.observe(mutationRoot, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        characterData: true
+      });
+    }
+  }
   function buildSelectedElementSummary() {
     const element = state2.selectedElement;
     if (!element || !element.isConnected) return null;
@@ -34716,6 +37136,13 @@ function createCommentary(options = {}) {
       tagName: element.tagName.toLowerCase(),
       updatedAt: Date.now()
     };
+  }
+  function getVoiceTarget() {
+    const resolved = resolveCommentaryVoiceTargetElement(
+      state2.selectedElement,
+      () => resolvedOptions.host.getCurrentHoveredElement?.() ?? state2.hoveredElement
+    );
+    return resolved ? createCommentaryVoiceTarget(resolved.element, resolved.source) : null;
   }
   function getHistoryCounts() {
     const tm = state2.transactionManager;
@@ -34803,6 +37230,7 @@ function createCommentary(options = {}) {
         elementKey: task.elementKey,
         status: task.status,
         sessionId: task.sessionId,
+        requestId: task.requestId,
         provider: task.provider,
         message: task.message,
         updatedAt: task.updatedAt
@@ -34866,6 +37294,8 @@ function createCommentary(options = {}) {
       aiExecutionProviderOptions: [],
       darkMode: false,
       disablePageAnimations: false,
+      captureTargetScreenshotAvailable: false,
+      captureTargetScreenshot: false,
       pageZoomEnabled: false,
       copySkillInstallPromptDisabled: true,
       selectionModeActive: resolvedOptions.ui.initialSelectionModeActive,
@@ -34935,6 +37365,15 @@ function createCommentary(options = {}) {
     } catch {
       return null;
     }
+  }
+  function validateExternalEditingTarget(elementKey, targetRef) {
+    const normalizedElementKey = String(elementKey || "").trim();
+    const element = resolveElementByKey(normalizedElementKey, targetRef);
+    if (!element) return false;
+    const annotationIdentity = resolveAnnotationElementIdentity(element);
+    const locator = createElementLocator(element);
+    const liveElementKey = annotationIdentity?.elementKey ?? generateStableElementKey(element, locator.shadowHostChain);
+    return liveElementKey === normalizedElementKey;
   }
   function resolveExternalEditingTargetByKey(elementKey, targetRef) {
     const normalizedElementKey = String(elementKey ?? "").trim();
@@ -35140,10 +37579,11 @@ function createCommentary(options = {}) {
   }
   async function setNodeEditingState(elementKey, nextState, taskRef, targetRef) {
     const normalizedTaskRef = normalizeExternalTaskRef(taskRef);
-    const reconcilePersistedEditingTask = async () => {
-      if (nextState !== "editing") return;
+    const settlePersistedEditingTask = async () => {
       await persistence?.waitForPendingWrites();
-      conversationTaskMonitor?.reconcile();
+      if (nextState === "editing") {
+        conversationTaskMonitor?.reconcile();
+      }
     };
     const recordNodeTaskState = (targetElementKey) => {
       if (nextState === "completed") return;
@@ -35179,7 +37619,7 @@ function createCommentary(options = {}) {
       if (nextState === "editing" && target && agentBridge?.setExternalEditingStateByElementKey) {
         const task = agentBridge.setExternalEditingStateByElementKey(target, taskRef);
         recordNodeTaskState(target.elementKey);
-        await reconcilePersistedEditingTask();
+        await settlePersistedEditingTask();
         notifyStatusChange();
         return {
           elementKey: target.elementKey,
@@ -35196,6 +37636,7 @@ function createCommentary(options = {}) {
         );
         if (!task) {
           if (forceCompleteStateByTarget(target)) {
+            await settlePersistedEditingTask();
             notifyStatusChange();
             return {
               elementKey: target.elementKey,
@@ -35213,6 +37654,7 @@ function createCommentary(options = {}) {
           };
         }
         recordNodeTaskState(target.elementKey);
+        await settlePersistedEditingTask();
         notifyStatusChange();
         return {
           elementKey: target.elementKey,
@@ -35224,6 +37666,7 @@ function createCommentary(options = {}) {
       if (nextState !== "editing" && agentBridge?.clearExternalEditingStateByElementKey) {
         const applied = agentBridge.clearExternalEditingStateByElementKey(elementKey, taskRef);
         recordNodeTaskState(elementKey);
+        await settlePersistedEditingTask();
         notifyStatusChange();
         return {
           elementKey,
@@ -35261,6 +37704,7 @@ function createCommentary(options = {}) {
         task = agentBridge.setExternalEditingTerminalStateByElementKey(target, nextState, taskRef);
         if (!task) {
           if (forceCompleteStateByTarget(target)) {
+            await settlePersistedEditingTask();
             notifyStatusChange();
             return {
               elementKey,
@@ -35303,7 +37747,7 @@ function createCommentary(options = {}) {
     }
     notifyStatusChange();
     recordNodeTaskState(elementKey);
-    await reconcilePersistedEditingTask();
+    await settlePersistedEditingTask();
     return {
       elementKey,
       state: nextState,
@@ -35327,7 +37771,9 @@ function createCommentary(options = {}) {
     persistMarkerVisibility: (visible) => persistence?.setMarkerVisibility(visible),
     getCommentTaskState: (elementKey) => persistence?.getCommentTaskState?.(elementKey) ?? null,
     onCommentEdited: (elementKey) => {
-      persistence?.resetCompletedCommentStateForElement(elementKey);
+      if (persistence?.resetTerminalCommentStateForElement(elementKey)) {
+        agentBridge?.clearExternalEditingStateByElementKey?.(elementKey);
+      }
     },
     onSelectMarkedElement: (element, anchor) => {
       if (!element.isConnected) return;
@@ -35357,8 +37803,12 @@ function createCommentary(options = {}) {
     getResourceContext: resolvedOptions.host.getResourceContext,
     getPersistenceScope: resolvedOptions.host.getPersistenceScope,
     persistenceAdapter: resolvedOptions.host.persistenceAdapter,
-    interactionProfile: resolvedOptions.interactionProfile,
-    getInteractionProfile: () => resolvedOptions.interactionProfile === "text-comment" || state2.uiSettings.documentCommentMode ? "text-comment" : "design"
+    interactionProfile: resolvedOptions.interactionProfile === "text-comment" ? "text-comment" : "design",
+    getInteractionProfile: () => resolvedOptions.interactionProfile === "text-comment" || state2.uiSettings.documentCommentMode ? "text-comment" : "design",
+    onSaveStatusChange: () => {
+      state2.propertyPanel?.refresh();
+      notifyStatusChange();
+    }
   });
   conversationTaskMonitor = createConversationTaskMonitor({
     persistence,
@@ -35447,7 +37897,9 @@ function createCommentary(options = {}) {
     textSession,
     agentBridge,
     logPrefix: "[WebEditorV2]",
-    onStatusChange: notifyStatusChange
+    onStatusChange: notifyStatusChange,
+    onSelectionChange: notifyVoiceSelectionChange,
+    onHoverChange: notifyVoiceHoverChange
   });
   const localActions = createLocalActionsService({
     state: state2,
@@ -35516,6 +37968,52 @@ function createCommentary(options = {}) {
       statusListeners.delete(listener);
     };
   }
+  function subscribeVoiceTargets(listener) {
+    voiceTargetListeners.add(listener);
+    listener(getVoiceTargets());
+    return () => {
+      voiceTargetListeners.delete(listener);
+    };
+  }
+  function findVoiceElements(query) {
+    return voicePageTools.findElements(query);
+  }
+  function getVoiceElementStructure(query) {
+    return voicePageTools.getStructure(query);
+  }
+  async function activateVoiceElement(targetRef) {
+    const element = voicePageTools.resolveTarget(targetRef);
+    if (!interaction?.activatePageTarget(element)) {
+      return { activated: false, targetRef, error: VOICE_TARGET_UNAVAILABLE_ERROR };
+    }
+    element.scrollIntoView?.({ block: "center", inline: "nearest" });
+    return { activated: true, targetRef };
+  }
+  async function createVoiceComment(targetRef, content, options2) {
+    const element = voicePageTools.resolveTarget(targetRef);
+    const target = voicePageTools.summarizeTarget(targetRef);
+    const rect = element.getBoundingClientRect();
+    const activated = interaction?.activatePageTarget(element, {
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top
+    });
+    if (!activated) {
+      return { applied: false, targetRef, error: VOICE_TARGET_UNAVAILABLE_ERROR };
+    }
+    const commentId = changes.setNoteForElement(element, content, {
+      voiceCreateOperationId: String(options2.operationId || "").trim() || void 0,
+      voiceTargetRef: targetRef,
+      voiceTarget: target,
+      anchorPlacement: "target",
+      ...options2.skillIds?.length ? { skillIds: options2.skillIds } : {}
+    });
+    if (!commentId) {
+      return { applied: false, targetRef, error: "\u6279\u6CE8\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A" };
+    }
+    persistence?.flushPendingWrite();
+    await persistence?.waitForPendingWrites();
+    return { applied: true, targetRef, commentId, target };
+  }
   function clearSelection() {
     if (destroyed) return;
     interaction?.clearSelection();
@@ -35570,10 +38068,21 @@ function createCommentary(options = {}) {
   }
   async function refreshPersistedComments(externallyDeletedCommentIds = []) {
     if (destroyed || !persistence) return;
+    await persistence.waitForPendingWrites();
     const deletedCommentIds = new Set(
       externallyDeletedCommentIds.map((id) => String(id ?? "").trim()).filter(Boolean)
     );
     const externallyDeletedElementKeys = Array.from(state2.editMetaByKey.values()).filter((meta) => Boolean(meta.commentId && deletedCommentIds.has(meta.commentId))).map((meta) => meta.elementKey);
+    const externallyDeletedElementKeySet = new Set(externallyDeletedElementKeys);
+    const linkedDeleteTransactions = Array.from(
+      state2.deleteElementAnnotationsByTransactionId.values()
+    ).filter(
+      (link) => link.active && externallyDeletedElementKeySet.has(link.parentElementKey)
+    ).reverse();
+    for (const link of linkedDeleteTransactions) {
+      if (state2.transactionManager?.restoreDeletedElement(link.transactionId)) continue;
+      feedback.toast("warning", "\u5220\u9664\u6279\u6CE8\u540E\u672A\u80FD\u8FD8\u539F\u5BF9\u5E94\u5143\u7D20\uFF0C\u8BF7\u5237\u65B0\u9875\u9762\u6062\u590D\u3002");
+    }
     const persistedDeletedElementKeys = await persistence.restoreCachedChanges();
     conversationTaskMonitor?.reconcile();
     agentBridge?.discardDeletedElementStates?.([
@@ -35604,6 +38113,14 @@ function createCommentary(options = {}) {
   function destroy() {
     if (destroyed) return;
     destroyed = true;
+    if (voiceHoverTimer !== null) {
+      clearTimeout(voiceHoverTimer);
+      voiceHoverTimer = null;
+    }
+    voiceTargetListeners.clear();
+    voiceMutationObserver?.disconnect();
+    voiceMutationObserver = null;
+    voicePageTools.destroy();
     reviewCommentInstallation.dispose();
     conversationTaskMonitor?.stop();
     lifecycle.stop();
@@ -35620,8 +38137,16 @@ function createCommentary(options = {}) {
     getState,
     getStatus,
     subscribeStatus,
+    getVoiceTargets,
+    subscribeVoiceTargets,
+    findVoiceElements,
+    getVoiceElementStructure,
+    activateVoiceElement,
+    createVoiceComment,
+    validateExternalEditingTarget,
     refresh,
     getSelectedElement: buildSelectedElementSummary,
+    getVoiceTarget,
     getModifiedElements,
     getTextChanges,
     getTargetedTextChanges,
@@ -35652,25 +38177,34 @@ function createWebEditorV2(options = {}) {
 0 && (module.exports = {
   AXHUB_WEB_EDITOR_AGENT_REQUEST,
   GLOBAL_COMMENTARY_TWEAK_PROTOCOL_KEY,
+  PROMPT_CARD_SKILLS,
+  PROMPT_CARD_SKILL_OPTIONS,
   WEB_EDITOR_V1_ACTIONS,
   WEB_EDITOR_V2_ACTIONS,
   buildAcpConversationRuntimeUrl,
   buildAcpRuntimeEventsUrl,
+  buildExternalCommentsPromptSection,
   createCommentary,
   createCommentaryTweakProtocol,
+  createCommentaryVoiceTarget,
   createWebEditorAgentRequestMessage,
   createWebEditorV2,
   ensureGlobalCommentaryTweakProtocol,
   getGlobalCommentaryTweakProtocol,
+  groupExternalCommentsByAuthor,
   installGlobalCommentaryReviewCommentProtocol,
   isAcpRuntimeEventStatus,
   isTerminalAcpRunState,
   isWebEditorAgentRequestMessage,
   matchesAcpRuntimeStatus,
+  normalizePromptCardSkillIds,
   notifyGlobalCommentaryTweakProtocol,
   postWebEditorAgentRequest,
   readAcpRuntimeStatusesFromSseChunk,
   resolveCommentaryDiagramTarget,
+  resolveCommentaryElementIdentity,
+  resolveCommentaryVoiceTargetElement,
+  sanitizeCommentaryVoiceTarget,
   subscribeAcpRuntimeStatuses,
   waitForAcpRuntimeTerminalStatus
 });

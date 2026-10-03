@@ -61,7 +61,7 @@
 
 ## 报告结构
 
-- 使用 `src/resources/templates/ui-review-report-template.md`；`title` 固定为 `UI 评审`。
+- 使用 `templates/ui-review.md`；`title` 固定为 `UI 评审`。
 - 公共前三组之后，第四组固定为 `核心元件`。
 - 可以追加 `响应式与可访问性`、`证据与评估说明`。
 

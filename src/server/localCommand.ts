@@ -9,6 +9,8 @@ export interface LocalCommandOptions {
   timeoutMs?: number;
   maxBuffer?: number;
   preferLocal?: boolean;
+  detached?: boolean;
+  stdio?: Options['stdio'];
   windowsHide?: boolean;
   env?: NodeJS.ProcessEnv;
   platform?: NodeJS.Platform;
@@ -173,6 +175,8 @@ export async function runLocalCommand(
     timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     forceKillAfterDelay: DEFAULT_FORCE_KILL_AFTER_DELAY_MS,
     maxBuffer: options.maxBuffer ?? DEFAULT_MAX_BUFFER,
+    detached: options.detached,
+    stdio: options.stdio,
     reject: true,
     preferLocal: options.preferLocal,
     localDir: localDirectoryForOptions(options),

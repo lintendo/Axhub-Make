@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import type { IncomingMessage } from 'node:http';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -6,6 +7,7 @@ import {
   LAN_ACCESS_COOKIE,
   createLanAccessSessionCookie,
   createLanAccessShareToken,
+  getLanAccessGateDecision,
   hashLanAccessPassword,
   isLanAccessRequestLocal,
   rotateLanAccessSecret,
@@ -13,7 +15,10 @@ import {
   validateLanAccessShareToken,
   verifyLanAccessPassword,
 } from '../lanAccessControl.ts';
-import { getGlobalServerConfigPath } from '../projectCore/index.ts';
+import {
+  getGlobalServerConfigPath,
+  getGlobalServerSecretsPath,
+} from '../projectCore/index.ts';
 import {
   cleanupProjectApiTestRoots,
   createTempRoot,
@@ -103,6 +108,74 @@ describe('LAN access control primitives', () => {
       socket: { remoteAddress: '127.0.0.1' },
     })).toBe(false);
   });
+
+  it('allows only the approved management runtime assets without a LAN session', () => {
+    const config = {
+      accessControl: {
+        lanPassword: {
+          algorithm: 'scrypt',
+          passwordHash: 'hash',
+          salt: 'salt',
+          secret: 'secret',
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    } as any;
+    const getDecision = (url: string, method: string) => getLanAccessGateDecision({
+      url,
+      method,
+      headers: { host: '192.168.1.22:53817', 'x-forwarded-for': '192.168.1.55' },
+      socket: { remoteAddress: '127.0.0.1' },
+    } as unknown as IncomingMessage, { getConfig: () => config });
+
+    for (const url of [
+      '/assets/dev-template-bootstrap.js',
+      '/runtime/quick-edit.js',
+    ]) {
+      expect(getDecision(url, 'GET')).toMatchObject({ allowed: true });
+      expect(getDecision(url, 'HEAD')).toMatchObject({ allowed: true });
+    }
+
+    for (const [url, method] of [
+      ['/assets/private.js', 'GET'],
+      ['/assets/dev-template-bootstrap.js.map', 'GET'],
+      ['/runtime/private.js', 'GET'],
+      ['/assets/dev-template-bootstrap.js', 'POST'],
+    ]) {
+      expect(getDecision(url, method)).toMatchObject({
+        allowed: false,
+        code: 'LAN_AUTH_REQUIRED',
+      });
+    }
+  });
+
+  it('allows only validated published requests to bypass the LAN password gate', () => {
+    const request = {
+      url: '/published/html/publish-1/index.html',
+      headers: { host: '192.168.1.22:53817', 'x-forwarded-for': '192.168.1.55' },
+      socket: { remoteAddress: '127.0.0.1' },
+    } as unknown as IncomingMessage;
+    const config = {
+      accessControl: {
+        lanPassword: {
+          algorithm: 'scrypt',
+          passwordHash: 'hash',
+          salt: 'salt',
+          secret: 'secret',
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    } as any;
+
+    expect(getLanAccessGateDecision(request, {
+      getConfig: () => config,
+      isPublicPublishedRequest: () => true,
+    })).toMatchObject({ allowed: true });
+    expect(getLanAccessGateDecision(request, {
+      getConfig: () => config,
+      isPublicPublishedRequest: () => false,
+    })).toMatchObject({ allowed: false, code: 'LAN_AUTH_REQUIRED' });
+  });
 });
 
 describe('LAN access control routes', () => {
@@ -181,7 +254,7 @@ describe('LAN access control routes', () => {
     }
   });
 
-  it('keeps LAN password hash and secret in global server config only', async () => {
+  it('keeps LAN password hash and secret only in the service-owned secret store', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot, {
       project: { id: 'lan-global-config', name: 'LAN Global Config' },
@@ -197,14 +270,25 @@ describe('LAN access control routes', () => {
         body: JSON.stringify({ password: 'global-secret' }),
       });
 
-      const config = await fetch(`${server.origin}/api/config`).then((response) => response.json());
+      const config = await fetch(new URL(
+        `/api/config?projectId=${encodeURIComponent('lan-global-config')}`,
+        server.origin,
+      )).then((response) => response.json());
       expect(JSON.stringify(config)).not.toContain('global-secret');
       expect(JSON.stringify(config)).not.toContain('passwordHash');
       expect(JSON.stringify(config)).not.toContain('secret');
 
-      const globalConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8'));
-      expect(globalConfig.accessControl.lanPassword.passwordHash).toEqual(expect.any(String));
-      expect(globalConfig.accessControl.lanPassword.secret).toEqual(expect.any(String));
+      const globalConfigText = fs.readFileSync(getGlobalServerConfigPath(registryHome), 'utf8');
+      expect(globalConfigText).not.toContain('passwordHash');
+      expect(globalConfigText).not.toContain('salt');
+      expect(globalConfigText).not.toContain('secret');
+      const globalSecrets = JSON.parse(fs.readFileSync(getGlobalServerSecretsPath(registryHome), 'utf8'));
+      expect(globalSecrets.accessControl.lanPassword).toMatchObject({
+        passwordHash: expect.any(String),
+        salt: expect.any(String),
+        secret: expect.any(String),
+        updatedAt: expect.any(String),
+      });
     } finally {
       await server.close();
     }

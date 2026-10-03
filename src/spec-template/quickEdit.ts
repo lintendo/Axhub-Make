@@ -1,6 +1,12 @@
 export type MarkdownQuickEditResourceKind = 'doc' | 'template' | 'unknown';
 
 const PROTOTYPE_SPEC_CONTENT_PATH_RE = /^\/api\/projects\/[^/]+\/prototypes\/[^/]+\/spec\/content$/u;
+const FIXED_MARKDOWN_TEMPLATES = new Map([
+    ['prd', 'templates/prd.md'],
+    ['prototype-spec-md', 'templates/prototype-spec.md'],
+    ['prototype-review', 'templates/prototype-review.md'],
+    ['ui-review', 'templates/ui-review.md'],
+]);
 
 export interface MarkdownQuickEditMeta {
     resourceKind: MarkdownQuickEditResourceKind;
@@ -101,6 +107,23 @@ export function shouldIgnoreInitialMarkdownEditorChange(params: {
         && nextContent !== currentContent;
 }
 
+export function syncDocumentCommentaryForMode(
+    mode: 'comment' | 'edit',
+    controls: {
+        startCommentary: () => void;
+        stopCommentary: () => void;
+        disableSelectionMode: () => void;
+    },
+): void {
+    if (mode === 'edit') {
+        controls.stopCommentary();
+        return;
+    }
+
+    controls.startCommentary();
+    controls.disableSelectionMode();
+}
+
 export function resolveMarkdownQuickEditMeta(docUrl?: string): MarkdownQuickEditMeta {
     const defaultMeta: MarkdownQuickEditMeta = {
         resourceKind: 'unknown',
@@ -116,6 +139,19 @@ export function resolveMarkdownQuickEditMeta(docUrl?: string): MarkdownQuickEdit
 
     try {
         const parsedUrl = new URL(docUrl || '', 'http://localhost');
+        if (parsedUrl.pathname.startsWith('/api/document-templates/')) {
+            const templateId = safeDecodeURIComponent(parsedUrl.pathname.slice('/api/document-templates/'.length));
+            const templatePath = FIXED_MARKDOWN_TEMPLATES.get(templateId);
+            if (!templatePath || parsedUrl.searchParams.get('path') !== templatePath) return defaultMeta;
+            return {
+                resourceKind: 'template',
+                entryType: 'unknown',
+                entryName: '',
+                docType: 'template',
+                docPath: templatePath,
+                prototypePath: '',
+            };
+        }
         if (parsedUrl.pathname === '/api/markdown-file' || parsedUrl.pathname === '/markdown-file/spec.html') {
             const rawFilePath = ensureMarkdownExtension(
                 safeDecodeURIComponent(parsedUrl.searchParams.get(parsedUrl.pathname === '/api/markdown-file' ? 'path' : 'file') || ''),

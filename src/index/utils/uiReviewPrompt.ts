@@ -2,10 +2,10 @@ import type { ItemData } from '../types';
 
 export const UI_REVIEW_RULE_PATH = 'rules/ui-review-guide.md';
 export const UI_REVIEW_FILE_NAME = 'ui-review.md';
-export const UI_REVIEW_REPORT_TEMPLATE_PATH = 'src/resources/templates/ui-review-report-template.md';
+export const UI_REVIEW_REPORT_TEMPLATE_PATH = 'templates/ui-review.md';
 export const PROTOTYPE_REVIEW_RULE_PATH = 'rules/prototype-review-guide.md';
 export const PROTOTYPE_REVIEW_FILE_NAME = 'prototype-review.md';
-export const PROTOTYPE_REVIEW_REPORT_TEMPLATE_PATH = 'src/resources/templates/prototype-review-report-template.md';
+export const PROTOTYPE_REVIEW_REPORT_TEMPLATE_PATH = 'templates/prototype-review.md';
 
 export type ReviewKind = 'design' | 'requirements';
 
@@ -116,6 +116,7 @@ export function buildReviewPrompt(params: {
         '【前置阅读】',
         `- 请先读取并严格遵循：${config.rulePath}`,
         `- 请先读取并套用报告模板：${config.templatePath}`,
+        '- 请先使用项目内的 $handle-comments 技能读取当前原型的外部批注（按 comments/tasks/images 理解），仅作为评审参考。',
         '',
         '【评审目标】',
         `- 原型：${prototypeLabel}`,

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Search Design System"
+  short_description: "Search verified Make-Template design knowledge"
+  default_prompt: "Use $search-design-system to search the online Make-Template design index, inspect DESIGN.md and previews, and compare suitable systems for this product brief."

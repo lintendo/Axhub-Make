@@ -3,7 +3,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import {
   getGlobalServerConfigPath,
@@ -24,12 +24,12 @@ const childProcessMock = vi.hoisted(() => ({
   }),
   spawn: vi.fn(() => {
     const child = {
-      once: vi.fn((event: string, callback: () => void) => {
+      once: vi.fn((event: string, callback: (...args: any[]) => void) => {
         if (event === 'spawn') {
           setTimeout(callback, 0);
         }
         if (event === 'close') {
-          setTimeout(() => callback(), 0);
+          setTimeout(() => callback(0, null), 0);
         }
         return child;
       }),
@@ -44,7 +44,59 @@ const childProcessMock = vi.hoisted(() => ({
   spawnSync: vi.fn(() => ({ status: 1, stdout: '', stderr: '' })),
 }));
 
+const coordinateDesktopIntegrationOpenMock = vi.hoisted(() => vi.fn());
+const openMakeAgentSurfaceMock = vi.hoisted(() => vi.fn(async () => ({
+  ok: true,
+  code: 'injected',
+  message: 'Injected Axhub Make.',
+  host: 'traework',
+  entryId: 'axhub-make',
+})));
+const openMakeAgentSurfaceProjectMock = vi.hoisted(() => vi.fn(async (options: {
+  provider: string;
+  targetPath: string;
+  appPath?: string;
+  newClient?: boolean;
+}) => ({
+  ok: true,
+  code: 'project-and-surface-opened',
+  message: 'Opened project and Axhub Make.',
+  provider: options.provider === 'chatgpt' ? 'codex' : options.provider,
+  targetPath: options.targetPath,
+  appPath: options.appPath,
+})));
+const openMakeAgentProjectOnlyMock = vi.hoisted(() => vi.fn(async (options: {
+  provider: string;
+  targetPath: string;
+  appPath?: string;
+}) => ({
+  ok: true,
+  code: 'project-opened',
+  message: 'Opened project.',
+  provider: options.provider === 'chatgpt' ? 'codex' : options.provider,
+  targetPath: options.targetPath,
+  appPath: options.appPath,
+})));
+
 vi.mock('node:child_process', () => childProcessMock);
+
+vi.mock('../desktopIntegrationOpen.ts', async (importActual) => {
+  const actual = await importActual<typeof import('../desktopIntegrationOpen.ts')>();
+  return {
+    ...actual,
+    coordinateDesktopIntegrationOpen: coordinateDesktopIntegrationOpenMock,
+  };
+});
+
+vi.mock('../agentSurfaceIntegration.ts', async (importActual) => {
+  const actual = await importActual<typeof import('../agentSurfaceIntegration.ts')>();
+  return {
+    ...actual,
+    openMakeAgentSurface: openMakeAgentSurfaceMock,
+    openMakeAgentSurfaceProject: openMakeAgentSurfaceProjectMock,
+    openMakeAgentProjectOnly: openMakeAgentProjectOnlyMock,
+  };
+});
 
 vi.mock('../localCommand.ts', async (importActual) => {
   const actual = await importActual<typeof import('../localCommand.ts')>();
@@ -67,10 +119,12 @@ const { startMakeServer } = await import('../index.ts');
 const {
   buildLocalAppOpenCommandForPlatform,
   buildLocalAppOpenResultForPlatform,
+  buildLocalAppLaunchCommandForPlatform,
   getMissingCLIAgentOpenError,
   getMissingLocalAppOpenError,
   getMissingWebAgentOpenError,
   openCLIAgent,
+  openLocalAppApplication,
   openLocalAppAgent,
   openWebAgent,
   readManagedOpenCodeServerUrl,
@@ -79,6 +133,16 @@ const {
 const runLocalCommandMock = vi.mocked(runLocalCommand);
 
 const tempRoots: string[] = [];
+const hostPlatform = process.platform;
+
+// Desktop integration cases exercise macOS launch behavior; platform-specific cases override it explicitly.
+beforeAll(() => {
+  Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
+});
+
+afterAll(() => {
+  Object.defineProperty(process, 'platform', { value: hostPlatform, configurable: true });
+});
 
 function createSpawnChildMock() {
   const child = {
@@ -87,7 +151,7 @@ function createSpawnChildMock() {
         setTimeout(callback, 0);
       }
       if (event === 'close') {
-        setTimeout(() => callback(), 0);
+        setTimeout(() => callback(0, null), 0);
       }
       return child;
     }),
@@ -172,14 +236,6 @@ async function startTestServer(projectRoot: string, options: { serverConfig?: un
   });
 }
 
-function projectApiUrl(origin: string, pathname: string, projectId = 'agent-client'): string {
-  const url = new URL(pathname, origin);
-  if (!url.searchParams.has('projectId')) {
-    url.searchParams.set('projectId', projectId);
-  }
-  return url.toString();
-}
-
 function mockDetectedCommands(commands: string[]) {
   childProcessMock.spawnSync.mockImplementation((...input: unknown[]) => {
     const command = String(input[0] || '');
@@ -195,6 +251,17 @@ function mockDetectedCommands(commands: string[]) {
       return { status: 0, stdout: `/usr/local/bin/${matched}\n`, stderr: '' };
     }
     return { status: 1, stdout: '', stderr: '' };
+  });
+}
+
+function mockMissingMacApplications(...applicationNames: string[]) {
+  const existsSync = fs.existsSync.bind(fs);
+  const missingPaths = applicationNames.map((applicationName) => `/Applications/${applicationName}.app/`);
+  return vi.spyOn(fs, 'existsSync').mockImplementation((filePath) => {
+    const candidate = String(filePath);
+    return missingPaths.some((missingPath) => candidate.startsWith(missingPath))
+      ? false
+      : existsSync(filePath);
   });
 }
 
@@ -219,7 +286,13 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.clearAllMocks();
+  childProcessMock.spawn.mockReset();
+  childProcessMock.spawn.mockImplementation(() => createSpawnChildMock());
   runLocalCommandMock.mockReset();
+  coordinateDesktopIntegrationOpenMock.mockReset();
+  openMakeAgentSurfaceMock.mockClear();
+  openMakeAgentSurfaceProjectMock.mockClear();
+  openMakeAgentProjectOnlyMock.mockClear();
   runLocalCommandMock.mockImplementation(async (command: string, args: string[]) => ({
     stdout: '',
     stderr: '',
@@ -234,6 +307,749 @@ afterEach(() => {
 });
 
 describe('make-server agent open API', () => {
+  it('delegates desktop project-path opening to the vendored Agent Surface runtime', () => {
+    const source = fs.readFileSync(new URL('../agentOpen.ts', import.meta.url), 'utf8');
+    expect(source).toContain('openProject as openAgentSurfaceProject');
+    expect(source).toContain('openAgentSurfaceProject({');
+  });
+
+  it('uses one Agent Surface call for integrated path opening and injection', () => {
+    const source = fs.readFileSync(new URL('../managementApi.assistantIde.ts', import.meta.url), 'utf8');
+    expect(source).toContain('openMakeAgentSurfaceProject');
+    expect(source).not.toContain('openCursorAgentsProject(targetPath)');
+    expect(source).not.toContain("if ((provider === 'workbuddy' || provider === 'traework') && mode === 'integrated')");
+  });
+
+  it.each(['unknown', 'qoderwork'])('rejects unsupported desktop integration provider %s', async (provider) => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot);
+    const server = await startTestServer(projectRoot);
+
+    try {
+      const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: 'agent-client', provider, action: 'prepare' }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body).toMatchObject({
+        code: 'DESKTOP_INTEGRATION_PROVIDER_UNSUPPORTED',
+        projectId: 'agent-client',
+        supported: ['chatgpt', 'cursor', 'workbuddy', 'traework'],
+      });
+      expect(coordinateDesktopIntegrationOpenMock).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('routes TRAEWORK to a surface-only desktop integration operation', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot);
+    const appPath = path.join(projectRoot, 'TRAEWORK.app', 'Contents', 'MacOS', 'Electron');
+    writeFile(appPath, '');
+    coordinateDesktopIntegrationOpenMock.mockResolvedValue({
+      provider: 'traework',
+      status: 'opened',
+      mode: 'integrated',
+      noticeCode: 'project-selection-required',
+      notice: 'TRAEWORK 已打开并注入 Axhub Make，但不支持自动打开目录，请在 TRAEWORK 中手动选择当前项目目录。',
+    });
+    const server = await startTestServer(projectRoot, {
+      serverConfig: {
+        schemaVersion: 1,
+        toolOpenState: {
+          'local-app:traework': { executablePath: appPath },
+        },
+      },
+    });
+
+    try {
+      const response = await fetch(`${server.origin}/api/desktop-integration/open?projectId=agent-client`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: 'agent-client',
+          provider: 'traework',
+          action: 'prepare',
+          targetPath: '.',
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toMatchObject({
+        success: true,
+        provider: 'traework',
+        projectId: 'agent-client',
+        noticeCode: 'project-selection-required',
+      });
+      expect(coordinateDesktopIntegrationOpenMock).toHaveBeenCalledWith(
+        { provider: 'traework', action: 'prepare' },
+        expect.objectContaining({ open: expect.any(Function) }),
+      );
+      const adapters = coordinateDesktopIntegrationOpenMock.mock.calls[0]?.[1] as {
+        open(mode: 'integrated' | 'normal'): Promise<unknown>;
+      };
+      await expect(adapters.open('integrated')).resolves.toMatchObject({
+        noticeCode: 'project-selection-required',
+      });
+      expect(openMakeAgentSurfaceMock).toHaveBeenCalledWith(expect.objectContaining({
+        provider: 'traework',
+        makeOrigin: server.origin,
+        projectId: 'agent-client',
+      }));
+      const firstSurfaceOpenCall = openMakeAgentSurfaceMock.mock.calls[0] as unknown[] | undefined;
+      expect(firstSurfaceOpenCall?.[0]).not.toHaveProperty('targetPath');
+      expect(openMakeAgentSurfaceProjectMock).not.toHaveBeenCalled();
+      expect(openMakeAgentProjectOnlyMock).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('launches TRAEWORK without a directory when entry injection is disabled', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot);
+    const appPath = path.join(projectRoot, 'TRAEWORK.app', 'Contents', 'MacOS', 'Electron');
+    const appBundle = path.join(projectRoot, 'TRAEWORK.app');
+    writeFile(appPath, '');
+    coordinateDesktopIntegrationOpenMock.mockResolvedValue({
+      provider: 'traework',
+      status: 'opened',
+      mode: 'normal',
+      noticeCode: 'project-selection-required',
+      notice: 'TRAEWORK 已打开，但不支持自动打开目录，请在 TRAEWORK 中手动选择当前项目目录。',
+    });
+    const server = await startTestServer(projectRoot, {
+      serverConfig: {
+        schemaVersion: 1,
+        automation: { injectLocalAiEntry: false },
+        toolOpenState: {
+          'local-app:traework': { executablePath: appPath },
+        },
+      },
+    });
+
+    try {
+      const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: 'agent-client',
+          provider: 'traework',
+          action: 'prepare',
+          targetPath: '.',
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(coordinateDesktopIntegrationOpenMock).toHaveBeenCalledWith(
+        { provider: 'traework', action: 'normal' },
+        expect.objectContaining({ open: expect.any(Function) }),
+      );
+      const adapters = coordinateDesktopIntegrationOpenMock.mock.calls[0]?.[1] as {
+        open(mode: 'integrated' | 'normal'): Promise<unknown>;
+      };
+      await expect(adapters.open('normal')).resolves.toMatchObject({
+        noticeCode: 'project-selection-required',
+      });
+      expect(openMakeAgentSurfaceMock).not.toHaveBeenCalled();
+      expect(openMakeAgentSurfaceProjectMock).not.toHaveBeenCalled();
+      expect(openMakeAgentProjectOnlyMock).not.toHaveBeenCalled();
+      expect(childProcessMock.spawn).toHaveBeenCalledWith(
+        'open',
+        ['-a', appBundle],
+        expect.objectContaining({ shell: false }),
+      );
+      const firstApplicationOpenCall = childProcessMock.spawn.mock.calls[0] as unknown[] | undefined;
+      expect(firstApplicationOpenCall?.[1]).not.toContain(projectRoot);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it.each(['workbuddy'] as const)(
+    'routes the %s iframe host through the desktop integration coordinator',
+    async (provider) => {
+      const projectRoot = createTempRoot();
+      writeProjectMetadata(projectRoot);
+      const appPath = path.join(projectRoot, 'WorkBuddy.app', 'Contents', 'MacOS', 'WorkBuddy');
+      writeFile(appPath, '');
+      coordinateDesktopIntegrationOpenMock.mockResolvedValue({
+        provider,
+        status: 'restart-required',
+      });
+      const server = await startTestServer(projectRoot, {
+        serverConfig: {
+          schemaVersion: 1,
+          toolOpenState: { 'local-app:workbuddy': { executablePath: appPath } },
+        },
+      });
+      const applicationProbe = mockMissingMacApplications('WorkBuddy');
+
+      try {
+        const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: 'agent-client',
+            provider,
+            action: 'prepare',
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toMatchObject({
+          success: true,
+          provider,
+          status: 'restart-required',
+        });
+        expect(coordinateDesktopIntegrationOpenMock).toHaveBeenCalledWith(
+          { provider, action: 'prepare' },
+          expect.objectContaining({
+            inspect: expect.any(Function),
+            launch: expect.any(Function),
+            close: expect.any(Function),
+            open: expect.any(Function),
+          }),
+        );
+      } finally {
+        applicationProbe.mockRestore();
+        await server.close();
+      }
+    },
+  );
+
+  it('rejects unsupported desktop integration actions and ignores caller launch configuration', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot);
+    const server = await startTestServer(projectRoot);
+
+    try {
+      const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'chatgpt',
+          action: 'force',
+          projectId: 'agent-client',
+          executablePath: '/tmp/untrusted-app',
+          debugPort: 9999,
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body).toMatchObject({
+        code: 'DESKTOP_INTEGRATION_ACTION_UNSUPPORTED',
+        projectId: 'agent-client',
+      });
+      expect(coordinateDesktopIntegrationOpenMock).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('rejects desktop integration target paths outside the selected project', async () => {
+    const projectRoot = createTempRoot();
+    const outsideProject = createTempRoot('axhub-make-desktop-integration-outside-');
+    writeProjectMetadata(projectRoot);
+    const server = await startTestServer(projectRoot);
+
+    try {
+      const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: 'agent-client',
+          provider: 'cursor',
+          action: 'normal',
+          targetPath: outsideProject,
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(body).toMatchObject({
+        code: 'PATH_OUTSIDE_PROJECT',
+        projectId: 'agent-client',
+      });
+      expect(coordinateDesktopIntegrationOpenMock).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('returns the desktop integration coordinator result without accepting launch details', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot);
+    const customCursorPath = path.join(projectRoot, 'Custom Cursor.app', 'Contents', 'MacOS', 'Cursor');
+    writeFile(customCursorPath, '');
+    coordinateDesktopIntegrationOpenMock.mockResolvedValue({
+      provider: 'cursor',
+      status: 'restart-required',
+    });
+    const server = await startTestServer(projectRoot, {
+      serverConfig: {
+        schemaVersion: 1,
+        toolOpenState: {
+          'ide:cursor': {
+            executablePath: customCursorPath,
+          },
+        },
+      },
+    });
+
+    try {
+      const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'cursor',
+          action: 'prepare',
+          projectId: 'agent-client',
+          targetPath: '.',
+          executablePath: '/tmp/untrusted-app',
+          debugPort: 9999,
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({
+        success: true,
+        provider: 'cursor',
+        status: 'restart-required',
+        projectId: 'agent-client',
+      });
+      expect(coordinateDesktopIntegrationOpenMock).toHaveBeenCalledWith(
+        { provider: 'cursor', action: 'prepare' },
+        expect.objectContaining({
+          inspect: expect.any(Function),
+          launch: expect.any(Function),
+          close: expect.any(Function),
+          open: expect.any(Function),
+        }),
+      );
+      expect(coordinateDesktopIntegrationOpenMock.mock.calls[0]).not.toContain('/tmp/untrusted-app');
+      expect(coordinateDesktopIntegrationOpenMock.mock.calls[0]).not.toContain(9999);
+      const adapters = coordinateDesktopIntegrationOpenMock.mock.calls[0]?.[1] as {
+        open(mode: 'integrated' | 'normal'): Promise<unknown>;
+      };
+      await adapters.open('integrated');
+      expect(openMakeAgentSurfaceProjectMock).toHaveBeenCalledWith(expect.objectContaining({
+        provider: 'cursor',
+        makeOrigin: server.origin,
+        projectId: 'agent-client',
+        targetPath: projectRoot,
+        appPath: customCursorPath,
+      }));
+      expect(openMakeAgentProjectOnlyMock).not.toHaveBeenCalled();
+      expect(childProcessMock.spawn).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('uses the configured ChatGPT executable and gives generic settings guidance when it cannot launch', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot);
+    const configuredPath = path.join(projectRoot, 'ChatGPT.app', 'Contents', 'MacOS', 'ChatGPT');
+    writeFile(configuredPath, '');
+    openMakeAgentSurfaceProjectMock.mockImplementationOnce(async () => ({
+      ok: false,
+      code: 'host-launch-failed',
+      message: 'The host exited with code 2.',
+      provider: 'codex',
+      targetPath: projectRoot,
+      appPath: configuredPath,
+    }));
+    coordinateDesktopIntegrationOpenMock.mockImplementationOnce(async (request, adapters) => {
+      await adapters.open('integrated');
+      return {
+        provider: request.provider,
+        status: 'opened',
+        mode: 'integrated',
+      };
+    });
+    const server = await startTestServer(projectRoot, {
+      serverConfig: {
+        schemaVersion: 1,
+        toolOpenState: {
+          'local-app:codex': {
+            executablePath: configuredPath,
+            lastOpenMode: 'direct-app',
+          },
+        },
+      },
+    });
+
+    try {
+      const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'chatgpt',
+          action: 'prepare',
+          projectId: 'agent-client',
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(body).toMatchObject({
+        code: 'DESKTOP_INTEGRATION_OPEN_FAILED',
+        error: '无法启动 ChatGPT。请前往左上角「设置」→「AI 设置」→「本地桌面 Agent」，检查 ChatGPT 的应用路径。',
+        provider: 'chatgpt',
+      });
+      expect(body.error).not.toContain('code 2');
+      expect(openMakeAgentSurfaceProjectMock).toHaveBeenCalledWith(expect.objectContaining({
+        appPath: configuredPath,
+      }));
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('translates an isolated-client CDP timeout into actionable user guidance', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot);
+    const configuredPath = path.join(projectRoot, 'ChatGPT.app', 'Contents', 'MacOS', 'ChatGPT');
+    writeFile(configuredPath, '');
+    openMakeAgentSurfaceProjectMock.mockImplementationOnce(async () => ({
+      ok: false,
+      code: 'cdp-start-timeout',
+      message: 'The new client launched, but its CDP target did not become ready.',
+      provider: 'codex',
+      targetPath: projectRoot,
+      appPath: configuredPath,
+    }));
+    coordinateDesktopIntegrationOpenMock.mockImplementationOnce(async (request, adapters) => {
+      await adapters.open('integrated');
+      return {
+        provider: request.provider,
+        status: 'opened',
+        mode: 'integrated',
+      };
+    });
+    const server = await startTestServer(projectRoot, {
+      serverConfig: {
+        schemaVersion: 1,
+        toolOpenState: {
+          'local-app:codex': {
+            executablePath: configuredPath,
+            lastOpenMode: 'direct-app',
+          },
+        },
+      },
+    });
+
+    try {
+      const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'chatgpt',
+          action: 'prepare',
+          projectId: 'agent-client',
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(body).toMatchObject({
+        code: 'DESKTOP_INTEGRATION_OPEN_FAILED',
+        error: '未能启动或连接到 ChatGPT，未检测到可用窗口。请前往左上角「设置」→「AI 设置」→「本地桌面 Agent」，检查 ChatGPT 的应用路径后重试。',
+        provider: 'chatgpt',
+      });
+      expect(body.error).not.toContain('CDP');
+      expect(body.error).not.toContain('renderer');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('rejects a non-application ChatGPT executable without launching it', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot);
+    const configuredPath = path.join(projectRoot, 'codex');
+    writeFile(configuredPath, '');
+    coordinateDesktopIntegrationOpenMock.mockImplementationOnce(async (request, adapters) => {
+      await adapters.open('integrated');
+      return {
+        provider: request.provider,
+        status: 'opened',
+        mode: 'integrated',
+      };
+    });
+    const server = await startTestServer(projectRoot, {
+      serverConfig: {
+        schemaVersion: 1,
+        toolOpenState: {
+          'local-app:codex': {
+            executablePath: configuredPath,
+            lastOpenMode: 'direct-app',
+          },
+        },
+      },
+    });
+
+    try {
+      const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'chatgpt',
+          action: 'prepare',
+          projectId: 'agent-client',
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(body).toMatchObject({
+        code: 'DESKTOP_INTEGRATION_OPEN_FAILED',
+        error: '无法启动 ChatGPT。请前往左上角「设置」→「AI 设置」→「本地桌面 Agent」，检查 ChatGPT 的应用路径。',
+        provider: 'chatgpt',
+      });
+      expect(coordinateDesktopIntegrationOpenMock).not.toHaveBeenCalled();
+      expect(openMakeAgentSurfaceProjectMock).not.toHaveBeenCalled();
+      expect(childProcessMock.spawn).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('starts the selected local AI project without injecting Make when disabled in settings', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot);
+    coordinateDesktopIntegrationOpenMock.mockResolvedValue({
+      provider: 'cursor',
+      status: 'opened',
+      mode: 'integrated',
+    });
+    const server = await startTestServer(projectRoot, {
+      serverConfig: {
+        automation: {
+          injectLocalAiEntry: false,
+        },
+      },
+    });
+
+    try {
+      const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'cursor',
+          action: 'prepare',
+          projectId: 'agent-client',
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(coordinateDesktopIntegrationOpenMock).toHaveBeenCalledWith(
+        { provider: 'cursor', action: 'normal' },
+        expect.any(Object),
+      );
+      const adapters = coordinateDesktopIntegrationOpenMock.mock.calls[0]?.[1] as {
+        open(mode: 'integrated' | 'normal'): Promise<unknown>;
+      };
+      await adapters.open('normal');
+
+      expect(openMakeAgentProjectOnlyMock).toHaveBeenCalledWith(expect.objectContaining({
+        provider: 'cursor',
+        makeOrigin: server.origin,
+        projectId: 'agent-client',
+        targetPath: projectRoot,
+      }));
+      expect(openMakeAgentSurfaceProjectMock).not.toHaveBeenCalled();
+      expect(childProcessMock.spawn).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('reuses the existing desktop client when extra application launch is disabled', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot);
+    coordinateDesktopIntegrationOpenMock.mockResolvedValue({
+      provider: 'cursor',
+      status: 'opened',
+      mode: 'integrated',
+    });
+    const server = await startTestServer(projectRoot, {
+      serverConfig: {
+        automation: {
+          launchLocalAiApp: false,
+        },
+      },
+    });
+
+    try {
+      const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'cursor',
+          action: 'prepare',
+          projectId: 'agent-client',
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      const adapters = coordinateDesktopIntegrationOpenMock.mock.calls[0]?.[1] as {
+        open(mode: 'integrated' | 'normal'): Promise<unknown>;
+      };
+      await adapters.open('integrated');
+
+      expect(openMakeAgentSurfaceProjectMock).toHaveBeenCalledWith(expect.objectContaining({
+        provider: 'cursor',
+        newClient: false,
+      }));
+    } finally {
+      await server.close();
+    }
+  });
+
+  it.each(['workbuddy'] as const)(
+    'opens the %s project and embedded surface through one Agent Surface call',
+    async (provider) => {
+      const projectRoot = createTempRoot();
+      writeProjectMetadata(projectRoot);
+      const appPath = path.join(projectRoot, 'WorkBuddy.app', 'Contents', 'MacOS', 'WorkBuddy');
+      writeFile(appPath, '');
+      coordinateDesktopIntegrationOpenMock.mockResolvedValue({
+        provider,
+        status: 'restart-required',
+      });
+      const server = await startTestServer(projectRoot, {
+        serverConfig: {
+          schemaVersion: 1,
+          toolOpenState: { 'local-app:workbuddy': { executablePath: appPath } },
+        },
+      });
+      const applicationProbe = mockMissingMacApplications('WorkBuddy');
+
+      try {
+        const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider,
+            action: 'prepare',
+            projectId: 'agent-client',
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const adapters = coordinateDesktopIntegrationOpenMock.mock.calls[0]?.[1] as {
+          open(mode: 'integrated' | 'normal'): Promise<unknown>;
+        };
+        await adapters.open('integrated');
+
+        expect(openMakeAgentSurfaceProjectMock).toHaveBeenCalledWith(expect.objectContaining({
+          provider,
+          makeOrigin: server.origin,
+          projectId: 'agent-client',
+          targetPath: projectRoot,
+        }));
+        expect(openMakeAgentProjectOnlyMock).not.toHaveBeenCalled();
+        expect(childProcessMock.spawn).not.toHaveBeenCalled();
+      } finally {
+        applicationProbe.mockRestore();
+        await server.close();
+      }
+    },
+  );
+
+  it('routes explicit normal Cursor project opening through Agent Surface', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot);
+    coordinateDesktopIntegrationOpenMock.mockResolvedValue({
+      provider: 'cursor',
+      status: 'opened',
+      mode: 'normal',
+    });
+    const server = await startTestServer(projectRoot);
+
+    try {
+      const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'cursor',
+          action: 'normal',
+          projectId: 'agent-client',
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      const adapters = coordinateDesktopIntegrationOpenMock.mock.calls[0]?.[1] as {
+        open(mode: 'integrated' | 'normal'): Promise<unknown>;
+      };
+      await adapters.open('normal');
+      expect(openMakeAgentProjectOnlyMock).toHaveBeenCalledWith(expect.objectContaining({
+        provider: 'cursor',
+        makeOrigin: server.origin,
+        projectId: 'agent-client',
+        targetPath: projectRoot,
+      }));
+      expect(openMakeAgentSurfaceProjectMock).not.toHaveBeenCalled();
+      expect(childProcessMock.spawn).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('keeps unsupported desktop platforms on the existing normal open path', async () => {
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot);
+    coordinateDesktopIntegrationOpenMock.mockResolvedValue({
+      provider: 'cursor',
+      status: 'opened',
+      mode: 'normal',
+    });
+    const server = await startTestServer(projectRoot);
+
+    try {
+      const response = await fetch(`${server.origin}/api/desktop-integration/open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: 'agent-client',
+          provider: 'cursor',
+          action: 'prepare',
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(coordinateDesktopIntegrationOpenMock).toHaveBeenCalledWith(
+        { provider: 'cursor', action: 'normal' },
+        expect.any(Object),
+      );
+      const adapters = coordinateDesktopIntegrationOpenMock.mock.calls[0]?.[1] as {
+        open(mode: 'integrated' | 'normal'): Promise<unknown>;
+      };
+      await adapters.open('normal');
+      expect(openMakeAgentProjectOnlyMock).not.toHaveBeenCalled();
+      expect(openMakeAgentSurfaceProjectMock).not.toHaveBeenCalled();
+      expect(childProcessMock.spawn).toHaveBeenCalledWith(
+        'open',
+        ['-a', 'Cursor', projectRoot],
+        expect.objectContaining({ shell: false }),
+      );
+    } finally {
+      await server.close();
+      Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
+    }
+  });
+
   it('keeps agent availability out of config because the open menu is fixed', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot);
@@ -242,7 +1058,7 @@ describe('make-server agent open API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/config'));
+      const response = await fetch(`${server.origin}/api/config?projectId=agent-client`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -301,7 +1117,7 @@ describe('make-server agent open API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const configAvailabilityResponse = await fetch(projectApiUrl(server.origin, '/api/config/availability'));
+      const configAvailabilityResponse = await fetch(`${server.origin}/api/config/availability?projectId=agent-client`);
       expect(configAvailabilityResponse.status).toBe(200);
       expect(runLocalCommandMock).not.toHaveBeenCalledWith(
         expect.stringMatching(/^(codex|claude|opencode)$/u),
@@ -310,7 +1126,7 @@ describe('make-server agent open API', () => {
       );
 
       runLocalCommandMock.mockClear();
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/versions'));
+      const response = await fetch(`${server.origin}/api/agent/versions`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -360,6 +1176,63 @@ describe('make-server agent open API', () => {
     }
   });
 
+  it('uses a configured CLI Agent command path when testing the saved local CLI Agent', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot);
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://registry.npmjs.org/%40openai%2Fcodex/latest') {
+        return new Response(JSON.stringify({ version: '1.3.0' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return originalFetch(input, init);
+    });
+    runLocalCommandMock.mockImplementation(async (command: string, args: string[]) => {
+      if (command === 'C:\\Users\\demo\\AppData\\Roaming\\npm\\codex.cmd' && args.join(' ') === '--version') {
+        return {
+          command,
+          escapedCommand: 'C:\\Users\\demo\\AppData\\Roaming\\npm\\codex.cmd --version',
+          stdout: 'codex-cli 1.2.3\n',
+          stderr: '',
+        };
+      }
+      throw new Error(`Unexpected command: ${command} ${args.join(' ')}`);
+    });
+
+    const server = await startTestServer(projectRoot, {
+      serverConfig: {
+        toolOpenState: {
+          'cli:codex': {
+            commandPath: 'C:\\Users\\demo\\AppData\\Roaming\\npm\\codex.cmd',
+          },
+        },
+      },
+    });
+
+    try {
+      const response = await fetch(`${server.origin}/api/agent/versions?agent=codex`);
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.agents.codex).toMatchObject({
+        status: 'installed',
+        command: 'C:\\Users\\demo\\AppData\\Roaming\\npm\\codex.cmd',
+        version: '1.2.3',
+      });
+      expect(runLocalCommandMock).toHaveBeenCalledWith(
+        'C:\\Users\\demo\\AppData\\Roaming\\npm\\codex.cmd',
+        ['--version'],
+        expect.any(Object),
+      );
+      expect(runLocalCommandMock).not.toHaveBeenCalledWith('codex', ['--version'], expect.any(Object));
+    } finally {
+      await server.close();
+    }
+  });
+
   it('detects only the requested local AI agent version when an agent query is provided', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot);
@@ -386,7 +1259,7 @@ describe('make-server agent open API', () => {
     try {
       runLocalCommandMock.mockClear();
       fetchMock.mockClear();
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/versions?agent=qoder'));
+      const response = await fetch(`${server.origin}/api/agent/versions?agent=qoder`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -425,7 +1298,7 @@ describe('make-server agent open API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/versions?agent=cursor'));
+      const response = await fetch(`${server.origin}/api/agent/versions?agent=cursor`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -450,7 +1323,7 @@ describe('make-server agent open API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/web/open'), {
+      const response = await fetch(`${server.origin}/api/agent/web/open?projectId=agent-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -484,7 +1357,7 @@ describe('make-server agent open API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/cli/open'), {
+      const response = await fetch(`${server.origin}/api/agent/cli/open?projectId=agent-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent: 'codex' }),
@@ -529,7 +1402,7 @@ describe('make-server agent open API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/cli/open'), {
+      const response = await fetch(`${server.origin}/api/agent/cli/open?projectId=agent-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent: 'gemini' }),
@@ -564,7 +1437,7 @@ describe('make-server agent open API', () => {
     });
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/cli/open'), {
+      const response = await fetch(`${server.origin}/api/agent/cli/open?projectId=agent-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent: 'gemini' }),
@@ -648,7 +1521,7 @@ describe('make-server agent open API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/cli/open'), {
+      const response = await fetch(`${server.origin}/api/agent/cli/open?projectId=agent-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent: 'codex' }),
@@ -667,35 +1540,31 @@ describe('make-server agent open API', () => {
     }
   });
 
-  it('opens Codex local app in the active project root', async () => {
+  it('does not use the Codex CLI when the desktop app is missing', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot);
     mockDetectedCommands(['codex']);
 
     const server = await startTestServer(projectRoot);
+    const applicationProbe = mockMissingMacApplications('Codex', 'ChatGPT');
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/local-app/open'), {
+      const response = await fetch(`${server.origin}/api/agent/local-app/open?projectId=agent-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent: 'codex' }),
       });
       const body = await response.json();
 
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(404);
       expect(body).toMatchObject({
-        success: true,
+        code: 'LOCAL_APP_AGENT_MISSING',
         agent: 'codex',
-        targetPath: projectRoot,
+        projectId: 'agent-client',
       });
-      expect(body.command).toContain('codex app');
-      expect(childProcessMock.spawn).toHaveBeenCalled();
-      const firstSpawnCall = childProcessMock.spawn.mock.calls[0] as unknown[] | undefined;
-      expect(firstSpawnCall?.[0]).toBe('/usr/local/bin/codex');
-      expect(firstSpawnCall?.[1]).toEqual(['app', projectRoot]);
-      const spawnOptions = firstSpawnCall?.[2] as { cwd?: string } | undefined;
-      expect(spawnOptions?.cwd).toBe(projectRoot);
+      expect(childProcessMock.spawn).not.toHaveBeenCalled();
     } finally {
+      applicationProbe.mockRestore();
       await server.close();
     }
   });
@@ -703,14 +1572,20 @@ describe('make-server agent open API', () => {
   it('opens OpenCode local app with an encoded project deeplink', async () => {
     const projectRoot = createTempRoot();
     const targetDir = path.join(projectRoot, 'Axhub Runtime');
+    const appPath = path.join(projectRoot, 'OpenCode.app', 'Contents', 'MacOS', 'OpenCode');
     fs.mkdirSync(targetDir, { recursive: true });
+    writeFile(appPath, '');
     writeProjectMetadata(projectRoot);
-    mockDetectedCommands(['opencode']);
-
-    const server = await startTestServer(projectRoot);
+    const server = await startTestServer(projectRoot, {
+      serverConfig: {
+        schemaVersion: 1,
+        toolOpenState: { 'local-app:opencode': { executablePath: appPath } },
+      },
+    });
+    const applicationProbe = mockMissingMacApplications('OpenCode');
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/local-app/open'), {
+      const response = await fetch(`${server.origin}/api/agent/local-app/open?projectId=agent-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent: 'opencode', targetPath: targetDir }),
@@ -730,6 +1605,67 @@ describe('make-server agent open API', () => {
       expect(spawnCalls).toContain('opencode://open-project?directory=');
       expect(spawnCalls).toContain('/Axhub%20Runtime');
     } finally {
+      applicationProbe.mockRestore();
+      await server.close();
+    }
+  });
+
+  it('opens WorkBuddy with a cwd task deeplink instead of requiring a CLI command', async () => {
+    const projectRoot = createTempRoot();
+    const result = await openLocalAppAgent({
+      agent: 'workbuddy',
+      targetPath: projectRoot,
+      availability: { status: 'installed', confidence: 'high', checkedAt: new Date().toISOString() },
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      agent: 'workbuddy',
+      targetPath: projectRoot,
+    });
+    expect(result.command).toContain('workbuddy://task?action=start');
+    expect(result.command).toContain('cwd=');
+    expect(result.command).toContain('prompt=%E4%BD%A0%E5%A5%BD');
+  });
+
+  it('rejects direct TRAEWORK project opening without spawning', async () => {
+    const projectRoot = createTempRoot();
+    await expect(openLocalAppAgent({
+      agent: 'traework',
+      targetPath: projectRoot,
+      availability: { status: 'installed', confidence: 'high', checkedAt: new Date().toISOString() },
+    })).rejects.toThrow('TRAEWORK does not support automatic project-directory opening');
+
+    expect(childProcessMock.spawn).not.toHaveBeenCalled();
+  });
+
+  it('rejects TRAEWORK through the legacy local-app API before launching', async () => {
+    const projectRoot = createTempRoot();
+    writeProjectMetadata(projectRoot);
+    const server = await startTestServer(projectRoot);
+
+    try {
+      const response = await fetch(`${server.origin}/api/agent/local-app/open?projectId=agent-client`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: 'agent-client',
+          agent: 'traework',
+          targetPath: '.',
+        }),
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(422);
+      expect(body).toMatchObject({
+        code: 'PROJECT_OPEN_UNSUPPORTED',
+        agent: 'traework',
+        projectId: 'agent-client',
+        targetPath: projectRoot,
+        error: 'TRAEWORK 暂不支持自动打开当前项目',
+      });
+      expect(childProcessMock.spawn).not.toHaveBeenCalled();
+    } finally {
       await server.close();
     }
   });
@@ -740,9 +1676,10 @@ describe('make-server agent open API', () => {
     mockDetectedCommands([]);
 
     const server = await startTestServer(projectRoot);
+    const applicationProbe = mockMissingMacApplications('OpenCode');
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/local-app/open'), {
+      const response = await fetch(`${server.origin}/api/agent/local-app/open?projectId=agent-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent: 'opencode' }),
@@ -757,54 +1694,65 @@ describe('make-server agent open API', () => {
       });
       expect(childProcessMock.spawn).not.toHaveBeenCalled();
     } finally {
+      applicationProbe.mockRestore();
       await server.close();
     }
   });
 
-  it('builds Windows local app deeplinks with Start-Process and encoded paths', () => {
+  it('builds Windows local app deeplinks through the explicit application path', () => {
+    const appPath = String.raw`C:\Apps\OpenCode\OpenCode.exe`;
     const command = buildLocalAppOpenCommandForPlatform({
       agent: 'opencode',
       directory: 'C:\\Projects\\Axhub Runtime',
       platform: 'win32',
+      applicationPath: appPath,
     });
 
-    expect(command.command).toBe('powershell');
-    expect(command.displayCommand).toBe(
-      "Start-Process 'opencode://open-project?directory=C%3A%5CProjects%5CAxhub%20Runtime'",
-    );
-    expect(command.args.join(' ')).toContain('Start-Process');
-    expect(command.args.join(' ')).toContain('C%3A%5CProjects%5CAxhub%20Runtime');
+    expect(command.command).toBe(appPath);
+    expect(command.args).toEqual([
+      'opencode://open-project?directory=C%3A%5CProjects%5CAxhub%20Runtime',
+    ]);
   });
 
-  it('returns Windows local app deeplinks for browser-side execution', async () => {
+  it('opens Windows local app deeplinks through explicit executables', async () => {
     const opencode = await buildLocalAppOpenResultForPlatform({
       agent: 'opencode',
       directory: 'C:\\Projects\\Axhub Runtime',
       platform: 'win32',
+      availability: {
+        status: 'installed',
+        confidence: 'high',
+        checkedAt: new Date().toISOString(),
+        path: String.raw`C:\Apps\OpenCode\OpenCode.exe`,
+      },
     });
     const codex = await buildLocalAppOpenResultForPlatform({
       agent: 'codex',
       directory: 'C:\\Projects\\Axhub Runtime',
       platform: 'win32',
       preferDeeplink: true,
+      availability: {
+        status: 'installed',
+        confidence: 'high',
+        checkedAt: new Date().toISOString(),
+        path: String.raw`C:\Apps\Codex\Codex.exe`,
+      },
     });
 
     expect(opencode).toMatchObject({
-      command: 'browser opencode://open-project?directory=C%3A%5CProjects%5CAxhub%20Runtime',
+      command: expect.stringContaining('OpenCode.exe opencode://open-project?directory='),
       url: 'opencode://open-project?directory=C%3A%5CProjects%5CAxhub%20Runtime',
-      openInBrowser: true,
       openMode: 'deeplink',
     });
     expect(codex).toMatchObject({
-      command: 'browser codex://threads/new?path=C%3A%5CProjects%5CAxhub%20Runtime',
+      command: expect.stringContaining('Codex.exe codex://threads/new?path='),
       url: 'codex://threads/new?path=C%3A%5CProjects%5CAxhub%20Runtime',
-      openInBrowser: true,
       openMode: 'deeplink',
     });
-    expect(childProcessMock.spawn).not.toHaveBeenCalled();
+    expect(childProcessMock.spawn).toHaveBeenCalledTimes(2);
   });
 
-  it('builds Codex app commands and non-Windows OpenCode deeplinks without losing path encoding', () => {
+  it('builds macOS Codex and OpenCode commands from Agent Surface provider rules', () => {
     const codex = buildLocalAppOpenCommandForPlatform({
       agent: 'codex',
       directory: '/workspace/axhub-runtime',
@@ -815,12 +1763,6 @@ describe('make-server agent open API', () => {
       directory: '/workspace/axhub-runtime',
       platform: 'darwin',
     });
-    const linuxOpenCode = buildLocalAppOpenCommandForPlatform({
-      agent: 'opencode',
-      directory: '/workspace/Axhub Runtime',
-      platform: 'linux',
-    });
-
     expect(codex).toMatchObject({
       command: 'codex',
       args: ['app', '/workspace/axhub-runtime'],
@@ -828,12 +1770,152 @@ describe('make-server agent open API', () => {
     expect(codex.displayCommand).toContain('codex app');
     expect(macOpenCode).toMatchObject({
       command: 'open',
-      args: ['opencode://open-project?directory=/workspace/axhub-runtime'],
+      args: [
+        'opencode://open-project?directory=/workspace/axhub-runtime',
+      ],
     });
-    expect(linuxOpenCode).toMatchObject({
-      command: 'xdg-open',
-      args: ['opencode://open-project?directory=/workspace/Axhub%20Runtime'],
+  });
+
+  it('uses the legacy Linux URL handler for OpenCode instead of Agent Surface injection', async () => {
+    const directory = '/workspace/Axhub Runtime';
+    const result = await buildLocalAppOpenResultForPlatform({
+      agent: 'opencode',
+      directory,
+      platform: 'linux',
     });
+
+    expect(result).toMatchObject({
+      command: expect.stringContaining('xdg-open opencode://open-project?directory='),
+      url: 'opencode://open-project?directory=/workspace/Axhub%20Runtime',
+      openMode: 'deeplink',
+    });
+    expect(childProcessMock.spawn).toHaveBeenCalledWith(
+      'xdg-open',
+      ['opencode://open-project?directory=/workspace/Axhub%20Runtime'],
+      expect.objectContaining({ cwd: directory, shell: false }),
+    );
+  });
+
+  it('builds a WorkBuddy task deeplink with the selected working directory', () => {
+    const workbuddy = buildLocalAppOpenCommandForPlatform({
+      agent: 'workbuddy' as any,
+      directory: '/workspace/Axhub Runtime',
+      platform: 'darwin',
+    });
+
+    expect(workbuddy).toMatchObject({
+      command: 'open',
+      args: [
+        '-a',
+        '/Applications/WorkBuddy.app',
+        'workbuddy://task?action=start&prompt=%E4%BD%A0%E5%A5%BD&cwd=/workspace/Axhub%20Runtime',
+      ],
+    });
+  });
+
+  it.each([
+    undefined,
+    '/Applications/TRAEWORK.app/Contents/MacOS/Electron',
+  ])('rejects TRAEWORK directory command construction on macOS', (applicationPath) => {
+    expect(() => buildLocalAppOpenCommandForPlatform({
+      agent: 'traework' as any,
+      directory: '/workspace/Axhub Runtime',
+      platform: 'darwin',
+      applicationPath,
+    })).toThrow('TRAEWORK does not support automatic project-directory opening.');
+    expect(childProcessMock.spawn).not.toHaveBeenCalled();
+  });
+
+  it('builds application-only TRAEWORK commands without a project directory on macOS and Windows', () => {
+    expect(buildLocalAppLaunchCommandForPlatform).toBeTypeOf('function');
+    const macApplicationPath = '/Applications/TRAEWORK.app/Contents/MacOS/Electron';
+    const windowsApplicationPath = String.raw`C:\Apps\TRAEWORK\TRAEWORK.exe`;
+
+    expect(buildLocalAppLaunchCommandForPlatform({
+      applicationPath: macApplicationPath,
+      platform: 'darwin',
+    })).toMatchObject({
+      command: 'open',
+      args: ['-a', '/Applications/TRAEWORK.app'],
+    });
+    expect(buildLocalAppLaunchCommandForPlatform({
+      applicationPath: windowsApplicationPath,
+      platform: 'win32',
+    })).toMatchObject({
+      command: windowsApplicationPath,
+      args: [],
+    });
+  });
+
+  it('launches a local application without accepting a project path', async () => {
+    expect(openLocalAppApplication).toBeTypeOf('function');
+    const applicationPath = '/Applications/TRAEWORK.app/Contents/MacOS/Electron';
+
+    await openLocalAppApplication({ applicationPath, platform: 'darwin' });
+
+    expect(childProcessMock.spawn).toHaveBeenCalledWith(
+      'open',
+      ['-a', '/Applications/TRAEWORK.app'],
+      expect.objectContaining({ shell: false }),
+    );
+  });
+
+  it.each([
+    {
+      agent: 'trae',
+      applicationPath: '/Applications/Trae CN.app/Contents/MacOS/Electron',
+      application: '/Applications/Trae CN.app',
+    },
+  ] as const)('opens the detected $agent app bundle with the project directory on macOS', ({ agent, applicationPath, application }) => {
+    const command = buildLocalAppOpenCommandForPlatform({
+      agent: agent as any,
+      directory: '/workspace/Axhub Runtime',
+      platform: 'darwin',
+      applicationPath,
+    });
+
+    expect(command).toMatchObject({
+      command: 'open',
+      args: ['-a', application, '/workspace/Axhub Runtime'],
+    });
+  });
+
+  it.each([
+    {
+      agent: 'trae',
+      applicationPath: String.raw`C:\Users\demo\AppData\Local\Programs\Trae CN\Trae CN.exe`,
+    },
+  ] as const)('launches the detected $agent executable with the project directory on Windows', ({ agent, applicationPath }) => {
+    const directory = String.raw`C:\workspace\Axhub Runtime`;
+    const command = buildLocalAppOpenCommandForPlatform({
+      agent: agent as any,
+      directory,
+      platform: 'win32',
+      applicationPath,
+    });
+
+    expect(command).toMatchObject({
+      command: applicationPath,
+      args: [directory],
+    });
+  });
+
+  it('rejects a detected TRAEWORK executable without launching it on Windows', async () => {
+    const executablePath = String.raw`C:\Users\demo\AppData\Local\Programs\TRAEWORK\TRAEWORK.exe`;
+    const directory = String.raw`C:\workspace\Axhub Runtime`;
+
+    await expect(buildLocalAppOpenResultForPlatform({
+      agent: 'traework' as any,
+      directory,
+      platform: 'win32',
+      availability: {
+        status: 'installed',
+        confidence: 'high',
+        checkedAt: new Date().toISOString(),
+        path: executablePath,
+      },
+    })).rejects.toThrow('TRAEWORK does not support automatic project-directory opening.');
+    expect(childProcessMock.spawn).not.toHaveBeenCalled();
   });
 
   it('falls back to a Codex deeplink when direct Codex app launch fails', async () => {
@@ -874,14 +1956,15 @@ describe('make-server agent open API', () => {
   it('uses the stored local app deeplink mode before direct Codex app launch', async () => {
     const projectRoot = createTempRoot();
     writeProjectMetadata(projectRoot);
-    mockDetectedCommands(['codex']);
+    const appPath = path.join(projectRoot, 'ChatGPT.app', 'Contents', 'MacOS', 'ChatGPT');
+    writeFile(appPath, '');
 
     const server = await startTestServer(projectRoot, {
       serverConfig: {
         schemaVersion: 1,
         toolOpenState: {
           'local-app:codex': {
-            commandPath: '/usr/local/bin/codex',
+            executablePath: appPath,
             lastOpenMode: 'deeplink',
           },
         },
@@ -889,7 +1972,7 @@ describe('make-server agent open API', () => {
     });
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/local-app/open'), {
+      const response = await fetch(`${server.origin}/api/agent/local-app/open?projectId=agent-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent: 'codex' }),
@@ -905,6 +1988,7 @@ describe('make-server agent open API', () => {
       expect(body.command).toContain('codex://threads/new?path=');
       expect(childProcessMock.spawn).toHaveBeenCalledTimes(process.platform === 'win32' ? 0 : 1);
       expect(JSON.stringify(childProcessMock.spawn.mock.calls)).not.toContain('"app"');
+      expect(JSON.stringify(childProcessMock.spawn.mock.calls)).toContain(path.join(projectRoot, 'ChatGPT.app'));
     } finally {
       await server.close();
     }
@@ -1027,10 +2111,10 @@ describe('make-server agent open API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/local-app/open'), {
+      const response = await fetch(`${server.origin}/api/agent/local-app/open?projectId=agent-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent: 'gemini' }),
+        body: JSON.stringify({ projectId: 'agent-client', agent: 'gemini' }),
       });
       const body = await response.json();
 
@@ -1038,7 +2122,7 @@ describe('make-server agent open API', () => {
       expect(body).toMatchObject({
         code: 'LOCAL_APP_AGENT_UNSUPPORTED',
         projectId: 'agent-client',
-        supported: ['codex', 'opencode'],
+        supported: ['codex', 'opencode', 'workbuddy', 'traework', 'trae'],
       });
       expect(childProcessMock.spawn).not.toHaveBeenCalled();
     } finally {
@@ -1054,7 +2138,7 @@ describe('make-server agent open API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/local-app/open'), {
+      const response = await fetch(`${server.origin}/api/agent/local-app/open?projectId=agent-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent: 'opencode', targetPath: outsidePath }),
@@ -1101,7 +2185,7 @@ describe('make-server agent open API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/web/open'), {
+      const response = await fetch(`${server.origin}/api/agent/web/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1172,7 +2256,7 @@ describe('make-server agent open API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const first = await fetch(projectApiUrl(server.origin, '/api/agent/web/open'), {
+      const first = await fetch(`${server.origin}/api/agent/web/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1182,7 +2266,7 @@ describe('make-server agent open API', () => {
       });
       expect(first.status).toBe(200);
 
-      const second = await fetch(projectApiUrl(server.origin, '/api/agent/web/open'), {
+      const second = await fetch(`${server.origin}/api/agent/web/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1224,7 +2308,7 @@ describe('make-server agent open API', () => {
     let portBlocker: net.Server | null = null;
 
     try {
-      const first = await fetch(projectApiUrl(server.origin, '/api/agent/web/open'), {
+      const first = await fetch(`${server.origin}/api/agent/web/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1235,7 +2319,7 @@ describe('make-server agent open API', () => {
       const firstBody = await first.json();
       const firstPort = Number(new URL(firstBody.serverUrl).port);
       portBlocker = await listenOnLocalPort(firstPort);
-      const second = await fetch(projectApiUrl(server.origin, '/api/agent/web/open'), {
+      const second = await fetch(`${server.origin}/api/agent/web/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1279,7 +2363,7 @@ describe('make-server agent open API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/web/open'), {
+      const response = await fetch(`${server.origin}/api/agent/web/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1324,7 +2408,7 @@ describe('make-server agent open API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const first = await fetch(projectApiUrl(server.origin, '/api/agent/web/open'), {
+      const first = await fetch(`${server.origin}/api/agent/web/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1335,7 +2419,7 @@ describe('make-server agent open API', () => {
       });
       expect(first.status).toBe(200);
 
-      const second = await fetch(projectApiUrl(server.origin, '/api/agent/web/open'), {
+      const second = await fetch(`${server.origin}/api/agent/web/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1384,7 +2468,7 @@ describe('make-server agent open API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/web/open'), {
+      const response = await fetch(`${server.origin}/api/agent/web/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1463,7 +2547,7 @@ describe('make-server agent open API', () => {
       });
       expect(registerResponse.status).toBe(201);
 
-      const response = await fetch(projectApiUrl(server.origin, '/api/agent/web/open', 'selected-agent-client'), {
+      const response = await fetch(`${server.origin}/api/agent/web/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1554,7 +2638,7 @@ describe('make-server agent open API', () => {
       });
       expect(registerResponse.status).toBe(201);
 
-      const activeResponse = await fetch(projectApiUrl(server.origin, '/api/agent/web/open', 'active-agent-client'), {
+      const activeResponse = await fetch(`${server.origin}/api/agent/web/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1568,7 +2652,7 @@ describe('make-server agent open API', () => {
       const activePort = Number(new URL(activeBody.serverUrl).port);
       portBlocker = await listenOnLocalPort(activePort);
 
-      const selectedResponse = await fetch(projectApiUrl(server.origin, '/api/agent/web/open', 'selected-agent-client'), {
+      const selectedResponse = await fetch(`${server.origin}/api/agent/web/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

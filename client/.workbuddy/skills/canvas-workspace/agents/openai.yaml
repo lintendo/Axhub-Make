@@ -1,0 +1,4 @@
+interface:
+  display_name: "画布工作区"
+  short_description: "把文档、原型页面、图片、流程图等产物创建或更新到 Axhub 画布"
+  default_prompt: "使用 $canvas-workspace 处理这个画布需求，先判断产物类型再更新当前画布。"

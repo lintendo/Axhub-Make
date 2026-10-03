@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 
 const coverageScope = process.env.AXHUB_MAKE_COVERAGE_SCOPE || 'all';
@@ -6,6 +7,15 @@ const coverageInclude = coverageScope === 'server'
   : ['src/**/*.{ts,tsx}'];
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+      '@axhub/commentary/prompt-card-skills': path.resolve(
+        __dirname,
+        'vendor/axhub-commentary/src/ui/runtime/prompt-card-skills.ts',
+      ),
+    },
+  },
   test: {
     environment: 'node',
     include: [

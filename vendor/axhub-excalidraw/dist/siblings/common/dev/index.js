@@ -35,9 +35,9 @@ var init_define_import_meta_env = __esm({
   }
 });
 
-// ../../../excalidraw-upstream/node_modules/es6-promise-pool/es6-promise-pool.js
+// ../../node_modules/es6-promise-pool/es6-promise-pool.js
 var require_es6_promise_pool = __commonJS({
-  "../../../excalidraw-upstream/node_modules/es6-promise-pool/es6-promise-pool.js"(exports, module) {
+  "../../node_modules/es6-promise-pool/es6-promise-pool.js"(exports, module) {
     init_define_import_meta_env();
     (function(root, factory) {
       if (typeof define === "function" && define.amd) {
@@ -226,9 +226,9 @@ var require_es6_promise_pool = __commonJS({
   }
 });
 
-// ../../../excalidraw-upstream/node_modules/@braintree/sanitize-url/dist/index.js
+// ../../node_modules/@braintree/sanitize-url/dist/index.js
 var require_dist = __commonJS({
-  "../../../excalidraw-upstream/node_modules/@braintree/sanitize-url/dist/index.js"(exports) {
+  "../../node_modules/@braintree/sanitize-url/dist/index.js"(exports) {
     "use strict";
     init_define_import_meta_env();
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -370,7 +370,7 @@ var isBounds = (box) => Array.isArray(box) && box.length === 4 && typeof box[0] 
 // src/colors.ts
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/tinycolor2/esm/tinycolor.js
+// ../../node_modules/tinycolor2/esm/tinycolor.js
 init_define_import_meta_env();
 function _typeof(obj) {
   "@babel/helpers - typeof";
@@ -2421,13 +2421,13 @@ var PromisePool = class {
 // src/random.ts
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/nanoid/index.browser.js
+// ../../node_modules/nanoid/index.browser.js
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/nanoid/url-alphabet/index.js
+// ../../node_modules/nanoid/url-alphabet/index.js
 init_define_import_meta_env();
 
-// ../../../excalidraw-upstream/node_modules/nanoid/index.browser.js
+// ../../node_modules/nanoid/index.browser.js
 var nanoid = (size = 21) => crypto.getRandomValues(new Uint8Array(size)).reduce((id, byte) => {
   byte &= 63;
   if (byte < 36) {
@@ -2442,7 +2442,7 @@ var nanoid = (size = 21) => crypto.getRandomValues(new Uint8Array(size)).reduce(
   return id;
 }, "");
 
-// ../../../excalidraw-upstream/node_modules/roughjs/bin/math.js
+// ../../node_modules/roughjs/bin/math.js
 init_define_import_meta_env();
 var Random = class {
   constructor(seed) {

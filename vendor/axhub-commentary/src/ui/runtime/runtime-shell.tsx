@@ -3,6 +3,7 @@ import { WEB_EDITOR_V2_HOST_ID } from '../../constants';
 import type { ViewportRect } from '../../overlay/canvas-overlay';
 import type { CommentEntryMode } from '../selection-ui-mode';
 import { isMobileDevice } from '../../utils/mobile-detect';
+import { resolveCspNonce } from '../csp-nonce';
 import { panelContainerStyle, WEB_EDITOR_POPUP_ROOT_STYLES } from './styles';
 import { ElementAgentTaskOverlays } from './element-agent-task-overlays';
 import { getAnnotationManualEditLocatorState, PromptCardView } from './prompt-card-view';
@@ -19,13 +20,19 @@ import {
   isStandardSvgText,
   mergePromptImageAttachments,
   readPromptImageAttachmentsFromDataTransferItems,
+  replaceUserPromptImageAttachments,
+  splitPromptImageAttachments,
 } from './image-attachments';
 import {
   PROMPT_TEXT_LIMIT_MESSAGE,
   isPromptTextChangeAllowed,
 } from './prompt-text-limit';
 import { notifyRuntimeMessage } from './runtime-feedback';
-import { insertPlainTextAtSelection } from './plain-text-selection';
+import {
+  insertLineBreakAtSelection,
+  insertPlainTextAtSelection,
+} from './plain-text-selection';
+import { writeEditableText } from '../../core/text-content';
 import type {
   SharedImageState,
   SharedAnnotationState,
@@ -153,7 +160,6 @@ function normalizeRuntimeSkillOptions(
       id,
       label,
       ...(item.description?.trim() ? { description: item.description.trim() } : {}),
-      ...(item.sourceUrl?.trim() ? { sourceUrl: item.sourceUrl.trim() } : {}),
       ...(item.prompt?.trim() ? { prompt: item.prompt.trim() } : {}),
       ...(item.custom === true ? { custom: true } : {}),
     });
@@ -202,6 +208,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   const [propertyPanelOpen, setPropertyPanelOpen] = React.useState<boolean>(initialPropertyPanelOpen);
   const [bubbleStyleEditorOpen, setBubbleStyleEditorOpen] = React.useState(false);
   const [inlineTextEditing, setInlineTextEditing] = React.useState(false);
+  const [inlineTextTarget, setInlineTextTarget] = React.useState<HTMLElement | null>(null);
   const [blockingLayerOpen, setBlockingLayerOpen] = React.useState(false);
   const [commentarySkillOptions, setCommentarySkillOptions] = React.useState<
     CommentarySkillOption[]
@@ -252,6 +259,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   });
 
   const currentTargetRef = React.useRef<Element | null>(null);
+  const inlineTextTargetRef = React.useRef<HTMLElement | null>(null);
   const uiModeRef = React.useRef<CommentEntryMode>(initialUiMode);
   const noteStateRef = React.useRef<SharedNoteState>(noteState);
   const textStateRef = React.useRef<SharedTextState>(textState);
@@ -268,6 +276,13 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     selectionGuards.handlePromptSelectionInteractionLockChange,
   );
 
+  const finishInlineTextEditing = React.useCallback(() => {
+    promptSelectionInteractionLockChangeRef.current(false);
+    inlineTextTargetRef.current = null;
+    setInlineTextTarget(null);
+    setInlineTextEditing(false);
+  }, []);
+
   useFeedbackBridge();
 
   React.useEffect(() => {
@@ -282,6 +297,10 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   React.useEffect(() => {
     textStateRef.current = textState;
   }, [textState]);
+
+  React.useEffect(() => {
+    inlineTextTargetRef.current = inlineTextTarget;
+  }, [inlineTextTarget]);
 
   React.useEffect(() => {
     imageStateRef.current = imageState;
@@ -389,6 +408,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     (element: Element | null, resetDraft: boolean) => {
       const nextSavedNote = propertyPanelOptions?.getAiNote?.(element) ?? '';
       const nextSkillIds = propertyPanelOptions?.getAiNoteSkillIds?.(element) ?? [];
+      const nextNoteMeta = propertyPanelOptions?.getAiNoteMeta?.(element) ?? null;
       const prev = noteStateRef.current;
       const next = syncDraftAgainstSaved(
         {
@@ -403,7 +423,10 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
         savedNote: next.saved,
         draftNote: next.draft,
         noteDirty: next.dirty,
-        savedNoteMeta: { skillIds: nextSkillIds.slice() },
+        savedNoteMeta: {
+          skillIds: nextSkillIds.slice(),
+          ...(nextNoteMeta ?? {}),
+        },
       };
       noteStateRef.current = nextState;
       setNoteState(nextState);
@@ -446,11 +469,11 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
         setImageState({ images: [] });
         return;
       }
+      const { userImages } = splitPromptImageAttachments(
+        propertyPanelOptions?.getAiNoteImages?.(element) ?? [],
+      );
       setImageState({
-        images: (propertyPanelOptions?.getAiNoteImages?.(element) ?? []).slice(
-          0,
-          MAX_PROMPT_IMAGE_ATTACHMENTS,
-        ),
+        images: userImages.slice(0, MAX_PROMPT_IMAGE_ATTACHMENTS),
       });
     },
     [imageAttachmentsEnabled, propertyPanelOptions],
@@ -521,6 +544,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     async (elementOverride?: Element | null, options: { skillIds?: readonly string[] } = {}) => {
       const element = elementOverride ?? currentTargetRef.current;
       if (!propertyPanelOptions?.onAiNoteChange) return false;
+      if (!(propertyPanelOptions.canEditAiNote?.(element) ?? true)) return false;
 
       const nextValue = noteStateRef.current.draftNote;
       const nextSkillIds =
@@ -538,7 +562,10 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
           savedNote: nextValue,
           draftNote: nextValue,
           noteDirty: false,
-          savedNoteMeta: { skillIds: nextSkillIds.slice() },
+          savedNoteMeta: {
+            skillIds: nextSkillIds.slice(),
+            ...(propertyPanelOptions.getAiNoteMeta?.(element) ?? {}),
+          },
         };
         noteStateRef.current = nextState;
         setNoteState(nextState);
@@ -551,7 +578,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
 
   const commitDraftText = React.useCallback(
     async (elementOverride?: Element | null) => {
-      const element = elementOverride ?? currentTargetRef.current;
+      const element = elementOverride ?? inlineTextTargetRef.current ?? currentTargetRef.current;
       if (!element || !propertyPanelOptions?.onTextValueChange) return false;
       if (!(propertyPanelOptions?.canEditText?.(element) ?? false)) return false;
       if (!textStateRef.current.textDirty) return false;
@@ -563,7 +590,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
         textStateRef.current.savedText,
       );
 
-      if (currentTargetRef.current === element) {
+      if (currentTargetRef.current === element || inlineTextTargetRef.current === element) {
         const nextState = {
           savedText: nextValue,
           draftText: nextValue,
@@ -643,12 +670,13 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     (element: Element | null) => {
       if (currentTargetRef.current === element) return;
       const previousTarget = currentTargetRef.current;
-      setInlineTextEditing(false);
+      const previousTextTarget = inlineTextTargetRef.current ?? previousTarget;
+      finishInlineTextEditing();
       if (noteStateRef.current.noteDirty) {
         void commitDraftNote(previousTarget);
       }
-      if (previousTarget && textStateRef.current.textDirty) {
-        void commitDraftText(previousTarget);
+      if (previousTextTarget && textStateRef.current.textDirty) {
+        void commitDraftText(previousTextTarget);
       }
       currentTargetRef.current = element;
       setCurrentTarget(element);
@@ -669,6 +697,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     [
       commitDraftNote,
       commitDraftText,
+      finishInlineTextEditing,
       selectionGuards,
       syncSavedAnnotationMarkdown,
       syncSavedImages,
@@ -697,7 +726,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
 
   const handleRefreshNoteState = React.useCallback(() => {
     syncSavedNote(currentTargetRef.current, false);
-    syncSavedText(currentTargetRef.current, false);
+    syncSavedText(inlineTextTargetRef.current ?? currentTargetRef.current, false);
     syncSavedImages(currentTargetRef.current);
     syncSavedAnnotationMarkdown(currentTargetRef.current, false);
   }, [syncSavedAnnotationMarkdown, syncSavedImages, syncSavedNote, syncSavedText]);
@@ -736,7 +765,10 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   const currentAgentTask = taskStateProvider.getCurrentTask(currentTarget);
   const currentTaskRunning =
     currentAgentTask?.status === 'pending' || currentAgentTask?.status === 'created';
-  const canEditNote = Boolean(propertyPanelOptions?.onAiNoteChange);
+  const canEditNote = propertyPanelOptions?.canEditAiNote?.(currentTarget)
+    ?? Boolean(propertyPanelOptions?.onAiNoteChange);
+  const canClearCurrentElementEdits = propertyPanelOptions?.canClearCurrentElementEdits?.(currentTarget)
+    ?? Boolean(propertyPanelOptions?.onClearCurrentElementEdits);
   const annotationDocumentEditUrl = React.useMemo(() => {
     const resolver =
       breadcrumbsOptions?.getAnnotationDocumentEditUrl ??
@@ -748,12 +780,19 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       if (!element || !element.isConnected) return false;
       if (!propertyPanelOptions?.onTextValueChange) return false;
       if (!(propertyPanelOptions?.canEditText?.(element) ?? false)) return false;
-      const task = taskStateProvider.getCurrentTask(element);
-      return task?.status !== 'pending' && task?.status !== 'created';
+      const targetTask = taskStateProvider.getCurrentTask(element);
+      const selectionTask = taskStateProvider.getCurrentTask(currentTargetRef.current);
+      return (
+        targetTask?.status !== 'pending'
+        && targetTask?.status !== 'created'
+        && selectionTask?.status !== 'pending'
+        && selectionTask?.status !== 'created'
+      );
     },
     [propertyPanelOptions, taskStateProvider],
   );
-  const canEditText = canStartInlineTextEditing(currentTarget);
+  const activeTextTarget = inlineTextTarget ?? currentTarget;
+  const canEditText = canStartInlineTextEditing(activeTextTarget);
 
   const handleDraftChange = React.useCallback((value: string) => {
     const prev = noteStateRef.current;
@@ -811,7 +850,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   }, []);
 
   const handleConfirmText = React.useCallback(async () => {
-    await commitDraftText();
+    await commitDraftText(inlineTextTargetRef.current);
   }, [commitDraftText]);
 
   const handleAnnotationDraftChange = React.useCallback((value: string) => {
@@ -837,17 +876,25 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   );
 
   const handleInlineTextEditingChange = React.useCallback(
-    (editing: boolean) => {
+    (editing: boolean, element?: HTMLElement | null) => {
       if (!editing) {
-        selectionGuards.handlePromptSelectionInteractionLockChange(false);
-        setInlineTextEditing(false);
+        finishInlineTextEditing();
         return;
       }
-      const allowed = canStartInlineTextEditing(currentTargetRef.current);
-      selectionGuards.handlePromptSelectionInteractionLockChange(allowed);
-      setInlineTextEditing(allowed);
+      const requestedTarget = element ?? currentTargetRef.current;
+      const textTarget = requestedTarget instanceof HTMLElement ? requestedTarget : null;
+      const allowed = canStartInlineTextEditing(textTarget);
+      if (!allowed || !textTarget) {
+        finishInlineTextEditing();
+        return;
+      }
+      selectionGuards.handlePromptSelectionInteractionLockChange(true);
+      inlineTextTargetRef.current = textTarget;
+      setInlineTextTarget(textTarget);
+      syncSavedText(textTarget, true);
+      setInlineTextEditing(true);
     },
-    [canStartInlineTextEditing, selectionGuards],
+    [canStartInlineTextEditing, finishInlineTextEditing, selectionGuards, syncSavedText],
   );
 
   const handleImagesChange = React.useCallback(
@@ -855,8 +902,15 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       const element = currentTargetRef.current;
       if (!imageAttachmentsEnabled) return;
       if (!element || !propertyPanelOptions?.onAiNoteImagesChange) return;
-      const clippedImages = images.slice(0, MAX_PROMPT_IMAGE_ATTACHMENTS);
-      await propertyPanelOptions.onAiNoteImagesChange(element, clippedImages);
+      if (!(propertyPanelOptions.canEditAiNote?.(element) ?? true)) return;
+      const clippedImages = images
+        .filter((image) => image.source !== 'target-screenshot')
+        .slice(0, MAX_PROMPT_IMAGE_ATTACHMENTS);
+      const nextImages = replaceUserPromptImageAttachments(
+        propertyPanelOptions.getAiNoteImages?.(element) ?? [],
+        clippedImages,
+      );
+      await propertyPanelOptions.onAiNoteImagesChange(element, nextImages);
       if (currentTargetRef.current === element) {
         setImageState({ images: clippedImages.slice() });
       }
@@ -880,6 +934,9 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       if (!incomingImages.length || !propertyPanelOptions?.onAiNoteImagesChange) {
         return { acceptedCount: 0, droppedCount: 0 };
       }
+      if (!(propertyPanelOptions.canEditAiNote?.(element) ?? true)) {
+        return { acceptedCount: 0, droppedCount: incomingImages.length };
+      }
       let preparedImages = incomingImages;
       try {
         preparedImages = propertyPanelOptions.onPrepareAiNoteImages
@@ -893,16 +950,15 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       if (!preparedImages.length) {
         return { acceptedCount: 0, droppedCount: incomingImages.length };
       }
-      const currentImages = (propertyPanelOptions.getAiNoteImages?.(element) ?? []).slice(
-        0,
-        MAX_PROMPT_IMAGE_ATTACHMENTS,
-      );
+      const currentImages = propertyPanelOptions.getAiNoteImages?.(element) ?? [];
+      const { userImages: currentUserImages } = splitPromptImageAttachments(currentImages);
       const merged = mergePromptImageAttachments(
-        currentImages,
+        currentUserImages,
         preparedImages,
         MAX_PROMPT_IMAGE_ATTACHMENTS,
       );
-      await propertyPanelOptions.onAiNoteImagesChange(element, merged.images);
+      const nextImages = replaceUserPromptImageAttachments(currentImages, merged.images);
+      await propertyPanelOptions.onAiNoteImagesChange(element, nextImages);
       if (currentTargetRef.current === element) {
         setImageState({ images: merged.images.slice() });
       }
@@ -1006,23 +1062,44 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
   const handleClearCurrentElementEdits = React.useCallback(async () => {
     const element = currentTargetRef.current;
     if (!element || !propertyPanelOptions?.onClearCurrentElementEdits) return;
+    if (!(propertyPanelOptions.canClearCurrentElementEdits?.(element) ?? true)) return;
 
     const didClear = await propertyPanelOptions.onClearCurrentElementEdits(element);
-    if (!didClear) return;
+    if (!didClear) {
+      const currentNoteState = noteStateRef.current;
+      if (currentNoteState.noteDirty && currentNoteState.savedNote.trim() === '') {
+        handleCancelNote();
+      }
+      return;
+    }
 
     syncSavedNote(element, true);
     syncSavedText(element, true);
     syncSavedImages(element);
     syncSavedAnnotationMarkdown(element, true);
-    setInlineTextEditing(false);
+    finishInlineTextEditing();
     propertyPanelOptions.onDismissSelection?.();
   }, [
+    finishInlineTextEditing,
+    handleCancelNote,
     propertyPanelOptions,
     syncSavedAnnotationMarkdown,
     syncSavedImages,
     syncSavedNote,
     syncSavedText,
   ]);
+
+  const handleDeleteExternalComment = React.useCallback(
+    async (commentId: string) => {
+      const element = currentTargetRef.current;
+      if (!element || !propertyPanelOptions?.onDeleteExternalComment) return;
+      const didDelete = await propertyPanelOptions.onDeleteExternalComment(element, commentId);
+      if (didDelete && currentTargetRef.current === element) {
+        syncSavedNote(element, true);
+      }
+    },
+    [propertyPanelOptions, syncSavedNote],
+  );
 
   const handleDeleteCurrentAnnotationNode = React.useCallback(async () => {
     const element = currentTargetRef.current;
@@ -1034,9 +1111,10 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     syncSavedText(element, true);
     syncSavedImages(element);
     syncSavedAnnotationMarkdown(element, true);
-    setInlineTextEditing(false);
+    finishInlineTextEditing();
     propertyPanelOptions.onDismissSelection?.();
   }, [
+    finishInlineTextEditing,
     propertyPanelOptions,
     syncSavedAnnotationMarkdown,
     syncSavedImages,
@@ -1074,14 +1152,25 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
 
   React.useEffect(() => {
     if (!inlineTextEditing) return;
-    if (canEditText && currentTarget?.isConnected) return;
-    setInlineTextEditing(false);
-  }, [canEditText, currentTarget, inlineTextEditing]);
+    if (canEditText && activeTextTarget?.isConnected) return;
+    const previousTextTarget = inlineTextTargetRef.current;
+    if (previousTextTarget?.isConnected && textStateRef.current.textDirty) {
+      writeEditableText(previousTextTarget, textStateRef.current.savedText);
+    }
+    handleCancelText();
+    finishInlineTextEditing();
+  }, [
+    activeTextTarget,
+    canEditText,
+    finishInlineTextEditing,
+    handleCancelText,
+    inlineTextEditing,
+  ]);
 
   React.useEffect(() => {
     const editableElement =
-      inlineTextEditing && canEditText && currentTarget instanceof HTMLElement
-        ? currentTarget
+      inlineTextEditing && canEditText && activeTextTarget instanceof HTMLElement
+        ? activeTextTarget
         : null;
     propertyPanelOptions?.onInlineTextEditingElementChange?.(editableElement);
 
@@ -1091,10 +1180,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       };
     }
 
-    const exitInlineTextEditing = () => {
-      promptSelectionInteractionLockChangeRef.current(false);
-      setInlineTextEditing(false);
-    };
+    const exitInlineTextEditing = finishInlineTextEditing;
 
     const previousContentEditableAttr = editableElement.getAttribute('contenteditable');
     const previousSpellcheck = editableElement.spellcheck;
@@ -1111,7 +1197,8 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     editableElement.style.setProperty('cursor', 'text', 'important');
 
     const syncDraftFromDom = () => {
-      const nextValue = editableElement.textContent ?? '';
+      const nextValue =
+        propertyPanelOptions?.getTextValue?.(editableElement) ?? editableElement.textContent ?? '';
       const prev = textStateRef.current;
       const nextState = {
         ...prev,
@@ -1144,22 +1231,36 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       if (event.key === 'Enter' && !isMobileDevice()) {
         event.preventDefault();
         event.stopPropagation();
-        syncDraftFromDom();
-        void (async () => {
-          await commitDraftText(editableElement);
-          exitInlineTextEditing();
-          editableElement.blur();
-        })();
+        if (event.metaKey || event.ctrlKey) {
+          syncDraftFromDom();
+          void (async () => {
+            await commitDraftText(editableElement);
+            exitInlineTextEditing();
+            editableElement.blur();
+          })();
+        } else if (insertLineBreakAtSelection(editableElement)) {
+          syncDraftFromDom();
+        }
         return;
       }
 
       if (event.key !== 'Escape') return;
       event.preventDefault();
       event.stopPropagation();
-      editableElement.textContent = textStateRef.current.savedText;
+      writeEditableText(editableElement, textStateRef.current.savedText);
       handleCancelText();
       exitInlineTextEditing();
       editableElement.blur();
+    };
+
+    const handleBeforeInput = (event: InputEvent) => {
+      if (!isMobileDevice()) return;
+      if (event.inputType !== 'insertParagraph' && event.inputType !== 'insertLineBreak') return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (insertLineBreakAtSelection(editableElement)) {
+        syncDraftFromDom();
+      }
     };
 
     const handleBlur = () => {
@@ -1173,6 +1274,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
     };
 
     editableElement.addEventListener('input', handleInput);
+    editableElement.addEventListener('beforeinput', handleBeforeInput);
     editableElement.addEventListener('paste', handlePaste);
     editableElement.addEventListener('keydown', handleKeyDown);
     editableElement.addEventListener('blur', handleBlur);
@@ -1235,6 +1337,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
         window.cancelAnimationFrame(restoreFocusRafId);
       }
       editableElement.removeEventListener('input', handleInput);
+      editableElement.removeEventListener('beforeinput', handleBeforeInput);
       editableElement.removeEventListener('paste', handlePaste);
       editableElement.removeEventListener('keydown', handleKeyDown);
       editableElement.removeEventListener('blur', handleBlur);
@@ -1255,9 +1358,10 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
       propertyPanelOptions?.onInlineTextEditingElementChange?.(null);
     };
   }, [
+    activeTextTarget,
     canEditText,
     commitDraftText,
-    currentTarget,
+    finishInlineTextEditing,
     handleCancelText,
     inlineTextEditing,
     propertyPanelOptions,
@@ -1265,7 +1369,7 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
 
   return (
     <div style={panelContainerStyle}>
-      <style>{WEB_EDITOR_POPUP_ROOT_STYLES}</style>
+      <style nonce={resolveCspNonce()}>{WEB_EDITOR_POPUP_ROOT_STYLES}</style>
       <ElementAgentTaskOverlays
         tasks={blockingLayerOpen ? [] : taskStateProvider.getVisibleTasks()}
         subscribeSessionActivity={propertyPanelOptions?.subscribeSessionActivity}
@@ -1294,9 +1398,11 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
           hideCurrentElementExecutionAction={Boolean(
             propertyPanelOptions?.hideCurrentElementExecutionAction,
           )}
+          hideClearEditsAction={Boolean(propertyPanelOptions?.hideClearEditsAction)}
           hideContextAppendAction={Boolean(
             breadcrumbsOptions.hideExecutionControls ?? propertyPanelOptions?.hideExecutionControls,
           )}
+          externalAnnotationMode={Boolean(propertyPanelOptions?.externalAnnotationMode)}
           enabledSkillIds={commentarySkillSelectionManaged ? enabledCommentarySkillIds : undefined}
           skillOptions={commentarySkillOptions}
           onBubbleStyleEditorOpenChange={setBubbleStyleEditorOpen}
@@ -1337,12 +1443,14 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
           onCancelText={handleCancelText}
           onConfirmText={handleConfirmText}
           canEditNote={canEditNote}
+          canClearCurrentElementEdits={canClearCurrentElementEdits}
           savedNote={noteState.savedNote}
           savedNoteMeta={noteState.savedNoteMeta}
           draftNote={noteState.draftNote}
           noteDirty={noteState.noteDirty}
           onDraftChange={handleDraftChange}
           onClearCurrentElementEdits={handleClearCurrentElementEdits}
+          onDeleteExternalComment={handleDeleteExternalComment}
           onCancelNote={handleCancelNote}
           onConfirmNote={handleConfirmNote}
           onDismissSelection={propertyPanelOptions?.onDismissSelection}
@@ -1409,12 +1517,14 @@ export function WebEditorUiApp(props: WebEditorUiAppProps): React.ReactElement {
           onCancelText={handleCancelText}
           onConfirmText={handleConfirmText}
           canEditNote={canEditNote}
+          canClearCurrentElementEdits={canClearCurrentElementEdits}
           savedNote={noteState.savedNote}
           savedNoteMeta={noteState.savedNoteMeta}
           draftNote={noteState.draftNote}
           noteDirty={noteState.noteDirty}
           onDraftChange={handleDraftChange}
           onClearCurrentElementEdits={handleClearCurrentElementEdits}
+          onDeleteExternalComment={handleDeleteExternalComment}
           onCancelNote={handleCancelNote}
           onConfirmNote={handleConfirmNote}
           onDismissSelection={propertyPanelOptions?.onDismissSelection}

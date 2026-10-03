@@ -46,7 +46,7 @@ function enableDocumentEditor(options?: {
   markdownViewerRef.current?.enableDocumentEditor(options);
 }
 
-function setDocumentEditorContext(context: { projectId: string; documentPath: string }): void {
+function setDocumentEditorContext(context: { projectId: string; documentPath: string; makeServerOrigin?: string }): void {
   markdownViewerRef.current?.setContext(context);
 }
 
@@ -66,6 +66,18 @@ function subscribeDocumentHostToolbarState(
 
 function runDocumentHostToolbarAction(action: CommentaryHostToolbarAction): Promise<boolean> {
   return markdownViewerRef.current?.runHostToolbarAction(action) ?? Promise.resolve(false);
+}
+
+function getDocumentCommentaryDebugState(): unknown | null {
+  return markdownViewerRef.current?.getDebugState() ?? null;
+}
+
+function getDocumentVoiceTarget(): unknown | null {
+  return markdownViewerRef.current?.getVoiceTarget() ?? null;
+}
+
+function refreshDocumentPersistedComments(deletedCommentIds?: readonly string[]): Promise<void> {
+  return markdownViewerRef.current?.refreshPersistedComments(deletedCommentIds) ?? Promise.resolve();
 }
 
 function renderViewer(props: React.ComponentProps<typeof MarkdownViewer>) {
@@ -258,6 +270,9 @@ if (typeof window !== 'undefined') {
     getHostToolbarState: getDocumentHostToolbarState,
     subscribeHostToolbarState: subscribeDocumentHostToolbarState,
     runHostToolbarAction: runDocumentHostToolbarAction,
+    getDebugState: getDocumentCommentaryDebugState,
+    getVoiceTarget: getDocumentVoiceTarget,
+    refreshPersistedComments: refreshDocumentPersistedComments,
   };
   console.log('[Spec Template Bootstrap] 已挂载到全局');
 }

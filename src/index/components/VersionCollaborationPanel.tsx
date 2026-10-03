@@ -17,15 +17,17 @@ import {
 } from '../services/api';
 import { generateGitCommitMessage } from '../domains/ai-generation/gitCommitMessageGeneration';
 import {
-    VersionChangeCard,
     VersionCommitRow,
     VersionInfoRow,
     VersionInfoValue,
     VersionSection,
-    VersionSyncTabs,
-    getVersionChangeTitle,
-    type VersionCardCommit,
 } from './VersionCards';
+import {
+    GIT_REPO_BEGINNER_GUIDE_SKILL_URL,
+    INSTALL_GIT_REPO_SKILL_PROMPT,
+} from './gitRepoSkillPrompt';
+
+export { GIT_REPO_BEGINNER_GUIDE_SKILL_URL, INSTALL_GIT_REPO_SKILL_PROMPT } from './gitRepoSkillPrompt';
 
 export type VersionCollaborationTab = 'local' | 'online' | 'skills' | 'all';
 
@@ -58,14 +60,6 @@ interface FlattenedChangeItem extends GitWorkspaceChangeItem {
 }
 
 const MAX_VISIBLE_CHANGE_ITEMS = 5;
-const GIT_REPO_BEGINNER_GUIDE_SKILL_URL = 'https://github.com/lintendo/Axhub-Skills/blob/main/skills/git-repo-beginner-guide/SKILL.md';
-const INSTALL_GIT_REPO_SKILL_PROMPT = [
-    '请帮我把下面这个 git-repo-beginner-guide 技能安装到当前项目内：',
-    GIT_REPO_BEGINNER_GUIDE_SKILL_URL,
-    '',
-    '安装后，请使用这个技能帮助我处理当前项目的 git 相关问题，包括版本管理、团队协作、异地办公，以及在多台设备间同步项目。',
-].join('\n');
-
 function getVisibleChangeItems<T>(items: T[], visibleItemCount: number): { items: T[]; remainingCount: number } {
     if (items.length === 0) {
         return { items: [], remainingCount: 0 };
@@ -158,6 +152,25 @@ function getRemoteStatusClass(status: GitWorkspaceStatusResponse | null): string
         return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-300';
     }
     return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-300';
+}
+
+function getRemoteSyncSummary(comparison: GitWorkspaceStatusResponse['remoteComparison']): string {
+    if (!comparison || comparison.available === false) return '尚未读取远端状态';
+
+    const behindCount = Number(comparison.behindCount || 0);
+    const aheadCount = Number(comparison.aheadCount || 0);
+    const incomingFiles = Number(comparison.incoming?.totalFiles || 0);
+    const outgoingFiles = Number(comparison.outgoing?.totalFiles || 0);
+    const summary: string[] = [];
+
+    if (behindCount > 0 || incomingFiles > 0) {
+        summary.push(`线上有更新 · 本地落后 ${behindCount}`);
+    }
+    if (aheadCount > 0 || outgoingFiles > 0) {
+        summary.push(`本地领先 ${aheadCount}`);
+    }
+
+    return summary.length > 0 ? summary.join(' · ') : '已同步';
 }
 
 function getActionErrorMessage(error: unknown, fallback: string): string {
@@ -287,24 +300,6 @@ export function VersionCollaborationPanel({
     const branchView = status?.branchView;
     const viewedRemoteComparison = branchView?.remoteComparison || status?.remoteComparison;
     const changeItems = useMemo(() => flattenChangeGroups(status?.changeSummary.groups || []), [status]);
-    const incomingChangeItems = useMemo(
-        () => flattenChangeGroups(viewedRemoteComparison?.incoming.groups || []),
-        [viewedRemoteComparison],
-    );
-    const outgoingChangeItems = useMemo(
-        () => flattenChangeGroups(viewedRemoteComparison?.outgoing.groups || []),
-        [viewedRemoteComparison],
-    );
-    const incomingAllCommits = useMemo<VersionCardCommit[]>(
-        () => viewedRemoteComparison?.incomingCommits || [],
-        [viewedRemoteComparison],
-    );
-    const incomingRecentCommits = useMemo(() => incomingAllCommits.slice(0, 2), [incomingAllCommits]);
-    const outgoingAllCommits = useMemo<VersionCardCommit[]>(
-        () => viewedRemoteComparison?.outgoingCommits || [],
-        [viewedRemoteComparison],
-    );
-    const outgoingRecentCommits = useMemo(() => outgoingAllCommits.slice(0, 2), [outgoingAllCommits]);
     const localBranchOptions = useMemo(
         () => normalizeLocalBranches(status?.branchOverview?.localBranches, status?.currentBranch),
         [status],
@@ -316,16 +311,15 @@ export function VersionCollaborationPanel({
 
     const isRepositoryReady = Boolean(status?.isGitRepo && status?.hasCommits);
     const hasConfiguredRemote = Boolean(status?.remote?.url);
-    const onlineBranchValue = viewedRemoteBranch;
     const isBusy = busyAction !== null;
     const showLocalPanel = activeTab === 'local' || activeTab === 'all';
     const showOnlinePanel = activeTab === 'online' || activeTab === 'all';
     const showSkillPanel = activeTab === 'skills' || activeTab === 'all';
-    const incomingTotal = viewedRemoteComparison?.incoming.totalFiles || 0;
-    const outgoingTotal = viewedRemoteComparison?.outgoing.totalFiles || 0;
     const recentCommits = branchView?.recentCommits || status?.recentCommits || [];
-    const behindCount = viewedRemoteComparison?.behindCount || incomingAllCommits.length;
-    const aheadCount = viewedRemoteComparison?.aheadCount || outgoingAllCommits.length;
+    const behindCount = Number(viewedRemoteComparison?.behindCount || 0);
+    const aheadCount = Number(viewedRemoteComparison?.aheadCount || 0);
+    const hasIncoming = behindCount > 0 || Number(viewedRemoteComparison?.incoming?.totalFiles || 0) > 0;
+    const hasOutgoing = aheadCount > 0 || Number(viewedRemoteComparison?.outgoing?.totalFiles || 0) > 0;
     const operationRemoteBranch = status?.remote?.defaultBranch || status?.currentBranch || '';
     const canWriteViewedPair = Boolean(
         status?.currentBranch
@@ -416,7 +410,7 @@ export function VersionCollaborationPanel({
     const handleInit = () => runAction(
         'init',
         () => apiService.initGitWorkspace({ projectId }),
-        '已初始化本地仓库',
+        '已开启本地版本',
         '初始化本地仓库失败',
     );
 
@@ -545,7 +539,7 @@ export function VersionCollaborationPanel({
                 disabled={isBusy || status?.gitAvailable === false}
             >
                 {busyAction === 'init' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                一键初始化
+                开启本地版本
             </Button>
         </div>
     );
@@ -673,7 +667,7 @@ export function VersionCollaborationPanel({
 
     const renderOnlineInfoCard = () => (
         <SectionCard
-            title="信息"
+            title="远端"
             actions={(
                 <Button
                     type="button"
@@ -684,7 +678,7 @@ export function VersionCollaborationPanel({
                     disabled={isBusy || !isRepositoryReady || !hasConfiguredRemote}
                 >
                     {busyAction === 'fetch' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                    读取分支
+                    刷新
                 </Button>
             )}
         >
@@ -700,6 +694,57 @@ export function VersionCollaborationPanel({
                         <InfoValue title={status.remote.url}>{status.remote.url}</InfoValue>
                     </InfoRow>
                 ) : null}
+                <InfoRow label="同步">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <InfoValue className="min-w-[180px] flex-1">
+                            {getRemoteSyncSummary(viewedRemoteComparison)}
+                        </InfoValue>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="inline-flex">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 gap-1.5 px-2"
+                                            onClick={handleSyncDown}
+                                            disabled={isBusy || !isRepositoryReady || !hasConfiguredRemote || !hasIncoming || !canWriteViewedPair}
+                                        >
+                                            {busyAction === 'sync-down' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                                            拉取
+                                        </Button>
+                                    </span>
+                                </TooltipTrigger>
+                                {!canWriteViewedPair ? (
+                                    <TooltipContent side="top">当前只是在查看其他分支，写操作仅支持工作区分支和已配置的线上分支</TooltipContent>
+                                ) : null}
+                            </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="inline-flex">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 gap-1.5 px-2"
+                                            onClick={handlePush}
+                                            disabled={isBusy || !isRepositoryReady || !hasConfiguredRemote || !hasOutgoing || !canWriteViewedPair}
+                                        >
+                                            {busyAction === 'push' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                                            推送
+                                        </Button>
+                                    </span>
+                                </TooltipTrigger>
+                                {!canWriteViewedPair ? (
+                                    <TooltipContent side="top">当前只是在查看其他分支，写操作仅支持工作区分支和已配置的线上分支</TooltipContent>
+                                ) : null}
+                            </Tooltip>
+                        </TooltipProvider>
+                    </div>
+                </InfoRow>
             </div>
         </SectionCard>
     );
@@ -845,82 +890,7 @@ export function VersionCollaborationPanel({
             {showOnlinePanel ? (
                 isRepositoryReady ? (
                     hasConfiguredRemote ? (
-                        <>
-                            {renderOnlineInfoCard()}
-
-                            <VersionSyncTabs
-                                incoming={incomingChangeItems.length > 0 ? (
-                                    <VersionChangeCard
-                                        title={getVersionChangeTitle('incoming', behindCount)}
-                                        description={`从线上 ${viewedRemoteComparison?.branch || onlineBranchValue || '当前'} 同步到本地，涉及 ${incomingTotal} 个文件。`}
-                                        recentCommits={incomingRecentCommits}
-                                        actions={(
-                                            <TooltipProvider>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <span className="inline-flex">
-                                                            <Button
-                                                                type="button"
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="h-7 gap-1.5 px-2"
-                                                                onClick={handleSyncDown}
-                                                                disabled={isBusy || !isRepositoryReady || !hasConfiguredRemote || !canWriteViewedPair}
-                                                            >
-                                                                {busyAction === 'sync-down' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                                                                同步下来
-                                                            </Button>
-                                                        </span>
-                                                    </TooltipTrigger>
-                                                    {!canWriteViewedPair ? (
-                                                        <TooltipContent side="top">
-                                                            当前只是在查看其他分支，写操作仅支持工作区分支和已配置的线上分支
-                                                        </TooltipContent>
-                                                    ) : null}
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                        )}
-                                    >
-                                        <ChangeItemList items={incomingChangeItems} />
-                                    </VersionChangeCard>
-                                ) : null}
-                                outgoing={outgoingChangeItems.length > 0 ? (
-                                    <VersionChangeCard
-                                        title={getVersionChangeTitle('outgoing', aheadCount)}
-                                        description={`推送到线上 ${viewedRemoteComparison?.branch || onlineBranchValue || '当前'}，涉及 ${outgoingTotal} 个文件。`}
-                                        recentCommits={outgoingRecentCommits}
-                                        actions={(
-                                            <TooltipProvider>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <span className="inline-flex">
-                                                            <Button
-                                                                type="button"
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="h-7 gap-1.5 px-2"
-                                                                onClick={handlePush}
-                                                                disabled={isBusy || !isRepositoryReady || !hasConfiguredRemote || !canWriteViewedPair}
-                                                            >
-                                                                {busyAction === 'push' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                                                                推送上去
-                                                            </Button>
-                                                        </span>
-                                                    </TooltipTrigger>
-                                                    {!canWriteViewedPair ? (
-                                                        <TooltipContent side="top">
-                                                            当前只是在查看其他分支，写操作仅支持工作区分支和已配置的线上分支
-                                                        </TooltipContent>
-                                                    ) : null}
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                        )}
-                                    >
-                                        <ChangeItemList items={outgoingChangeItems} />
-                                    </VersionChangeCard>
-                                ) : null}
-                            />
-                        </>
+                        renderOnlineInfoCard()
                     ) : (
                         renderOnlineRemoteSetupCard()
                     )

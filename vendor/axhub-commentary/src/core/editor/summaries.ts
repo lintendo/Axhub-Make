@@ -53,6 +53,7 @@ type SaveRunCommentMeta = {
   actions: string[];
   imageCount: number;
   imageAssetPaths: string[];
+  targetScreenshotAssetPath: string;
   dirtySince: number;
 };
 
@@ -65,6 +66,7 @@ type CopyPromptPersistedCommentMeta = {
   skillIds?: string[];
   actions: string[];
   imageAssetPaths: string[];
+  targetScreenshotAssetPath: string;
 };
 
 type ElementSnapshot = {
@@ -173,15 +175,35 @@ function inferPromptImageAssetPath(
 
 function collectPromptImageAssetPaths(
   images:
-    | readonly (Pick<PromptImageAttachment, 'id' | 'name' | 'mimeType'> & {
+    | readonly (Pick<PromptImageAttachment, 'id' | 'name' | 'mimeType' | 'source'> & {
         assetPath?: string;
       })[]
     | null
     | undefined,
 ): string[] {
   return dedupeStrings(
-    (images ?? []).map((image, index) => inferPromptImageAssetPath(image, index)),
+    (images ?? [])
+      .filter((image) => image.source !== 'target-screenshot')
+      .map((image, index) => inferPromptImageAssetPath(image, index)),
   );
+}
+
+function collectPromptTargetScreenshotAssetPath(
+  images:
+    | readonly (Pick<PromptImageAttachment, 'id' | 'name' | 'mimeType' | 'source'> & {
+        assetPath?: string;
+      })[]
+    | null
+    | undefined,
+): string {
+  const entries = images ?? [];
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const image = entries[index];
+    if (image.source === 'target-screenshot') {
+      return inferPromptImageAssetPath(image, 0);
+    }
+  }
+  return '';
 }
 
 function collectPersistedImageAssetPathsForComment(
@@ -196,6 +218,7 @@ function collectPersistedImageAssetPathsForComment(
     images
       .filter((image) => {
         if (normalizePathValue(image.commentId) !== commentId) return false;
+        if (image.source === 'target-screenshot') return false;
         const imagePageScope = normalizePathValue(image.pageScope);
         return !pageScope || !imagePageScope || imagePageScope === pageScope;
       })
@@ -212,6 +235,32 @@ function collectPersistedImageAssetPathsForComment(
           ),
       ),
   );
+}
+
+function collectPersistedTargetScreenshotAssetPathForComment(
+  images: readonly PrototypeEditCommentImageEntry[],
+  comment: Pick<PrototypeEditCommentEntry, 'id' | 'pageScope'>,
+): string {
+  const commentId = normalizePathValue(comment.id);
+  const pageScope = normalizePathValue(comment.pageScope);
+  if (!commentId) return '';
+  let target: PrototypeEditCommentImageEntry | undefined;
+  for (let index = images.length - 1; index >= 0; index -= 1) {
+    const image = images[index];
+    if (image.source !== 'target-screenshot') continue;
+    if (normalizePathValue(image.commentId) !== commentId) continue;
+    const imagePageScope = normalizePathValue(image.pageScope);
+    if (!pageScope || !imagePageScope || imagePageScope === pageScope) {
+      target = image;
+      break;
+    }
+  }
+  if (!target) return '';
+  return normalizePathValue(target.assetPath) || inferPromptImageAssetPath({
+    id: normalizePathValue(target.id),
+    name: normalizePathValue(target.name),
+    mimeType: normalizePathValue(target.mimeType),
+  }, 0);
 }
 
 function readElementAttr(element: Element | null, attr: string): string {
@@ -817,6 +866,7 @@ export function createEditorSummariesService(options: {
     skillIds?: string[];
     actions: string[];
     imageAssetPaths: string[];
+    targetScreenshotAssetPath: string;
     dirtySince: number;
   }> {
     return Array.from(state.editMetaByKey.values())
@@ -829,6 +879,7 @@ export function createEditorSummariesService(options: {
         skillIds: meta.skillIds?.slice(),
         actions: buildMetaActionLines(meta),
         imageAssetPaths: collectPromptImageAssetPaths(meta.images),
+        targetScreenshotAssetPath: collectPromptTargetScreenshotAssetPath(meta.images),
         dirtySince: Number(meta.dirtySince ?? 0),
       }))
       .filter(
@@ -837,7 +888,8 @@ export function createEditorSummariesService(options: {
           (Boolean(meta.note) ||
             (meta.skillIds?.length ?? 0) > 0 ||
             meta.actions.length > 0 ||
-            meta.imageAssetPaths.length > 0),
+            meta.imageAssetPaths.length > 0 ||
+            Boolean(meta.targetScreenshotAssetPath)),
       )
       .sort((a, b) => b.dirtySince - a.dirtySince || a.label.localeCompare(b.label));
   }
@@ -851,6 +903,7 @@ export function createEditorSummariesService(options: {
     actions: string[];
     imageCount: number;
     imageAssetPaths: string[];
+    targetScreenshotAssetPath: string;
     dirtySince: number;
   }> {
     return Array.from(state.editMetaByKey.values())
@@ -862,8 +915,11 @@ export function createEditorSummariesService(options: {
         note: buildPromptNote(meta.note, meta),
         skillIds: meta.skillIds?.slice(),
         actions: buildMetaActionLines(meta),
-        imageCount: Array.isArray(meta.images) ? meta.images.length : 0,
+        imageCount: Array.isArray(meta.images)
+          ? meta.images.filter((image) => image.source !== 'target-screenshot').length
+          : 0,
         imageAssetPaths: collectPromptImageAssetPaths(meta.images),
+        targetScreenshotAssetPath: collectPromptTargetScreenshotAssetPath(meta.images),
         dirtySince: Number(meta.dirtySince ?? 0),
       }))
       .filter(
@@ -872,6 +928,7 @@ export function createEditorSummariesService(options: {
           (Boolean(meta.note) ||
             (meta.skillIds?.length ?? 0) > 0 ||
             meta.imageCount > 0 ||
+            Boolean(meta.targetScreenshotAssetPath) ||
             meta.actions.length > 0),
       )
       .sort((a, b) => b.dirtySince - a.dirtySince || a.label.localeCompare(b.label));
@@ -1002,6 +1059,7 @@ export function createEditorSummariesService(options: {
       debugFileHint?: string;
       pageScope?: string;
       imageAssetPaths?: readonly string[];
+      targetScreenshotAssetPath?: string;
       actions: string[];
       note?: string;
     },
@@ -1024,6 +1082,10 @@ export function createEditorSummariesService(options: {
     if (params.pageScope) lines.push(`  - 页面范围: ${params.pageScope}`);
     if (params.debugFileHint) lines.push(`  - 可能相关文件: ${params.debugFileHint}`);
     const imageAssetPaths = dedupeStrings(params.imageAssetPaths ?? []);
+    const targetScreenshotAssetPath = normalizePathValue(params.targetScreenshotAssetPath);
+    if (targetScreenshotAssetPath) {
+      lines.push(`  - 目标截图（用于精确定位当前批注元素）：${targetScreenshotAssetPath}`);
+    }
     if (imageAssetPaths.length > 0) {
       lines.push(`  - 本地图片素材: ${imageAssetPaths.join(', ')}`);
     }
@@ -1210,6 +1272,10 @@ export function createEditorSummariesService(options: {
           skillIds: comment.skillIds?.slice(),
           actions: buildPersistedCommentActionLines(comment),
           imageAssetPaths: collectPersistedImageAssetPathsForComment(images, comment),
+          targetScreenshotAssetPath: collectPersistedTargetScreenshotAssetPathForComment(
+            images,
+            comment,
+          ),
         };
       })
       .filter(
@@ -1218,7 +1284,8 @@ export function createEditorSummariesService(options: {
           (Boolean(comment.note) ||
             (comment.skillIds?.length ?? 0) > 0 ||
             comment.actions.length > 0 ||
-            comment.imageAssetPaths.length > 0),
+            comment.imageAssetPaths.length > 0 ||
+            Boolean(comment.targetScreenshotAssetPath)),
       );
   }
 
@@ -1299,6 +1366,7 @@ export function createEditorSummariesService(options: {
         actions: meta.actions,
         pageScope: meta.pageScope,
         imageAssetPaths: meta.imageAssetPaths,
+        targetScreenshotAssetPath: meta.targetScreenshotAssetPath,
         note: meta.note,
       });
       itemIndex += 1;
@@ -1309,6 +1377,7 @@ export function createEditorSummariesService(options: {
       const note = buildPromptNote(meta?.note ?? '', meta);
       const actions = [...buildMetaActionLines(meta), ...buildSummaryActionLines(summary)];
       const imageAssetPaths = collectPromptImageAssetPaths(meta?.images);
+      const targetScreenshotAssetPath = collectPromptTargetScreenshotAssetPath(meta?.images);
 
       appendChangeItem(lines, {
         index: itemIndex,
@@ -1319,6 +1388,7 @@ export function createEditorSummariesService(options: {
         debugFileHint: includeDebugFileHint ? formatDebugSource(summary.debugSource) : '',
         pageScope: currentPageScope,
         imageAssetPaths,
+        targetScreenshotAssetPath,
         actions,
         note,
       });
@@ -1338,7 +1408,8 @@ export function createEditorSummariesService(options: {
         meta.note ||
         (meta.skillIds?.length ?? 0) > 0 ||
         meta.actions.length > 0 ||
-        meta.imageAssetPaths.length > 0
+        meta.imageAssetPaths.length > 0 ||
+        Boolean(meta.targetScreenshotAssetPath)
       ) {
         appendChangeItem(lines, {
           index: itemIndex,
@@ -1347,6 +1418,7 @@ export function createEditorSummariesService(options: {
           actions: meta.actions,
           pageScope: currentPageScope,
           imageAssetPaths: meta.imageAssetPaths,
+          targetScreenshotAssetPath: meta.targetScreenshotAssetPath,
           note: meta.note,
         });
       }
@@ -1389,12 +1461,13 @@ export function createEditorSummariesService(options: {
           meta.dirtySince !== null && !isCompletedCurrentPageComment(meta.elementKey),
       )
       .map((meta) => ({
+        ...(meta.commentId ? { commentId: meta.commentId } : {}),
         elementKey: meta.elementKey,
         locator: stripLocatorDebugSource(meta.locator),
         label: meta.label,
         note: buildPromptNote(meta.note, meta),
         skillIds: meta.skillIds?.slice(),
-        imageCount: meta.images.length,
+        imageCount: meta.images.filter((image) => image.source !== 'target-screenshot').length,
         changeKinds: meta.changeKinds.slice(),
       }));
   }
@@ -1485,6 +1558,7 @@ export function createEditorSummariesService(options: {
       const note = buildPromptNote(meta?.note ?? '', meta);
       const actions = [...buildMetaActionLines(meta), ...buildSummaryActionLines(summary)];
       const imageAssetPaths = collectPromptImageAssetPaths(meta?.images);
+      const targetScreenshotAssetPath = collectPromptTargetScreenshotAssetPath(meta?.images);
 
       appendChangeItem(lines, {
         index: itemIndex,
@@ -1494,6 +1568,7 @@ export function createEditorSummariesService(options: {
           summary.netEffect.textChange?.after ?? summary.netEffect.textChange?.before ?? '',
         debugFileHint: includeDebugFileHint ? formatDebugSource(summary.debugSource) : '',
         imageAssetPaths,
+        targetScreenshotAssetPath,
         actions,
         note,
       });
@@ -1516,6 +1591,7 @@ export function createEditorSummariesService(options: {
           locator: meta.locator,
           fallbackLabel: meta.label,
           imageAssetPaths: meta.imageAssetPaths,
+          targetScreenshotAssetPath: meta.targetScreenshotAssetPath,
           actions,
           note: meta.note,
         });

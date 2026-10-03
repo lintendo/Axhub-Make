@@ -228,6 +228,58 @@ describe('HTML resource save bridge', () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
+  it('separates HTML text preparation, preflight, and commit side effects', async () => {
+    const editor = createEditor();
+    const fetchImpl = vi.fn(async () => jsonResponse({
+      success: true,
+      changedCount: 1,
+      revision: 'revision-2',
+    }));
+    const confirm = vi.fn(async () => true);
+    const reload = vi.fn();
+    const bridge = createHtmlResourceSaveBridge({
+      getEditor: () => editor,
+      getContext: () => ({ path: 'src/resources/demo.html', projectId: 'project-1' }),
+      documentRef: createDocumentStub(),
+      fetchImpl: fetchImpl as typeof fetch,
+      confirm,
+      notify: vi.fn(),
+      reload,
+    });
+
+    const draft = await bridge.prepareQuickEditSave('save-text');
+    expect(draft).toEqual({
+      kind: 'html-text',
+      action: 'save-text',
+      resource: {
+        engine: 'html',
+        projectId: 'project-1',
+        path: 'src/resources/demo.html',
+        revision: 'revision-1',
+      },
+      edits: [{ key: 'body/p[1]/#text[0]', before: '重复', after: '第二处' }],
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(confirm).not.toHaveBeenCalled();
+    expect(editor.acknowledgeSavedTextChanges).not.toHaveBeenCalled();
+
+    await expect(bridge.preflightQuickEditSave(draft!)).resolves.toEqual({
+      action: 'save-text',
+      changeCount: 1,
+      affectedCount: 1,
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+
+    await expect(bridge.commitQuickEditSave(draft!)).resolves.toMatchObject({
+      changed: true,
+      changedCount: 1,
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(editor.acknowledgeSavedTextChanges).toHaveBeenCalledTimes(1);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
   it('saves and clears temporary styles with the matching HTTP methods', async () => {
     const editor = createEditor();
     const fetchImpl = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => (
@@ -249,6 +301,40 @@ describe('HTML resource save bridge', () => {
     expect(fetchImpl.mock.calls.map((call) => call[1]?.method)).toEqual(['PUT', 'DELETE']);
     expect(editor.acknowledgeSavedStyleChanges).toHaveBeenCalledTimes(2);
     expect(editor.acknowledgeSavedTextChanges).not.toHaveBeenCalled();
+  });
+
+  it('saves HTML text and style changes together with the updated revision', async () => {
+    const editor = createEditor();
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => (
+      init?.method === 'POST'
+        ? jsonResponse({ success: true, changedCount: 1, revision: 'revision-2' })
+        : jsonResponse({ success: true, changed: true, revision: 'revision-3' })
+    ));
+    const reload = vi.fn();
+    const bridge = createHtmlResourceSaveBridge({
+      getEditor: () => editor,
+      getContext: () => ({ path: 'templates/prototype-spec.html', projectId: 'project-1' }),
+      documentRef: createDocumentStub(),
+      fetchImpl: fetchImpl as typeof fetch,
+      confirm: vi.fn(async () => true),
+      notify: vi.fn(),
+      reload,
+    });
+
+    await expect(bridge.saveAllChanges()).resolves.toEqual({
+      changed: true,
+      changedCount: 2,
+      message: 'HTML 文本和样式已保存。',
+    });
+
+    expect(fetchImpl.mock.calls.map((call) => call[1]?.method)).toEqual(['POST', 'PUT']);
+    expect(JSON.parse(String(fetchImpl.mock.calls[1][1]?.body))).toMatchObject({
+      path: 'templates/prototype-spec.html',
+      revision: 'revision-2',
+    });
+    expect(editor.acknowledgeSavedTextChanges).toHaveBeenCalledTimes(1);
+    expect(editor.acknowledgeSavedStyleChanges).toHaveBeenCalledTimes(1);
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 
   it('rejects unsupported changed targets before writing or acknowledging', async () => {

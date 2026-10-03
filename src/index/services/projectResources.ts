@@ -62,7 +62,7 @@ export const DEFAULT_PROTOTYPE_PLACEHOLDER_GUIDE: PrototypePlaceholderGuide = {
     description: '告诉 AI 你想做什么：目标用户、使用场景、页面内容和参考风格。',
     steps: [],
     tips: [
-        '模型不要用 auto，推荐：Claude Opus 4.8、Gemini 3.1 Pro、GPT-5.5、Kimi K2.7、GLM-5.2。',
+        '模型不要用 auto，推荐：Claude Opus 4.8、Gemini 3.1 Pro、GPT-5.5、Kimi K2.7、GLM-5.3。',
         '一个任务一个对话，避免多个需求互相干扰。',
         '多用图片和语音，截图、草图和参考页面更清楚。',
         '如果已有视觉规范，建议先创建设计系统。',

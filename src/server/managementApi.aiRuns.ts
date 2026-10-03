@@ -123,6 +123,29 @@ function resolvePromptProvider(value: unknown, fallback: unknown): string {
   return provider === 'manual' ? 'codex' : provider;
 }
 
+export function resolveAiPurposePreference(scene: unknown, automation: any): {
+  promptClient: unknown;
+  model: unknown;
+} {
+  const normalized = safeText(scene).toLowerCase();
+  if (normalized.includes('annotation') || normalized.includes('review')) {
+    return {
+      promptClient: automation?.annotationPromptClient,
+      model: automation?.annotationModel,
+    };
+  }
+  if (normalized.startsWith('canvas-')) {
+    return {
+      promptClient: automation?.canvasPromptClient,
+      model: automation?.canvasModel,
+    };
+  }
+  return {
+    promptClient: automation?.conversationPromptClient,
+    model: automation?.conversationModel,
+  };
+}
+
 export function resolveAiRunTimeoutMs(scene: AiRunScene, config: any): number {
   const timeoutSeconds = Number(config?.automation?.acp?.timeout || 1800);
   const configuredSeconds = Math.round(Number.isFinite(timeoutSeconds) ? timeoutSeconds : 1800);
@@ -173,11 +196,20 @@ function sendAcpRuntimeUnavailableRunError(res: ServerResponse, params: {
   res.end();
 }
 
-function buildUserMessage(threadId: string, prompt: string) {
+function getReferenceImages(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map(safeText).filter((image) => image.startsWith('data:image/'))
+    : [];
+}
+
+function buildUserMessage(threadId: string, prompt: string, referenceImages: string[] = []) {
   return {
     id: `${threadId}-user`,
     role: 'user',
-    parts: [{ type: 'text', text: prompt }],
+    parts: [
+      { type: 'text', text: prompt },
+      ...referenceImages.map((image) => ({ type: 'image', image })),
+    ],
   };
 }
 
@@ -214,9 +246,7 @@ function buildRunPrompt(params: {
     DEFAULT_IMAGE_CONFIG,
     { model: imageModel },
   );
-  const referenceImages = Array.isArray(params.body.referenceImages)
-    ? params.body.referenceImages.filter((image: unknown): image is string => typeof image === 'string' && image.trim().length > 0)
-    : [];
+  const referenceImages = getReferenceImages(params.body.referenceImages);
   const imageSavePathPattern = resolveImageSavePathPattern(params.body.targetPath, params.prompt);
   return {
     prompt: buildImageGenerationPrompt({
@@ -875,7 +905,8 @@ export function handleAiRunsApi(
     const context = handlers.resolveProjectContext(req, res, options, 'explicit-required', request);
     if (!context) return;
 
-    const scene = normalizeScene(request.scene);
+    const rawScene = request.scene;
+    const scene = normalizeScene(rawScene);
     const prompt = safeText(request.prompt);
     if (!prompt) {
       sendJson(res, { error: 'Prompt 不能为空', code: 'AI_RUN_PROMPT_EMPTY' }, { status: 400 });
@@ -910,11 +941,12 @@ export function handleAiRunsApi(
     const threadId = safeText(request.threadId) || runId;
     const taskId = safeText(request.taskId) || runId;
     const conversationId = safeText(request.conversationId) || threadId;
+    const purposePreference = resolveAiPurposePreference(rawScene, config?.automation);
     const provider = resolvePromptProvider(
       request.preferredPromptClient || request.client || request.provider,
-      config?.automation?.defaultPromptClient,
+      purposePreference.promptClient,
     );
-    const model = safeText(request.model) || undefined;
+    const model = safeText(request.model) || safeText(purposePreference.model) || undefined;
     const agentRunConcurrency = sanitizeAgentRunConcurrency(
       request.agentRunConcurrency,
       config?.automation?.agentRunConcurrency,
@@ -1073,13 +1105,14 @@ export function handleAiRunsApi(
         model,
         modeId: safeText(request.modeId || request.mode) || undefined,
         thoughtLevel: safeText(request.thoughtLevel || request.thought) || undefined,
+        permissionMode: safeText(request.permissionMode) || undefined,
         context: request.contextBundle || request.context,
         mcpServers: Array.isArray(request.mcpServers) ? request.mcpServers : undefined,
         builtinTools: enableImageGenerationBuiltinTool ? ['image-generation'] : undefined,
         builtinToolSettings: enableImageGenerationBuiltinTool
           ? resolveImageBuiltinToolSettings(config, promptPlan.imageSavePathPattern, request.builtinToolSettings)
           : undefined,
-        messages: [buildUserMessage(threadId, promptPlan.prompt)],
+        messages: [buildUserMessage(threadId, promptPlan.prompt, getReferenceImages(request.referenceImages))],
       }, {
         timeoutMs: aiRunTimeoutMs,
       })) {

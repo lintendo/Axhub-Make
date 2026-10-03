@@ -34,11 +34,9 @@ describe('responsive workspace styles', () => {
     expect(styles).toContain('.axhub-canvas-sidebar-toggle-anchor');
   });
 
-  it('hides contextual toolbar actions and publish together only when their container is narrow', () => {
+  it('keeps contextual toolbar and publish icon controls mounted when their container is narrow', () => {
     const styles = readStyles();
 
-    expect(styles).toContain('.ax-presentation-toolbar {\n    container-type: inline-size;\n}');
-    expect(styles).toContain('@container (max-width: 600px)');
-    expect(styles).toContain('.ax-toolbar-adaptive-action {\n        display: none !important;\n    }');
+    expect(styles).not.toContain('.ax-toolbar-adaptive-action');
   });
 });

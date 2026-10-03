@@ -5,18 +5,25 @@ import { fileURLToPath } from 'node:url';
 
 import {
   getConfigPath,
+  maskAiServicesSettings,
+  mergeAiServicesSettingsPatch,
+  parseAiServicesUpdateRequest,
   resolveCodexLocalImageGenerationConfig,
+  toPublicServerConfig,
 } from './projectCore/index.ts';
 
 import { getLocalNetworkHosts, readJsonBody, sendJson, streamDirectoryAsZip } from './http.ts';
 import { syncProjectAgentInstructions } from './projectAgentInstructions.ts';
 import type { ManagementApiOptions } from './managementApi.ts';
+import {
+  sanitizeVoiceAssistantTestError,
+  testVoiceAssistantConfig,
+} from './voiceAssistantConfigTest.ts';
 
 const makePackageJsonPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../package.json');
 const AI_IMAGE_CONFIG_TEST_PROMPT = '生成一张用于验证图片生成配置的极简测试图片，内容为白底黑色文字 OK。';
 const AI_IMAGE_CONFIG_TEST_TIMEOUT_MS = 600_000;
 const EMPTY_AGENT_AVAILABILITY = { cli: {}, localApp: {}, web: {} };
-
 export function readMakeServerVersion(): string | null {
   return fs.existsSync(makePackageJsonPath)
     ? JSON.parse(fs.readFileSync(makePackageJsonPath, 'utf8')).version ?? null
@@ -54,16 +61,13 @@ function buildConfigBootstrapResponse(params: {
     : any;
 }) {
   const availableLANHosts = getLocalNetworkHosts();
+  const publicServerConfig = toPublicServerConfig(params.serverConfig);
   return {
     ...params.config,
     server: normalizeProjectServerConfig(params.config?.server, availableLANHosts),
     availableLANHosts,
     projectInfo: params.projectInfo,
-    automation: params.serverConfig.automation,
-    assistant: params.serverConfig.assistant,
-    ai: params.serverConfig.ai,
-    uiPreferences: params.serverConfig.uiPreferences,
-    toolOpenState: params.serverConfig.toolOpenState,
+    ...publicServerConfig,
     projectPath: params.activeProjectRoot,
     projectId: params.activeProject.id,
   };
@@ -90,10 +94,20 @@ function normalizeProjectServerConfig(server: unknown, availableLANHosts: string
   const host = normalizeString(raw.host) || 'localhost';
   const configuredLANHost = normalizeString(raw.lanHost);
   const fallbackLANHost = availableLANHosts.find(Boolean) || '';
+  const configuredIpv4 = configuredLANHost.match(/^(\d+)\.(\d+)\.(\d+)\.\d+$/u);
+  const detectedSameSubnet = configuredIpv4
+    ? availableLANHosts.find((candidate) => {
+      const detectedIpv4 = candidate.match(/^(\d+)\.(\d+)\.(\d+)\.\d+$/u);
+      return detectedIpv4
+        && detectedIpv4[1] === configuredIpv4[1]
+        && detectedIpv4[2] === configuredIpv4[2]
+        && detectedIpv4[3] === configuredIpv4[3];
+    }) || ''
+    : '';
   return {
     ...Object.fromEntries(Object.entries(raw).filter(([key]) => key !== 'allowLAN')),
     host,
-    ...(configuredLANHost || fallbackLANHost ? { lanHost: configuredLANHost || fallbackLANHost } : {}),
+    ...(configuredLANHost || fallbackLANHost ? { lanHost: detectedSameSubnet || configuredLANHost || fallbackLANHost } : {}),
   };
 }
 
@@ -142,6 +156,12 @@ function hasOwn(record: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(record, key);
 }
 
+function getRegistryHome(options: ManagementApiOptions): string | undefined {
+  return options.registryPath
+    ? path.dirname(path.dirname(path.dirname(path.resolve(options.registryPath))))
+    : undefined;
+}
+
 function hasGeneratedImagePayload(value: unknown, depth = 0): boolean {
   if (depth > 8 || value == null) return false;
   if (Array.isArray(value)) {
@@ -165,8 +185,8 @@ function hasGeneratedImagePayload(value: unknown, depth = 0): boolean {
 }
 
 function sanitizeProviderMessage(message: string, apiKey: string): string {
-  const normalized = message.replace(/\s+/gu, ' ').trim().slice(0, 500);
-  return apiKey ? normalized.split(apiKey).join('***') : normalized;
+  const redacted = apiKey ? message.split(apiKey).join('***') : message;
+  return redacted.replace(/\s+/gu, ' ').trim().slice(0, 500);
 }
 
 function readImageProviderError(body: unknown): string {
@@ -303,49 +323,109 @@ export function handleConfigApi(
     return true;
   }
 
-  if (pathname === '/api/config/ai-image/codex-local') {
-    if (req.method !== 'GET') {
-      sendJson(res, { error: 'Method not allowed' }, { status: 405 });
+  if (pathname === '/api/config/ai-services') {
+    if (req.method === 'GET') {
+      try {
+        const { serverConfig } = buildConfigContext();
+        sendJson(res, {
+          settings: maskAiServicesSettings(serverConfig.ai),
+        });
+      } catch (error: any) {
+        sendJson(res, { error: error?.message || '读取 AI 服务配置失败' }, { status: 500 });
+      }
       return true;
     }
-    const registryHome = options.registryPath
-      ? path.dirname(path.dirname(path.dirname(options.registryPath)))
-      : undefined;
-    const result = resolveCodexLocalImageGenerationConfig(registryHome ? { homeDir: registryHome } : undefined);
-    sendJson(res, {
-      success: true,
-      ready: result.ready,
-      config: result.config,
-      discovery: result.discovery,
-      warnings: result.warnings,
-    });
+    if (req.method === 'PUT') {
+      readJsonBody(req).then((body) => {
+        const request = parseAiServicesUpdateRequest(body);
+        const { serverConfigStore, serverConfig } = buildConfigContext();
+        const nextAi = mergeAiServicesSettingsPatch(serverConfig.ai, request.patch, {
+          clearSecrets: request.clearSecrets,
+        });
+        const saved = serverConfigStore.saveConfig({ ai: nextAi }) as typeof serverConfig;
+        sendJson(res, { settings: maskAiServicesSettings(saved.ai) });
+      }).catch((error) => {
+        sendJson(res, { error: error?.message || '保存 AI 服务配置失败' }, { status: 400 });
+      });
+      return true;
+    }
+    sendJson(res, { error: 'Method not allowed' }, { status: 405 });
     return true;
   }
 
-  if (pathname === '/api/config/ai-image/test') {
+  if (pathname === '/api/config/ai-services/test') {
     if (req.method !== 'POST') {
       sendJson(res, { error: 'Method not allowed' }, { status: 405 });
       return true;
     }
     readJsonBody(req).then(async (body) => {
-      const { serverConfig } = buildConfigContext();
       try {
-        const result = await testAiImageGenerationConfig({
+        const { serverConfig } = buildConfigContext();
+        if (isRecord(body) && body.section === 'imageGeneration') {
+          const request = parseAiServicesUpdateRequest({
+            patch: body.patch,
+            clearSecrets: body.clearSecrets,
+          });
+          if (Object.keys(request.patch).some((section) => section !== 'imageGeneration')) {
+            throw new AiImageConfigTestError('图片测试只能提交 imageGeneration 配置', 400);
+          }
+          const merged = mergeAiServicesSettingsPatch(serverConfig.ai, request.patch, {
+            clearSecrets: request.clearSecrets,
+          });
+          const result = await testAiImageGenerationConfig({
+            body: {
+              ...merged.imageGeneration,
+              ...(typeof body.prompt === 'string' ? { prompt: body.prompt } : {}),
+            },
+          });
+          sendJson(res, { success: true, message: result.message });
+          return;
+        }
+        const result = await testVoiceAssistantConfig({
           body,
-          fallbackConfig: serverConfig.ai?.imageGeneration,
+          savedSettings: serverConfig.ai,
         });
-        sendJson(res, {
-          success: true,
-          message: result.message,
-        });
+        sendJson(res, { success: true, message: result.message });
       } catch (error: any) {
+        const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 502;
         sendJson(res, {
           success: false,
-          error: error?.message || '图片配置测试失败',
-        }, { status: error?.statusCode || 502 });
+          error: sanitizeVoiceAssistantTestError(error),
+        }, { status: statusCode });
       }
     }).catch((error) => {
-      sendJson(res, { error: error?.message || 'Invalid request body' }, { status: 400 });
+      sendJson(res, {
+        success: false,
+        error: sanitizeVoiceAssistantTestError(error),
+      }, { status: 400 });
+    });
+    return true;
+  }
+
+  if (pathname === '/api/config/ai-services/import-codex') {
+    if (req.method !== 'POST') {
+      sendJson(res, { error: 'Method not allowed' }, { status: 405 });
+      return true;
+    }
+    const registryHome = getRegistryHome(options);
+    const result = resolveCodexLocalImageGenerationConfig(registryHome ? { homeDir: registryHome } : undefined);
+    if (!result.ready) {
+      sendJson(res, {
+        success: true,
+        ready: false,
+        warnings: result.warnings,
+      });
+      return true;
+    }
+    const { serverConfigStore } = buildConfigContext();
+    const saved = serverConfigStore.saveConfig({
+      ai: { imageGeneration: result.config },
+    }) as ReturnType<typeof serverConfigStore.getConfig>;
+    sendJson(res, {
+      success: true,
+      ready: true,
+      settings: maskAiServicesSettings(saved.ai).imageGeneration,
+      warnings: result.warnings,
     });
     return true;
   }
@@ -370,16 +450,13 @@ export function handleConfigApi(
           const currentProjectConfig = handlers.readProjectConfig(requestProjectRoot);
           nextConfig.server = currentProjectConfig.server || { host: 'localhost' };
         }
-        if (nextConfig.automation || nextConfig.assistant || nextConfig.ai || nextConfig.uiPreferences || nextConfig.toolOpenState) {
+        if (nextConfig.automation || nextConfig.assistant || nextConfig.uiPreferences || nextConfig.toolOpenState) {
           serverConfigStore.saveConfig({
             ...(nextConfig.automation && typeof nextConfig.automation === 'object'
               ? { automation: nextConfig.automation }
               : {}),
             ...(nextConfig.assistant && typeof nextConfig.assistant === 'object'
               ? { assistant: nextConfig.assistant }
-              : {}),
-            ...(nextConfig.ai && typeof nextConfig.ai === 'object'
-              ? { ai: nextConfig.ai }
               : {}),
             ...(nextConfig.uiPreferences && typeof nextConfig.uiPreferences === 'object'
               ? { uiPreferences: nextConfig.uiPreferences }
@@ -438,17 +515,14 @@ export function handleConfigApi(
       return true;
     }
     const { config, projectInfo, serverConfig } = buildConfigContext();
+    const publicServerConfig = toPublicServerConfig(serverConfig);
     const availableLANHosts = getLocalNetworkHosts();
     sendJson(res, {
       ...config,
       server: normalizeProjectServerConfig(config?.server, availableLANHosts),
       availableLANHosts,
       projectInfo,
-      automation: serverConfig.automation,
-      assistant: serverConfig.assistant,
-      ai: serverConfig.ai,
-      uiPreferences: serverConfig.uiPreferences,
-      toolOpenState: serverConfig.toolOpenState,
+      ...publicServerConfig,
       ideAvailability: {},
       agentAvailability: EMPTY_AGENT_AVAILABILITY,
       projectPath: requestProjectRoot,

@@ -1,4 +1,4 @@
-import { createElement, useCallback, useMemo, useState, type ReactNode, type SetStateAction } from 'react';
+import { createElement, useCallback, useMemo, useReducer, useState, type ReactNode, type SetStateAction } from 'react';
 import {
     Columns2,
     LayoutGrid,
@@ -19,6 +19,12 @@ import {
     type PreviewSinglePreset,
 } from '../../domains/device/preview-layout';
 import {
+    createPreviewResponsiveBasisState,
+    reducePreviewResponsiveBasisState,
+    resolvePreviewResponsiveBasisWidth,
+    type PreviewLayoutStabilizationReason,
+} from '../../domains/device/preview-responsive-basis';
+import {
     DEVICE_SIZES,
     normalizePreviewHeight,
     normalizePreviewWidth,
@@ -37,8 +43,9 @@ type PreviewDeviceActions = {
     previewConfig: PreviewConfig;
     previewDeviceParam: string | null;
     handlePreviewContainerSizeChange: (width: number) => void;
-    lockAdaptiveDesktopPreview: () => void;
-    unlockAdaptiveDesktopPreview: () => void;
+    handlePreviewExternalWorkspaceWidthChange: (width: number) => void;
+    startPreviewLayoutStabilization: (reason: PreviewLayoutStabilizationReason) => void;
+    endPreviewLayoutStabilization: (reason: PreviewLayoutStabilizationReason) => void;
     selectedDeviceId: string;
     setSelectedDeviceId: (id: string) => void;
     deviceSegmentOptions: Array<{ value: string; icon: ReactNode }>;
@@ -79,14 +86,23 @@ export function usePreviewDeviceActions(): PreviewDeviceActions {
             scaleMode: 'fit-screen',
         };
     });
-    const [previewContainerWidth, setPreviewContainerWidth] = useState(0);
-    const [lockedAdaptiveDesktop, setLockedAdaptiveDesktop] = useState<boolean | null>(null);
+    const [responsiveBasisState, dispatchResponsiveBasis] = useReducer(
+        reducePreviewResponsiveBasisState,
+        undefined,
+        createPreviewResponsiveBasisState,
+    );
+    const [explicitDesktop, setExplicitDesktop] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        const selection = parsePreviewDeviceParam(new URLSearchParams(window.location.search).get('device'));
+        return selection?.preset === 'desktop';
+    });
+    const responsiveBasisWidth = resolvePreviewResponsiveBasisWidth(responsiveBasisState);
 
     const previewConfig = useMemo(
-        () => resolveAdaptiveDesktopPreviewConfig(previewIntentConfig, previewContainerWidth, lockedAdaptiveDesktop),
-        [lockedAdaptiveDesktop, previewContainerWidth, previewIntentConfig],
+        () => resolveAdaptiveDesktopPreviewConfig(previewIntentConfig, responsiveBasisWidth),
+        [previewIntentConfig, responsiveBasisWidth],
     );
-    const previewDeviceParam = serializePreviewDeviceParam(previewIntentConfig);
+    const previewDeviceParam = serializePreviewDeviceParam(previewIntentConfig, { explicitDesktop });
     const selectedDeviceId = getPreviewSelectedDeviceId(previewConfig);
     const currentPreviewDeviceId = previewConfig.previewMode === 'single' && previewConfig.singlePreset !== 'custom'
         ? previewConfig.singlePreset
@@ -104,12 +120,12 @@ export function usePreviewDeviceActions(): PreviewDeviceActions {
     ]), []);
 
     const updatePreviewIntentConfig = useCallback((next: SetStateAction<PreviewConfig>) => {
-        setLockedAdaptiveDesktop(null);
         setPreviewIntentConfig(next);
     }, []);
 
     const setSelectedDeviceId = useCallback((id: string) => {
         if (id === 'desktop' || id === 'mobile' || id === 'tablet') {
+            setExplicitDesktop(id === 'desktop');
             updatePreviewIntentConfig((previous) => ({
                 ...previous,
                 previewMode: 'single',
@@ -119,6 +135,7 @@ export function usePreviewDeviceActions(): PreviewDeviceActions {
     }, [updatePreviewIntentConfig]);
 
     const handleSelectPreviewSinglePreset = useCallback((preset: PreviewSinglePreset) => {
+        setExplicitDesktop(preset === 'desktop');
         updatePreviewIntentConfig((previous) => ({
             ...previous,
             previewMode: 'single',
@@ -127,6 +144,7 @@ export function usePreviewDeviceActions(): PreviewDeviceActions {
     }, [updatePreviewIntentConfig]);
 
     const handleSelectCustomPreview = useCallback(() => {
+        setExplicitDesktop(false);
         updatePreviewIntentConfig((previous) => ({
             ...previous,
             previewMode: 'single',
@@ -138,6 +156,7 @@ export function usePreviewDeviceActions(): PreviewDeviceActions {
     }, [previewConfig.customHeight, previewConfig.customWidth, updatePreviewIntentConfig]);
 
     const handleActivateSplitPreview = useCallback(() => {
+        setExplicitDesktop(false);
         updatePreviewIntentConfig((previous) => ({
             ...previous,
             previewMode: 'split',
@@ -154,6 +173,7 @@ export function usePreviewDeviceActions(): PreviewDeviceActions {
     }, [updatePreviewIntentConfig]);
 
     const handleActivateMultiPagePreview = useCallback((pageCount?: number) => {
+        setExplicitDesktop(false);
         updatePreviewIntentConfig((previous) => ({
             ...previous,
             previewMode: 'multi-page',
@@ -173,6 +193,7 @@ export function usePreviewDeviceActions(): PreviewDeviceActions {
     }, [updatePreviewIntentConfig]);
 
     const handleChangeCustomPreviewWidth = useCallback((width: number) => {
+        setExplicitDesktop(false);
         const customWidth = normalizePreviewWidth(width, previewConfig.customWidth ?? DEVICE_PRESET_SIZES.desktop.width);
         const customHeight = normalizePreviewHeight(previewConfig.customHeight ?? DEVICE_PRESET_SIZES.desktop.height, DEVICE_PRESET_SIZES.desktop.height);
         saveStoredCustomPreviewSize(getPreviewCustomSizeStorage(), { customWidth, customHeight });
@@ -185,6 +206,7 @@ export function usePreviewDeviceActions(): PreviewDeviceActions {
     }, [previewConfig.customHeight, previewConfig.customWidth, updatePreviewIntentConfig]);
 
     const handleChangeCustomPreviewHeight = useCallback((height: number) => {
+        setExplicitDesktop(false);
         const customWidth = normalizePreviewWidth(previewConfig.customWidth ?? DEVICE_PRESET_SIZES.desktop.width, DEVICE_PRESET_SIZES.desktop.width);
         const customHeight = normalizePreviewHeight(height, previewConfig.customHeight ?? DEVICE_PRESET_SIZES.desktop.height);
         saveStoredCustomPreviewSize(getPreviewCustomSizeStorage(), { customWidth, customHeight });
@@ -238,29 +260,28 @@ export function usePreviewDeviceActions(): PreviewDeviceActions {
     }, [previewConfig.adaptiveDesktop, previewConfig.customHeight, previewConfig.customWidth, previewConfig.scaleMode, updatePreviewIntentConfig]);
 
     const handlePreviewContainerSizeChange = useCallback((width: number) => {
-        if (!Number.isFinite(width) || width <= 0) {
-            return;
-        }
-        const nextWidth = Math.floor(width);
-        setPreviewContainerWidth((previous) => previous === nextWidth ? previous : nextWidth);
+        dispatchResponsiveBasis({ type: 'preview-width-changed', width });
     }, []);
 
-    const lockAdaptiveDesktopPreview = useCallback(() => {
-        setLockedAdaptiveDesktop((previous) => previous ?? (
-            resolveAdaptiveDesktopPreviewConfig(previewIntentConfig, previewContainerWidth).adaptiveDesktop === true
-        ));
-    }, [previewContainerWidth, previewIntentConfig]);
+    const handlePreviewExternalWorkspaceWidthChange = useCallback((width: number) => {
+        dispatchResponsiveBasis({ type: 'external-workspace-width-changed', width });
+    }, []);
 
-    const unlockAdaptiveDesktopPreview = useCallback(() => {
-        setLockedAdaptiveDesktop(null);
+    const startPreviewLayoutStabilization = useCallback((reason: PreviewLayoutStabilizationReason) => {
+        dispatchResponsiveBasis({ type: 'stabilization-started', reason });
+    }, []);
+
+    const endPreviewLayoutStabilization = useCallback((reason: PreviewLayoutStabilizationReason) => {
+        dispatchResponsiveBasis({ type: 'stabilization-ended', reason });
     }, []);
 
     return {
         previewConfig,
         previewDeviceParam,
         handlePreviewContainerSizeChange,
-        lockAdaptiveDesktopPreview,
-        unlockAdaptiveDesktopPreview,
+        handlePreviewExternalWorkspaceWidthChange,
+        startPreviewLayoutStabilization,
+        endPreviewLayoutStabilization,
         selectedDeviceId,
         setSelectedDeviceId,
         deviceSegmentOptions,

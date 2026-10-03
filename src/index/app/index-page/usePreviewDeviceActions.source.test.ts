@@ -72,8 +72,16 @@ describe('usePreviewDeviceActions source', () => {
     const source = readUsePreviewDeviceActionsSource();
 
     expect(source).toContain('const [previewIntentConfig, setPreviewIntentConfig]');
-    expect(source).toContain('resolveAdaptiveDesktopPreviewConfig(previewIntentConfig, previewContainerWidth)');
-    expect(source).toContain('serializePreviewDeviceParam(previewIntentConfig)');
+    expect(source).toContain('const [explicitDesktop, setExplicitDesktop]');
+    expect(source).toContain('resolvePreviewResponsiveBasisWidth(responsiveBasisState)');
+    expect(source).toContain('resolveAdaptiveDesktopPreviewConfig(previewIntentConfig, responsiveBasisWidth)');
+    expect(source).toContain('serializePreviewDeviceParam(previewIntentConfig, { explicitDesktop })');
     expect(source).toContain('handlePreviewContainerSizeChange');
+    expect(source).toContain('handlePreviewExternalWorkspaceWidthChange');
+    expect(source).toContain('startPreviewLayoutStabilization');
+    expect(source).toContain('endPreviewLayoutStabilization');
+    expect(source).not.toContain('lockedAdaptiveDesktop');
+    expect(source).not.toContain('lockAdaptiveDesktopPreview');
+    expect(source).not.toContain('unlockAdaptiveDesktopPreview');
   });
 });

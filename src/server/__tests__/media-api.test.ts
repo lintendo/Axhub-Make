@@ -47,12 +47,6 @@ async function startMediaServer(projectRoot: string) {
   });
 }
 
-function projectApiUrl(origin: string, pathname: string): string {
-  const url = new URL(pathname, origin);
-  url.searchParams.set('projectId', 'media-client');
-  return url.toString();
-}
-
 afterEach(() => {
   for (const root of tempRoots.splice(0)) {
     fs.rmSync(root, { recursive: true, force: true });
@@ -76,7 +70,7 @@ describe('make-server media API', () => {
     const server = await startMediaServer(projectRoot);
 
     try {
-      const create = await fetch(projectApiUrl(server.origin, '/api/media/folder'), {
+      const create = await fetch(`${server.origin}/api/media/folder?projectId=media-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'photos', parentPath: 'icons' }),
@@ -87,18 +81,18 @@ describe('make-server media API', () => {
       });
       expect(fs.existsSync(path.join(mediaDir, 'icons/photos'))).toBe(true);
 
-      const file = await fetch(projectApiUrl(server.origin, '/api/media/file/icons/logo.svg'));
+      const file = await fetch(`${server.origin}/api/media/file/icons/logo.svg?projectId=media-client`);
       expect(file.status).toBe(200);
       expect(file.headers.get('content-type')).toContain('image/svg+xml');
       expect(await file.text()).toBe('<svg />');
 
-      const list = await fetch(projectApiUrl(server.origin, `/api/media?path=${encodeURIComponent('icons')}`)).then((response) => response.json());
+      const list = await fetch(`${server.origin}/api/media?path=${encodeURIComponent('icons')}&projectId=media-client`).then((response) => response.json());
       expect(list).toEqual(expect.arrayContaining([
         expect.objectContaining({ name: 'logo.svg', path: 'icons/logo.svg', type: 'image' }),
         expect.objectContaining({ name: 'photos', path: 'icons/photos', type: 'folder' }),
       ]));
 
-      const deleted = await fetch(projectApiUrl(server.origin, '/api/media/icons/photos'), { method: 'DELETE' });
+      const deleted = await fetch(`${server.origin}/api/media/icons/photos?projectId=media-client`, { method: 'DELETE' });
       expect(deleted.status).toBe(200);
       expect(fs.existsSync(path.join(mediaDir, 'icons/photos'))).toBe(false);
     } finally {
@@ -122,24 +116,24 @@ describe('make-server media API', () => {
     const server = await startMediaServer(projectRoot);
 
     try {
-      const unsafeFolder = await fetch(projectApiUrl(server.origin, '/api/media/folder'), {
+      const unsafeFolder = await fetch(`${server.origin}/api/media/folder?projectId=media-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: '../escape', parentPath: '' }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(unsafeFolder).toMatchObject({ status: 400, body: { error: 'Invalid folder name' } });
 
-      const unsafeParent = await fetch(projectApiUrl(server.origin, '/api/media/folder'), {
+      const unsafeParent = await fetch(`${server.origin}/api/media/folder?projectId=media-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'escape', parentPath: '../outside' }),
       }).then(async (response) => ({ status: response.status, body: await response.json() }));
       expect(unsafeParent).toMatchObject({ status: 403, body: { error: 'Invalid parent path' } });
 
-      const unsafeBackslash = await fetch(projectApiUrl(server.origin, `/api/media/file/${encodeURIComponent('..\\\\outside.svg')}`));
+      const unsafeBackslash = await fetch(`${server.origin}/api/media/file/${encodeURIComponent('..\\\\outside.svg')}?projectId=media-client`);
       expect(unsafeBackslash.status).toBe(403);
 
-      const rootDelete = await fetch(projectApiUrl(server.origin, '/api/media/'), { method: 'DELETE' });
+      const rootDelete = await fetch(`${server.origin}/api/media/?projectId=media-client`, { method: 'DELETE' });
       expect(rootDelete.status).toBe(403);
       expect(fs.existsSync(mediaDir)).toBe(true);
       expect(fs.existsSync(path.join(projectRoot, 'outside.svg'))).toBe(true);

@@ -10,6 +10,7 @@ export const AXHUB_ANNOTATION_DIRECT_ACTION_ATTR = 'data-axhub-annotation-direct
 type ShadowHitRoot = {
   elementsFromPoint?: (x: number, y: number) => Element[];
   elementFromPoint?: (x: number, y: number) => Element | null;
+  querySelectorAll?: (selector: string) => ArrayLike<Element> | Iterable<Element>;
 };
 
 function isFinitePoint(x: number, y: number): boolean {
@@ -170,15 +171,56 @@ function readShadowElementsFromPoint(shadowRoot: ShadowHitRoot, x: number, y: nu
   return [];
 }
 
+function containsPoint(element: Element, x: number, y: number): boolean {
+  const rect = readRect(element);
+  if (!rect || rect.width <= 0 || rect.height <= 0) return false;
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
+
+function isAnnotationHostTopmostAtPoint(x: number, y: number): boolean {
+  if (typeof document.elementFromPoint !== 'function') return true;
+
+  try {
+    const host = document.getElementById(AXHUB_ANNOTATION_HOST_ID);
+    return Boolean(host && document.elementFromPoint(x, y) === host);
+  } catch {
+    return false;
+  }
+}
+
+function readDeclaredShadowTargetsAtPoint(
+  shadowRoot: ShadowHitRoot,
+  x: number,
+  y: number,
+): Element[] {
+  if (typeof shadowRoot.querySelectorAll !== 'function') return [];
+  if (!isAnnotationHostTopmostAtPoint(x, y)) return [];
+
+  try {
+    const candidates = shadowRoot.querySelectorAll([
+      `[${AXHUB_ANNOTATION_COMMENT_TARGET_ATTR}="true"]`,
+      `[${AXHUB_ANNOTATION_DIRECT_ACTION_ATTR}="true"]`,
+    ].join(', '));
+    return Array.from(candidates).filter(
+      (element) => !isPointerPassthroughElement(element) && containsPoint(element, x, y),
+    );
+  } catch {
+    return [];
+  }
+}
+
 function readAxhubAnnotationShadowHitElementsAtPoint(x: number, y: number): Element[] {
   if (!isFinitePoint(x, y)) return [];
 
   const shadowRoot = getAnnotationShadowRoot();
   if (!shadowRoot) return [];
 
-  return readShadowElementsFromPoint(shadowRoot, x, y).filter(
+  const pointHits = readShadowElementsFromPoint(shadowRoot, x, y).filter(
     (element) => !isAnnotationShellElement(element) && !isPointerPassthroughElement(element),
   );
+  if (pointHits.length > 0) return pointHits;
+
+  return readDeclaredShadowTargetsAtPoint(shadowRoot, x, y);
 }
 
 export function getAxhubAnnotationShadowHitElementsAtPoint(x: number, y: number): Element[] {

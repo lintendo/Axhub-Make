@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { ItemData, ViewMode } from '../../types';
+import type { AnnotationDocumentDirectoryNode } from '../../types';
 import type { DataTableResourceItem, ThemeResourceItem } from '../../domains/resources/resource.types';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import {
     Columns2,
+    Check,
     ChevronDown,
     CircleX,
     Cloud,
@@ -27,7 +29,10 @@ import {
     LayoutGrid,
     List,
     ListChecks,
+    Loader2,
+    MessageSquare,
     MapPin,
+    Mic,
     Monitor,
     PencilRuler,
     ScanSearch,
@@ -43,6 +48,7 @@ import {
     Trash2,
 } from "lucide-react";
 import { Segmented } from 'antd';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
     DropdownMenu,
@@ -56,6 +62,7 @@ import { cn } from '@/lib/utils';
 import { MAIN_IDE_APP_NAMES, resolveVisibleIDEPreference } from '../../../common/ide';
 import type { IDEAvailabilityMap, MainIDEPreference } from '../../../common/ide';
 import type {
+    CommentaryAnnotationSaveStatus,
     CommentaryHostToolbarAction,
     CommentaryHostToolbarState,
 } from '@axhub/commentary';
@@ -70,7 +77,111 @@ import type {
 } from '../../domains/device/preview-layout';
 import type { ConfigurableCloudPublishTarget, ExportAvailability, QuickEditRuntimeStatus, QuickEditSaveAction } from '../../types/index-page.types';
 import type { CloudPublishTarget } from '../../services/api';
+import PrototypeVersionPopover from '../PrototypeVersionPopover';
 import ResponsiveSidebarTriggerButton from '../sidebar/ResponsiveSidebarTriggerButton';
+import { useSmoothedAnnotationSaveStatus } from './useSmoothedAnnotationSaveStatus';
+import DocumentManagementDialog from './DocumentManagementDialog';
+
+const QUICK_EDIT_ANNOTATION_SAVE_STATUS_LABELS = {
+    saving: '正在保存',
+    saved: '已保存',
+    unsaved: '未保存',
+} as const;
+const QUICK_EDIT_ANNOTATION_SAVE_STATUS_TOOLTIPS = {
+    saving: '正在保存批注。',
+    unsaved: '保存失败，请重试。',
+} as const;
+
+function QuickEditAnnotationSaveStatus({
+    status,
+    count,
+    copyPromptDisabled,
+    onCopyPrompt,
+}: {
+    status: CommentaryAnnotationSaveStatus;
+    count: number;
+    copyPromptDisabled: boolean;
+    onCopyPrompt: () => void;
+}) {
+    const visibleStatus = useSmoothedAnnotationSaveStatus(status);
+    const label = `${QUICK_EDIT_ANNOTATION_SAVE_STATUS_LABELS[visibleStatus]} · ${count} 条`;
+    const trigger = (
+        <span
+            className="pointer-events-auto absolute left-full top-1/2 z-10 ml-4 inline-flex h-7 min-w-[112px] -translate-y-1/2 items-center whitespace-nowrap px-1 text-[12px] font-medium leading-none text-foreground opacity-50 transition-opacity duration-150 hover:opacity-80 focus-visible:opacity-80 focus-visible:outline-none"
+            tabIndex={0}
+            aria-label={visibleStatus === 'saved' ? '查看批注处理方法' : QUICK_EDIT_ANNOTATION_SAVE_STATUS_TOOLTIPS[visibleStatus]}
+        >
+            {label}
+        </span>
+    );
+
+    if (visibleStatus === 'saved') {
+        return (
+            <HoverCard openDelay={160} closeDelay={120}>
+                <HoverCardTrigger asChild>{trigger}</HoverCardTrigger>
+                <HoverCardContent
+                    align="start"
+                    side="bottom"
+                    className="w-[360px] space-y-3 p-3.5 text-left"
+                >
+                    <div>
+                        <div className="text-sm font-medium text-foreground">让 AI 处理批注</div>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">批注已保存，可以通过以下三种方式交给 AI。</p>
+                    </div>
+                    <div className="space-y-3">
+                        <div className="flex items-start gap-2.5">
+                            <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">1</span>
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-foreground">
+                                    直接让 AI 处理批注
+                                    <span className="rounded-sm bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">推荐</span>
+                                </div>
+                                <p className="mt-1 whitespace-nowrap text-xs leading-5 text-muted-foreground">在 AI 输入框中说“处理批注”即可。</p>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-2.5">
+                            <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">2</span>
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-foreground">
+                                    复制提示词给 AI
+                                </div>
+                                <p className="mt-1 whitespace-nowrap text-xs leading-5 text-muted-foreground">
+                                    <button
+                                        type="button"
+                                        disabled={copyPromptDisabled}
+                                        onClick={onCopyPrompt}
+                                        className="font-medium text-primary underline decoration-primary/40 underline-offset-4 transition-colors hover:text-primary/80 disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline"
+                                    >
+                                        复制提示词
+                                    </button>
+                                    <span>，再粘贴到 AI 输入框中发送。</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-2.5">
+                            <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">3</span>
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-foreground">
+                                    在页面上执行
+                                </div>
+                                <p className="mt-1 whitespace-nowrap text-xs leading-5 text-muted-foreground">点击顶部工具栏的“AI 执行”，需本地安装相关 CLI 工具。</p>
+                            </div>
+                        </div>
+                    </div>
+                </HoverCardContent>
+            </HoverCard>
+        );
+    }
+
+    return (
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+                <TooltipContent>{QUICK_EDIT_ANNOTATION_SAVE_STATUS_TOOLTIPS[visibleStatus]}</TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    );
+}
 
 function PreviewSplitIcon() {
     return (
@@ -164,7 +275,12 @@ interface PresentationToolbarProps {
     handlePublishCloudTarget: (target: CloudPublishTarget) => void | Promise<void>;
     handleOpenCloudPublishSettings: (target?: ConfigurableCloudPublishTarget | 'publish-settings') => void;
     handleOpenAxhubPublishDialog: () => void | Promise<void>;
+    handleOpenLocalPublishDialog?: (mode: 'html' | 'realtime') => void;
     currentPublishResourcePath?: string;
+    activeProjectId?: string | null;
+    prototypeVersionPopoverOpen?: boolean;
+    onPrototypeVersionPopoverOpenChange?: (open: boolean) => void;
+    onOpenRemoteRepositorySettings?: () => void;
     visibleCloudPublishTargets?: CloudPublishTarget[];
     latestCloudPublishUrl: string;
     handleCopyLatestCloudPublishUrl: () => void | Promise<void>;
@@ -188,6 +304,14 @@ interface PresentationToolbarProps {
     handleCheckPrototypeAnnotationEnabled: () => Promise<boolean | null>;
     handleEnablePrototypeAnnotation: () => Promise<boolean>;
     handleCopyPrototypeAnnotationPrompt: () => void | Promise<void>;
+    annotationDocuments?: AnnotationDocumentDirectoryNode[];
+    annotationDocumentsLoading?: boolean;
+    handleLoadPrototypeAnnotationDocuments?: () => void | Promise<void>;
+    handleCreatePrototypeAnnotationDocument?: (folderId?: string | null) => void | Promise<void>;
+    handlePrototypeAnnotationDocumentTreeChange?: (tree: AnnotationDocumentDirectoryNode[]) => void;
+    handlePersistPrototypeAnnotationDocumentTree?: (tree: AnnotationDocumentDirectoryNode[]) => void | Promise<void>;
+    handleEditPrototypeAnnotationDocument?: (node: AnnotationDocumentDirectoryNode) => void | Promise<void>;
+    handleDeletePrototypeAnnotationDocument?: (node: AnnotationDocumentDirectoryNode) => void | Promise<void>;
     docEditState?: {
         enabled: boolean;
         dirty: boolean;
@@ -215,6 +339,10 @@ interface PresentationToolbarProps {
     reviewPanelOpen?: boolean;
     onReviewPanelToggle?: () => void;
     onOpenAISettings?: () => void;
+    commentaryVoiceVisible?: boolean;
+    onToggleCommentaryVoice?: () => void;
+    canvasVoiceVisible?: boolean;
+    onToggleCanvasVoice?: () => void;
 }
 
 export default function PresentationToolbar({
@@ -254,7 +382,12 @@ export default function PresentationToolbar({
     handlePublishCloudTarget,
     handleOpenCloudPublishSettings,
     handleOpenAxhubPublishDialog,
+    handleOpenLocalPublishDialog,
     currentPublishResourcePath = '',
+    activeProjectId = null,
+    prototypeVersionPopoverOpen = false,
+    onPrototypeVersionPopoverOpenChange,
+    onOpenRemoteRepositorySettings,
     visibleCloudPublishTargets = ['axhub'],
     latestCloudPublishUrl,
     handleCopyLatestCloudPublishUrl,
@@ -276,6 +409,14 @@ export default function PresentationToolbar({
     handleCheckPrototypeAnnotationEnabled,
     handleEnablePrototypeAnnotation,
     handleCopyPrototypeAnnotationPrompt: copyPrototypeAnnotationPrompt,
+    annotationDocuments = [],
+    annotationDocumentsLoading = false,
+    handleLoadPrototypeAnnotationDocuments,
+    handleCreatePrototypeAnnotationDocument,
+    handlePrototypeAnnotationDocumentTreeChange,
+    handlePersistPrototypeAnnotationDocumentTree,
+    handleEditPrototypeAnnotationDocument,
+    handleDeletePrototypeAnnotationDocument,
     docEditState = { enabled: false, dirty: false, saving: false, quickEditMode: 'comment' },
     markdownPromptCopying = false,
     quickEditRuntimeStatus = 'idle',
@@ -297,9 +438,13 @@ export default function PresentationToolbar({
     reviewPanelOpen = false,
     onReviewPanelToggle,
     onOpenAISettings,
+    commentaryVoiceVisible = false,
+    onToggleCommentaryVoice,
+    canvasVoiceVisible = false,
+    onToggleCanvasVoice,
 }: PresentationToolbarProps) {
+    const [documentManagementOpen, setDocumentManagementOpen] = React.useState(false);
     const canOpenGenericFigmaExport = exportAvailability?.canOpenGenericFigmaExport ?? Boolean(selectedItem);
-    const canOpenSelectedSource = hasExplicitLocalPath(selectedItem);
     const canOpenDataSource = hasExplicitLocalPath(selectedDataTable);
     const figmaDomDisabledReason = exportAvailability?.figmaDomDisabledReason
         || (selectedItem && quickEditRuntimeStatus !== 'ready' ? '复制当前页面需要接入 /runtime/quick-edit.js' : '');
@@ -317,8 +462,8 @@ export default function PresentationToolbar({
     const currentMarkdownLabel = contentMode === 'template' ? '模板' : contentMode === 'prototype-spec' ? '规格' : '文档';
     const edgeIconButtonClass =
         "p-0 inline-flex items-center justify-center text-sm [&_svg]:h-[18px] [&_svg]:w-[18px]";
-    const toolbarTextButtonClass = "gap-1.5 [&_svg]:h-3.5 [&_svg]:w-3.5";
-    const toolbarPillButtonClass = "h-8 rounded-md px-3 gap-1.5 text-[12px] font-medium [&_svg]:h-4 [&_svg]:w-4";
+    const toolbarTextButtonClass = "ax-presentation-toolbar-compact-button gap-1.5 [&_svg]:h-3.5 [&_svg]:w-3.5";
+    const toolbarPillButtonClass = "ax-presentation-toolbar-compact-button h-8 rounded-md px-3 gap-1.5 text-[12px] font-medium [&_svg]:h-4 [&_svg]:w-4";
 
     const isPreviewContent = contentMode === 'preview';
     const currentRuntimeExportResource = contentMode === 'theme' ? selectedTheme : selectedItem;
@@ -345,6 +490,7 @@ export default function PresentationToolbar({
     const isDocumentCommentActive = isDocumentEditActive && docEditState.quickEditMode === 'comment';
     const isSplitQuickEditActive = isQuickEditActive && previewConfig.previewMode === 'split';
     const [annotationEnableDialogOpen, setAnnotationEnableDialogOpen] = React.useState(false);
+    const [exitPending, setExitPending] = React.useState(false);
 
     const quickEditSegmentLabelText = '批注/编辑';
     const documentModeSegmentedControl = (
@@ -441,9 +587,10 @@ export default function PresentationToolbar({
         && !isQuickEditActive
         && !docEditState.enabled;
     const showHostSelectionModeAction = !isDocumentCommentActive;
-    const showHostPropertyPanelAction = contentMode !== 'theme' && !isDocumentCommentActive;
+    const isDocumentCommentToolbarActive = isDocumentCommentActive || (isHtmlDocumentEditingContent && isQuickEditActive);
+    const showHostPropertyPanelAction = contentMode !== 'theme' && !isDocumentCommentToolbarActive;
     const showHostPropertyPanelToolbarAction = showHostPropertyPanelAction && canShowPrototypeDecisionActions;
-    const showHostPropertyPanelMenuAction = showHostPropertyPanelAction && !canShowPrototypeDecisionActions;
+    const showHostPropertyPanelMenuAction = contentMode !== 'theme' && (isDocumentCommentToolbarActive || !canShowPrototypeDecisionActions);
 
     const [hostActionMenuOpen, setHostActionMenuOpen] = React.useState(false);
     const hostActionMenuTriggerRef = React.useRef<HTMLButtonElement | null>(null);
@@ -495,9 +642,18 @@ export default function PresentationToolbar({
         };
     }, [closeHostMenus, hostActionMenuOpen]);
 
+    const handleToolbarExit = () => {
+        if (exitPending) return;
+        setExitPending(true);
+        void Promise.resolve(handleExitWebEditor()).then(
+            () => setExitPending(false),
+            () => setExitPending(false),
+        );
+    };
+
     const handleQuickEditClick = () => {
         if (isQuickEditActive) {
-            handleExitWebEditor();
+            handleToolbarExit();
             return;
         }
         handleOpenWebEditor();
@@ -505,7 +661,7 @@ export default function PresentationToolbar({
 
     const handlePrototypeAnnotationClick = async () => {
         if (prototypeAnnotationSessionActive) {
-            void handleExitWebEditor();
+            handleToolbarExit();
             return;
         }
         const enabled = prototypeAnnotationEnabled
@@ -595,6 +751,10 @@ export default function PresentationToolbar({
         hostToolbarState?.visible
         && (hostToolbarState.sendVisible || hostToolbarState.interruptVisible),
     );
+    const publishedAnnotationSession = Boolean(
+        (hostToolbarState as (CommentaryHostToolbarState & { publishedAnnotationSession?: boolean }) | null | undefined)
+            ?.publishedAnnotationSession,
+    );
     const selectionModeShortcutLabel = 'Ctrl / Cmd + S';
     const selectionModeTooltip = `切换（${selectionModeShortcutLabel}）`;
     const renderHostToolbarActionButton = (
@@ -617,9 +777,10 @@ export default function PresentationToolbar({
                 variant="ghost"
                 size="xs"
                 className={cn(
-                    "gap-1.5 [&_svg]:h-3.5 [&_svg]:w-3.5",
+                    toolbarTextButtonClass,
                     options?.active && 'bg-secondary text-secondary-foreground',
                 )}
+                aria-label={label}
                 disabled={options?.disabled || options?.loading}
                 onClick={() => runHostAction(action)}
             >
@@ -639,6 +800,7 @@ export default function PresentationToolbar({
         );
     };
     const hostMenuItemClass = "flex h-8 w-full cursor-pointer items-center gap-2 rounded-sm px-2 text-left text-sm outline-none transition-colors hover:bg-accent focus-visible:bg-accent disabled:pointer-events-none disabled:opacity-50";
+    const hostMenuSelectedItemClass = "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary";
     const hostMenuIconClass = "h-3.5 w-3.5 shrink-0";
     const hostMenuGroupLabelClass = "px-2 pb-1 pt-1.5 text-[11px] font-medium leading-4 text-muted-foreground";
     const hostMenuSeparatorClass = "my-1 h-px bg-border";
@@ -685,12 +847,13 @@ export default function PresentationToolbar({
         );
     };
     const hostMoreMenu = hostToolbarState?.visible ? (
+        publishedAnnotationSession ? null : (
         <>
             <Button
                 ref={hostActionMenuTriggerRef}
                 variant="ghost"
                 size="xs"
-                className="gap-1.5 [&_svg]:h-3.5 [&_svg]:w-3.5"
+                className={toolbarTextButtonClass}
                 aria-label="更多 ACP UI 操作"
                 aria-haspopup="menu"
                 aria-expanded={hostActionMenuOpen}
@@ -728,6 +891,26 @@ export default function PresentationToolbar({
                                     <Copy className={hostMenuIconClass} /> 复制提示词
                                 </button>
                             ) : null}
+                            {hostToolbarState.captureTargetScreenshotAvailable ? (
+                                <button
+                                    type="button"
+                                    role="menuitemcheckbox"
+                                    aria-checked={hostToolbarState.captureTargetScreenshot}
+                                    {...getHostMenuActionHandlers({
+                                        type: 'toggle-target-screenshot',
+                                        enabled: !hostToolbarState.captureTargetScreenshot,
+                                    })}
+                                    className={cn(
+                                        hostMenuItemClass,
+                                        hostToolbarState.captureTargetScreenshot && hostMenuSelectedItemClass,
+                                    )}
+                                >
+                                    {hostToolbarState.captureTargetScreenshot
+                                        ? <Check className={hostMenuIconClass} />
+                                        : <ImageIcon className={hostMenuIconClass} />}
+                                    附带目标截图
+                                </button>
+                            ) : null}
                             {showHostExecutionControls && hostToolbarState.interruptVisible ? (
                                 <button
                                     type="button"
@@ -739,30 +922,54 @@ export default function PresentationToolbar({
                                     <Square className={hostMenuIconClass} /> 中断执行
                                 </button>
                             ) : null}
-                        </div>
-                        <div role="separator" className={hostMenuSeparatorClass} />
-                        <div role="group" aria-label="页面">
-                            <div className={hostMenuGroupLabelClass}>页面</div>
-                            {showHostPropertyPanelMenuAction ? (
+                            {isQuickEditActive && onToggleCommentaryVoice ? (
                                 <button
                                     type="button"
-                                    role="menuitem"
-                                    {...getHostMenuActionHandlers({ type: 'toggle-property-panel' })}
-                                    className={hostMenuItemClass}
+                                    role="menuitemcheckbox"
+                                    aria-checked={commentaryVoiceVisible}
+                                    onClick={() => {
+                                        closeHostMenus();
+                                        onToggleCommentaryVoice?.();
+                                    }}
+                                    className={cn(
+                                        hostMenuItemClass,
+                                        commentaryVoiceVisible && hostMenuSelectedItemClass,
+                                    )}
                                 >
-                                    <SlidersHorizontal className={hostMenuIconClass} />
-                                    {hostToolbarState.propertyPanelOpen ? '关闭设计决策' : '设计决策'}
+                                    {commentaryVoiceVisible
+                                        ? <Check className={hostMenuIconClass} />
+                                        : <Mic className={hostMenuIconClass} />}
+                                    语音助手
                                 </button>
                             ) : null}
-                            <button
-                                type="button"
-                                role="menuitem"
-                                {...getHostMenuActionHandlers({ type: 'toggle-page-animations' })}
-                                className={hostMenuItemClass}
-                            >
-                                <Settings2 className={hostMenuIconClass} /> {hostToolbarState.disablePageAnimations ? '开启页面动画' : '关闭页面动画'}
-                            </button>
                         </div>
+                        {!prototypeAnnotationSessionActive ? (
+                            <>
+                                <div role="separator" className={hostMenuSeparatorClass} />
+                                <div role="group" aria-label="页面">
+                                    <div className={hostMenuGroupLabelClass}>页面</div>
+                                    {showHostPropertyPanelMenuAction ? (
+                                        <button
+                                            type="button"
+                                            role="menuitem"
+                                            {...getHostMenuActionHandlers({ type: 'toggle-property-panel' })}
+                                            className={hostMenuItemClass}
+                                        >
+                                            <SlidersHorizontal className={hostMenuIconClass} />
+                                            {hostToolbarState.propertyPanelOpen ? '关闭设计决策' : '设计决策'}
+                                        </button>
+                                    ) : null}
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        {...getHostMenuActionHandlers({ type: 'toggle-page-animations' })}
+                                        className={hostMenuItemClass}
+                                    >
+                                        <Settings2 className={hostMenuIconClass} /> {hostToolbarState.disablePageAnimations ? '开启页面动画' : '关闭页面动画'}
+                                    </button>
+                                </div>
+                            </>
+                        ) : null}
                         <div role="separator" className={hostMenuSeparatorClass} />
                         <div role="group" aria-label="帮助">
                             <div className={hostMenuGroupLabelClass}>帮助</div>
@@ -775,7 +982,7 @@ export default function PresentationToolbar({
                                 <Keyboard className={hostMenuIconClass} /> 快捷键
                             </button>
                         </div>
-                        {isQuickEditActive && !isReadOnlyHtmlPrototypeSpec ? (
+                        {isQuickEditActive && !isReadOnlyHtmlPrototypeSpec && !prototypeAnnotationSessionActive ? (
                             <>
                                 <div role="separator" className={hostMenuSeparatorClass} />
                                 <div role="group" aria-label="保存">
@@ -803,8 +1010,10 @@ export default function PresentationToolbar({
                 ),
             })}
         </>
+        )
     ) : null;
     const hostExecutionToolbarControls = hostToolbarState?.visible ? (
+        prototypeAnnotationSessionActive || publishedAnnotationSession ? null : (
         <>
             {renderHostToolbarActionButton(
                 'host-send',
@@ -818,21 +1027,24 @@ export default function PresentationToolbar({
                 },
             )}
         </>
+        )
     ) : null;
-    const hostClearToolbarControl = hostToolbarState?.visible ? renderHostToolbarActionButton(
-        'host-clear',
-        '清空',
-        <Trash2 />,
-        { type: 'clear-edits', scope: 'prototype', target: 'completed' },
-        {
-            disabled: hostToolbarState.clearEditsDisabled,
-        },
+    const hostClearToolbarControl = hostToolbarState?.visible && !publishedAnnotationSession ? (
+        prototypeAnnotationSessionActive ? null : renderHostToolbarActionButton(
+            'host-clear',
+            '清空',
+            <Trash2 />,
+            { type: 'clear-edits', scope: 'prototype', target: 'completed' },
+            {
+                disabled: hostToolbarState.clearEditsDisabled,
+            },
+        )
     ) : null;
     const hostToolToolbarControls = hostToolbarState?.visible ? (
         <>
             {renderHostToolbarActionButton(
                 'host-selection-mode',
-                '选择元素',
+                prototypeAnnotationSessionActive ? '标注元素' : '选择元素',
                 <ScanSearch />,
                 { type: 'toggle-selection-mode', active: !hostToolbarState.selectionModeActive },
                 {
@@ -842,7 +1054,23 @@ export default function PresentationToolbar({
                     tooltip: selectionModeTooltip,
                 },
             )}
-            {showHostPropertyPanelToolbarAction ? renderHostToolbarActionButton(
+            {prototypeAnnotationSessionActive ? (
+                <Button
+                    key="host-document-management"
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    className={toolbarTextButtonClass}
+                    aria-label="文档管理"
+                    onClick={() => {
+                        setDocumentManagementOpen(true);
+                        void handleLoadPrototypeAnnotationDocuments?.();
+                    }}
+                >
+                    <FileText /> 文档管理
+                </Button>
+            ) : null}
+            {showHostPropertyPanelToolbarAction && !publishedAnnotationSession ? renderHostToolbarActionButton(
                 'host-panel',
                 '设计决策',
                 <SlidersHorizontal />,
@@ -858,8 +1086,20 @@ export default function PresentationToolbar({
             {hostToolToolbarControls}
         </div>
     ) : null;
+    const quickEditAnnotationCount = Math.max(0, hostToolbarState?.modifiedCount ?? 0);
+    const hasQuickEditAnnotationData = quickEditAnnotationCount > 0;
+    const showQuickEditLocalSaveStatus = hasQuickEditAnnotationData;
+    const quickEditAnnotationSaveStatus = hostToolbarState?.annotationSaveStatus ?? 'saved';
+    const quickEditLocalSaveStatus = showQuickEditLocalSaveStatus ? (
+        <QuickEditAnnotationSaveStatus
+            status={quickEditAnnotationSaveStatus}
+            count={quickEditAnnotationCount}
+            copyPromptDisabled={!hostToolbarState?.copyPromptVisible || Boolean(hostToolbarState.copyPromptDisabled)}
+            onCopyPrompt={() => runHostAction({ type: 'copy-prompt' })}
+        />
+    ) : null;
     const activeQuickEditToolbarButtons = (
-        <div className="inline-flex items-center gap-3" data-axhub-quick-edit-toolbar="true">
+        <div className="relative inline-flex items-center gap-3" data-axhub-quick-edit-toolbar="true">
             <div
                 className="inline-flex items-center gap-1"
                 data-axhub-toolbar-group="tools"
@@ -875,21 +1115,36 @@ export default function PresentationToolbar({
                 <Button
                     variant="ghost"
                     size="xs"
-                    className="gap-1.5 [&_svg]:h-3.5 [&_svg]:w-3.5"
+                    className={toolbarTextButtonClass}
+                    aria-label="刷新"
                     onClick={handleRefreshElement}
                 >
                     <RotateCw /> 刷新
                 </Button>
+                {publishedAnnotationSession ? (
+                    <Button
+                        variant="ghost"
+                        size="xs"
+                        className={toolbarTextButtonClass}
+                        aria-label="快捷键"
+                        onClick={() => runHostAction({ type: 'open-keyboard-shortcuts' })}
+                    >
+                        <Keyboard /> 快捷键
+                    </Button>
+                ) : null}
                 {hostMoreMenu}
                 <Button
                     variant="ghost"
                     size="xs"
-                    className="gap-1.5 [&_svg]:h-3.5 [&_svg]:w-3.5"
-                    onClick={handleExitWebEditor}
+                    className={toolbarTextButtonClass}
+                    aria-label={exitPending ? '退出中' : '退出'}
+                    disabled={exitPending}
+                    onClick={handleToolbarExit}
                 >
-                    <CircleX /> 退出
+                    {exitPending ? <><Loader2 className="animate-spin" /> 退出中</> : <><CircleX /> 退出</>}
                 </Button>
             </div>
+            {quickEditLocalSaveStatus}
         </div>
     );
 
@@ -968,8 +1223,8 @@ export default function PresentationToolbar({
                                         toolbarTextButtonClass,
                                         isQuickEditActive && 'bg-secondary text-secondary-foreground',
                                     )}
-                                    disabled={quickEditDisabled}
-                                    onClick={isQuickEditActive ? handleExitWebEditor : handleOpenWebEditor}
+                                    disabled={quickEditDisabled || exitPending}
+                                    onClick={isQuickEditActive ? handleToolbarExit : handleOpenWebEditor}
                                 >
                                     <PencilRuler /> 批注
                                 </Button>
@@ -1087,13 +1342,19 @@ export default function PresentationToolbar({
                                                 toolbarTextButtonClass,
                                                 prototypeAnnotationSessionActive && 'bg-secondary text-secondary-foreground',
                                             )}
-                                            disabled={prototypeAnnotationEnableLoading}
+                                            disabled={quickEditDisabled || prototypeAnnotationEnableLoading}
                                             onClick={handlePrototypeAnnotationClick}
                                         >
                                             <MapPin /> PRD 标注
                                         </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent>{prototypeAnnotationSessionActive ? '退出标注' : '使用标注需求和生成 RRD'}</TooltipContent>
+                                    <TooltipContent>
+                                        {prototypeAnnotationSessionActive
+                                            ? '退出标注'
+                                            : quickEditDisabled
+                                                ? quickEditTooltip
+                                                : '使用标注需求和生成 RRD'}
+                                    </TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>
 
@@ -1151,11 +1412,12 @@ export default function PresentationToolbar({
 
     const actionButtons = isDocumentEditingContent && !isPreviewContent
         ? (
-            <>
+            <div className="relative inline-flex items-center gap-1">
                 {resourceActionButtons}
                 {isDocumentCommentActive ? hostToolbarControls : null}
                 {isDocumentEditActive ? documentEditTrailingActionButtons : null}
-            </>
+                {isDocumentCommentActive ? quickEditLocalSaveStatus : null}
+            </div>
         )
         : resourceActionButtons ?? (isPreviewContent ? previewActionButtons : null);
 
@@ -1353,10 +1615,11 @@ export default function PresentationToolbar({
                     size="sm"
                     className={toolbarPillButtonClass}
                     disabled={!canCopyCurrentScreenshot && !canOpenGenericFigmaExport && !canOpenGenericAxureExport && !showHtmlExportEntry && !hasCurrentPublishResource}
+                    aria-label="发布"
                 >
                     <Cloud />
-                    <span>发布</span>
-                    <ChevronDown className="h-3.5 w-3.5" />
+                    <span className="ax-presentation-toolbar-label">发布</span>
+                    <ChevronDown className="ax-presentation-toolbar-chevron h-3.5 w-3.5" />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 text-sm">
@@ -1371,15 +1634,12 @@ export default function PresentationToolbar({
                 >
                     <Copy className="h-3.5 w-3.5" /> 复制到 Figma
                 </DropdownMenuItem>
-                {showMakeExportEntry ? (
+                {showMakeExportEntry && !makeExportDisabledReason ? (
                     <DropdownMenuItem
                         onClick={handleExportMake}
-                        disabled={Boolean(makeExportDisabledReason)}
-                        title={makeExportDisabledReason}
                         className="gap-2 h-7 text-sm"
                     >
-                        <Download className="h-3.5 w-3.5" />
-                        {makeExportDisabledReason ? `导出 Figma Make（${makeExportDisabledReason}）` : '导出 Figma Make'}
+                        <Download className="h-3.5 w-3.5" /> 导出 Figma Make
                     </DropdownMenuItem>
                 ) : null}
                 <DropdownMenuSeparator />
@@ -1434,6 +1694,24 @@ export default function PresentationToolbar({
                         </DropdownMenuItem>
                     </>
                 ) : null}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="px-2 py-1 text-[11px] font-normal text-muted-foreground">
+                    局域网
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                    onClick={() => handleOpenLocalPublishDialog?.('html')}
+                    disabled={!hasCurrentPublishResource || !handleOpenLocalPublishDialog}
+                    className="gap-2 h-7 text-sm"
+                >
+                    <Download className="h-3.5 w-3.5" /> 发布当前版本原型
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                    onClick={() => handleOpenLocalPublishDialog?.('realtime')}
+                    disabled={!hasCurrentPublishResource || !handleOpenLocalPublishDialog}
+                    className="gap-2 h-7 text-sm"
+                >
+                    <MessageSquare className="h-3.5 w-3.5" /> 发布实时原型
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel className="px-2 py-1 text-[11px] font-normal text-muted-foreground">
                     云服务
@@ -1522,14 +1800,23 @@ export default function PresentationToolbar({
             </div>
 
             {/* Center: Tools */}
-            <div className="ax-toolbar-adaptive-action flex-1 flex justify-center items-center gap-1 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
                 <div className="flex items-center gap-1 [&>*]:self-center text-[12px]">
                     {actionButtons}
                 </div>
             </div>
 
             {/* Right: Export */}
-            <div className="ax-toolbar-adaptive-action flex items-center justify-end gap-1.5 z-10">
+            <div className="flex items-center justify-end gap-1.5 z-10">
+                {contentMode === 'preview' && viewMode === 'demo' ? (
+                    <PrototypeVersionPopover
+                        projectId={activeProjectId || ''}
+                        item={selectedItem}
+                        open={prototypeVersionPopoverOpen}
+                        onOpenChange={(open) => onPrototypeVersionPopoverOpenChange?.(open)}
+                        onOpenRemoteRepositorySettings={onOpenRemoteRepositorySettings}
+                    />
+                ) : null}
                 {showExportMenuButton ? exportMenuButton : null}
             </div>
             <Dialog
@@ -1564,6 +1851,19 @@ export default function PresentationToolbar({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <DocumentManagementDialog
+                open={documentManagementOpen}
+                onOpenChange={setDocumentManagementOpen}
+                tree={annotationDocuments}
+                loading={annotationDocumentsLoading}
+                onTreeChange={(nextTree) => handlePrototypeAnnotationDocumentTreeChange?.(nextTree)}
+                onTreePersist={(nextTree) => handlePersistPrototypeAnnotationDocumentTree?.(nextTree)}
+                onCreateDocument={(folderId) => handleCreatePrototypeAnnotationDocument?.(folderId)}
+                onEditDocument={(node) => handleEditPrototypeAnnotationDocument?.(node)}
+                onDeleteDocument={(node) => handleDeletePrototypeAnnotationDocument?.(node)}
+                onCopyPrompt={copyPrototypeAnnotationPrompt}
+                promptCopying={prototypeAnnotationPromptCopying}
+            />
         </div>
     );
 }

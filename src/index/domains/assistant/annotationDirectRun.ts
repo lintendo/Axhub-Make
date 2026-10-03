@@ -30,7 +30,11 @@ export interface SubmitAnnotationPromptViaApiOptions {
   model?: string | null;
   mode?: string | null;
   thought?: string | null;
+  permissionMode?: string | null;
   targetPath?: string | null;
+  threadId?: string | null;
+  conversationId?: string | null;
+  referenceImages?: string[];
   agentRunConcurrency?: number;
   mcpServers?: unknown[];
   builtinToolSettings?: Record<string, unknown>;
@@ -85,13 +89,17 @@ export function resolveAnnotationDirectRunTarget(options: {
 
 export function prepareAnnotationDirectRunThread(options: {
   target: AnnotationDirectRunTarget;
+  threadId?: string | null;
+  conversationId?: string | null;
   createRunId?: () => string;
 }): PreparedAnnotationDirectRunThread {
   const runId = (options.createRunId || createAnnotationDirectRunId)();
+  const threadId = normalizePath(options.threadId) || runId;
+  const conversationId = normalizePath(options.conversationId) || threadId;
   return {
     runId,
-    threadId: runId,
-    conversationId: runId,
+    threadId,
+    conversationId,
     target: options.target,
   };
 }
@@ -106,6 +114,8 @@ export async function submitAnnotationPromptViaApi(
   });
   const prepared = prepareAnnotationDirectRunThread({
     target,
+    threadId: options.threadId,
+    conversationId: options.conversationId,
     createRunId: options.createRunId,
   });
   const provider = String(options.provider || '').trim() || null;
@@ -124,9 +134,11 @@ export async function submitAnnotationPromptViaApi(
     model: options.model,
     mode: options.mode,
     thought: options.thought,
+    permissionMode: options.permissionMode,
     projectId: options.projectId,
     context: options.context,
     contextBundle: mapAssistantContextToAcpContextBundle(options.context),
+    referenceImages: options.referenceImages,
     targetPath: toPrototypeRelativePath(options.targetPath || target.currentFilePath) || target.currentFilePath,
     agentRunConcurrency: options.agentRunConcurrency,
     mcpServers: options.mcpServers,

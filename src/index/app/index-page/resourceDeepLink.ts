@@ -1,6 +1,6 @@
 import type { ItemData, ViewMode } from '../../types';
 import type { ResourceSection, SidebarTab, ThemeResourceItem } from '../../types/index-page.types';
-import { parsePreviewDeviceParam } from './previewDeviceUrl';
+import { formatPreviewDeviceParamSelection, parsePreviewDeviceParam } from './previewDeviceUrl';
 
 export type ResourceDeepLinkType = 'prototype' | 'doc' | 'project-doc' | 'template' | 'theme';
 
@@ -11,6 +11,7 @@ export interface ResourceDeepLinkTarget {
     pageId?: string;
     projectId?: string;
     openSpec?: boolean;
+    openEditor?: boolean;
     collapseSidebar?: boolean;
     device?: string;
 }
@@ -90,6 +91,10 @@ function isMarkdownDocumentPath(value: string): boolean {
     return /\.mdx?$/iu.test(normalizeDeepLinkResourceId(value));
 }
 
+function isHtmlDocumentPath(value: string): boolean {
+    return /\.html?$/iu.test(normalizeDeepLinkResourceId(value));
+}
+
 function getProjectResourceFileRouteName(value: string): string {
     const normalizedPath = normalizeDeepLinkResourceId(value);
     if (!normalizedPath.startsWith('src/resources/')) {
@@ -144,17 +149,19 @@ function buildProjectDocumentDeepLinkItem(target: ResourceDeepLinkTarget): ItemD
             ...(openMode === 'canvas' ? { canvasFilePath: documentPath } : {}),
         };
     }
-    if (!isMarkdownDocumentPath(documentPath)) return null;
-    const markdownUrl = buildProjectDocumentContentEndpoint(target.projectId, documentPath);
-    if (!markdownUrl) {
+    if (!isMarkdownDocumentPath(documentPath) && !isHtmlDocumentPath(documentPath)) return null;
+    const documentUrl = buildProjectDocumentContentEndpoint(target.projectId, documentPath);
+    if (!documentUrl) {
         return null;
     }
     return {
         name: documentPath,
         displayName: getBaseName(documentPath),
         jsUrl: '',
-        specUrl: markdownUrl,
-        previewUrl: `/spec-template.html?url=${encodeURIComponent(markdownUrl)}`,
+        specUrl: documentUrl,
+        previewUrl: isHtmlDocumentPath(documentPath)
+            ? documentUrl
+            : `/spec-template.html?url=${encodeURIComponent(documentUrl)}`,
         filePath: documentPath,
         projectId: target.projectId,
         resourceId: documentPath,
@@ -221,12 +228,15 @@ export function buildIndexDeepLinkUrl(target: ResourceDeepLinkTarget, baseUrl?: 
         }
         const device = parsePreviewDeviceParam(target.device);
         if (device) {
-            url.searchParams.set('device', `${device.width}x${device.height}`);
+            url.searchParams.set('device', formatPreviewDeviceParamSelection(device));
         }
     } else if (target.resourceType === 'doc') {
         url.searchParams.set('doc', target.resourceId);
     } else if (target.resourceType === 'project-doc') {
         url.searchParams.set('docPath', target.resourceId);
+        if (target.openEditor) {
+            url.searchParams.set('edit', '1');
+        }
     } else if (target.resourceType === 'template') {
         const templateId = normalizeTemplateDeepLinkResourceId(target.resourceId);
         if (templateId) {
@@ -237,6 +247,9 @@ export function buildIndexDeepLinkUrl(target: ResourceDeepLinkTarget, baseUrl?: 
     }
     if (target.collapseSidebar) {
         url.searchParams.set('sidebar', 'collapsed');
+    }
+    if (new URL(getBaseUrl(baseUrl)).searchParams.get('surface') === 'codex') {
+        url.searchParams.set('surface', 'codex');
     }
     return url.toString();
 }
@@ -280,7 +293,7 @@ export function parseIndexDeepLink(value?: string): ResourceDeepLinkTarget | nul
     const canvasView = parseOptionalCanvasViewMode(url);
     const collapseSidebar = url.searchParams.get('sidebar') === 'collapsed';
     const parsedDevice = parsePreviewDeviceParam(url.searchParams.get('device'));
-    const device = parsedDevice ? `${parsedDevice.width}x${parsedDevice.height}` : undefined;
+    const device = parsedDevice ? formatPreviewDeviceParamSelection(parsedDevice) : undefined;
     const prototypeId = url.searchParams.get('p')?.trim();
     if (prototypeId) {
         return {
@@ -322,6 +335,7 @@ export function parseIndexDeepLink(value?: string): ResourceDeepLinkTarget | nul
             resourceId: docPath,
             ...(canvasView ? { view: canvasView } : {}),
             ...(projectId ? { projectId } : {}),
+            ...(url.searchParams.get('edit') === '1' ? { openEditor: true } : {}),
             collapseSidebar: true,
         };
     }

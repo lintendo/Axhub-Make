@@ -16,7 +16,8 @@ describe('annotation demo prototype', () => {
       fs.readFileSync(path.join(guideRoot, 'annotation-source.json'), 'utf8'),
     );
 
-    expect(indexSource).toContain('@name 标注演示');
+    expect(indexSource).toContain('@name PRD 演示');
+    expect(indexSource).toContain('<h1>PRD 演示</h1>');
     expect(indexSource).toContain("import annotationSourceDocument from './annotation-source.json';");
     expect(indexSource).toContain('<AnnotationViewer');
     expect(indexSource).toContain('showThemeToggle: true');
@@ -29,8 +30,9 @@ describe('annotation demo prototype', () => {
     expect(indexSource).toContain('annotation-guide-content-inner');
     expect(indexSource).toContain('annotation-guide-footer');
     expect(indexSource).toContain('原型即 PRD');
-    expect(indexSource).toContain('我们的目的');
     expect(indexSource).toContain('原型 + PRD');
+    expect(indexSource).toContain('将完整 PRD 放进可运行原型');
+    expect(indexSource).toContain('需求和页面在同一个项目中维护');
     expect(indexSource).toContain('annotation-guide-section-body');
     expect(indexSource).toContain('annotation-guide-comparison-table');
     expect(indexSource).toContain('字数');
@@ -40,10 +42,9 @@ describe('annotation demo prototype', () => {
     expect(indexSource).not.toContain('const chapterMetrics =');
     expect(indexSource).toContain([
       '<th scope="col">维度</th>',
-      '                <th scope="col">原型即 PRD</th>',
-      '                <th scope="col">原型 + PRD</th>',
+      '                                <th scope="col">原型即 PRD</th>',
+      '                                <th scope="col">原型 + PRD</th>',
     ].join('\n'));
-    expect(indexSource).toContain('<th scope="col">原型即 PRD</th>');
     expect(indexSource).toContain('<td className="annotation-guide-comparison-prototype">{row.prototypeOnly}</td>');
     expect(indexSource).toContain('<td>{row.traditional}</td>');
     expect(indexSource).toContain('统一入口');
@@ -91,6 +92,17 @@ describe('annotation demo prototype', () => {
     expect(indexSource).toContain('data-annotation-id="state-list-card"');
     expect(indexSource).toContain('data-annotation-id="state-metric-card"');
     expect(indexSource).toContain('DirectoryGuideView');
+    expect(indexSource).toContain('DocumentModeView');
+    expect(indexSource).toContain("id: 'document-mode'");
+    expect(indexSource).toContain('document-mode-reading');
+    expect(indexSource).toContain('分屏阅读');
+    expect(indexSource).toContain('文档目录');
+    expect(indexSource).toContain('页面锚点');
+    expect(indexSource).toContain('openDocumentPreview');
+    expect(indexSource).toContain('onTargetRoute');
+    expect(indexSource).not.toContain("import documentModeMarkdown from './docs/prd-06-document-mode.md?raw';");
+    expect(indexSource).not.toContain('openDirectoryArticle');
+    expect(indexSource).not.toContain('annotation-guide-directory-anchor-demo');
     expect(indexSource).toContain('annotation-guide-directory-overview');
     expect(indexSource).toContain('annotation-guide-directory-copy');
     expect(indexSource).toContain('annotation-guide-directory-type-list');
@@ -99,30 +111,35 @@ describe('annotation demo prototype', () => {
     expect(indexSource).toContain('EnableAnnotationPractice');
     expect(indexSource).toContain('EditCommentsView');
     expect(indexSource).toContain('AgentReadView');
-    expect(indexSource).toContain('annotation-guide-generate-capability-grid');
     expect(indexSource).toContain('annotation-guide-generate-section-body');
-    expect(indexSource).toContain('id="enable-methods"');
-    expect(indexSource).toContain('data-annotation-id="enable-annotation-methods"');
+    expect(indexSource).not.toContain('const capabilityItems =');
+    expect(indexSource).not.toContain('title="标注内容"');
     expect(indexSource).toContain("'edit-comments-methods'");
     expect(indexSource).toContain('id="agent-read-skill"');
-    expect(indexSource).toContain('任意元素标注');
     expect(indexSource).toContain('状态标注');
-    expect(indexSource).toContain('原型目录内容');
-    expect(indexSource).toContain('默认设置状态');
-    expect(indexSource).toContain('annotation-guide-method-grid');
-    expect(indexSource).toContain('批注工具');
-    expect(indexSource).toContain('Agent 标注技能');
-    expect(indexSource).toContain('批注模式更多菜单');
+    expect(indexSource).not.toContain('任意元素标注');
+    expect(indexSource).not.toContain('页面目录内容');
+    expect(indexSource).toContain('人工开启');
+    expect(indexSource).toContain('AI 开启');
+    expect(indexSource).toContain('从原型顶部的标注入口进入');
+    expect(indexSource).not.toContain('批注工具');
+    expect(indexSource).not.toContain('批注模式更多菜单');
     expect(indexSource).toContain('annotation-guide-edit-method-list');
+    expect(indexSource).toContain('AI 编辑');
+    expect(indexSource).toContain('手动编辑');
     expect(indexSource).toContain('对话框直接提');
-    expect(indexSource).toContain('编辑节点');
+    expect(indexSource).toContain('批注后通过 AI 执行');
+    expect(indexSource).not.toContain('编辑节点');
+    expect(indexSource).toContain('编辑文档');
+    expect(indexSource).toContain('顶部的“文档管理”');
+    expect(indexSource).toContain("title: '编辑标注'");
     expect(indexSource).toContain('annotation-guide-read-source-list');
     expect(indexSource).toContain('源码');
     expect(indexSource).toContain('标注内容');
     expect(indexSource).toContain('文档内容');
     expect(indexSource).toContain("import makeAnnotationAsset from './assets/make-annotation.png';");
     expect(indexSource).toContain("import aiSkillOpenAsset from './assets/ai-skill-open.png';");
-    expect(indexSource).toContain("import commentMenuOpenAsset from './assets/comment-menu-open.png';");
+    expect(indexSource).not.toContain("import commentMenuOpenAsset from './assets/comment-menu-open.png';");
     expect(indexSource).toContain("import documentEditAsset from './assets/document-edit.png';");
     expect(indexSource).toContain("import manualEditCommentAsset from './assets/manual-edit-comment.png';");
     expect(indexSource).toContain("import agentReadAsset from './assets/agent-read.png';");
@@ -130,9 +147,10 @@ describe('annotation demo prototype', () => {
     expect(indexSource.match(/className="annotation-guide-method-placeholder"/g)).toHaveLength(3);
     expect(indexSource).toContain('image: makeAnnotationAsset');
     expect(indexSource).toContain('image: aiSkillOpenAsset');
-    expect(indexSource).toContain('image: commentMenuOpenAsset');
+    expect(indexSource).not.toContain('image: commentMenuOpenAsset');
     expect(indexSource).toContain('image: manualEditCommentAsset');
     expect(indexSource).toContain('image: documentEditAsset');
+    expect(indexSource.indexOf("title: '编辑文档'")).toBeLessThan(indexSource.indexOf("title: '编辑标注'"));
     expect(indexSource).toContain('alt={`${item.title}界面`}');
     expect(indexSource).toContain('alt={`${method.title}界面`}');
     expect(indexSource).not.toContain('批注编辑功能站位图');
@@ -151,6 +169,7 @@ describe('annotation demo prototype', () => {
     expect(indexSource).toContain("activeChapter.id === 'prototype-directory' ? 'is-directory-page' : ''");
     expect(indexSource).toContain('页面');
     expect(indexSource).toContain('文档');
+    expect(indexSource).toContain('页面 / 链接');
     expect(indexSource).toContain('链接');
     expect(indexSource).not.toContain("id: 'settings'");
     expect(indexSource).not.toContain('SettingsPractice');
@@ -254,10 +273,18 @@ describe('annotation demo prototype', () => {
     expect(styleSource).not.toContain('font-size:clamp(44px, 7vw, 92px)');
     expect(annotationSource.format).toBe('axhub-annotation-source');
     expect(annotationSource.data.prototypeName).toBe('annotation-guide');
-    expect(annotationSource.markdownMap['prototype-as-prd-purpose']).toContain('原型是主需求载体');
+    expect(annotationSource.markdownMap['prototype-as-prd-purpose']).toContain('完整需求文档放进可运行原型');
+    expect(annotationSource.markdownMap['prototype-as-prd-purpose']).toContain('通过锚点直达相关页面或元素');
+    expect(annotationSource.markdownMap['prototype-as-prd-purpose']).toContain('局部的边界和例外则用标注补充');
+    expect(indexSource).toContain('人工开启');
+    expect(indexSource).toContain('AI 开启');
+    expect(indexSource).not.toContain('批注工具');
+    expect(indexSource).not.toContain('批注模式更多菜单');
+    expect(indexSource).toContain('AI 编辑');
+    expect(indexSource).toContain('手动编辑');
+    expect(indexSource).toContain('从原型顶部的标注入口进入');
     expect(annotationSource.directory.nodes).toEqual([
       expect.objectContaining({ type: 'folder', id: 'directory-pages', title: '页面' }),
-      expect.objectContaining({ type: 'folder', id: 'directory-documents', title: '文档' }),
       expect.objectContaining({ type: 'folder', id: 'directory-external-links', title: '外部链接' }),
     ]);
     expect(annotationSource.directory.nodes[0].children[0]).toMatchObject({
@@ -268,24 +295,34 @@ describe('annotation demo prototype', () => {
     });
     expect(annotationSource.directory.nodes[0].children).toHaveLength(7);
     expect(annotationSource.directory.nodes[0].children).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'route-document-mode', route: 'document-mode' })]),
+    );
+    expect(annotationSource.directory.nodes[0].children).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ id: 'route-settings' })]),
     );
-    expect(annotationSource.directory.nodes[1].children).toHaveLength(6);
-    expect(annotationSource.directory.nodes[1].children).not.toEqual(
+    expect(annotationSource.documents.nodes).toEqual([
+      expect.objectContaining({ type: 'folder', id: 'documents-prd', title: '文档' }),
+    ]);
+    expect(annotationSource.documents.nodes[0].children).toHaveLength(7);
+    expect(annotationSource.documents.nodes[0].children).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ id: 'doc-prd-example' })]),
     );
-    expect(annotationSource.directory.nodes[1].children.map((node: any) => node.title)).toEqual([
+    expect(annotationSource.documents.nodes[0].children.map((node: any) => node.title)).toEqual([
       'PRD 00｜总览',
       'PRD 01｜角色',
       'PRD 02｜流程',
       'PRD 03｜状态',
       'PRD 04｜风险',
       'PRD 05｜交付',
+      'PRD 06｜指标阅读',
     ]);
-    const prdDocuments = annotationSource.directory.nodes[1].children as Array<{ markdownPath: string }>;
+    const prdDocuments = annotationSource.documents.nodes[0].children.filter(
+      (node: any) => node.type === 'markdown',
+    ) as Array<{ markdownPath: string; readerMode?: string }>;
     const prdMarkdown = prdDocuments.map((node) => {
       expect(node).toHaveProperty('markdownPath');
       expect(node).not.toHaveProperty('markdown');
+      expect(node.readerMode).toBe('split');
       expect(node.markdownPath).toMatch(/^docs\/prd-\d{2}-[a-z-]+\.md$/);
       return fs.readFileSync(path.join(guideRoot, node.markdownPath), 'utf8');
     });
@@ -294,10 +331,12 @@ describe('annotation demo prototype', () => {
     expect(prdMarkdown[0]).toContain('原型即 PRD');
     expect(prdMarkdown[0]).toContain('内容标注');
     expect(prdMarkdown[0]).toContain('状态标注');
-    expect(prdMarkdown[0]).toContain('原型目录');
-    expect(prdMarkdown[0]).toContain('开启标注');
-    expect(prdMarkdown[0]).toContain('编辑标注');
+    expect(prdMarkdown[0]).toContain('页面目录');
+    expect(prdMarkdown[0]).toContain('开启 PRD 和标注');
+    expect(prdMarkdown[0]).toContain('编辑 PRD 和标注');
     expect(prdMarkdown[0]).toContain('Agent 读取');
+    expect(prdMarkdown[0]).toContain('人工开启');
+    expect(prdMarkdown[0]).toContain('AI 开启');
     expect(prdMarkdown[0]).toContain('## 4. Markdown 层级案例');
     expect(prdMarkdown[0]).toContain('- [背景](#背景)');
     expect(prdMarkdown[0]).toContain('    - [页面范围](#页面范围)');
@@ -310,7 +349,7 @@ describe('annotation demo prototype', () => {
     expect(prdMarkdown[1]).toContain('研发');
     expect(prdMarkdown[2]).toContain('## 1. 主流程');
     expect(prdMarkdown[2]).toContain('## 2. 页面流转');
-    expect(prdMarkdown[2]).toContain('开启标注后');
+    expect(prdMarkdown[2]).toContain('人工开启或 AI 开启');
     expect(prdMarkdown[2]).toContain('开发 Agent');
     expect(prdMarkdown[3]).toContain('## 1. 状态标注范围');
     expect(prdMarkdown[3]).toContain('结果状态');
@@ -322,8 +361,15 @@ describe('annotation demo prototype', () => {
     expect(prdMarkdown[5]).toContain('## 1. 交付物');
     expect(prdMarkdown[5]).toContain('## 2. 验收标准');
     expect(prdMarkdown[5]).toContain('只保留必要的外部设计来源链接');
-    expect(annotationSource.directory.nodes[2].children).toHaveLength(1);
-    expect(annotationSource.directory.nodes[2].children[0]).toMatchObject({
+    expect(annotationSource.markdownMap['directory-practice']).not.toContain('页面、文档和链接');
+    expect(annotationSource.markdownMap).not.toHaveProperty('document-mode-guide');
+    expect(annotationSource.markdownMap['directory-practice']).not.toContain('directory-anchor-demo');
+    expect(prdMarkdown[0]).toContain('[查看内容标注](#axhub-target:content-preview-node)');
+    expect(prdMarkdown[0]).toContain('[查看状态结果](#axhub-target:state-result-card)');
+    expect(prdMarkdown[0]).toContain('[查看角色 PRD](./prd-01-roles.md)');
+    expect(prdMarkdown[0]).toContain('[定位本文档起点](#prd-overview-anchor)');
+    expect(annotationSource.directory.nodes[1].children).toHaveLength(1);
+    expect(annotationSource.directory.nodes[1].children[0]).toMatchObject({
       type: 'link',
       id: 'link-design-source-guizang-ppt-skill',
       title: '设计来源：op7418/guizang-ppt-skill',
@@ -340,7 +386,7 @@ describe('annotation demo prototype', () => {
     expect(annotationSource.markdownMap['state-list-card']).toContain('点击上方');
     expect(annotationSource.markdownMap['state-metric-card']).toContain('文案标注和状态标注可以同时存在');
     expect(annotationSource.markdownMap['state-metric-card']).toContain('点击上方');
-    expect(annotationSource.markdownMap['directory-practice']).toContain('页面、文档和链接');
+    expect(annotationSource.markdownMap['directory-practice']).toContain('页面和外部链接');
     expect(annotationSource.markdownMap).not.toHaveProperty('generate-practice');
     expect(annotationSource.markdownMap).not.toHaveProperty('agent-read-skill');
     expect(annotationSource.markdownMap).not.toHaveProperty('settings-practice');
@@ -446,15 +492,16 @@ describe('annotation demo prototype', () => {
     const prototype = metadata.resources.prototypes.find((item: any) => item.id === 'annotation-demo');
 
     expect(prototype).toMatchObject({
-      title: '标注演示',
+      title: 'PRD 演示',
       defaultPageId: 'prototype-as-prd',
       pages: [
         { id: 'prototype-as-prd', title: '原型即 PRD' },
+        { id: 'document-mode', title: '文档模式' },
         { id: 'content-annotation', title: '内容标注' },
         { id: 'state-annotation', title: '状态标注' },
-        { id: 'prototype-directory', title: '原型目录' },
-        { id: 'generate-annotation', title: '开启标注' },
-        { id: 'edit-comments', title: '编辑标注' },
+        { id: 'prototype-directory', title: '页面目录' },
+        { id: 'generate-annotation', title: '开启 PRD 和标注' },
+        { id: 'edit-comments', title: '编辑 PRD 和标注' },
         { id: 'agent-read', title: 'Agent 读取' },
       ],
     });

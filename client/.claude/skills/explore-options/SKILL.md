@@ -28,6 +28,7 @@ description: Use when a Make client批注 or user request asks for 多方案探�
 
 如果用户要求“看看不同方向”“能切换比较”，或当前实现适合在页面内切换方案，就把方案做成 tweak：
 
+- `@axhub/commentary-react` 只有把方案做成页面内可切换的 React tweak 时才需要；普通方案探索不依赖它。
 - React 原型优先使用 `@axhub/commentary-react` 的 `createCommentaryReactTweakStore` 和 `useRegisterCommentaryTweak`。
 - 复用项目现有 `schema / values / adapter / update` 模式，不另造平行配置。
 - 方案字段优先用 `card`，不要用普通下拉。

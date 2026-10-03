@@ -88,6 +88,26 @@ describe('localCommand', () => {
     }));
   });
 
+  it('passes detached GUI process options through to execa', async () => {
+    const executor = vi.fn(async () => ({ stdout: '', stderr: '' }));
+
+    await runLocalCommand('cmd.exe', ['/d', '/c', 'start', 'explorer.exe', 'E:\\make16'], {
+      detached: true,
+      stdio: 'ignore',
+      executor,
+    });
+
+    expect(executor).toHaveBeenCalledWith(
+      'cmd.exe',
+      ['/d', '/c', 'start', 'explorer.exe', 'E:\\make16'],
+      expect.objectContaining({
+        detached: true,
+        stdio: 'ignore',
+        shell: false,
+      }),
+    );
+  });
+
   it('allows GUI commands to show Windows child process windows', async () => {
     const executor = vi.fn(async () => ({ stdout: 'ok', stderr: '' }));
 

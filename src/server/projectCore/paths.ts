@@ -13,9 +13,13 @@ export const PROJECT_METADATA_RELATIVE_PATH = path.join(MAKE_STATE_DIR, 'project
 export const MAKE_CLIENT_MARKER_RELATIVE_PATH = path.join(MAKE_STATE_DIR, 'client.json');
 export const PROJECT_SESSIONS_RELATIVE_DIR = path.join(MAKE_STATE_DIR, 'sessions');
 export const PROJECT_EXPORTS_RELATIVE_DIR = path.join(MAKE_STATE_DIR, 'exports');
+export const PROJECT_PUBLISHED_HTML_RELATIVE_DIR = path.join(PROJECT_EXPORTS_RELATIVE_DIR, 'published-html');
+export const PROJECT_PUBLISHED_REALTIME_RELATIVE_DIR = path.join(PROJECT_EXPORTS_RELATIVE_DIR, 'published-realtime');
 export const PROJECT_EDIT_HISTORY_RELATIVE_DIR = path.join(MAKE_STATE_DIR, 'edit-history');
 export const GLOBAL_PROJECTS_REGISTRY_FILE_NAME = 'projects.json';
 export const GLOBAL_SERVER_CONFIG_FILE_NAME = 'server.config.json';
+export const GLOBAL_SERVER_SECRETS_FILE_NAME = 'server.secrets.json';
+export const GLOBAL_MAKE_SERVICE_LOG_FILE_NAME = 'make-service.log';
 
 export function resolveProjectRoot(projectRoot: string): string {
   return path.resolve(projectRoot);
@@ -36,6 +40,14 @@ export function getProjectRegistryPath(homeDir?: string): string {
 
 export function getGlobalServerConfigPath(homeDir?: string): string {
   return path.join(getGlobalMakeStateDir(homeDir), GLOBAL_SERVER_CONFIG_FILE_NAME);
+}
+
+export function getGlobalServerSecretsPath(homeDir?: string): string {
+  return path.join(getGlobalMakeStateDir(homeDir), GLOBAL_SERVER_SECRETS_FILE_NAME);
+}
+
+export function getGlobalMakeServiceLogPath(homeDir?: string): string {
+  return path.join(getGlobalMakeStateDir(homeDir), GLOBAL_MAKE_SERVICE_LOG_FILE_NAME);
 }
 
 export function getConfigPath(projectRoot: string): string {
@@ -76,6 +88,14 @@ export function getProjectSessionsDir(projectRoot: string): string {
 
 export function getProjectExportsDir(projectRoot: string): string {
   return path.join(resolveProjectRoot(projectRoot), PROJECT_EXPORTS_RELATIVE_DIR);
+}
+
+export function getProjectPublishedHtmlDir(projectRoot: string): string {
+  return path.join(resolveProjectRoot(projectRoot), PROJECT_PUBLISHED_HTML_RELATIVE_DIR);
+}
+
+export function getProjectPublishedRealtimeDir(projectRoot: string): string {
+  return path.join(resolveProjectRoot(projectRoot), PROJECT_PUBLISHED_REALTIME_RELATIVE_DIR);
 }
 
 export function getProjectEditHistoryDir(projectRoot: string): string {

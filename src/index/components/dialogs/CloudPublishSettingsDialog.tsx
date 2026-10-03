@@ -99,16 +99,22 @@ const PUBLISH_PLATFORM_OPTIONS: Array<{ id: CloudPublishTarget; label: string }>
     { id: 'github-pages', label: 'GitHub Pages' },
 ];
 
-function buildCloudPublishAiConfigPrompt(target: ConfigurableCloudPublishTarget): string {
+function buildCloudPublishAiConfigPrompt(
+    target: ConfigurableCloudPublishTarget,
+    projectId: string,
+    makeApiOrigin: string,
+): string {
+    const endpoint = `${makeApiOrigin.replace(/\/+$/u, '')}/api/cloud-publishing/config?projectId=${encodeURIComponent(projectId)}`;
+    const boundary = `请通过 POST ${endpoint} 保存配置；不得直接读取或写入 \`server.config.json\` 和 \`server.secrets.json\`，不得回显完整凭据。`;
     switch (target) {
         case 's3':
-            return '请帮我配置 Axhub Make 对象存储发布。配置文件是 Make Server 全局配置：默认 ~/.axhub/make/server.config.json；如果设置了 AXHUB_MAKE_HOME_DIR，则写 $AXHUB_MAKE_HOME_DIR/.axhub/make/server.config.json。请引导我提供 accessKeyId、secretAccessKey、region、bucket、baseUrl，可选 prefix、endpoint，然后写入 JSON 的 cloudPublishing.s3。';
+            return `请帮我配置 Axhub Make 对象存储发布。请引导我提供 accessKeyId、secretAccessKey、region、bucket、baseUrl，可选 prefix、endpoint，并通过请求体的 \`s3\` 字段提交。${boundary}`;
         case 'vercel':
-            return '请帮我配置 Axhub Make Vercel 发布。配置文件是 Make Server 全局配置：默认 ~/.axhub/make/server.config.json；如果设置了 AXHUB_MAKE_HOME_DIR，则写 $AXHUB_MAKE_HOME_DIR/.axhub/make/server.config.json。请引导我提供 token、projectName，可选 teamId，然后写入 JSON 的 cloudPublishing.vercel。';
+            return `请帮我配置 Axhub Make Vercel 发布。请引导我提供 token、projectName，可选 teamId，并通过请求体的 \`vercel\` 字段提交。${boundary}`;
         case 'cloudflare-pages':
-            return '请帮我配置 Axhub Make Cloudflare Pages 发布。配置文件是 Make Server 全局配置：默认 ~/.axhub/make/server.config.json；如果设置了 AXHUB_MAKE_HOME_DIR，则写 $AXHUB_MAKE_HOME_DIR/.axhub/make/server.config.json。请引导我提供 apiToken、accountId，可选 projectName，productionBranch 默认 main，然后写入 JSON 的 cloudPublishing.cloudflarePages。';
+            return `请帮我配置 Axhub Make Cloudflare Pages 发布。请引导我提供 apiToken、accountId，可选 projectName，productionBranch 默认 main，并通过请求体的 \`cloudflarePages\` 字段提交。${boundary}`;
         case 'github-pages':
-            return '请帮我配置 Axhub Make GitHub Pages 发布。配置文件是 Make Server 全局配置：默认 ~/.axhub/make/server.config.json；如果设置了 AXHUB_MAKE_HOME_DIR，则写 $AXHUB_MAKE_HOME_DIR/.axhub/make/server.config.json。请引导我提供 repository、branch、sourceDirectory，可选 pathPrefix；repository 可从 git remote 推断，branch 默认 gh-pages，sourceDirectory 只能是 / 或 /docs。然后写入 JSON 的 cloudPublishing.githubPages。';
+            return `请帮我配置 Axhub Make GitHub Pages 发布。请引导我提供 repository、branch、sourceDirectory，可选 pathPrefix；repository 可从 git remote 推断，branch 默认 gh-pages，sourceDirectory 只能是 / 或 /docs，并通过请求体的 \`githubPages\` 字段提交。${boundary}`;
     }
 }
 
@@ -360,7 +366,7 @@ export default function CloudPublishSettingsDialog({
     const handleCopyAiConfigPrompt = async () => {
         if (activeTab === 'publish-settings') return;
         try {
-            await navigator.clipboard.writeText(buildCloudPublishAiConfigPrompt(activeTab));
+            await navigator.clipboard.writeText(buildCloudPublishAiConfigPrompt(activeTab, projectId, window.location.origin));
             toast.success('AI 配置提示词已复制');
         } catch {
             toast.error('复制 AI 配置提示词失败');

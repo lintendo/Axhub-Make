@@ -18,7 +18,8 @@ const ACP_UI_NPM_COMMAND = 'npm';
 const ACP_UI_START_CHECK_DELAY_MS = 500;
 const ACP_UI_READY_CHECK_TIMEOUT_MS = 120_000;
 const ACP_UI_READY_CHECK_INTERVAL_MS = 500;
-const ACP_UI_ENDPOINT_PROBE_TIMEOUT_MS = 1_500;
+const ACP_UI_DEVELOPMENT_ENDPOINT_PROBE_TIMEOUT_MS = 15_000;
+const ACP_UI_PRODUCTION_ENDPOINT_PROBE_TIMEOUT_MS = 3_000;
 const COMMAND_AVAILABILITY_TIMEOUT_MS = 2_000;
 const ACP_UI_SERVICE_ID = '@axhub/acp';
 const ACP_UI_DEFAULT_CORS_ORIGINS = [
@@ -426,7 +427,7 @@ async function runAcpUiCommandInBackground(
     const child = spawn(spawnSpec.command, spawnSpec.args, {
       cwd: startSpec.cwd,
       detached: true,
-      stdio: ['ignore', 'ignore', 'pipe'],
+      stdio: 'ignore',
       windowsHide: spawnSpec.windowsHide,
       shell: false,
       env: buildAcpUiStartEnv({ corsOrigin: options.corsOrigin }),
@@ -488,10 +489,19 @@ function getCommandSourceForEndpointSource(source: AssistantEndpointSource): Ass
   return source === 'default' ? 'default' : source;
 }
 
+export function resolveAssistantEndpointProbeTimeoutMs(
+  options: { argv?: readonly string[] } = {},
+): number {
+  const argv = options.argv || process.argv;
+  return argv.includes('--dev')
+    ? ACP_UI_DEVELOPMENT_ENDPOINT_PROBE_TIMEOUT_MS
+    : ACP_UI_PRODUCTION_ENDPOINT_PROBE_TIMEOUT_MS;
+}
+
 async function fetchEndpoint(url: string, options: RequestInit = {}) {
   return fetch(url, {
     ...options,
-    signal: AbortSignal.timeout(ACP_UI_ENDPOINT_PROBE_TIMEOUT_MS),
+    signal: AbortSignal.timeout(resolveAssistantEndpointProbeTimeoutMs()),
   });
 }
 

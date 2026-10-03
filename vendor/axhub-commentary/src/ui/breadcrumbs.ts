@@ -59,6 +59,8 @@ export interface BreadcrumbsOptions {
   onElementToolAction?: (tool: CommentaryElementTool, element: Element) => void | Promise<void>;
   /** Whether local annotation markdown editing is available for the selected element */
   canEditAnnotationMarkdown?: (element: Element | null) => boolean;
+  /** Whether the selected-element card may show its inline annotation Markdown editor */
+  showAnnotationMarkdownEditor?: boolean;
   /** Resolve synthetic editor targets to the host element used by annotation checks */
   resolveAnnotationTarget?: (element: Element | null) => Element | null;
   /** Return a host-specific reason that prevents creating an annotation for the selected element */
@@ -73,6 +75,8 @@ export interface BreadcrumbsOptions {
   onAnnotationMarkdownChange?: (element: Element, markdown: string) => void | Promise<void>;
   /** Delete the selected local annotation node, including its runtime marker */
   onDeleteCurrentAnnotationNode?: (element: Element) => void | Promise<void>;
+  /** Delete the selected page element and create a recoverable annotation on its parent. */
+  onDeleteCurrentElement?: (element: Element) => boolean | Promise<boolean>;
   /** Callback when selecting the parent candidate */
   onSelectParent?: (element: Element) => void;
 }
@@ -85,8 +89,8 @@ export interface Breadcrumbs {
   setAnchorRect(rect: ViewportRect | null): void;
   /** Force a re-render when external UI dependencies change */
   refresh(): void;
-  /** Legacy no-op retained for older host integrations. */
-  enterInlineTextEdit?(): void;
+  /** Start inline editing for the explicit text target while preserving the selected context. */
+  enterInlineTextEdit?(element?: HTMLElement | null): void;
   /** Cleanup */
   dispose(): void;
 }

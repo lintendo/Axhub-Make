@@ -56,7 +56,12 @@ vi.mock('../localCommand.ts', async (importActual) => {
 });
 
 const { commandExists, runLocalCommand } = await import('../localCommand.ts');
-const { resolveAssistantMakeCorsOrigins, resolveAssistantRuntime, runAssistantBootstrap } = await import('../assistantRuntime.ts');
+const {
+  resolveAssistantEndpointProbeTimeoutMs,
+  resolveAssistantMakeCorsOrigins,
+  resolveAssistantRuntime,
+  runAssistantBootstrap,
+} = await import('../assistantRuntime.ts');
 const { startMakeServer } = await import('../index');
 const { handleAssistantPromptIde } = await import('../managementApi.assistantIde.ts');
 
@@ -275,6 +280,7 @@ function expectAcpUiSpawn(params: {
     : expect.arrayContaining(['-y', '@axhub/acp@latest', '--port', params.port, '--cors-origin']));
   expectAcpUiCorsArg(args, params.makeOrigin);
   expect(options.detached).toBe(true);
+  expect(options.stdio).toBe('ignore');
   expect(normalizeTestPath(options.cwd)).toBe(normalizeTestPath(params.cwd));
 }
 
@@ -301,14 +307,6 @@ async function startTestServer(projectRoot: string) {
     registryPath: getProjectRegistryPath(registryHome),
   });
   return Object.assign(server, { registryHome });
-}
-
-function projectApiUrl(origin: string, pathname: string, projectId = 'assistant-client'): string {
-  const url = new URL(pathname, origin);
-  if (!url.searchParams.has('projectId')) {
-    url.searchParams.set('projectId', projectId);
-  }
-  return url.toString();
 }
 
 function createLocalCommandResult(command: string, args: string[], stdout = '', stderr = '') {
@@ -345,6 +343,20 @@ afterEach(() => {
   for (const root of tempRoots.splice(0)) {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+describe('resolveAssistantEndpointProbeTimeoutMs', () => {
+  it('uses 15 seconds when Axhub Make is started with --dev', () => {
+    expect(resolveAssistantEndpointProbeTimeoutMs({
+      argv: ['node', 'src/server/cli.ts', '--', '--dev'],
+    })).toBe(15_000);
+  });
+
+  it('uses 3 seconds outside Axhub Make development mode', () => {
+    expect(resolveAssistantEndpointProbeTimeoutMs({
+      argv: ['node', 'src/server/cli.ts'],
+    })).toBe(3_000);
+  });
 });
 
 describe('resolveAssistantMakeCorsOrigins', () => {
@@ -441,7 +453,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime?autoStart=false'));
+      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=false&projectId=assistant-client`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -480,7 +492,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime?autoStart=false'));
+      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=false&projectId=assistant-client`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -516,7 +528,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime'));
+      const response = await fetch(`${server.origin}/api/assistant/runtime?projectId=assistant-client`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -557,7 +569,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime?autoStart=true'));
+      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true&projectId=assistant-client`);
       const body = await response.json();
       const assistantPort = new URL(assistant.origin).port;
 
@@ -612,7 +624,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime?autoStart=true'));
+      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true&projectId=assistant-client`);
       const body = await response.json();
       const assistantPort = new URL(assistant.origin).port;
 
@@ -647,7 +659,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime?autoStart=false'));
+      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=false&projectId=assistant-client`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -684,7 +696,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime?autoStart=false'));
+      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=false&projectId=assistant-client`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -768,7 +780,7 @@ describe('make-server assistant runtime API', () => {
     });
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime?autoStart=true'));
+      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true&projectId=assistant-client`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -851,7 +863,7 @@ describe('make-server assistant runtime API', () => {
     });
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime?autoStart=true'));
+      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true&projectId=assistant-client`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -929,7 +941,7 @@ describe('make-server assistant runtime API', () => {
     });
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime?autoStart=true'));
+      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true&projectId=assistant-client`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -985,7 +997,7 @@ describe('make-server assistant runtime API', () => {
     });
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime?autoStart=false'));
+      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=false&projectId=assistant-client`);
       const body = await response.json();
       const savedConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(server.registryHome), 'utf8'));
 
@@ -1061,7 +1073,7 @@ describe('make-server assistant runtime API', () => {
     });
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime?autoStart=true'));
+      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true&projectId=assistant-client`);
       const body = await response.json();
       const savedConfig = JSON.parse(fs.readFileSync(getGlobalServerConfigPath(server.registryHome), 'utf8'));
 
@@ -1107,7 +1119,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime?autoStart=false'));
+      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=false&projectId=assistant-client`);
       const body = await response.json();
 
       expect(response.status).toBe(200);
@@ -1206,7 +1218,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime?autoStart=true'));
+      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true&projectId=assistant-client`);
       const body = await response.json();
       const assistantPort = new URL(assistant.origin).port;
 
@@ -1361,7 +1373,7 @@ describe('make-server assistant runtime API', () => {
     const killSpy = vi.spyOn(process, 'kill').mockImplementation((() => true) as any);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime?autoStart=true'));
+      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=true&projectId=assistant-client`);
       const body = await response.json();
       const savedConfigPath = getGlobalServerConfigPath(server.registryHome);
 
@@ -1416,16 +1428,16 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/runtime?autoStart=false'), {
-        headers: { 'x-forwarded-host': '192.168.31.9:5174' },
+      const response = await fetch(`${server.origin}/api/assistant/runtime?autoStart=false&projectId=assistant-client`, {
+        headers: { 'x-forwarded-host': '192.168.1.9:5174' },
       });
       const body = await response.json();
 
       expect(response.status).toBe(200);
       const assistantPort = new URL(assistant.origin).port;
       expect(body).toMatchObject({
-        webBaseUrl: `http://192.168.31.9:${assistantPort}`,
-        apiBaseUrl: `http://192.168.31.9:${assistantPort}/api`,
+        webBaseUrl: `http://192.168.1.9:${assistantPort}`,
+        apiBaseUrl: `http://192.168.1.9:${assistantPort}/api`,
         projectId: 'assistant-client',
         projectPath: projectRoot,
         source: 'config',
@@ -1453,7 +1465,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/bootstrap'), {
+      const response = await fetch(`${server.origin}/api/assistant/bootstrap?projectId=assistant-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'start_existing' }),
@@ -1543,7 +1555,7 @@ describe('make-server assistant runtime API', () => {
     });
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/bootstrap'), {
+      const response = await fetch(`${server.origin}/api/assistant/bootstrap?projectId=assistant-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'restart_existing' }),
@@ -1628,7 +1640,7 @@ describe('make-server assistant runtime API', () => {
     });
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/bootstrap'), {
+      const response = await fetch(`${server.origin}/api/assistant/bootstrap?projectId=assistant-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'restart_existing' }),
@@ -1673,7 +1685,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/bootstrap'), {
+      const response = await fetch(`${server.origin}/api/assistant/bootstrap?projectId=assistant-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'restart_existing' }),
@@ -1699,7 +1711,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/assistant/bootstrap'), {
+      const response = await fetch(`${server.origin}/api/assistant/bootstrap?projectId=assistant-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'bad-mode' }),
@@ -1723,7 +1735,7 @@ describe('make-server assistant runtime API', () => {
     const server = await startTestServer(projectRoot);
 
     try {
-      const response = await fetch(projectApiUrl(server.origin, '/api/prompt/execute'), {
+      const response = await fetch(`${server.origin}/api/prompt/execute?projectId=assistant-client`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: 'hello' }),

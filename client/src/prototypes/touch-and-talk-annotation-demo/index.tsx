@@ -87,7 +87,7 @@ const chapters: Chapter[] = [
         nav: '快速批注',
         title: '快速即可体验',
         kicker: 'Workflow',
-        summary: '从打开批注到复制提示词，目标是让一次局部修改在 30 秒内完成表达。',
+        summary: '从打开批注到告知 AI，目标是让一次局部修改在 30 秒内完成表达。',
         icon: PencilLine,
         tone: 'dark',
     },
@@ -238,7 +238,7 @@ function QuickFlowSlide({ chapter }: { chapter: Chapter }) {
                         ['开启批注', '打开原型顶部的批注入口，让页面进入可点选状态。'],
                         ['选择元素', '选中按钮、卡片、图表或文字，任意元素都可以批注。'],
                         ['输入批注', '写一句要改什么；能说清目的，比格式漂亮更重要。'],
-                        ['复制提示词', '把当前页面批注整理成可独立交接的 AI 上下文，复制后即可交给其他 AI 工具继续处理。'],
+                        ['告知 AI', '把当前页面链接或原型名称告知 AI，即可持续处理批注。'],
                     ].map(([title, detail], index) => (
                         <article key={title}>
                             <span>{String(index + 1).padStart(2, '0')}</span>

@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 
-import { runCli } from '../src/server/cli.ts';
+import { handleCliError, runCli } from '../src/server/cli.ts';
 
-runCli().catch((error) => {
-  console.error(error?.stack || error?.message || error);
-  process.exitCode = 1;
-});
+runCli()
+  .then((exitCode) => {
+    process.exitCode = exitCode;
+  })
+  .catch((error) => {
+    process.exitCode = handleCliError(error);
+  });

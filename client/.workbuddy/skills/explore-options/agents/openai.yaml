@@ -1,0 +1,4 @@
+interface:
+  display_name: "多方案探索"
+  short_description: "批注或需求需要多方案、比稿或设计决策时，先比较 2-3 个方向"
+  default_prompt: "使用 $explore-options 对当前批注做多方案探索，形成设计决策后执行最合适的一种。"

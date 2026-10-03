@@ -1686,8 +1686,22 @@ export function handleGitApi(
     }
 
     if (pathname === '/api/git/history' && req.method === 'GET') {
+      const requestedBranch = String(url.searchParams.get('branch') || '').trim();
+      if (requestedBranch) {
+        const branchOverview = await getWorkspaceBranchOverview(context.project.root, executor);
+        if (!branchOverview.localBranches.includes(requestedBranch)) {
+          sendJson(res, {
+            error: 'Branch does not exist',
+            code: 'BRANCH_NOT_FOUND',
+            projectId: context.project.id,
+            branchOverview,
+          }, { status: 404 });
+          return;
+        }
+      }
+      const historyRef = requestedBranch || 'HEAD';
       const status = await execGit(['status', '--porcelain', '--', gitScopePath], context.project.root);
-      const log = await execGit(['log', '-20', '--pretty=format:%H|%an|%ae|%at|%s', '--', gitScopePath], context.project.root);
+      const log = await execGit(['log', '-20', '--pretty=format:%H|%an|%ae|%at|%s', historyRef, '--', gitScopePath], context.project.root);
       const prototypeEntryCandidates = getPrototypeIndexGitPathCandidates(gitScopePath, versionFileBasePath);
       const commits = log.stdout
         ? await Promise.all(log.stdout.split('\n').filter(Boolean).map(async (line) => {

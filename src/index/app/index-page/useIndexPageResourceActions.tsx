@@ -258,7 +258,6 @@ export function useIndexPageResourceActions(params: any) {
     const [selectedTheme, setSelectedTheme] = useState<any>(null);
     const [selectedDataTable, setSelectedDataTable] = useState<any>(null);
     const [themeCreateDialogVisible, setThemeCreateDialogVisible] = useState(false);
-    const [initialThemeDialogTab, setInitialThemeDialogTab] = useState<'import' | 'onlineSelect'>('import');
     const [versionDialogVisible, setVersionDialogVisible] = useState(false);
     const [currentVersionItem, setCurrentVersionItem] = useState<ItemData | null>(null);
     const [docReferencePromptDialog, setDocReferencePromptDialog] = useState<any>(null);
@@ -459,6 +458,46 @@ export function useIndexPageResourceActions(params: any) {
         setViewMode,
     ]);
 
+    const handleCreateDocument = useCallback(async (targetFolder?: string | null) => {
+        const createdName = buildUniqueResourceFileName(docsItems, targetFolder, '新文档.md');
+        const hide = messageApi.loading('正在创建文档...', 0);
+        try {
+            const response = await fetch(buildResourceUrl(`/api/docs/${encodeURIComponent(createdName)}`), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(buildResourceBody({ content: '# 新文档\n' })),
+            });
+            const payload = await response.json().catch(() => ({} as any));
+            if (!response.ok) {
+                throw new Error(payload?.error || '创建文档失败');
+            }
+            const nextDocs = await reloadDocsItems();
+            if (typeof loadSidebarTree === 'function') {
+                await loadSidebarTree('docs', { force: true, items: nextDocs });
+            }
+            const createdDoc = findCreatedResourceDoc(nextDocs, createdName);
+            setSidebarTab('document');
+            setViewMode('demo');
+            setSelectedResourceFolder(null);
+            setSelectedDoc(createdDoc);
+            messageApi.success('文档已创建');
+        } catch (error: any) {
+            messageApi.error(error?.message || '创建文档失败');
+        } finally {
+            hide();
+        }
+    }, [
+        buildResourceBody,
+        buildResourceUrl,
+        docsItems,
+        findCreatedResourceDoc,
+        loadSidebarTree,
+        messageApi,
+        reloadDocsItems,
+        setSidebarTab,
+        setViewMode,
+    ]);
+
     const handleCreateDrawioResourceFile = useCallback(async (targetFolder?: string | null) => {
         const createdName = buildUniqueResourceFileName(docsItems, targetFolder, 'untitled.drawio');
         const hide = messageApi.loading('正在创建 Drawio 图表...', 0);
@@ -569,7 +608,6 @@ export function useIndexPageResourceActions(params: any) {
 
     const clearThemeCreateDialogState = useCallback(() => {
         setThemeCreateDialogVisible(false);
-        setInitialThemeDialogTab('import');
     }, []);
 
     const handleThemeCreateCancel = useCallback(() => {
@@ -1543,7 +1581,6 @@ export function useIndexPageResourceActions(params: any) {
     const handleImportThemeResource = useCallback(() => {
         setSidebarTab('assets');
         setResourceSection('themes');
-        setInitialThemeDialogTab('import');
         setThemeCreateDialogVisible(true);
     }, [setResourceSection, setSidebarTab]);
 
@@ -1599,6 +1636,23 @@ export function useIndexPageResourceActions(params: any) {
             return null;
         }
     }, [activeProjectId, getSidebarTabItems, messageApi, setSidebarTrees]);
+
+    const prepareImageAiResourceFolder = useCallback(async (folderPath: string) => {
+        try {
+            const response = await sidebarApi.ensureSidebarFolder(folderPath, requireProjectScope(activeProjectId));
+            const items = getSidebarTabItems('docs');
+            const nextTree = sanitizeSidebarTree('docs', Array.isArray(response.tree) ? response.tree : [], items);
+            setSidebarTrees((previous: Record<SidebarTreeTab, SidebarTreeNode[]>) => ({ ...previous, docs: nextTree }));
+            handleSelectResourceFolder(response.folder, 'docs');
+            return {
+                folder: toSelectedResourceFolder(response.folder, 'docs'),
+                absolutePath: response.absolutePath,
+            };
+        } catch (error: any) {
+            messageApi.error(error?.message || '准备图片保存文件夹失败');
+            return null;
+        }
+    }, [activeProjectId, getSidebarTabItems, handleSelectResourceFolder, messageApi, setSidebarTrees]);
 
     const handleSidebarTreeChange = useCallback((tab: SidebarTreeTab, nextTree: SidebarTreeNode[]) => {
         const items = getSidebarTabItems(tab);
@@ -1685,8 +1739,6 @@ export function useIndexPageResourceActions(params: any) {
         setSelectedDataTable,
         themeCreateDialogVisible,
         setThemeCreateDialogVisible,
-        initialThemeDialogTab,
-        setInitialThemeDialogTab,
         versionDialogVisible,
         setVersionDialogVisible,
         currentVersionItem,
@@ -1699,6 +1751,7 @@ export function useIndexPageResourceActions(params: any) {
         clearThemeCreateDialogState,
         handleThemeCreateCancel,
         refreshSidebarAssets,
+        refreshDocsResources,
         handleCreateDialogUploadSuccess,
         handleReorderThemes,
         handleReorderDataTables,
@@ -1727,8 +1780,10 @@ export function useIndexPageResourceActions(params: any) {
         handleUploadedResourceFiles,
         handleCreateResourceCanvasFile,
         handleCreateDrawioResourceFile,
+        handleCreateDocument,
         handleCreatePlaceholderPrototype,
         handleCreateFolder,
+        prepareImageAiResourceFolder,
         handleProjectTitleChange: async (title: string) => {
             const nextTitle = title.trim();
             const previousTitle = projectTitle;

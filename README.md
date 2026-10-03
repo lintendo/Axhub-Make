@@ -25,6 +25,62 @@ npx -y @axhub/make@latest
 
 启动后会自动打开管理页面。如果没有打开，复制终端里显示的地址到浏览器。
 
+## 本地开发
+
+管理端页面、服务端 API 和运行时注入必须通过完整开发服务器一起启动：
+
+```bash
+pnpm server:dev -- --host 127.0.0.1 --no-open
+```
+
+不要直接启动 Vite，也不要为浏览器验证创建独立的管理端前端服务；独立前端缺少 Make 服务端 API 和运行时注入，并会占用管理端口。
+
+## CLI 启动与打开 AI 应用
+
+默认命令在当前终端前台启动 Make 并打开管理页面。需要命令完成后继续在后台运行时，使用：
+
+```bash
+npx -y @axhub/make@latest --background
+```
+
+`open` 会启动或复用 Make，再打开指定 AI 应用、注入 Axhub Make 入口并立即激活：
+
+```bash
+npx -y @axhub/make@latest open codex
+npx -y @axhub/make@latest open cursor
+npx -y @axhub/make@latest open workbuddy
+npx -y @axhub/make@latest open traework
+```
+
+以上 App ID 是当前公开入口。加上 `--background` 可让新建的 Make 服务在后台运行；`--no-open` 只禁止系统浏览器打开管理页面，不影响 AI 应用里的入口激活。
+
+如果目标应用已经运行但没有可用的调试端点，交互式终端会先请求重启确认。自动化或非交互环境可以显式传入 `--restart`，Make 只会请求应用正常退出，不会静默强制结束进程。`--app-path <path>` 可为本次调用指定应用路径，不会持久化。
+
+查看或停止当前用户的 Make Admin 服务：
+
+```bash
+npx -y @axhub/make@latest status
+npx -y @axhub/make@latest stop
+```
+
+这套 `open` 流程是一次性启动与注入，不安装扩展、常驻 companion、LaunchAgent 或 Windows 计划任务。重复调用会更新并激活已有入口。
+
+## 从 Make 打开本地 AI 应用
+
+Make 左上角“打开 AI”菜单的指定目录启动统一委托给 `@axhub/agent-surface`。需要页面集成时，服务端只调用一次组合接口完成项目打开和入口注入：
+
+| 应用 | 指定目录方式 | 当前边界 |
+| --- | --- | --- |
+| ChatGPT / Codex | Codex 应用命令或项目深链 | 支持 Agent Surface 入口注入 |
+| Cursor Agents | 内置 desktop router 的 `--chat` 与目录参数 | 支持 Agent Surface 入口注入 |
+| WorkBuddy | `workbuddy://task?action=start&cwd=...` 任务深链 | 支持 Agent Surface 入口注入 |
+| TRAEWORK | 不自动打开目录 | 对应 TRAE SOLO / SOLO CN，支持 Agent Surface 入口注入 |
+| OpenCode | `opencode://open-project?directory=...` 项目深链 | 仅打开目录，不注入入口 |
+
+用户在「设置」中配置的应用路径仍由 Make 保存，并在检查、退出和启动时作为最高优先级 `appPath` 传给 `@axhub/agent-surface`。只有未配置路径时，ChatGPT、WorkBuddy、TRAEWORK 和 TRAE 的 macOS / Windows 自动探测才交给共享宿主适配器；Cursor 的 Surface 检查与启动也使用同一包。OpenCode 暂无宿主适配器，因此仍由 Make 本地探测。
+
+Agent Surface 的桌面客户端与注入等待由调用参数 `timeoutMs` 控制，未传时统一为 30 秒；Make 可以在特殊冷启动场景显式覆盖，不在宿主适配器中维护不同等待值。
+
 ## 让 AI 帮你启动
 
 把下面这段发给你的 AI Agent，让它读取启动说明，然后帮你检查环境、启动 Make，并创建一个以后可以直接双击运行的桌面脚本：
@@ -117,12 +173,6 @@ Make 内置新手教程、100+ 设计规范和 10+ 行业原型。原型完成�
 
 <img src="assets/images/axhub-make-user-group-qrcode.png" alt="Axhub Make 用户群二维码" height="128">
 
-## 参与贡献
+## 贡献与安全
 
-提交 Bug、功能建议或代码前，请阅读 [贡献指南](CONTRIBUTING.md)。安全漏洞不要提交公开 Issue，请按照 [安全政策](SECURITY.md) 私密报告。
-
-参与社区时请遵守 [行为准则](CODE_OF_CONDUCT.md)。
-
-## License
-
-Axhub Make 使用 [Apache License 2.0](LICENSE)。
+参阅 [贡献指南](CONTRIBUTING.md) 和 [安全报告说明](SECURITY.md)。本项目使用 [Apache License 2.0](LICENSE)。

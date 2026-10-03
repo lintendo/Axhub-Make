@@ -7297,6 +7297,11 @@ body.excalidraw-cursor-resize * {
 .excalidraw__canvas {
   position: absolute;
 }
+.excalidraw__scene-layers {
+  position: absolute;
+  inset: 0;
+  z-index: var(--zIndex-canvas);
+}
 .excalidraw__embeddable {
   width: 100%;
   height: 100%;

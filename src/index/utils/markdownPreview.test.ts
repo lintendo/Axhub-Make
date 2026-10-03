@@ -64,6 +64,13 @@ describe('markdown preview url helpers', () => {
         }, 'doc')).toBe('/spec-template.html?url=%2Fapi%2Fprojects%2Fclient-project%2Fdocument-content%3Fpath%3Dsrc%252Fprototypes%252Fannotation-demo%252Fdocs%252Fprd-03-states.md');
 
         expect(resolveMarkdownPreviewIframeUrl({
+            name: 'templates/prototype-spec.html',
+            filePath: 'templates/prototype-spec.html',
+            projectId: 'client-project',
+            projectDocumentPath: 'templates/prototype-spec.html',
+        }, 'doc')).toBe('/api/projects/client-project/document-content?path=templates%2Fprototype-spec.html');
+
+        expect(resolveMarkdownPreviewIframeUrl({
             name: 'local-prd',
             absoluteFilePath: '/workspace/client/src/resources/local-prd.md',
             projectId: 'client-project',

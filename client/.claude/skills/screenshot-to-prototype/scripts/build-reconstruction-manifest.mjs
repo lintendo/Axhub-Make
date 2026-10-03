@@ -38,6 +38,8 @@ function main() {
   };
   const rawElements = Array.isArray(elementInput) ? elementInput : (elementInput.elements || []);
   const elements = rawElements.map((element, index) => {
+    const id = typeof element.id === 'string' ? element.id.trim() : '';
+    if (!id) throw new Error(`elements[${index}] id is required`);
     const candidates = Array.isArray(element.candidates) ? element.candidates : [];
     const selectedCandidateId = element.selectedCandidateId
       || (typeof element.selectedCandidate === 'string' ? element.selectedCandidate : element.selectedCandidate?.id)
@@ -46,15 +48,20 @@ function main() {
       || null;
     const selectedCandidate = candidates.find((candidate) => candidate?.id === selectedCandidateId);
     return {
-      id: element.id || element.specElementId || `element-${index + 1}`,
+      id,
+      ...(element.parentId ? { parentId: element.parentId } : {}),
       ...(element.name ? { name: element.name } : {}),
       ...(element.kind ? { kind: element.kind } : {}),
+      ...(element.uiRole ? { uiRole: element.uiRole } : {}),
       sourceBBox: element.sourceBBox || element.bbox || element.targetBBox,
       targetBBox: element.targetBBox || element.bbox || element.sourceBBox,
       ...(element.representation || selectedCandidate?.route ? { representation: element.representation || selectedCandidate.route } : {}),
+      ...(Object.prototype.hasOwnProperty.call(element, 'textReview') ? { textReview: element.textReview } : {}),
+      ...(Object.prototype.hasOwnProperty.call(element, 'assetReview') ? { assetReview: element.assetReview } : {}),
+      ...(element.visualStyle ? { visualStyle: element.visualStyle } : {}),
       candidates,
       selectedCandidateId,
-      specElementId: element.specElementId || element.id || `element-${index + 1}`,
+      specElementId: element.specElementId || id,
       reactTarget: element.reactTarget ?? null,
     };
   });

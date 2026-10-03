@@ -42,6 +42,18 @@ export interface ItemData {
     defaultPageId?: string;
 }
 
+export interface AnnotationDocumentDirectoryNode {
+    type: 'folder' | 'markdown' | 'html';
+    id: string;
+    title: string;
+    markdownPath?: string;
+    htmlPath?: string;
+    markdown?: string;
+    defaultExpanded?: boolean;
+    children?: AnnotationDocumentDirectoryNode[];
+    [key: string]: unknown;
+}
+
 export type ResourceOpenMode = 'document' | 'canvas' | 'drawio' | 'image' | 'file';
 
 export interface PrototypePlaceholderGuide {
@@ -71,11 +83,17 @@ export type PromptClient = AcpPromptClient | LocalPromptClient;
 export type PromptClientPreference = PromptClient | null;
 
 export interface AutomationConfig {
-    defaultPromptClient?: PromptClientPreference;
+    conversationPromptClient?: PromptClientPreference;
+    conversationModel?: string | null;
     defaultIDE?: MainIDEPreference;
+    injectLocalAiEntry?: boolean;
+    launchLocalAiApp?: boolean;
     annotationPromptClient?: PromptClientPreference;
     annotationModel?: string | null;
+    canvasPromptClient?: PromptClientPreference;
+    canvasModel?: string | null;
     agentRunConcurrency?: number;
+    autoClearCompletedComments?: boolean;
 }
 
 export type ViewMode = 'demo' | 'canvas';

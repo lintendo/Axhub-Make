@@ -7,7 +7,9 @@ import {
   buildMainPreviewIframeUrl,
   buildProjectPrototypeIframeUrl,
   buildProjectPrototypeScreenshotIframeUrl,
+  buildCurrentScreenshotPayload,
   createDefaultHostToolbarState,
+  createPrototypeEditorVoiceBridgeResponse,
   getClientUrlOrigin,
   isQuickEditRuntimeReadyForIframe,
   resolveActiveAnnotationDirectRunToolbarState,
@@ -17,12 +19,78 @@ import {
   resolveExportScreenshotViewportSize,
   resolveHostToolbarStateForDisplay,
   resolveAnnotationActionEditingTargets,
+  replacePreviewAnnotationRuntimeSource,
   waitForHostToolbarActionState,
 } from './previewActions.helpers';
+
+describe('createDefaultHostToolbarState', () => {
+  it('keeps target screenshot capture unavailable and off before the runtime connects', () => {
+    expect(createDefaultHostToolbarState()).toMatchObject({
+      captureTargetScreenshotAvailable: false,
+      captureTargetScreenshot: false,
+    });
+  });
+});
 
 describe('previewActions.helpers', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('does not treat edits or terminal AI tasks as design decision data', () => {
+    const hasPrototypeDecisionData = (helpers as Record<string, unknown>)
+      .hasPrototypeDecisionData as undefined | ((
+        state: { propertyPanelVisible?: boolean; modifiedCount?: number; terminalTaskCount?: number } | null,
+        decisionDataCount?: number,
+      ) => boolean);
+
+    expect(typeof hasPrototypeDecisionData).toBe('function');
+    expect(hasPrototypeDecisionData?.({
+      propertyPanelVisible: false,
+      modifiedCount: 2,
+      terminalTaskCount: 1,
+    }, 0)).toBe(false);
+    expect(hasPrototypeDecisionData?.({ propertyPanelVisible: true }, 0)).toBe(true);
+    expect(hasPrototypeDecisionData?.({ propertyPanelVisible: false }, 1)).toBe(true);
+  });
+
+  it('creates structured-clone-safe voice responses with only contract fields', () => {
+    const target = {
+      targetRef: 'page.1.1',
+      label: 'button',
+      textExcerpt: '提交',
+      tagName: 'button',
+      role: 'button',
+      path: 'body > main > button',
+      childCount: 0,
+    };
+    const response = structuredClone(createPrototypeEditorVoiceBridgeResponse({
+      requestId: 'request-1',
+      success: true,
+      voiceTargets: { selected: target, hovered: null, preferred: target },
+      voiceCommentResult: {
+        applied: true,
+        targetRef: 'page.1.1',
+        commentId: 'comment-1',
+        target,
+      },
+    }));
+
+    expect(response).toEqual({
+      type: 'AXHUB_PROTOTYPE_EDITOR_STATE',
+      requestId: 'request-1',
+      success: true,
+      voiceTargets: { selected: target, hovered: null, preferred: target },
+      voiceCommentResult: {
+        applied: true,
+        targetRef: 'page.1.1',
+        commentId: 'comment-1',
+        target,
+      },
+    });
+    expect(response).not.toHaveProperty('debugState');
+    expect(response).not.toHaveProperty('voiceTarget');
+    expect(JSON.stringify(response)).not.toMatch(/locator|selector|outerHTML|innerHTML|attributes/u);
   });
 
   it('binds quick-edit runtime readiness to the current iframe identity', () => {
@@ -33,6 +101,26 @@ describe('previewActions.helpers', () => {
     expect(isQuickEditRuntimeReadyForIframe('ready', readyIframe, replacementIframe)).toBe(false);
     expect(isQuickEditRuntimeReadyForIframe('pending', readyIframe, readyIframe)).toBe(false);
     expect(isQuickEditRuntimeReadyForIframe('ready', readyIframe, null)).toBe(false);
+  });
+
+  it('replaces the mounted annotation source without reloading preview iframes', async () => {
+    const source = {
+      documentVersion: 1,
+      format: 'axhub-annotation-source',
+      data: { version: 2, prototypeName: 'home', nodes: [], updatedAt: 2 },
+      documents: { nodes: [{ type: 'markdown', id: 'new-doc', title: '新文档' }] },
+    };
+
+    const postToPreview = vi.fn(() => true);
+    const replaced = replacePreviewAnnotationRuntimeSource([
+      {} as HTMLIFrameElement,
+    ], source, postToPreview);
+
+    expect(replaced).toBe(true);
+    expect(postToPreview).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'AXHUB_ANNOTATION_RUNTIME_SOURCE_REPLACE',
+      source,
+    }), expect.anything());
   });
 
   it('uses mobile annotation interaction only for phone-sized prototype previews', () => {
@@ -74,12 +162,12 @@ describe('previewActions.helpers', () => {
     expect(resolveAnnotationActionEditingTargets(
       { type: 'send-to-agent' },
       [
-        { elementKey: 'card-a', locator: locatorA, label: 'Card A', note: 'A', imageCount: 0, changeKinds: [] },
-        { elementKey: 'card-b', locator: locatorB, label: 'Card B', note: 'B', imageCount: 0, changeKinds: [] },
+        { commentId: 'comment-a', elementKey: 'card-a', locator: locatorA, label: 'Card A', note: 'A', imageCount: 0, changeKinds: [] },
+        { commentId: 'comment-b', elementKey: 'card-b', locator: locatorB, label: 'Card B', note: 'B', imageCount: 0, changeKinds: [] },
       ],
     )).toEqual([
-      { elementKey: 'card-a', targetRef: { locator: locatorA, label: 'Card A' } },
-      { elementKey: 'card-b', targetRef: { locator: locatorB, label: 'Card B' } },
+      { commentId: 'comment-a', elementKey: 'card-a', targetRef: { locator: locatorA, label: 'Card A' } },
+      { commentId: 'comment-b', elementKey: 'card-b', targetRef: { locator: locatorB, label: 'Card B' } },
     ]);
   });
 
@@ -90,10 +178,49 @@ describe('previewActions.helpers', () => {
     expect(resolveAnnotationActionEditingTargets({
       type: 'send-to-agent',
       elementKey: 'card-a',
+      commentId: 'comment-a',
       locator: locatorA,
       label: 'Card A',
     }, [{ elementKey: 'card-b', locator: locatorB, label: 'Card B', note: 'B', imageCount: 0, changeKinds: [] }]))
-      .toEqual([{ elementKey: 'card-a', targetRef: { locator: locatorA, label: 'Card A' } }]);
+      .toEqual([{ commentId: 'comment-a', elementKey: 'card-a', targetRef: { locator: locatorA, label: 'Card A' } }]);
+  });
+
+  it('recovers a saved comment id for an explicit element action', () => {
+    const locatorA = { selectors: ['[data-card="a"]'], fingerprint: 'card-a', path: [0] };
+
+    expect(resolveAnnotationActionEditingTargets({
+      type: 'send-to-agent',
+      elementKey: 'card-a',
+      locator: locatorA,
+      label: 'Card A',
+    }, [{
+      commentId: 'comment-a',
+      elementKey: 'card-a',
+      locator: locatorA,
+      label: 'Card A',
+      note: 'A',
+      imageCount: 0,
+      changeKinds: [],
+    }])).toEqual([{
+      commentId: 'comment-a',
+      elementKey: 'card-a',
+      targetRef: { locator: locatorA, label: 'Card A' },
+    }]);
+  });
+
+  it('resolves a persisted comment id to its live modified element', () => {
+    const locatorA = { selectors: ['[data-card="a"]'], fingerprint: 'card-a', path: [0] };
+    const locatorB = { selectors: ['[data-card="b"]'], fingerprint: 'card-b', path: [1] };
+
+    expect(resolveAnnotationActionEditingTargets({
+      type: 'send-to-agent',
+      commentId: 'comment-b',
+    }, [
+      { commentId: 'comment-a', elementKey: 'card-a', locator: locatorA, label: 'Card A', note: 'A', imageCount: 0, changeKinds: [] },
+      { commentId: 'comment-b', elementKey: 'card-b', locator: locatorB, label: 'Card B', note: 'B', imageCount: 0, changeKinds: [] },
+    ])).toEqual([
+      { commentId: 'comment-b', elementKey: 'card-b', targetRef: { locator: locatorB, label: 'Card B' } },
+    ]);
   });
 
   it('ignores blank modified element keys and keeps the first duplicate target', () => {
@@ -257,6 +384,7 @@ describe('previewActions.helpers', () => {
     const url = new URL(buildProjectPrototypeScreenshotIframeUrl({
       name: 'touch-and-talk-annotation-demo',
       displayName: '批注演示',
+      projectId: 'make-project',
       clientUrl: 'http://localhost:51723/prototypes/touch-and-talk-annotation-demo?agentToolbar=host',
       previewUrl: 'http://localhost:51723/prototypes/touch-and-talk-annotation-demo',
     }, 'cover'));
@@ -264,6 +392,7 @@ describe('previewActions.helpers', () => {
     expect(url.origin).toBe('http://localhost:53817');
     expect(url.pathname).toBe('/prototypes/touch-and-talk-annotation-demo');
     expect(url.searchParams.get('agentToolbar')).toBeNull();
+    expect(url.searchParams.get('projectId')).toBe('make-project');
     expect(url.hash).toBe('#page=cover');
   });
 
@@ -503,6 +632,15 @@ describe('previewActions.helpers', () => {
     }, { width: 1920, height: 1080 })).toEqual({ width: 1280, height: 720 });
   });
 
+  it('omits target dimensions when a screenshot must preserve the live preview layout', () => {
+    const size = { width: 1024, height: 768 };
+
+    expect(buildCurrentScreenshotPayload('viewport', size, { preserveLayout: true }))
+      .toEqual({ scope: 'viewport' });
+    expect(buildCurrentScreenshotPayload('full-page', size))
+      .toEqual({ scope: 'full-page', targetWidth: 1024, targetHeight: 768 });
+  });
+
   it('resolves automatic Axure screenshot viewports from the current preview size', () => {
     expect(resolveExportScreenshotViewportSize({
       currentPreviewSize: { width: 1366, height: 820 },
@@ -584,12 +722,43 @@ describe('previewActions.helpers', () => {
       ...createDefaultHostToolbarState(),
       visible: false,
       selectionModeActive: false,
+      captureTargetScreenshotAvailable: true,
+      captureTargetScreenshot: true,
     };
 
     const resolvedState = resolveHostToolbarStateForDisplay(null, hiddenHostState, false);
 
     expect(resolvedState?.visible).toBe(true);
     expect(resolvedState?.selectionModeActive).toBe(false);
+    expect(resolvedState?.captureTargetScreenshotAvailable).toBe(true);
+    expect(resolvedState?.captureTargetScreenshot).toBe(true);
+  });
+
+  it('clears stale prompt availability when a hidden host state reports no edits', () => {
+    const previousState = {
+      ...createDefaultHostToolbarState(),
+      visible: true,
+      modifiedCount: 1,
+      copyPromptDisabled: false,
+      clearEditsDisabled: false,
+    };
+    const hiddenEmptyState = {
+      ...createDefaultHostToolbarState(),
+      toolbarMode: 'host' as const,
+      visible: false,
+      modifiedCount: 0,
+      copyPromptDisabled: true,
+      clearEditsDisabled: true,
+    };
+
+    const resolvedState = resolveHostToolbarStateForDisplay(previousState, hiddenEmptyState, false);
+
+    expect(resolvedState).toMatchObject({
+      visible: true,
+      modifiedCount: 0,
+      copyPromptDisabled: true,
+      clearEditsDisabled: true,
+    });
   });
 
   it('keeps copy prompt disabled in the fallback toolbar state until an editor reports promptable edits', () => {

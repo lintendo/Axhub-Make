@@ -1,6 +1,10 @@
 import React from 'react';
 import { App, Button, Input } from 'antd';
 import { setWebEditorFeedbackBridge } from '../../feedback-bridge';
+import { flushRuntimeMessages } from '../runtime-feedback';
+
+const HOST_TOAST_EVENT_NAME = 'axhub-commentary-host-toast';
+const MESSAGE_TYPES = new Set(['success', 'info', 'warning', 'error']);
 
 type PromptBridgeContentHandle = {
   getValue: () => string;
@@ -228,7 +232,27 @@ export function useFeedbackBridge(): void {
       },
     });
 
+    const handleHostToast = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        type?: unknown;
+        content?: unknown;
+        duration?: unknown;
+      }>).detail;
+      if (!detail || !MESSAGE_TYPES.has(String(detail.type)) || typeof detail.content !== 'string') {
+        return;
+      }
+      app.message.open({
+        type: detail.type as 'success' | 'info' | 'warning' | 'error',
+        content: detail.content,
+        duration: typeof detail.duration === 'number' ? detail.duration : 2,
+      });
+    };
+
+    window.addEventListener(HOST_TOAST_EVENT_NAME, handleHostToast);
+    flushRuntimeMessages();
+
     return () => {
+      window.removeEventListener(HOST_TOAST_EVENT_NAME, handleHostToast);
       setWebEditorFeedbackBridge(null);
     };
   }, [app]);

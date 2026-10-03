@@ -1,0 +1,4 @@
+interface:
+  display_name: "写 PRD"
+  short_description: "把对话、资源、原型和画布上下文整理成项目级 PRD，默认落入 src/resources"
+  default_prompt: "使用 $write-prd 基于当前上下文写一份 PRD；如果已有模板，请优先按模板整理。"

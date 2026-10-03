@@ -29,6 +29,21 @@ const sensitiveTextRules = [
   ['known-local-identity', new RegExp(['jian', 'zhoulin'].join(''), 'iu')],
 ];
 
+const syntheticTestHomeNames = new Set(['demo', 'person', 'tester']);
+const testFileRule = /\.test\.(?:[cm]?[jt]sx?)$/u;
+const homePathCaptures = {
+  'posix-home-path': /(?<![A-Za-z0-9._-])\/(?:Users|home)\/([^/\s"'<>]+)(?:\/|$)/gu,
+  'windows-home-path': /\b[A-Za-z]:\\Users\\([^\\\s"'<>]+)(?:\\|$)/gu,
+};
+
+function isSyntheticTestHomePath(filePath, rule, line) {
+  if (!testFileRule.test(filePath)) return false;
+  const capture = homePathCaptures[rule];
+  if (!capture) return false;
+  const matches = [...line.matchAll(capture)];
+  return matches.length > 0 && matches.every((match) => syntheticTestHomeNames.has(match[1]));
+}
+
 function normalizePath(filePath) {
   return filePath.split(path.sep).join('/').replace(/^\.\//u, '');
 }
@@ -52,7 +67,7 @@ export function findSensitiveTextFindings(relativePath, content) {
   const lines = content.split(/\r?\n/u);
   for (let index = 0; index < lines.length; index += 1) {
     for (const [rule, pattern] of sensitiveTextRules) {
-      if (pattern.test(lines[index])) {
+      if (pattern.test(lines[index]) && !isSyntheticTestHomePath(relativePath, rule, lines[index])) {
         findings.push({ path: normalizePath(relativePath), line: index + 1, rule });
       }
     }

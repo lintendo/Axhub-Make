@@ -1,15 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ClaudeCode, Codex, Cursor, DeepSeek, Grok, OpenCode } from '@lobehub/icons';
 import { QRCode } from 'antd';
-import { AlertTriangle, CheckCircle2, CircleHelp, Copy, Loader2, Play, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Copy, Loader2, Play, RefreshCw, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import codeBuddyIconUrl from '../assets/brand-icons/codebuddy.svg?url';
-import qoderIconUrl from '../assets/brand-icons/qoder.svg?url';
+import { codeBuddyIconUrl, qoderIconUrl } from '../assets/brand-icons/brandIconUrls';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabelWithHint } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
     Select,
     SelectContent,
@@ -30,9 +28,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { apiService, type AgentVersionsResponse, type AssistantRuntimeResponse, type LanAccessStatusResponse, type MakeClientUpdateApplyResult, type MakeClientUpdateBackupRecord, type MakeClientUpdateStatus } from '../services/api';
+import { apiService, resolveMakeApiOrigin, type AgentVersionsResponse, type AssistantRuntimeResponse, type LanAccessStatusResponse, type MakeClientUpdateApplyResult, type MakeClientUpdateBackupRecord, type MakeClientUpdateStatus } from '../services/api';
 import { requireProjectScope, withProjectScope } from '../services/projectScope';
-import { normalizePromptClientPreference } from '../../common/promptExecution';
+import { fillUnsetAiPurposePromptClients, normalizePromptClientPreference } from '../../common/promptExecution';
 import { ACP_PROVIDER_OPTIONS, type AcpProviderKey } from '../../common/acpModelConfig';
 import { runAiText, type AiRunClientError } from '../domains/ai-generation/aiRunClient';
 import {
@@ -61,28 +59,50 @@ import type { ExcalidrawPropertyPanelMode, ExcalidrawPropertyPanelPosition } fro
 import type { ThemeResourceItem } from '../domains/resources/resource.types';
 import { PrototypeThemeSearchSelect } from '../domains/prototype-generation/PrototypeThemeSearchSelect';
 import { NO_PROTOTYPE_THEME_VALUE } from '../domains/prototype-generation/prototypeGenerationThemeSelection';
+import { LocalAgentPathSettings } from './settings/LocalAgentPathSettings';
+import {
+    buildGlobalSettingsAiPrompt,
+    buildLocalAgentToolOpenStatePatch,
+    LOCAL_DESKTOP_AGENT_PATH_OPTIONS,
+    readLocalAgentPathEntries,
+    type LocalAgentPathEntry,
+    type LocalAgentToolOpenState,
+} from './settings/localAgentSettings';
+import { SettingsCollapsiblePanel } from './settings/SettingsCollapsiblePanel';
+import {
+    SETTINGS_COMPACT_CONTROL_CLASS_NAME,
+    SettingsConfigRow,
+    SettingsSectionSurface,
+} from './settings/SettingsSectionSurface';
+import { DocumentTemplateSettings } from './settings/FixedDocumentTemplateSettings';
+import {
+    VoiceAssistantSettingsSection,
+    type VoiceAssistantSettingsSectionHandle,
+} from './settings/VoiceAssistantSettingsSection';
 
 export type SettingsDialogInitialTab = 'project' | 'update' | 'ai' | 'network';
-
 export interface SettingsDialogAIContext {
     runtime?: AssistantRuntimeResponse | null;
     failureSource?: string;
     failureMessage?: string;
+    voiceSection?: 'voice-doubao';
 }
 
 interface SettingsDialogProps {
     open: boolean;
     projectId: string;
+    standalone?: 'ai' | 'network';
     onClose: () => void;
     onSaved?: () => void;
     makeClientUpdateReminderVisible?: boolean;
     onMakeClientUpdateReminderSeen?: () => void;
     onMakeClientUpdateAvailabilityChange?: (status: MakeClientUpdateStatus | null) => void;
-    onOpenVersionCollaboration?: () => void;
     initialTab?: SettingsDialogInitialTab;
     initialAcpRuntime?: AssistantRuntimeResponse | null;
     initialAcpFailureSource?: string;
     initialAcpFailureMessage?: string;
+    initialVoiceSection?: 'voice-doubao';
+    conversationUiEnabled?: boolean;
     excalidrawPropertyPanelMode?: ExcalidrawPropertyPanelMode;
     onExcalidrawPropertyPanelModeChange?: (mode: ExcalidrawPropertyPanelMode) => void;
     excalidrawPropertyPanelPosition?: ExcalidrawPropertyPanelPosition;
@@ -112,12 +132,19 @@ interface Config {
         defaultTheme?: string | null;
     };
     automation?: {
-        defaultPromptClient?: PromptClientPreference;
+        conversationPromptClient?: PromptClientPreference;
+        conversationModel?: string | null;
         defaultIDE?: MainIDEPreference;
+        injectLocalAiEntry?: boolean;
+        launchLocalAiApp?: boolean;
         annotationPromptClient?: PromptClientPreference;
         annotationModel?: string | null;
+        canvasPromptClient?: PromptClientPreference;
+        canvasModel?: string | null;
         agentRunConcurrency?: number;
+        autoClearCompletedComments?: boolean;
     };
+    toolOpenState?: LocalAgentToolOpenState;
     assistant?: {
         webBaseUrl?: string | null;
         apiBaseUrl?: string | null;
@@ -125,8 +152,8 @@ interface Config {
     ai?: {
         imageGeneration?: {
             baseUrl?: string | null;
-            apiKey?: string | null;
             model?: string | null;
+            hasApiKey?: boolean;
             lastTest?: AiImageConfigLastTest | null;
         };
     };
@@ -139,10 +166,17 @@ interface SettingsFormState {
     projectName: string;
     projectDescription: string;
     defaultTheme: string;
-    defaultPromptClient: PromptClientPreference;
+    conversationPromptClient: PromptClientPreference;
+    conversationModel: string;
     annotationPromptClient: PromptClientPreference;
     annotationModel: string;
+    canvasPromptClient: PromptClientPreference;
+    canvasModel: string;
     agentRunConcurrency: number;
+    autoClearCompletedComments: boolean;
+    injectLocalAiEntry: boolean;
+    launchLocalAiApp: boolean;
+    localDesktopAgentPaths: LocalAgentPathEntry[];
     aiBaseUrl: string;
     aiApiKey: string;
     aiModel: string;
@@ -181,10 +215,17 @@ const DEFAULT_FORM_STATE: SettingsFormState = {
     projectName: '',
     projectDescription: '',
     defaultTheme: '',
-    defaultPromptClient: null,
+    conversationPromptClient: null,
+    conversationModel: '',
     annotationPromptClient: null,
     annotationModel: '',
+    canvasPromptClient: null,
+    canvasModel: '',
     agentRunConcurrency: 5,
+    autoClearCompletedComments: true,
+    injectLocalAiEntry: true,
+    launchLocalAiApp: true,
+    localDesktopAgentPaths: [],
     aiBaseUrl: 'https://api.openai.com/v1',
     aiApiKey: '',
     aiModel: 'gpt-image-2',
@@ -253,12 +294,19 @@ function normalizeFormState(config: Config): SettingsFormState {
         projectName: config.projectInfo?.name || '',
         projectDescription: config.projectInfo?.description || '',
         defaultTheme: config.projectDefaults?.defaultTheme || '',
-        defaultPromptClient: normalizePromptClientPreference(config.automation?.defaultPromptClient),
+        conversationPromptClient: normalizePromptClientPreference(config.automation?.conversationPromptClient),
+        conversationModel: config.automation?.conversationModel || '',
         annotationPromptClient: normalizePromptClientPreference(config.automation?.annotationPromptClient),
         annotationModel: config.automation?.annotationModel || '',
+        canvasPromptClient: normalizePromptClientPreference(config.automation?.canvasPromptClient),
+        canvasModel: config.automation?.canvasModel || '',
         agentRunConcurrency: sanitizeAgentRunConcurrency(config.automation?.agentRunConcurrency),
+        autoClearCompletedComments: config.automation?.autoClearCompletedComments !== false,
+        injectLocalAiEntry: config.automation?.injectLocalAiEntry !== false,
+        launchLocalAiApp: config.automation?.launchLocalAiApp !== false,
+        localDesktopAgentPaths: readLocalAgentPathEntries(config.toolOpenState, 'desktop'),
         aiBaseUrl: config.ai?.imageGeneration?.baseUrl || 'https://api.openai.com/v1',
-        aiApiKey: config.ai?.imageGeneration?.apiKey || '',
+        aiApiKey: '',
         aiModel: config.ai?.imageGeneration?.model || 'gpt-image-2',
     };
 }
@@ -445,10 +493,14 @@ function isAiRunAcpRuntimeUnavailable(error: unknown): error is AiRunClientError
     return record.code === 'ACP_RUNTIME_UNAVAILABLE' || record.action === 'open-ai-settings';
 }
 
-export default function SettingsDialog({ open, projectId, onClose, onSaved, makeClientUpdateReminderVisible, onMakeClientUpdateReminderSeen, onMakeClientUpdateAvailabilityChange, onOpenVersionCollaboration, initialTab = 'project', initialAcpRuntime = null, initialAcpFailureSource = '', initialAcpFailureMessage = '' }: SettingsDialogProps) {
+export default function SettingsDialog({ open, projectId, standalone, onClose, onSaved, makeClientUpdateReminderVisible, onMakeClientUpdateReminderSeen, onMakeClientUpdateAvailabilityChange, initialTab = 'project', initialAcpRuntime = null, initialAcpFailureSource = '', initialAcpFailureMessage = '', initialVoiceSection, conversationUiEnabled = true }: SettingsDialogProps) {
+    const isAiStandalone = standalone === 'ai';
+    const isNetworkStandalone = standalone === 'network';
     const [loading, setLoading] = useState(false);
     const [formState, setFormState] = useState<SettingsFormState>(DEFAULT_FORM_STATE);
-    const [activeTab, setActiveTab] = useState<SettingsDialogInitialTab>(initialTab);
+    const [activeTab, setActiveTab] = useState<SettingsDialogInitialTab>(isAiStandalone ? 'ai' : isNetworkStandalone ? 'network' : 'project');
+    const [projectSettingsSection, setProjectSettingsSection] = useState<'info' | 'template' | 'update'>(initialTab === 'update' ? 'update' : 'info');
+    const [aiSettingsSection, setAiSettingsSection] = useState<'agent' | 'app' | 'other'>('agent');
     const [notificationSettings, setNotificationSettings] = useState(readNotificationSettings);
     const [agentVersions, setAgentVersions] = useState<AgentVersionMap>({});
     const [latestAgentVersions, setLatestAgentVersions] = useState<AgentVersionMap>({});
@@ -457,6 +509,8 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
     const [agentProviderTests, setAgentProviderTests] = useState<Record<string, AgentProviderTestState>>({});
     const [aiImageConfigTest, setAiImageConfigTest] = useState<AiImageConfigTestState>({ status: 'idle' });
     const [aiImageConfigLastTest, setAiImageConfigLastTest] = useState<AiImageConfigLastTest | undefined>(undefined);
+    const [aiImageApiKeyConfigured, setAiImageApiKeyConfigured] = useState(false);
+    const [aiImageApiKeyClearRequested, setAiImageApiKeyClearRequested] = useState(false);
     const [availableThemes, setAvailableThemes] = useState<ThemeResourceItem[]>([]);
     const [availableLANHosts, setAvailableLANHosts] = useState<string[]>([]);
     const [lanAccessStatus, setLanAccessStatus] = useState<LanAccessStatusResponse | null>(null);
@@ -471,6 +525,8 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
     const [localAcpFailureContext, setLocalAcpFailureContext] = useState<{ source: string; message: string } | null>(null);
     const [localAcpConnecting, setLocalAcpConnecting] = useState(false);
     const [localAcpRefreshing, setLocalAcpRefreshing] = useState(false);
+    const [localAcpDetailsOpen, setLocalAcpDetailsOpen] = useState(false);
+    const [agentDiagnosticsOpen, setAgentDiagnosticsOpen] = useState(false);
     const [makeClientUpdateStatus, setMakeClientUpdateStatus] = useState<MakeClientUpdateStatus | null>(null);
     const [makeClientUpdateResult, setMakeClientUpdateResult] = useState<MakeClientUpdateApplyResult | null>(null);
     const [makeClientUpdateError, setMakeClientUpdateError] = useState<unknown>(null);
@@ -485,6 +541,8 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
     const aiTabVersionLoadedRef = useRef(false);
     const initialAcpFailureAppliedRef = useRef(false);
     const localAcpAutoCloseBlockedRef = useRef(false);
+    const settingsDialogInitializedRef = useRef(false);
+    const voiceAssistantSettingsRef = useRef<VoiceAssistantSettingsSectionHandle>(null);
     const localAcpConnected = localAcpRuntime?.health.status === 'ready';
     const localAcpHasCorsFailure = isLocalAcpCorsFailure(localAcpRuntime, localAcpFailureContext?.message);
     const localAcpActionLabel = localAcpConnected || localAcpHasCorsFailure ? '重新检测' : '链接';
@@ -493,42 +551,33 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
     const visibleMakeClientUpdateBlocker = makeClientUpdateAvailable ? getVisibleMakeClientUpdateBlocker(makeClientUpdateStatus) : '';
     const makeClientUpdateCanApply = Boolean(makeClientUpdateAvailable && makeClientUpdateStatus?.canApply);
     const latestMakeClientUpdateBackup = makeClientUpdateResult?.backupRecord || makeClientUpdateStatus?.lastBackup || null;
-    const providerSupportsNpxFallback = (provider: AcpProviderKey): boolean => (
-        LOCAL_AI_AGENT_OPTIONS.some((option) => option.provider === provider && option.supportsNpxFallback)
+    const installedLocalAiAgentOptions = LOCAL_AI_AGENT_OPTIONS.filter(
+        (option) => agentVersions[option.versionKey]?.status === 'installed',
     );
-    const isAgentProviderMissingFromVersions = (versions: AgentVersionMap, provider: AcpProviderKey): boolean => (
-        versions[provider]?.status === 'missing' && !providerSupportsNpxFallback(provider)
-    );
-    const isAgentProviderMissing = (provider: AcpProviderKey): boolean => (
-        isAgentProviderMissingFromVersions(agentVersions, provider)
-    );
-    const allLocalAiAgentOptionsDisabled = LOCAL_AI_AGENT_OPTIONS.every((option) => isAgentProviderMissing(option.provider));
-
-    const clearMissingDefaultPromptClientAfterVersionCheck = (versions: AgentVersionMap) => {
-        setFormState((previous) => {
-            const selected = LOCAL_AI_AGENT_OPTIONS.find((option) => option.value === previous.defaultPromptClient);
-            if (!selected || !isAgentProviderMissingFromVersions(versions, selected.provider)) {
-                return previous;
-            }
-            return {
-                ...previous,
-                defaultPromptClient: null,
-            };
-        });
-    };
+    const agentProviderTestStates = Object.values(agentProviderTests);
+    const agentProviderTestingCount = agentProviderTestStates.filter((state) => state.status === 'testing').length;
+    const agentProviderFailureCount = agentProviderTestStates.filter((state) => state.status === 'failed').length;
+    const agentProviderPassedCount = agentProviderTestStates.filter((state) => state.status === 'passed').length;
 
     useEffect(() => {
         if (!open) {
-            setActiveTab(initialTab);
+            settingsDialogInitializedRef.current = false;
+            setActiveTab(isAiStandalone ? 'ai' : isNetworkStandalone ? 'network' : 'project');
+            setProjectSettingsSection(initialTab === 'update' ? 'update' : 'info');
+            setAiSettingsSection('agent');
             setAgentProviderTests({});
             setAiImageConfigTest({ status: 'idle' });
+            setAiImageApiKeyConfigured(false);
+            setAiImageApiKeyClearRequested(false);
             setMakeClientUpdateStatus(null);
             setMakeClientUpdateResult(null);
             setMakeClientUpdateError(null);
             setLocalAcpRuntime(null);
             setLocalAcpFailureContext(null);
             setLocalAcpConnecting(false);
-            setLocalAcpRestarting(false);
+            setLocalAcpRefreshing(false);
+            setLocalAcpDetailsOpen(false);
+            setAgentDiagnosticsOpen(false);
             setAgentVersionRefreshingProvider(null);
             aiTabVersionLoadedRef.current = false;
             initialAcpFailureAppliedRef.current = false;
@@ -542,31 +591,47 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
             return;
         }
 
+        if (settingsDialogInitializedRef.current) return;
+        settingsDialogInitializedRef.current = true;
+
         setNotificationSettings(readNotificationSettings());
-        setActiveTab(initialTab);
-        if (initialTab === 'update') {
+        setActiveTab(isAiStandalone ? 'ai' : isNetworkStandalone ? 'network' : 'project');
+        setProjectSettingsSection(initialTab === 'update' ? 'update' : 'info');
+        if (!isAiStandalone && !isNetworkStandalone && initialTab === 'update') {
             onMakeClientUpdateReminderSeen?.();
         }
-        if (initialTab === 'ai' && initialAcpRuntime && initialAcpRuntime.health.status !== 'ready') {
+        if (isAiStandalone && initialAcpRuntime && initialAcpRuntime.health.status !== 'ready') {
             setLocalAcpRuntime(initialAcpRuntime);
             setLocalAcpFailureContext({
                 source: initialAcpFailureSource,
                 message: initialAcpFailureMessage || initialAcpRuntime?.health.message || '',
             });
+            setLocalAcpDetailsOpen(true);
             initialAcpFailureAppliedRef.current = true;
-        } else if (initialTab === 'ai' && !initialAcpFailureAppliedRef.current) {
+        } else if (isAiStandalone && !initialAcpFailureAppliedRef.current) {
             void handleLocalAcpRuntimeCheck({ silent: true });
         }
         const configPromise = loadConfig();
-        if (initialTab === 'ai') {
-            void configPromise.then(() => loadAgentVersions().then(clearMissingDefaultPromptClientAfterVersionCheck));
+        if (isAiStandalone) {
+            void configPromise.then(() => loadAgentVersions());
         }
-        void loadThemeOptions();
-        void loadLanAccessStatus();
-    }, [open, initialAcpRuntime, initialAcpFailureMessage, initialAcpFailureSource, initialTab, onMakeClientUpdateReminderSeen]);
+        if (!isAiStandalone) {
+            if (!isNetworkStandalone) {
+                void loadThemeOptions();
+            }
+            void loadLanAccessStatus();
+        }
+    }, [open, initialAcpRuntime, initialAcpFailureMessage, initialAcpFailureSource, initialTab, isAiStandalone, isNetworkStandalone, onMakeClientUpdateReminderSeen]);
 
     const updateField = <K extends keyof SettingsFormState>(key: K, value: SettingsFormState[K]) => {
         setFormState((previous) => ({ ...previous, [key]: value }));
+    };
+
+    const updatePromptClientField = (
+        key: 'conversationPromptClient' | 'annotationPromptClient' | 'canvasPromptClient',
+        value: PromptClientPreference,
+    ) => {
+        setFormState((previous) => fillUnsetAiPurposePromptClients(previous, key, value));
     };
 
     const updateNotificationSetting = (patch: Partial<NotificationSettings>) => {
@@ -585,6 +650,8 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
             }
             const config: Config = await response.json();
             setFormState(normalizeFormState(config));
+            setAiImageApiKeyConfigured(config.ai?.imageGeneration?.hasApiKey === true);
+            setAiImageApiKeyClearRequested(false);
             setAvailableLANHosts(Array.isArray(config.availableLANHosts) ? config.availableLANHosts : []);
             setAiImageConfigLastTest(normalizeAiImageConfigLastTest(config.ai?.imageGeneration?.lastTest));
             if (initialTab === 'update' && activeProjectId) {
@@ -700,7 +767,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
             return;
         }
         aiTabVersionLoadedRef.current = true;
-        void loadAgentVersions().then(clearMissingDefaultPromptClientAfterVersionCheck);
+        void loadAgentVersions();
     };
 
     const preserveSettingsDialogDuringLocalAcpAction = async <T,>(action: () => Promise<T>): Promise<T> => {
@@ -727,6 +794,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
             const runtime = await apiService.getAssistantRuntime({ autoStart: false, projectId: activeProjectId || projectId });
             setLocalAcpRuntime(runtime);
             setLocalAcpFailureContext(null);
+            setLocalAcpDetailsOpen(runtime.health.status !== 'ready');
             loadLocalAiAgentVersionsAfterAcpReady(runtime);
             if (!options.silent) {
                 if (runtime.health.status === 'ready') {
@@ -738,6 +806,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
             return runtime;
         } catch (error: any) {
             console.error('Error checking local ACP runtime:', error);
+            setLocalAcpDetailsOpen(true);
             if (!options.silent) {
                 toast.error(error?.message || '检测本地 ACP 服务失败');
             }
@@ -752,6 +821,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                 const runtime = await apiService.getAssistantRuntime({ autoStart: true, projectId: activeProjectId || projectId });
                 setLocalAcpRuntime(runtime);
                 setLocalAcpFailureContext(null);
+                setLocalAcpDetailsOpen(runtime.health.status !== 'ready');
                 loadLocalAiAgentVersionsAfterAcpReady(runtime);
                 if (runtime.health.status === 'ready') {
                     toast.success('本地 ACP 服务已链接');
@@ -761,6 +831,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                 return runtime;
             } catch (error: any) {
                 console.error('Error connecting local ACP runtime:', error);
+                setLocalAcpDetailsOpen(true);
                 toast.error(error?.message || '链接本地 ACP 服务失败');
                 return null;
             } finally {
@@ -776,6 +847,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                 const runtime = await apiService.getAssistantRuntime({ autoStart: false, projectId: activeProjectId || projectId });
                 setLocalAcpRuntime(runtime);
                 setLocalAcpFailureContext(null);
+                setLocalAcpDetailsOpen(runtime.health.status !== 'ready');
                 loadLocalAiAgentVersionsAfterAcpReady(runtime);
                 if (runtime.health.status === 'ready') {
                     toast.success('本地 ACP 服务状态已更新');
@@ -785,6 +857,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                 return runtime;
             } catch (error: any) {
                 console.error('Error refreshing local ACP runtime:', error);
+                setLocalAcpDetailsOpen(true);
                 toast.error(error?.message || '重新检测本地 ACP 服务失败');
                 return null;
             } finally {
@@ -815,10 +888,15 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
     };
 
     const handleTabValueChange = (value: string) => {
-        setActiveTab(value === 'ai' ? 'ai' : value === 'update' ? 'update' : value === 'network' ? 'network' : 'project');
+        if (value === 'update') {
+            setActiveTab('project');
+            handleProjectSettingsSectionChange('update');
+            return;
+        }
+        setActiveTab(value === 'ai' ? 'ai' : value === 'network' ? 'network' : 'project');
         if (value === 'ai') {
             void handleLocalAcpRuntimeCheck({ silent: true });
-            void loadAgentVersions().then(clearMissingDefaultPromptClientAfterVersionCheck);
+            void loadAgentVersions();
         }
         if (value === 'update') {
             onMakeClientUpdateReminderSeen?.();
@@ -831,6 +909,28 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                         void loadMakeClientUpdateStatus(projectId);
                     }
                 });
+            }
+        }
+    };
+
+    const handleAiSettingsSectionChange = (value: string) => {
+        if (value === 'app' || value === 'other') {
+            setAiSettingsSection(value);
+            return;
+        }
+        setAiSettingsSection('agent');
+    };
+
+    const handleProjectSettingsSectionChange = (value: string) => {
+        if (value !== 'template' && value !== 'update') {
+            setProjectSettingsSection('info');
+            return;
+        }
+        setProjectSettingsSection(value);
+        if (value === 'update') {
+            onMakeClientUpdateReminderSeen?.();
+            if (activeProjectId) {
+                void loadMakeClientUpdateStatus(activeProjectId);
             }
         }
     };
@@ -858,10 +958,6 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
         } finally {
             setMakeClientUpdateApplying(false);
         }
-    };
-
-    const handleOpenVersionCollaboration = () => {
-        onOpenVersionCollaboration?.();
     };
 
     const handleCopyMakeClientUpdateFailurePrompt = async () => {
@@ -920,6 +1016,18 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
         }
     };
 
+    const handleCopyGlobalSettingsAiPrompt = async () => {
+        try {
+            await navigator.clipboard.writeText(buildGlobalSettingsAiPrompt({
+                makeApiOrigin: resolveMakeApiOrigin(),
+                projectId,
+            }));
+            toast.success('AI 配置提示词已复制');
+        } catch {
+            toast.error('复制 AI 配置提示词失败');
+        }
+    };
+
     function handleAiRunAcpRuntimeUnavailable(error: unknown, source: string): boolean {
         if (!isAiRunAcpRuntimeUnavailable(error)) return false;
         const record = error as AiRunClientError;
@@ -930,12 +1038,14 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
             source,
             message: typeof record.message === 'string' ? record.message : '本地 ACP 服务不可用',
         });
+        setLocalAcpDetailsOpen(true);
         setActiveTab('ai');
         toast.warning('本地 ACP 服务不可用，请查看上方修复信息');
         return true;
     }
 
     const handleAgentProviderTest = async (option: typeof LOCAL_AI_AGENT_OPTIONS[number]) => {
+        setAgentDiagnosticsOpen(true);
         updateAgentProviderTestState(option.value, { status: 'testing', message: '测试中' });
         const controller = new AbortController();
         const timeoutId = window.setTimeout(() => controller.abort(), AGENT_PROVIDER_TEST_TIMEOUT_MS);
@@ -973,23 +1083,27 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
     const handleImportCodexConfig = async () => {
         try {
             setLoading(true);
-            const response = await fetch(buildSettingsUrl('/api/config/ai-image/codex-local'), { cache: 'no-store' });
+            const response = await fetch(buildSettingsUrl('/api/config/ai-services/import-codex'), {
+                method: 'POST',
+            });
             const result = await response.json().catch(() => ({}));
             if (!response.ok || !result?.success) {
-                throw new Error(result?.error || '读取本地 Codex 配置失败');
+                throw new Error(result?.error || '导入本地 Codex 配置失败');
             }
-            if (!result.ready || !result.config) {
+            if (!result.ready || !result.settings) {
                 const warning = result?.warnings?.[0]?.message || '未找到本地 Codex 图片 API 配置';
                 throw new Error(warning);
             }
-            const imported = result.config;
+            const imported = result.settings;
             updateField('aiBaseUrl', imported.baseUrl || DEFAULT_FORM_STATE.aiBaseUrl);
-            updateField('aiApiKey', imported.apiKey || '');
+            updateField('aiApiKey', '');
+            setAiImageApiKeyConfigured(true);
+            setAiImageApiKeyClearRequested(false);
             updateField('aiModel', imported.model || 'gpt-image-2');
-            toast.success('已读取本地 Codex 配置');
+            toast.success('已导入本地 Codex 配置');
         } catch (error: any) {
             console.error('Error importing local Codex config:', error);
-            toast.error(error?.message || '读取本地 Codex 配置失败');
+            toast.error(error?.message || '导入本地 Codex 配置失败');
         } finally {
             setLoading(false);
         }
@@ -997,20 +1111,21 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
 
     const persistAiImageConfigLastTest = async (lastTest: AiImageConfigLastTest) => {
         setAiImageConfigLastTest(lastTest);
-        const response = await fetch(buildSettingsUrl('/api/config'), {
-            method: 'POST',
+        const response = await fetch(buildSettingsUrl('/api/config/ai-services'), {
+            method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                ai: {
+                patch: {
                     imageGeneration: {
                         baseUrl: formState.aiBaseUrl.trim() || 'https://api.openai.com/v1',
-                        apiKey: formState.aiApiKey.trim() || null,
                         model: formState.aiModel.trim() || 'gpt-image-2',
                         lastTest,
+                        ...(formState.aiApiKey.trim() ? { apiKey: formState.aiApiKey.trim() } : {}),
                     },
                 },
+                clearSecrets: aiImageApiKeyClearRequested ? ['imageGeneration.apiKey'] : [],
             }),
         });
         if (!response.ok) {
@@ -1022,16 +1137,22 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
     const handleAiImageConfigTest = async () => {
         setAiImageConfigTest({ status: 'testing', message: '测试中' });
         try {
-            const response = await fetch(buildSettingsUrl('/api/config/ai-image/test'), {
+            const response = await fetch(buildSettingsUrl('/api/config/ai-services/test'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
+                    section: 'imageGeneration',
                     prompt: AI_IMAGE_CONFIG_TEST_PROMPT,
-                    baseUrl: formState.aiBaseUrl.trim(),
-                    apiKey: formState.aiApiKey.trim(),
-                    model: formState.aiModel.trim() || 'gpt-image-2',
+                    patch: {
+                        imageGeneration: {
+                            baseUrl: formState.aiBaseUrl.trim(),
+                            model: formState.aiModel.trim() || 'gpt-image-2',
+                            ...(formState.aiApiKey.trim() ? { apiKey: formState.aiApiKey.trim() } : {}),
+                        },
+                    },
+                    clearSecrets: aiImageApiKeyClearRequested ? ['imageGeneration.apiKey'] : [],
                 }),
             });
             const body = await response.json().catch(() => ({}));
@@ -1136,7 +1257,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
 
     const handleSave = async () => {
         const host = formState.host.trim();
-        if (!host) {
+        if (!isAiStandalone && !isNetworkStandalone && !host) {
             toast.error('主机地址不能为空');
             return;
         }
@@ -1144,10 +1265,56 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
         try {
             setLoading(true);
 
+            if (isAiStandalone || activeTab === 'ai') {
+                await voiceAssistantSettingsRef.current?.save({
+                    baseUrl: formState.aiBaseUrl.trim() || 'https://api.openai.com/v1',
+                    apiKey: formState.aiApiKey.trim(),
+                    model: formState.aiModel.trim() || 'gpt-image-2',
+                    lastTest: aiImageConfigLastTest,
+                    clearApiKey: aiImageApiKeyClearRequested,
+                });
+            }
+
             const currentConfigResponse = await fetch(buildSettingsUrl('/api/config'));
             const currentConfig: Config = currentConfigResponse.ok
                 ? await currentConfigResponse.json()
                 : { server: { host: 'localhost', port: 51720 } };
+
+            if (isAiStandalone) {
+                const globalConfig: Pick<Config, 'automation' | 'toolOpenState'> = {
+                    automation: {
+                        ...(currentConfig.automation || {}),
+                        conversationPromptClient: formState.conversationPromptClient || null,
+                        conversationModel: formState.conversationModel.trim() || null,
+                        annotationPromptClient: formState.annotationPromptClient || null,
+                        annotationModel: formState.annotationModel.trim() || null,
+                        canvasPromptClient: formState.canvasPromptClient || null,
+                        canvasModel: formState.canvasModel.trim() || null,
+                        agentRunConcurrency: sanitizeAgentRunConcurrency(formState.agentRunConcurrency),
+                        autoClearCompletedComments: formState.autoClearCompletedComments,
+                        injectLocalAiEntry: formState.injectLocalAiEntry,
+                        launchLocalAiApp: formState.launchLocalAiApp,
+                    },
+                    toolOpenState: buildLocalAgentToolOpenStatePatch(
+                        currentConfig.toolOpenState,
+                        formState.localDesktopAgentPaths,
+                    ),
+                };
+                const response = await fetch(buildSettingsUrl('/api/config'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(globalConfig),
+                });
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error((error as any)?.error || 'Failed to save AI config');
+                }
+                const result = await response.json();
+                toast.success(result.message || 'AI 配置已保存');
+                onSaved?.();
+                onClose();
+                return;
+            }
 
             const config: Config = {
                 ...currentConfig,
@@ -1168,21 +1335,23 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                 },
                 automation: {
                     ...(currentConfig.automation || {}),
-                    defaultPromptClient: formState.defaultPromptClient,
+                    conversationPromptClient: formState.conversationPromptClient || null,
+                    conversationModel: formState.conversationModel.trim() || null,
                     annotationPromptClient: formState.annotationPromptClient || null,
                     annotationModel: formState.annotationModel.trim() || null,
+                    canvasPromptClient: formState.canvasPromptClient || null,
+                    canvasModel: formState.canvasModel.trim() || null,
                     agentRunConcurrency: sanitizeAgentRunConcurrency(formState.agentRunConcurrency),
+                    autoClearCompletedComments: formState.autoClearCompletedComments,
+                    injectLocalAiEntry: formState.injectLocalAiEntry,
+                    launchLocalAiApp: formState.launchLocalAiApp,
                 },
-                ai: {
-                    ...(currentConfig.ai || {}),
-                    imageGeneration: {
-                        baseUrl: formState.aiBaseUrl.trim() || 'https://api.openai.com/v1',
-                        apiKey: formState.aiApiKey.trim() || null,
-                        model: formState.aiModel.trim() || 'gpt-image-2',
-                        lastTest: aiImageConfigLastTest,
-                    },
-                },
+                toolOpenState: buildLocalAgentToolOpenStatePatch(
+                    currentConfig.toolOpenState,
+                    formState.localDesktopAgentPaths,
+                ),
             };
+            delete config.ai;
 
             const response = await fetch(buildSettingsUrl('/api/config'), {
                 method: 'POST',
@@ -1224,6 +1393,70 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
         }
     };
 
+    const renderAiPurposeConfigRow = (
+        label: string,
+        clientKey: 'conversationPromptClient' | 'annotationPromptClient' | 'canvasPromptClient',
+        modelKey: 'conversationModel' | 'annotationModel' | 'canvasModel',
+    ) => {
+        const selectedClient = formState[clientKey];
+        const selectedOption = LOCAL_AI_AGENT_OPTIONS.find((option) => option.value === selectedClient);
+        const selectedUnavailable = Boolean(
+            selectedOption && agentVersions[selectedOption.versionKey]?.status !== 'installed',
+        );
+
+        return (
+            <div
+                key={clientKey}
+                role="row"
+                className="grid min-w-0 grid-cols-1 gap-2 border-t border-border px-3 py-2 first:border-t-0 sm:grid-cols-[88px_minmax(0,1fr)_minmax(0,1fr)] sm:items-start sm:gap-3"
+            >
+                <div role="rowheader" className="min-w-0 text-sm font-medium text-foreground sm:flex sm:min-h-8 sm:items-center">
+                    {label}
+                </div>
+                <div role="cell" className="min-w-0 space-y-1.5">
+                    <span className="text-xs text-muted-foreground sm:hidden">Agent</span>
+                    <Select
+                        value={selectedClient || undefined}
+                        onValueChange={(value) => updatePromptClientField(clientKey, normalizePromptClientPreference(value))}
+                    >
+                        <SelectTrigger
+                            clearable
+                            hasValue={Boolean(selectedClient)}
+                            onClear={() => updatePromptClientField(clientKey, null)}
+                            aria-label={`${label} Agent`}
+                            className={`min-w-0 ${SETTINGS_COMPACT_CONTROL_CLASS_NAME}`}
+                        >
+                            <SelectValue placeholder={agentVersionsLoading ? '正在检测已安装 Agent' : '选择已安装 Agent'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {selectedUnavailable && selectedOption ? (
+                                <SelectItem value={selectedOption.value} disabled>
+                                    {selectedOption.label}（当前不可用）
+                                </SelectItem>
+                            ) : null}
+                            {installedLocalAiAgentOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div role="cell" className="min-w-0 space-y-1.5">
+                    <span className="text-xs text-muted-foreground sm:hidden">模型</span>
+                    <Input
+                        value={formState[modelKey]}
+                        onChange={(event) => updateField(modelKey, event.target.value)}
+                        placeholder="Agent 默认模型"
+                        disabled={!selectedClient}
+                        aria-label={`${label} 模型`}
+                        className={`min-w-0 ${SETTINGS_COMPACT_CONTROL_CLASS_NAME}`}
+                    />
+                </div>
+            </div>
+        );
+    };
+
     return (
         <Sheet open={open} onOpenChange={handleSettingsDialogOpenChange}>
             <SheetContent
@@ -1232,25 +1465,32 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
             >
                 <Tabs value={activeTab} onValueChange={handleTabValueChange} className="flex h-full flex-col">
                     <SheetHeader className="border-b px-5 py-3.5">
-                        <SheetTitle className="sr-only">项目设置 / 项目更新 / AI 设置 / 网络配置</SheetTitle>
+                        <SheetTitle className="sr-only">{isAiStandalone ? 'AI 设置' : isNetworkStandalone ? '网络设置' : '项目设置'}</SheetTitle>
                         <div className="flex items-center justify-between gap-3">
-                            <TabsList className="grid h-8 w-full max-w-[460px] grid-cols-4 rounded-lg border border-border/70 bg-muted/50 p-0.5">
-                                <TabsTrigger value="project" className="h-full rounded-md px-2.5 py-0 text-[13px] leading-none data-[state=active]:shadow-none">
-                                    项目设置
-                                </TabsTrigger>
-                                <TabsTrigger value="update" className="relative h-full rounded-md px-2.5 py-0 text-[13px] leading-none data-[state=active]:shadow-none">
-                                    项目更新
-                                    {makeClientUpdateReminderVisible ? (
-                                        <span aria-label="有项目更新" className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-destructive" />
-                                    ) : null}
-                                </TabsTrigger>
-                                <TabsTrigger value="ai" className="h-full rounded-md px-2.5 py-0 text-[13px] leading-none data-[state=active]:shadow-none">
-                                    AI 设置
-                                </TabsTrigger>
-                                <TabsTrigger value="network" className="h-full rounded-md px-2.5 py-0 text-[13px] leading-none data-[state=active]:shadow-none">
-                                    网络配置
-                                </TabsTrigger>
-                            </TabsList>
+                            {activeTab === 'project' ? (
+                                <Tabs value={projectSettingsSection} onValueChange={handleProjectSettingsSectionChange} className="min-w-0 flex-1">
+                                    <TabsList className="grid h-8 w-full max-w-[580px] grid-cols-3 rounded-lg border border-border/70 bg-muted/50 p-0.5">
+                                        <TabsTrigger value="info" className="h-full rounded-md px-2.5 py-0 text-[13px] leading-none data-[state=active]:shadow-none">项目信息</TabsTrigger>
+                                        <TabsTrigger value="template" className="h-full rounded-md px-2.5 py-0 text-[13px] leading-none data-[state=active]:shadow-none">项目模板</TabsTrigger>
+                                        <TabsTrigger value="update" className="relative h-full rounded-md px-2.5 py-0 text-[13px] leading-none data-[state=active]:shadow-none">
+                                            项目更新
+                                            {makeClientUpdateReminderVisible ? (
+                                                <span aria-label="有项目更新" className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-destructive" />
+                                            ) : null}
+                                        </TabsTrigger>
+                                    </TabsList>
+                                </Tabs>
+                            ) : activeTab === 'ai' ? (
+                                <Tabs value={aiSettingsSection} onValueChange={handleAiSettingsSectionChange} className="min-w-0 flex-1">
+                                    <TabsList className="grid h-8 w-full max-w-[580px] grid-cols-3 rounded-lg border border-border/70 bg-muted/50 p-0.5">
+                                        <TabsTrigger value="agent" className="h-full rounded-md px-2.5 py-0 text-[13px] leading-none data-[state=active]:shadow-none">本地 Agent</TabsTrigger>
+                                        <TabsTrigger value="app" className="h-full rounded-md px-2.5 py-0 text-[13px] leading-none data-[state=active]:shadow-none">本地应用</TabsTrigger>
+                                        <TabsTrigger value="other" className="h-full rounded-md px-2.5 py-0 text-[13px] leading-none data-[state=active]:shadow-none">其他 API</TabsTrigger>
+                                    </TabsList>
+                                </Tabs>
+                            ) : (
+                                <div className="text-sm font-medium text-foreground">网络设置</div>
+                            )}
                             <Button
                                 variant="ghost"
                                 size="icon-sm"
@@ -1264,9 +1504,10 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                     </SheetHeader>
 
                     <TabsContent value="project" className="m-0 min-h-0 flex-1 overflow-y-auto px-5 py-4.5">
+                        <Tabs value={projectSettingsSection} onValueChange={handleProjectSettingsSectionChange} className="space-y-3">
+                            <TabsContent value="info" className="m-0 space-y-4">
                         <section className="space-y-4">
                         <div className="space-y-1">
-                            <h3 className="text-base font-semibold text-foreground">项目信息</h3>
                             <p className="text-xs text-muted-foreground">用于定义项目基础信息与默认资产。</p>
                         </div>
 
@@ -1310,13 +1551,20 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                         </Field>
 
                         </section>
-                    </TabsContent>
+                            </TabsContent>
+                            <TabsContent value="template" className="m-0 space-y-4">
+                                <section className="space-y-4">
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-muted-foreground">查看项目内固定的文档模板。</p>
+                                    </div>
+                                    <DocumentTemplateSettings projectId={projectId} />
+                                </section>
+                            </TabsContent>
+                            <TabsContent value="update" className="m-0 space-y-4">
 
-                    <TabsContent value="update" className="m-0 min-h-0 flex-1 overflow-y-auto px-5 py-4.5">
                         <section className="space-y-4">
                             <div className="flex items-start justify-between gap-3">
                                 <div className="space-y-1">
-                                    <h3 className="text-base font-semibold text-foreground">项目更新</h3>
                                     <p className="text-xs text-muted-foreground">更新当前已注册 Make Client 项目的官方模板文件。</p>
                                 </div>
                                 <Button
@@ -1377,14 +1625,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                                 <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-300">
                                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                                     <span>
-                                        更新前会自动备份本次覆盖的文件。你也可以先通过 Git 提交一版作为额外备份。
-                                        <button
-                                            type="button"
-                                            className="ml-1 font-medium underline underline-offset-2"
-                                            onClick={handleOpenVersionCollaboration}
-                                        >
-                                            打开版本管理
-                                        </button>
+                                        更新前会自动备份本次覆盖的文件。你也可以先通过“仓库”入口提交一版作为额外备份。
                                     </span>
                                 </div>
                             ) : null}
@@ -1494,46 +1735,53 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                                 </Button>
                             </div>
                         </section>
+                            </TabsContent>
+                        </Tabs>
                     </TabsContent>
 
-                    <TabsContent value="ai" className="m-0 min-h-0 flex-1 overflow-y-auto px-5 py-4.5">
-                        <section className="space-y-4">
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="space-y-1">
-                                    <h3 className="text-base font-semibold text-foreground">本地 ACP 服务</h3>
-                                    <p className="text-xs text-muted-foreground">用于在网页端直接使用相关 AI Agent。</p>
-                                </div>
-                                <span
-                                    className={localAcpConnected
-                                        ? 'inline-flex h-6 shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-2 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300'
-                                        : 'inline-flex h-6 shrink-0 items-center gap-1 rounded-md bg-muted px-2 text-xs font-medium text-muted-foreground'}
-                                >
-                                    {localAcpConnected ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
-                                    {localAcpConnected ? '已链接' : '未链接'}
-                                </span>
-                            </div>
-
-                            <div data-local-acp-status-card className="grid gap-2 rounded-md border border-border bg-muted/20 p-3 text-xs">
-                                <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2">
+                    <TabsContent value="ai" className="m-0 min-h-0 flex-1 space-y-0 overflow-y-auto px-5 py-4.5">
+                        <Tabs value={aiSettingsSection} onValueChange={handleAiSettingsSectionChange} className="space-y-3">
+                            <div className="space-y-0">
+                            <div className={aiSettingsSection === 'agent' ? 'contents' : 'hidden'}>
+                        <SettingsCollapsiblePanel title="本地 ACP 服务"
+                            description={`${localAcpConnected ? '已链接' : '未链接'} · ${localAcpRuntime?.webBaseUrl || '地址未检测'} · ${formatLocalAcpCheckedAt(localAcpRuntime?.health.checkedAt)}`}
+                            open={localAcpDetailsOpen}
+                            onOpenChange={setLocalAcpDetailsOpen}
+                            actions={(
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button type="button" variant="ghost" size="icon-xs" className="shrink-0" onClick={localAcpHasCorsFailure || localAcpConnected ? handleLocalAcpRuntimeRefresh : handleLocalAcpRuntimeConnect} disabled={localAcpActionBusy} aria-label={localAcpActionLabel}>
+                                                {localAcpActionBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : localAcpConnected ? <RefreshCw className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent arrow>{localAcpActionLabel}</TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            )}
+                        >
+                            <SettingsSectionSurface data-local-acp-status-card className="p-0">
+                                <div className="divide-y divide-border text-xs">
+                                <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 px-3 py-2.5">
                                     <span className="text-muted-foreground">状态</span>
                                     <span className={localAcpConnected ? 'font-medium text-emerald-600' : 'font-medium text-muted-foreground'}>
                                         {localAcpConnected ? '已链接' : '未链接'}
                                     </span>
                                 </div>
-                                <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2">
+                                <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 px-3 py-2.5">
                                     <span className="text-muted-foreground">上次检测</span>
                                     <span className="truncate font-medium text-foreground">
                                         {formatLocalAcpCheckedAt(localAcpRuntime?.health.checkedAt)}
                                     </span>
                                 </div>
-                                <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2">
+                                <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 px-3 py-2.5">
                                     <span className="text-muted-foreground">地址</span>
                                     <span className="truncate font-medium text-foreground" title={localAcpRuntime?.webBaseUrl || ''}>
                                         {localAcpRuntime?.webBaseUrl || '未检测'}
                                     </span>
                                 </div>
                                 {localAcpRuntime?.health.message ? (
-                                    <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2">
+                                    <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 px-3 py-2.5">
                                         <span className="text-muted-foreground">检测结果</span>
                                         <span
                                             className={localAcpConnected ? 'truncate text-emerald-600' : 'truncate text-amber-600'}
@@ -1544,7 +1792,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                                     </div>
                                 ) : null}
                                 {!localAcpConnected && localAcpRuntime ? (
-                                    <div data-local-acp-repair className="mt-1 space-y-2 border-t border-border/70 pt-2">
+                                    <div data-local-acp-repair className="space-y-2 px-3 pb-2.5 pt-2">
                                         <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2">
                                             <span className="text-muted-foreground">修复信息</span>
                                             <div className="min-w-0 space-y-1">
@@ -1588,68 +1836,80 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                                         </div>
                                     </div>
                                 ) : null}
+                                </div>
+                            </SettingsSectionSurface>
+
+                        </SettingsCollapsiblePanel>
+
                             </div>
+                            <div className={aiSettingsSection === 'app' ? 'contents' : 'hidden'}>
 
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 gap-1.5"
-                                    onClick={localAcpHasCorsFailure || localAcpConnected ? handleLocalAcpRuntimeRefresh : handleLocalAcpRuntimeConnect}
-                                    disabled={localAcpActionBusy}
-                                >
-                                    {localAcpConnecting || localAcpRefreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-                                    {localAcpActionLabel}
-                                </Button>
-                            </div>
-                        </section>
-
-                        {localAcpConnected ? (
-                            <>
-                                <Separator className="my-5" />
-
-                                <section className="space-y-4">
-                                    <div className="space-y-1">
-                                        <h3 className="text-base font-semibold text-foreground">AI Agent</h3>
-                                        <p className="text-xs text-muted-foreground">
-                                            {allLocalAiAgentOptionsDisabled
-                                                ? '未检测到可用的本地 AI Agent，暂时无法设置。请先安装后刷新版本检测。'
-                                                : '配置本地可用的 AI Agent。'}
-                                        </p>
-                                    </div>
-
-                                    <Field>
-                                        <RadioGroup
-                                            value={formState.defaultPromptClient || undefined}
-                                            onValueChange={(value) => updateField('defaultPromptClient', normalizePromptClientPreference(value))}
-                                            className="gap-0 rounded-md border border-border"
+                        <SettingsCollapsiblePanel title="本地桌面 Agent"
+                            description="配置从 Make 打开的桌面 Agent；路径用于系统无法自动发现应用时的兜底。"
+                            contentClassName="space-y-4"
+                        >
+                            <Field className="gap-2">
+                                <FieldLabelWithHint hint="控制 Make 打开桌面 Agent 时的启动和入口注入行为。">
+                                    打开行为
+                                </FieldLabelWithHint>
+                                <SettingsSectionSurface className="p-0">
+                                    <div>
+                                        <SettingsConfigRow
+                                            label="注入 Axhub Make 入口"
+                                            hint="关闭后仍会启动本地 AI 应用和项目，但不会注入 Axhub Make 入口。"
                                         >
+                                        <Switch
+                                            checked={formState.injectLocalAiEntry}
+                                            onCheckedChange={(checked) => updateField('injectLocalAiEntry', checked === true)}
+                                            aria-label="注入 Axhub Make 入口"
+                                        />
+                                        </SettingsConfigRow>
+                                        <SettingsConfigRow
+                                            label="额外启动应用"
+                                            hint="关闭后优先复用已打开的本地 AI 应用，不会额外启动新的应用实例。"
+                                        >
+                                        <Switch
+                                            checked={formState.launchLocalAiApp}
+                                            onCheckedChange={(checked) => updateField('launchLocalAiApp', checked === true)}
+                                            aria-label="额外启动应用"
+                                        />
+                                        </SettingsConfigRow>
+                                    </div>
+                                </SettingsSectionSurface>
+                            </Field>
+                            <LocalAgentPathSettings
+                                group="desktop"
+                                options={LOCAL_DESKTOP_AGENT_PATH_OPTIONS}
+                                value={formState.localDesktopAgentPaths}
+                                onChange={(value) => updateField('localDesktopAgentPaths', value)}
+                            />
+                        </SettingsCollapsiblePanel>
+                            </div>
+
+                            <div className={aiSettingsSection === 'agent' ? 'contents' : 'hidden'}>
+                                <SettingsCollapsiblePanel title="本地 CLI Agent"
+                                    description={`已安装 ${installedLocalAiAgentOptions.length}/${LOCAL_AI_AGENT_OPTIONS.length}${agentProviderTestingCount ? ` · ${agentProviderTestingCount} 个测试中` : agentProviderFailureCount ? ` · ${agentProviderFailureCount} 个失败` : agentProviderPassedCount ? ` · ${agentProviderPassedCount} 个通过` : ' · 尚未测试'}`}
+                                    open={agentDiagnosticsOpen}
+                                    onOpenChange={setAgentDiagnosticsOpen}
+                                    actions={(
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button type="button" variant="ghost" size="icon-xs" onClick={() => void loadAgentVersions(true)} disabled={agentVersionsLoading} aria-label="重新检测所有 Agent">
+                                                        {agentVersionsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent arrow>重新检测版本</TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    )}
+                                >
+                                    <SettingsSectionSurface className="p-0">
+                                    <div className="overflow-x-auto">
                                             <Table>
                                                 <TableHeader className="bg-muted/30">
                                                     <TableRow className="hover:bg-transparent">
-                                                        <TableHead className="h-8 w-[76px] px-2 text-xs">
-                                                            <span className="inline-flex items-center gap-1">
-                                                                默认
-                                                                <TooltipProvider>
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger asChild>
-                                                                            <button
-                                                                                type="button"
-                                                                                className="inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground"
-                                                                                aria-label="默认说明"
-                                                                            >
-                                                                                <CircleHelp className="h-3.5 w-3.5" />
-                                                                            </button>
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent arrow className="max-w-[320px]">
-                                                                            用于原型生成和本地 AI 面板的默认 agent
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
-                                                                </TooltipProvider>
-                                                            </span>
-                                                        </TableHead>
-                                                        <TableHead className="h-8 w-[170px] px-2 text-xs">供应商</TableHead>
+                                                        <TableHead className="h-8 w-[170px] px-3 text-xs">Agent</TableHead>
                                                         <TableHead className="h-8 w-[180px] px-3 text-xs">版本</TableHead>
                                                         <TableHead className="h-8 w-[230px] px-3 text-center text-xs">上次测试</TableHead>
                                                     </TableRow>
@@ -1662,15 +1922,12 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                                                     const testLabel = getAgentProviderTestLabel(testState);
                                                     const isTesting = testState?.status === 'testing';
                                                     const testTime = testState?.status === 'passed' ? formatAgentProviderTestTime(testState.testedAt) : '';
-                                                    const optionDisabled = isAgentProviderMissing(option.provider);
+                                                    const optionInstalled = agentVersions[option.versionKey]?.status === 'installed';
                                                     const versionRefreshing = agentVersionRefreshingProvider === option.provider;
                                                     const versionLoading = agentVersionsLoading || versionRefreshing;
                                                     return (
-                                                        <TableRow key={option.value} data-state={!optionDisabled && formState.defaultPromptClient === option.value ? 'selected' : undefined}>
-                                                            <TableCell className="px-2 py-2">
-                                                                <RadioGroupItem value={option.value} disabled={optionDisabled} aria-label={`默认使用 ${option.label}`} />
-                                                            </TableCell>
-                                                            <TableCell className="w-[170px] max-w-[170px] px-2 py-2">
+                                                        <TableRow key={option.value}>
+                                                            <TableCell className="w-[170px] max-w-[170px] px-3 py-2">
                                                                 <span className="inline-flex min-w-0 max-w-full items-center gap-2 font-medium text-foreground">
                                                                     <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden="true">
                                                                         {getAgentProviderIcon(option.provider)}
@@ -1680,7 +1937,6 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                                                             </TableCell>
                                                             <TableCell className="w-[180px] max-w-[180px] px-3 py-2 text-xs text-muted-foreground">
                                                                 <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
-                                                                    {versionLoading && !meta ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
                                                                     <span className="block max-w-[144px] truncate font-mono text-[11px] leading-4" title={metaTitle || undefined}>{meta || (versionLoading ? '检测中' : '未检测')}</span>
                                                                     <TooltipProvider>
                                                                         <Tooltip>
@@ -1690,7 +1946,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                                                                                     variant="ghost"
                                                                                     size="icon-xs"
                                                                                     className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
-                                                                                    onClick={() => refreshAgentVersion(option.provider)}
+                                                                                    onClick={() => void refreshAgentVersion(option.provider)}
                                                                                     disabled={versionRefreshing}
                                                                                     aria-label={`刷新 ${option.label} 版本`}
                                                                                 >
@@ -1733,7 +1989,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                                                                                     size="icon-xs"
                                                                                     className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
                                                                                     onClick={() => handleAgentProviderTest(option)}
-                                                                                    disabled={isTesting || optionDisabled}
+                                                                                    disabled={isTesting || !optionInstalled}
                                                                                     aria-label={`测试 ${option.label}`}
                                                                                 >
                                                                                     {isTesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
@@ -1749,133 +2005,101 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                                                 })}
                                                 </TableBody>
                                             </Table>
-                                        </RadioGroup>
-                                    </Field>
-                                </section>
-
-                                <Separator className="my-5" />
-
-                                <section className="space-y-4">
-                                    <div className="space-y-1">
-                                        <h3 className="text-base font-semibold text-foreground">批注执行 AI</h3>
-                                        <p className="text-xs text-muted-foreground">可以单独为批注场景配置一个执行速度更快的 AI；不选择时使用上面的执行 Agent。</p>
                                     </div>
+                                    </SettingsSectionSurface>
+                                </SettingsCollapsiblePanel>
 
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                        <Field>
-                                            <FieldLabelWithHint hint="批注执行时优先使用的本地 ACP 供应商；不选择时使用上面的执行 Agent">批注供应商</FieldLabelWithHint>
-                                            <Select
-                                                value={formState.annotationPromptClient || undefined}
-                                                onValueChange={(value) => updateField('annotationPromptClient', normalizePromptClientPreference(value))}
-                                            >
-                                                <SelectTrigger
-                                                    clearable
-                                                    hasValue={Boolean(formState.annotationPromptClient)}
-                                                    onClear={() => updateField('annotationPromptClient', null)}
-                                                >
-                                                    <SelectValue placeholder="默认供应商" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {LOCAL_AI_AGENT_OPTIONS.map((option) => (
-                                                        <SelectItem key={option.value} value={option.value}>
-                                                            {option.label}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </Field>
-
-                                        <Field>
-                                            <FieldLabelWithHint hint="留空时使用供应商或 ACP UI 的默认模型">批注执行模型</FieldLabelWithHint>
+                                <SettingsCollapsiblePanel title="AI 用途配置"
+                                    description="配置对话、批注和画布使用的 Agent、模型及批注执行偏好。"
+                                    contentClassName="space-y-4"
+                                >
+                                    <SettingsSectionSurface className="p-0">
+                                    <div role="table" aria-label="AI 用途配置" className="min-w-0">
+                                        <div role="rowgroup">
+                                            <div role="row" className="hidden min-w-0 grid-cols-[88px_minmax(0,1fr)_minmax(0,1fr)] border-b border-border bg-muted/30 sm:grid">
+                                                <div role="columnheader" className="min-w-0 px-3 py-2 text-xs font-medium text-muted-foreground">用途</div>
+                                                <div role="columnheader" className="min-w-0 px-3 py-2 text-xs font-medium text-muted-foreground">Agent</div>
+                                                <div role="columnheader" className="min-w-0 px-3 py-2 text-xs font-medium text-muted-foreground">模型</div>
+                                            </div>
+                                        </div>
+                                        <div role="rowgroup" className="min-w-0">
+                                            {conversationUiEnabled ? renderAiPurposeConfigRow('对话 AI', 'conversationPromptClient', 'conversationModel') : null}
+                                            {renderAiPurposeConfigRow('批注 AI', 'annotationPromptClient', 'annotationModel')}
+                                            {renderAiPurposeConfigRow('画布 AI', 'canvasPromptClient', 'canvasModel')}
+                                        </div>
+                                    </div>
+                                    </SettingsSectionSurface>
+                                    <SettingsSectionSurface className="p-0">
+                                        <SettingsConfigRow label="批注 AI 并发数" hint="批量批注执行时同时发送的 AI 任务数量，默认 5。">
                                             <Input
-                                                value={formState.annotationModel}
-                                                onChange={(event) => updateField('annotationModel', event.target.value)}
-                                                placeholder="例如输入自定义模型 ID"
-                                            />
-                                        </Field>
-
-                                        <Field>
-                                            <FieldLabelWithHint hint="批量批注执行时同时发送的 AI 任务数量，默认 5。">AI 并发数</FieldLabelWithHint>
-                                            <Input
+                                                className={`w-24 ${SETTINGS_COMPACT_CONTROL_CLASS_NAME}`}
                                                 type="number"
                                                 min={1}
                                                 max={10}
                                                 value={formState.agentRunConcurrency}
                                                 onChange={(event) => updateField('agentRunConcurrency', sanitizeAgentRunConcurrency(event.target.value))}
                                             />
-                                        </Field>
-                                    </div>
-                                </section>
+                                        </SettingsConfigRow>
+                                        <SettingsConfigRow label="任务完成后自动清空批注" hint="AI 任务完成后立即移除已完成批注，默认开启。">
+                                            <Switch
+                                                checked={formState.autoClearCompletedComments}
+                                                onCheckedChange={(checked) => updateField('autoClearCompletedComments', checked === true)}
+                                                aria-label="任务完成后自动清空批注"
+                                            />
+                                        </SettingsConfigRow>
+                                    </SettingsSectionSurface>
+                                </SettingsCollapsiblePanel>
+                            </div>
 
-                                <Separator className="my-5" />
+                            <div className={aiSettingsSection === 'other' ? 'contents' : 'hidden'}>
+                                <SettingsCollapsiblePanel title="声音通知"
+                                    description="仅保存在当前浏览器；不影响项目配置和 AI 执行。"
+                                >
+                                    <SettingsSectionSurface data-ai-notification-settings className="p-0">
+                                        <SettingsConfigRow label="完成音" hint="批注或侧边栏 AI 成功完成时播放">
+                                            <Switch
+                                                checked={notificationSettings.completionEnabled}
+                                                onCheckedChange={(checked) => updateNotificationSetting({ completionEnabled: checked === true })}
+                                                aria-label="启用完成音"
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon-xs"
+                                                aria-label="试听完成音"
+                                                onClick={() => { void notificationPlayer.play('completion'); }}
+                                            >
+                                                <Play className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </SettingsConfigRow>
+                                        <SettingsConfigRow label="提醒音" hint="批注或侧边栏 AI 报错时播放">
+                                            <Switch
+                                                checked={notificationSettings.reminderEnabled}
+                                                onCheckedChange={(checked) => updateNotificationSetting({ reminderEnabled: checked === true })}
+                                                aria-label="启用提醒音"
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon-xs"
+                                                aria-label="试听提醒音"
+                                                onClick={() => { void notificationPlayer.play('reminder'); }}
+                                            >
+                                                <Play className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </SettingsConfigRow>
+                                    </SettingsSectionSurface>
+                                </SettingsCollapsiblePanel>
 
-                                <section className="space-y-3">
-                                    <div className="space-y-1">
-                                        <h3 className="text-base font-semibold text-foreground">声音通知</h3>
-                                        <p className="text-xs text-muted-foreground">仅保存在当前浏览器；不影响项目配置和 AI 执行。</p>
-                                    </div>
-
-                                    <div className="space-y-2 rounded-md border border-border px-3 py-2.5">
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <div className="text-sm font-medium text-foreground">完成音</div>
-                                                <div className="text-xs text-muted-foreground">批注或侧边栏 AI 成功完成时播放</div>
-                                            </div>
-                                            <div className="flex shrink-0 items-center gap-1.5">
-                                                <Switch
-                                                    checked={notificationSettings.completionEnabled}
-                                                    onCheckedChange={(checked) => updateNotificationSetting({ completionEnabled: checked === true })}
-                                                    aria-label="启用完成音"
-                                                />
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon-xs"
-                                                    aria-label="试听完成音"
-                                                    onClick={() => { void notificationPlayer.play('completion'); }}
-                                                >
-                                                    <Play className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center justify-between gap-3 border-t border-border pt-2">
-                                            <div className="min-w-0">
-                                                <div className="text-sm font-medium text-foreground">提醒音</div>
-                                                <div className="text-xs text-muted-foreground">批注或侧边栏 AI 报错时播放</div>
-                                            </div>
-                                            <div className="flex shrink-0 items-center gap-1.5">
-                                                <Switch
-                                                    checked={notificationSettings.reminderEnabled}
-                                                    onCheckedChange={(checked) => updateNotificationSetting({ reminderEnabled: checked === true })}
-                                                    aria-label="启用提醒音"
-                                                />
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon-xs"
-                                                    aria-label="试听提醒音"
-                                                    onClick={() => { void notificationPlayer.play('reminder'); }}
-                                                >
-                                                    <Play className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </section>
-
-                                <Separator className="my-5" />
-
-                                <section className="space-y-4">
-                                    <div className="space-y-1">
-                                        <h3 className="text-base font-semibold text-foreground">图片生成 AI</h3>
-                                        <p className="text-xs text-muted-foreground">配置图片生成 AI 的接口信息。</p>
-                                    </div>
-
+                                <SettingsCollapsiblePanel title="图片生成 API"
+                                    description="配置图片生成 API 的接口信息。"
+                                >
+                                    <SettingsSectionSurface className="p-3">
                                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                         <Field>
                                             <FieldLabelWithHint hint="OpenAI 或兼容服务的 /v1 API 地址">Base URL</FieldLabelWithHint>
                                             <Input
+                                                className={SETTINGS_COMPACT_CONTROL_CLASS_NAME}
                                                 value={formState.aiBaseUrl}
                                                 onChange={(event) => updateField('aiBaseUrl', event.target.value)}
                                                 placeholder="https://api.openai.com/v1"
@@ -1884,17 +2108,40 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
 
                                         <Field>
                                             <FieldLabelWithHint hint="保存在本机服务端配置，不写入项目仓库">API Key</FieldLabelWithHint>
-                                            <Input
-                                                type="password"
-                                                value={formState.aiApiKey}
-                                                onChange={(event) => updateField('aiApiKey', event.target.value)}
-                                                placeholder="sk-..."
-                                            />
+                                            <div className="flex min-w-0 gap-2">
+                                                <Input
+                                                    className={`min-w-0 ${SETTINGS_COMPACT_CONTROL_CLASS_NAME}`}
+                                                    type="password"
+                                                    autoComplete="new-password"
+                                                    value={formState.aiApiKey}
+                                                    onChange={(event) => {
+                                                        updateField('aiApiKey', event.target.value);
+                                                        setAiImageApiKeyClearRequested(false);
+                                                    }}
+                                                    placeholder={aiImageApiKeyConfigured ? '已配置；留空保持不变' : '请输入密钥'}
+                                                />
+                                                {aiImageApiKeyConfigured || formState.aiApiKey ? (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        className="shrink-0 gap-1 text-destructive hover:text-destructive"
+                                                        onClick={() => {
+                                                            updateField('aiApiKey', '');
+                                                            setAiImageApiKeyConfigured(false);
+                                                            setAiImageApiKeyClearRequested(true);
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                        清除
+                                                    </Button>
+                                                ) : null}
+                                            </div>
                                         </Field>
 
                                         <Field>
                                             <FieldLabelWithHint hint="图片生成模型 ID">模型</FieldLabelWithHint>
                                             <Input
+                                                className={SETTINGS_COMPACT_CONTROL_CLASS_NAME}
                                                 value={formState.aiModel}
                                                 onChange={(event) => updateField('aiModel', event.target.value)}
                                                 placeholder="gpt-image-2"
@@ -1919,7 +2166,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                                         </Field>
                                     </div>
 
-                                    <div data-ai-image-config-actions className="flex flex-wrap items-center gap-2 pt-1">
+                                    <div data-ai-image-config-actions className="mt-4 flex flex-wrap items-center gap-2">
                                         <Button
                                             type="button"
                                             variant="outline"
@@ -1940,7 +2187,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                                             disabled={loading || aiImageConfigTest.status === 'testing'}
                                         >
                                             <RefreshCw className="h-3.5 w-3.5" />
-                                            读取本地 Codex 配置
+                                            导入本地 Codex 配置
                                         </Button>
                                         {aiImageConfigTest.status === 'passed' ? (
                                             <span className="block max-w-full whitespace-normal break-words text-xs leading-5 text-emerald-600 [overflow-wrap:anywhere] min-w-0 flex-[1_1_220px]">{aiImageConfigTest.message || '测试通过'}</span>
@@ -1948,15 +2195,22 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                                             <span className="block max-w-full whitespace-normal break-words text-xs leading-5 text-destructive [overflow-wrap:anywhere] min-w-0 flex-[1_1_220px]" title={aiImageConfigTest.message}>测试失败：{aiImageConfigTest.message}</span>
                                         ) : null}
                                     </div>
-                                </section>
-                            </>
-                        ) : null}
+                                    </SettingsSectionSurface>
+                                </SettingsCollapsiblePanel>
+                                <VoiceAssistantSettingsSection
+                                    ref={voiceAssistantSettingsRef}
+                                    active={activeTab === 'ai'}
+                                    initialSection={initialVoiceSection}
+                                    projectId={projectId}
+                                />
+                            </div>
+                            </div>
+                        </Tabs>
                     </TabsContent>
 
                     <TabsContent value="network" className="m-0 min-h-0 flex-1 overflow-y-auto px-5 py-4.5">
                         <section className="space-y-4">
                         <div className="space-y-1">
-                            <h3 className="text-base font-semibold text-foreground">网络配置</h3>
                             <p className="text-xs text-muted-foreground">配置服务监听地址与网络访问范围。</p>
                         </div>
 
@@ -1974,7 +2228,7 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                             <Input
                                 value={formState.lanHost}
                                 onChange={(event) => updateField('lanHost', event.target.value)}
-                                placeholder={availableLANHosts[0] || '192.168.1.10'}
+                                placeholder={availableLANHosts[0] || '输入局域网 IP'}
                             />
                             {availableLANHosts.length ? (
                                 <div className="flex flex-wrap gap-1.5">
@@ -2097,27 +2351,42 @@ export default function SettingsDialog({ open, projectId, onClose, onSaved, make
                         </section>
                     </TabsContent>
 
-                    <SheetFooter className="flex flex-row justify-end gap-2 border-t px-5 py-3.5">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={onClose}
-                            disabled={loading || aiImageConfigTest.status === 'testing' || makeClientUpdateApplying}
-                        >
-                            取消
-                        </Button>
-                        {activeTab === 'update' ? null : (
+                    <SheetFooter className="flex flex-row items-center justify-between gap-3 border-t px-5 py-3.5">
+                        <div className="min-w-0">
+                            {activeTab === 'ai' ? (
+                                <Button
+                                    type="button"
+                                    variant="link"
+                                    size="sm"
+                                    className="h-auto px-0 py-0 text-xs text-emerald-600 hover:text-emerald-700"
+                                    onClick={() => void handleCopyGlobalSettingsAiPrompt()}
+                                >
+                                    复制 AI 配置提示词
+                                </Button>
+                            ) : null}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
                             <Button
                                 type="button"
-                                variant="brand"
+                                variant="outline"
                                 size="sm"
-                                onClick={handleSave}
-                                disabled={loading || aiImageConfigTest.status === 'testing'}
+                                onClick={onClose}
+                                disabled={loading || aiImageConfigTest.status === 'testing' || makeClientUpdateApplying}
                             >
-                                {loading ? '保存中...' : '保存'}
+                                取消
                             </Button>
-                        )}
+                            {activeTab === 'project' && projectSettingsSection === 'update' ? null : (
+                                <Button
+                                    type="button"
+                                    variant="brand"
+                                    size="sm"
+                                    onClick={handleSave}
+                                    disabled={loading || aiImageConfigTest.status === 'testing'}
+                                >
+                                    {loading ? '保存中...' : '保存'}
+                                </Button>
+                            )}
+                        </div>
                     </SheetFooter>
                 </Tabs>
             </SheetContent>

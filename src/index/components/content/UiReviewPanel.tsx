@@ -1,13 +1,11 @@
 import React, { useRef, useState } from 'react';
-import { ArrowLeft, ChevronDown, CircleHelp, Copy, FileText, ListChecks, Loader2, RefreshCw, Send, Trash2, UploadCloud } from 'lucide-react';
+import { ArrowLeft, ChevronDown, CircleHelp, Copy, FileText, Loader2, RefreshCw, Send, Trash2 } from 'lucide-react';
 import { XMarkdown } from '@ant-design/x-markdown';
 import type { ComponentProps } from '@ant-design/x-markdown';
 import { Mermaid, XProvider } from '@ant-design/x';
 import zhCN_X from '@ant-design/x/locale/zh_CN';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     Tooltip,
     TooltipContent,
@@ -330,12 +328,6 @@ const REVIEW_ACTIONS: Array<{ kind: ReviewKind; label: string; description: stri
     },
 ];
 
-const REVIEW_REPORT_SUBMIT_SKILL_URL = 'https://github.com/lintendo/Axhub-Skills/blob/main/skills/axhub-prototype-context/SKILL.md';
-const INSTALL_REVIEW_REPORT_SUBMIT_SKILL_PROMPT = [
-    `请把下面这个技能安装到当前项目：${REVIEW_REPORT_SUBMIT_SKILL_URL}`,
-    '安装到当前项目后，请用 $axhub-prototype-context 读取 Axhub 原型上下文，并按页面注入的评审提交地址把报告提交到当前原型的评审列表。',
-].join('\n');
-
 export default function UiReviewPanel({
     reports,
     selectedReport,
@@ -346,10 +338,7 @@ export default function UiReviewPanel({
     reviewDocumentPaths,
     loading = false,
     detailLoading = false,
-    uploadLoading = false,
     error = '',
-    lanSubmitConfig,
-    axhubSubmitConfig,
     onExecutePrompt,
     onSelectReport,
     onBackToList,
@@ -357,14 +346,7 @@ export default function UiReviewPanel({
     onDeleteReport,
     onStartReview,
     onRunReviewDirect,
-    onUploadReport,
-    onLanSubmitEnabledChange,
-    onAxhubSubmitEnabledChange,
 }: UiReviewPanelProps) {
-    const [lanSubmitPending, setLanSubmitPending] = useState(false);
-    const [axhubSubmitPending, setAxhubSubmitPending] = useState(false);
-    const uploadInputRef = useRef<HTMLInputElement | null>(null);
-
     const getReviewPrompt = (kind: ReviewKind) => reviewPrompts?.[kind] || reviewPrompt;
 
     const getReviewDocumentPath = (kind: ReviewKind) => reviewDocumentPaths?.[kind] || reviewDocumentPath || '';
@@ -414,49 +396,6 @@ export default function UiReviewPanel({
                 />
             </div>
         );
-    };
-
-    const handleFilesSelected = (files: File[]) => {
-        const markdownFiles = files.filter((file) => {
-            const name = file.name.toLowerCase();
-            return name.endsWith('.md') || name.endsWith('.markdown') || file.type === 'text/markdown';
-        });
-        if (markdownFiles.length === 0) {
-            return;
-        }
-        void onUploadReport(markdownFiles.slice(0, 1), {});
-    };
-
-    const handleUploadInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        handleFilesSelected(Array.from(event.target.files || []));
-        event.target.value = '';
-    };
-
-    const handleLanSubmitToggle = async (enabled: boolean) => {
-        setLanSubmitPending(true);
-        try {
-            await onLanSubmitEnabledChange(enabled);
-        } finally {
-            setLanSubmitPending(false);
-        }
-    };
-
-    const handleAxhubSubmitToggle = async (enabled: boolean) => {
-        setAxhubSubmitPending(true);
-        try {
-            await onAxhubSubmitEnabledChange(enabled);
-        } finally {
-            setAxhubSubmitPending(false);
-        }
-    };
-
-    const handleCopySubmitSkillPrompt = async () => {
-        try {
-            await navigator.clipboard.writeText(INSTALL_REVIEW_REPORT_SUBMIT_SKILL_PROMPT);
-            toast.success('已复制提交技能提示词');
-        } catch {
-            toast.error('复制失败，请手动选择提示词');
-        }
     };
 
     const handleDeleteSelectedReport = () => {
@@ -519,127 +458,17 @@ export default function UiReviewPanel({
                             <FileText className="mx-auto mb-3 h-9 w-9 text-muted-foreground/45" />
                             <div className="text-[13px] font-medium text-foreground">暂无评审报告</div>
                             <div className="mt-2 text-[12px] leading-5 text-muted-foreground">
-                                可以从底部发起一次评审，或上传已有 Markdown 报告。
+                                可以从底部发起一次 AI 评审。
                             </div>
                         </div>
                     </div>
                 )}
             </div>
             <div className="shrink-0 border-t bg-muted/10 px-3 py-3">
-                <Tabs defaultValue="ai-review" className="w-full">
-                    <TabsList className="grid h-8 w-full grid-cols-2">
-                        <TabsTrigger value="ai-review" className="h-6 text-xs">AI 评审</TabsTrigger>
-                        <TabsTrigger value="human-review" className="h-6 text-xs">人工评审</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="ai-review" className="mt-3 h-[72px] space-y-1">
-                        {REVIEW_ACTIONS.map(renderReviewActionRow)}
-                    </TabsContent>
-                    <TabsContent value="human-review" className="mt-3 h-[72px] space-y-1">
-                        <div className="flex h-8 items-center justify-between gap-2 px-2">
-                            <div className="flex min-w-0 items-center gap-2 text-[12px] font-medium text-foreground">
-                                <UploadCloud className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                <span>提交报告</span>
-                            </div>
-                            <input
-                                ref={uploadInputRef}
-                                type="file"
-                                accept=".md,.markdown,text/markdown"
-                                className="hidden"
-                                disabled={uploadLoading}
-                                onChange={handleUploadInputChange}
-                            />
-                            <div className="flex shrink-0 items-center gap-0.5">
-                                {lanSubmitConfig?.lanSubmitEnabled === true || axhubSubmitConfig?.submitEnabled === true ? (
-                                    <Button
-                                        type="button"
-                                        size="xs"
-                                        variant="ghost"
-                                        className="h-7 gap-1 px-1.5 text-xs text-muted-foreground hover:text-foreground"
-                                        onClick={() => { void handleCopySubmitSkillPrompt(); }}
-                                    >
-                                        <Copy className="h-3.5 w-3.5" />
-                                        技能提交
-                                    </Button>
-                                ) : null}
-                                <Button
-                                    type="button"
-                                    size="xs"
-                                    variant="ghost"
-                                    className="h-7 shrink-0 gap-1 px-1.5 text-xs text-muted-foreground hover:text-foreground"
-                                    disabled={uploadLoading}
-                                    onClick={() => uploadInputRef.current?.click()}
-                                >
-                                    {uploadLoading ? (
-                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                        <UploadCloud className="h-3.5 w-3.5" />
-                                    )}
-                                    上传报告
-                                </Button>
-                            </div>
-                        </div>
-                        <div className="flex h-8 items-center justify-between gap-2 px-2">
-                            <div className="flex min-w-0 items-center gap-2 text-[12px] font-medium text-foreground">
-                                <ListChecks className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                <span>提交方式</span>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-3 text-[12px] font-medium text-foreground">
-                                <div className="flex items-center gap-1.5">
-                                    <Checkbox
-                                        id="review-lan-submit"
-                                        checked={lanSubmitConfig?.lanSubmitEnabled === true}
-                                        disabled={lanSubmitPending || lanSubmitConfig?.projectLanAllowed === false}
-                                        onCheckedChange={(checked) => { void handleLanSubmitToggle(checked === true); }}
-                                    />
-                                    <label htmlFor="review-lan-submit" className="whitespace-nowrap">局域网提交</label>
-                                    <TooltipProvider delayDuration={150}>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <button
-                                                    type="button"
-                                                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                    aria-label="局域网提交说明"
-                                                >
-                                                    <CircleHelp className="h-3.5 w-3.5" />
-                                                </button>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="top" className="max-w-[320px]">
-                                                允许研发团队成员的 AI agent 通过局域网提交 Markdown 评审报告。
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <Checkbox
-                                        id="review-axhub-submit"
-                                        checked={axhubSubmitConfig?.submitEnabled === true}
-                                        disabled={axhubSubmitPending || axhubSubmitConfig?.bound !== true}
-                                        onCheckedChange={(checked) => { void handleAxhubSubmitToggle(checked === true); }}
-                                    />
-                                    <label htmlFor="review-axhub-submit" className="whitespace-nowrap">Axhub 提交</label>
-                                    <TooltipProvider delayDuration={150}>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <button
-                                                    type="button"
-                                                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                    aria-label="Axhub 提交说明"
-                                                >
-                                                    <CircleHelp className="h-3.5 w-3.5" />
-                                                </button>
-                                            </TooltipTrigger>
-                                            <TooltipContent side="top" className="max-w-[320px]">
-                                                {axhubSubmitConfig?.bound === true
-                                                    ? '允许评审者通过已发布的 Axhub 原型提交 Markdown 评审报告。'
-                                                    : '重新发布到 Axhub 后可开启'}
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                </div>
-                            </div>
-                        </div>
-                    </TabsContent>
-                </Tabs>
+                <div className="px-2 pb-1 text-[12px] font-medium text-foreground">AI 评审</div>
+                <div className="h-[72px] space-y-1">
+                    {REVIEW_ACTIONS.map(renderReviewActionRow)}
+                </div>
             </div>
         </>
     );

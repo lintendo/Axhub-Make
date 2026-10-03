@@ -25,6 +25,7 @@ export type PostIframeMessageRequestOptions = {
   successType: string;
   errorType?: string;
   timeoutMs: number;
+  retryDelaysMs?: readonly number[];
   isCurrent: () => boolean;
 };
 
@@ -43,6 +44,7 @@ export function postIframeMessageRequest({
   successType,
   errorType,
   timeoutMs,
+  retryDelaysMs = RETRY_DELAYS_MS,
   isCurrent,
 }: PostIframeMessageRequestOptions): Promise<Record<string, unknown> | null> {
   const target = targetWindow;
@@ -87,7 +89,7 @@ export function postIframeMessageRequest({
     };
 
     host.addEventListener('message', onMessage);
-    RETRY_DELAYS_MS.forEach((delay) => {
+    retryDelaysMs.forEach((delay) => {
       timers.push(host.setTimeout(() => {
         if (!isCurrent()) {
           finish(null);

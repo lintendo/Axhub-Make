@@ -152,7 +152,7 @@ export function VersionInfoValue({
 
 function VersionLogTooltipButton({
     commits,
-    label = '完整更新日志',
+    label = '更新日志',
 }: {
     commits: VersionCardCommit[];
     label?: string;
@@ -218,7 +218,12 @@ export function VersionCommitCard({
         <div className={cn('rounded-md border border-border bg-card px-3.5 py-3', compact && 'px-3 py-2.5', className)}>
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-semibold leading-5 text-foreground">{commit.message || getCommitShortHash(commit)}</div>
+                    <div
+                        className="truncate whitespace-nowrap text-[13px] font-semibold leading-5 text-foreground"
+                        title={commit.message || getCommitShortHash(commit)}
+                    >
+                        {commit.message || getCommitShortHash(commit)}
+                    </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                         <span>{commit.author || 'Unknown'}</span>
                         <span>·</span>
@@ -256,7 +261,12 @@ export function VersionCommitRow({
     return (
         <div className={cn('grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-3', className)}>
             <div className="min-w-0">
-                <div className="break-words text-[13px] font-semibold leading-5 text-foreground">{commit.message || getCommitShortHash(commit)}</div>
+                <div
+                    className="truncate whitespace-nowrap text-[13px] font-semibold leading-5 text-foreground"
+                    title={commit.message || getCommitShortHash(commit)}
+                >
+                    {commit.message || getCommitShortHash(commit)}
+                </div>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                     <span>{commit.author || 'Unknown'}</span>
                     <span>·</span>

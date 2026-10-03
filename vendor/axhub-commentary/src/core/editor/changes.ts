@@ -31,6 +31,8 @@ import type {
 } from '../../tweak/protocol';
 import { getGlobalCommentaryTweakProtocol } from '../../tweak/protocol';
 import { normalizePromptCardSkillIds } from '../../ui/runtime/prompt-card-skills';
+import { buildCommenterColorMap } from '../../ui/runtime/commenter-style';
+import { buildExternalCommentsPromptSection } from '../../external-comments';
 import {
   extractAnnotationPanelNodeId,
   findAnnotationMarkerByNodeId,
@@ -392,6 +394,31 @@ export function createChangesService(options: {
     );
   }
 
+  function getCommenterDisplayMeta(element: Element | null): {
+    name: string;
+    color: string;
+    readOnly: boolean;
+    externalComments: ElementEditMeta['externalComments'];
+  } | null {
+    const meta = getMetaForElement(element);
+    if (!meta) return null;
+    const externalComments = meta.externalComments ?? [];
+    if (externalComments.length === 0 && !meta.author) return null;
+    // External review authors are nested node context, not the ordinary author.
+    // Keep the display name empty when a node has only external comments so the
+    // prompt card does not render the same reviewer twice.
+    const name = String(meta.author ?? '').trim();
+    const names = Array.from(state.editMetaByKey.values())
+      .flatMap((item) => [item.author, ...(item.externalComments ?? []).map((comment) => comment.authorName)])
+      .filter((item): item is string => Boolean(String(item ?? '').trim()));
+    return {
+      name,
+      color: buildCommenterColorMap(names).get(name) ?? '#3B82F6',
+      readOnly: Boolean(meta.readOnly),
+      externalComments,
+    };
+  }
+
   function getViewportMarkerPosition(anchor: MarkerAnchor): { left: number; top: number } {
     return getViewportPointFromMarkerAnchor(anchor, {
       scrollX: window.scrollX,
@@ -491,14 +518,17 @@ export function createChangesService(options: {
   function buildMarkerDetailLines(meta: ElementEditMeta): string[] {
     const lines: string[] = [];
     const note = normalizeNote(meta.note).trim();
+    const userImageCount = meta.images.filter((image) => image.source !== 'target-screenshot').length;
     if (note) {
       lines.push(note);
     } else if ((meta.skillIds?.length ?? 0) > 0) {
       lines.push('已选择 AI 技能');
-    } else if (meta.images.length > 0) {
-      lines.push(`已附加 ${meta.images.length} 张参考图片`);
+    } else if (userImageCount > 0) {
+      lines.push(`已附加 ${userImageCount} 张参考图片`);
     } else if (meta.changeKinds.length > 0) {
       lines.push(`已修改：${meta.changeKinds.join(' / ')}`);
+    } else if ((meta.externalComments?.length ?? 0) > 0) {
+      lines.push(`外部评审意见 ${meta.externalComments?.length ?? 0} 条`);
     } else {
       lines.push('已记录修改');
     }
@@ -542,6 +572,7 @@ export function createChangesService(options: {
     if (hasNote) return;
     if ((meta.skillIds?.length ?? 0) > 0) return;
     if (meta.images.length > 0) return;
+    if ((meta.externalComments?.length ?? 0) > 0) return;
     if (meta.dirtySince !== null) return;
     if (meta.changeKinds.length > 0) return;
     if (hasRecordedTweak(meta)) return;
@@ -564,7 +595,7 @@ export function createChangesService(options: {
     }
 
     const dirtyMetas = Array.from(state.editMetaByKey.values())
-      .filter((meta) => meta.dirtySince !== null && meta.anchor)
+      .filter((meta) => (meta.dirtySince !== null || (meta.externalComments?.length ?? 0) > 0) && meta.anchor)
       .sort((a, b) => {
         const at = Number(a.dirtySince ?? 0);
         const bt = Number(b.dirtySince ?? 0);
@@ -580,6 +611,9 @@ export function createChangesService(options: {
     })();
 
     const visibleMetas = filterVisibleChangeMarkerMetas(dirtyMetas, activeMarkerKey);
+    const commenterColors = buildCommenterColorMap(
+      visibleMetas.map((meta) => meta.author),
+    );
 
     if (visibleMetas.length === 0) {
       layer.hidden = true;
@@ -607,6 +641,12 @@ export function createChangesService(options: {
       ].filter(Boolean).join(' ');
       marker.style.left = `${position.left}px`;
       marker.style.top = `${position.top}px`;
+      const commenterColor = commenterColors.get(String(meta.author ?? '').trim());
+      if (commenterColor) {
+        marker.style.setProperty('--we-commenter-color', commenterColor);
+        marker.style.backgroundColor = commenterColor;
+        marker.style.borderColor = commenterColor;
+      }
       marker.setAttribute('role', 'button');
       marker.tabIndex = 0;
       marker.setAttribute(
@@ -623,6 +663,7 @@ export function createChangesService(options: {
       const markerBody = document.createElement('span');
       markerBody.className = 'we-change-marker__body';
       markerBody.textContent = markerText;
+      if (commenterColor) markerBody.style.backgroundColor = commenterColor;
 
       const taskGlyph = taskState === 'completed' || taskState === 'error'
         ? CHANGE_MARKER_TASK_GLYPHS[taskState]
@@ -885,10 +926,16 @@ export function createChangesService(options: {
   function setNoteForElement(
     element: Element | null,
     note: string,
-    options: { skillIds?: readonly string[] } = {},
-  ): void {
+    options: {
+      skillIds?: readonly string[];
+      voiceCreateOperationId?: string;
+      voiceTargetRef?: string;
+      voiceTarget?: import('../../web-editor-types').CommentaryPageElementSummary;
+      anchorPlacement?: 'target';
+    } = {},
+  ): string | null {
     const meta = getMetaForElement(element);
-    if (!meta) return;
+    if (!meta) return null;
     meta.note = normalizeNote(note);
     const hasNote = Boolean(meta.note.trim());
     if (!hasNote) {
@@ -910,8 +957,16 @@ export function createChangesService(options: {
       meta.anchor = fallbackElement ? buildFallbackAnchor(fallbackElement) : null;
     }
 
+    const commentId = hasNote ? ensureElementEditCommentId(meta) : null;
     if (hasNote) {
-      ensureElementEditCommentId(meta);
+      const voiceCreateOperationId = String(options.voiceCreateOperationId || '').trim();
+      if (voiceCreateOperationId) {
+        meta.voiceCreateOperationId = voiceCreateOperationId;
+        meta.voiceElementKey = meta.elementKey;
+        meta.voiceTargetRef = String(options.voiceTargetRef || '').trim() || undefined;
+        meta.voiceTarget = options.voiceTarget;
+        meta.anchorPlacement = options.anchorPlacement;
+      }
       if (meta.dirtySince === null) {
         meta.dirtySince = Date.now();
       }
@@ -929,10 +984,26 @@ export function createChangesService(options: {
     pruneIdleMeta(meta.elementKey);
     notifyCommentEdited(meta);
     notifyEditMetaChanged();
+    return commentId;
   }
 
   function getImagesForElement(element: Element | null): PromptImageAttachment[] {
     return getMetaForElement(element)?.images.slice() ?? [];
+  }
+
+  function removeExternalCommentForElement(element: Element | null, commentId: string): boolean {
+    const meta = getMetaForElement(element);
+    const normalizedCommentId = String(commentId ?? '').trim();
+    if (!meta || !normalizedCommentId || !Array.isArray(meta.externalComments)) return false;
+    const nextExternalComments = meta.externalComments.filter(
+      (comment) => String(comment.id ?? '').trim() !== normalizedCommentId,
+    );
+    if (nextExternalComments.length === meta.externalComments.length) return false;
+    meta.externalComments = nextExternalComments;
+    pruneIdleMeta(meta.elementKey);
+    notifyCommentEdited(meta);
+    notifyEditMetaChanged();
+    return true;
   }
 
   function setImagesForElement(
@@ -1107,7 +1178,7 @@ export function createChangesService(options: {
 
   function buildModifiedElementsContext() {
     const dirtyMetas = Array.from(state.editMetaByKey.values())
-      .filter((meta) => meta.dirtySince !== null)
+      .filter((meta) => meta.dirtySince !== null || (meta.externalComments?.length ?? 0) > 0)
       .sort((a, b) => Number(a.dirtySince ?? 0) - Number(b.dirtySince ?? 0));
 
     return dirtyMetas.map((meta, index) => ({
@@ -1116,6 +1187,9 @@ export function createChangesService(options: {
       note: meta.note,
       skillIds: meta.skillIds?.slice(),
       changeKinds: meta.changeKinds.slice(),
+      ...((meta.externalComments?.length ?? 0) > 0
+        ? { externalComments: meta.externalComments?.map((comment) => ({ ...comment })) }
+        : {}),
       marker: meta.anchor
         ? {
             index: index + 1,
@@ -1139,7 +1213,8 @@ export function createChangesService(options: {
     return sourceMetas
       .map((meta) => {
         const note = normalizeNote(meta.note).trim();
-        if (!note) return null;
+        const externalSection = buildExternalCommentsPromptSection(meta.externalComments ?? []);
+        if (!note && !externalSection) return null;
         let resolvedElement: Element | null = null;
         try {
           resolvedElement = locateElement(meta.locator);
@@ -1150,7 +1225,7 @@ export function createChangesService(options: {
           elementKey: meta.elementKey,
           selector: formatSelectorPath(meta.locator),
           label: meta.label,
-          note,
+          note: [note, externalSection].filter(Boolean).join('\n\n'),
           elementType: resolvedElement?.tagName ?? '',
         };
       })
@@ -1194,11 +1269,13 @@ export function createChangesService(options: {
     normalizeNote,
     getOrCreateEditMeta,
     getMetaForElement,
+    getCommenterDisplayMeta,
     rememberSelectionAnchor,
     clearPendingSelectionAnchor,
     renderChangeMarkers,
     syncEditMetaWithTransactions,
     setNoteForElement,
+    removeExternalCommentForElement,
     getImagesForElement,
     setImagesForElement,
     recordTweakValuesForElement,

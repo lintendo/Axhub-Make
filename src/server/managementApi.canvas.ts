@@ -7,7 +7,11 @@ import { isPathInside } from './projectCore/index.ts';
 
 import { getCanvasBridgeHub } from './canvasBridge.ts';
 import { readJsonBody, sendFile, sendJson } from './http.ts';
-import { resolveResourceFilePath } from './resourceFiles.ts';
+import {
+  getResourceAssetDirectory,
+  getResourceAssetRelativePath,
+  resolveResourceFilePath,
+} from './resourceFiles.ts';
 
 const CANVAS_EXT = '.excalidraw';
 const DEFAULT_CANVAS_SOURCE = '@axhub/make';
@@ -56,13 +60,20 @@ function parseEncodedSegment(value: string): string | null {
   }
 }
 
-function createResourceCanvasAssetStorageOptions(canvasPath: string): CanvasAssetStorageOptions {
-  const canvasDir = path.dirname(canvasPath);
-  const canvasAssetBase = toSafeCanvasAssetFileBase(path.basename(canvasPath, CANVAS_EXT));
+function createResourceCanvasAssetStorageOptions(
+  resourcesDir: string,
+  resourcePath: string,
+): CanvasAssetStorageOptions {
+  const assetRelativePath = getResourceAssetRelativePath(resourcePath) || `${resourcePath}.assets`;
+  const assetDirectory = getResourceAssetDirectory(resourcesDir, resourcePath)
+    || path.resolve(resourcesDir, ...assetRelativePath.split('/'));
+  if (!assetDirectory || !assetRelativePath) {
+    throw new Error('Invalid resource canvas asset path');
+  }
   return {
-    assetBaseDir: canvasDir,
-    imageAssetDir: path.resolve(canvasDir, `${canvasAssetBase}.assets`, CANVAS_IMAGE_ASSETS_DIR),
-    imagePathPrefix: `${canvasAssetBase}.assets/${CANVAS_IMAGE_ASSETS_DIR}`,
+    assetBaseDir: resourcesDir,
+    imageAssetDir: path.resolve(assetDirectory, CANVAS_IMAGE_ASSETS_DIR),
+    imagePathPrefix: `${assetRelativePath}/${CANVAS_IMAGE_ASSETS_DIR}`,
   };
 }
 
@@ -272,6 +283,8 @@ function sendCanvasJsonFile(
   }
   try {
     const data = hydrateStoredCanvasImageFiles(JSON.parse(content), options);
+    data.sceneRevision = createHash('sha256').update(Buffer.from(content, 'utf8')).digest('hex');
+    data.dirty = false;
     res.end(JSON.stringify(data, null, 2));
   } catch {
     res.end(content);
@@ -401,7 +414,6 @@ function createResourceScreenshotResponse(
   projectRoot: string,
   projectId: string,
   resourcePath: string,
-  canvasPath: string,
   screenshotPath: string,
   params: {
     changed: boolean;
@@ -414,9 +426,8 @@ function createResourceScreenshotResponse(
   const fileName = path.basename(screenshotPath);
   const relativeScreenshotPath = path.relative(projectRoot, screenshotPath).split(path.sep).join('/');
   const latestPath = params.latestPath ? path.relative(projectRoot, params.latestPath).split(path.sep).join('/') : undefined;
-  const assetRelativePath = path.relative(path.dirname(canvasPath), screenshotPath).split(path.sep).join('/');
   const query = new URLSearchParams({ v: String(updatedAt), projectId });
-  const apiScreenshotUrl = `/api/canvas/resources/${encodeCanvasApiPath(resourcePath)}/${encodeCanvasApiPath(assetRelativePath)}?${query.toString()}`;
+  const apiScreenshotUrl = `/api/canvas/resources/${encodeCanvasApiPath(resourcePath)}/asset/${encodeURIComponent(fileName)}?${query.toString()}`;
   return {
     success: true,
     changed: params.changed,
@@ -434,18 +445,15 @@ function createResourceScreenshotResponse(
   };
 }
 
-function resolveResourceScreenshotReadPath(canvasPath: string, requestedAssetPath: string): string | null {
-  const canvasDir = path.dirname(canvasPath);
-  const assetBase = `${toSafeCanvasAssetFileBase(path.basename(canvasPath, CANVAS_EXT))}.assets`;
+function resolveResourceScreenshotReadPath(assetsDir: string, requestedAssetPath: string): string | null {
   const normalized = requestedAssetPath.replace(/\\/gu, '/');
-  if (!normalized.startsWith(`${assetBase}/`)) {
+  if (!normalized.startsWith('asset/')) {
     return null;
   }
-  const fileName = normalized.slice(assetBase.length + 1);
+  const fileName = normalized.slice('asset/'.length);
   if (!getRequestedScreenshotFileName(fileName)) {
     return null;
   }
-  const assetsDir = path.resolve(canvasDir, assetBase);
   const requestedPath = path.resolve(assetsDir, fileName);
   return isPathInside(assetsDir, requestedPath) ? requestedPath : null;
 }
@@ -468,7 +476,7 @@ function handleResourceCanvasScreenshotApi(
     sendJson(res, { error: 'Invalid resource canvas path' }, { status: 400 });
     return true;
   }
-  const resolved = resolveResourceFilePath(projectRoot, decodedCanvasPath);
+  const resolved = resolveResourceFilePath(projectRoot, decodedCanvasPath, { allowAssetPath: true });
   if (!resolved) {
     sendJson(res, { error: 'Invalid resource canvas path' }, { status: 403 });
     return true;
@@ -478,9 +486,12 @@ function handleResourceCanvasScreenshotApi(
     return true;
   }
 
-  const canvasDir = path.dirname(resolved.absolutePath);
-  const assetBase = `${toSafeCanvasAssetFileBase(path.basename(resolved.absolutePath, CANVAS_EXT))}.assets`;
-  const assetsDir = path.resolve(canvasDir, assetBase);
+  const assetsDir = getResourceAssetDirectory(resolved.resourcesDir, resolved.relativePath)
+    || path.resolve(resolved.resourcesDir, `${resolved.relativePath}.assets`);
+  if (!assetsDir) {
+    sendJson(res, { error: 'Invalid resource canvas asset path' }, { status: 403 });
+    return true;
+  }
   const latestScreenshotPath = path.resolve(assetsDir, CANVAS_SCREENSHOT_FILE);
 
   if (action.endsWith('.png')) {
@@ -488,7 +499,7 @@ function handleResourceCanvasScreenshotApi(
       sendJson(res, { error: 'Method not allowed' }, { status: 405 });
       return true;
     }
-    const requestedPath = resolveResourceScreenshotReadPath(resolved.absolutePath, action);
+    const requestedPath = resolveResourceScreenshotReadPath(assetsDir, action);
     if (!requestedPath) {
       sendJson(res, { error: 'Invalid screenshot path' }, { status: 403 });
       return true;
@@ -526,7 +537,7 @@ function handleResourceCanvasScreenshotApi(
       : writeScreenshotIfChanged(latestScreenshotPath, png);
     sendJson(
       res,
-      createResourceScreenshotResponse(projectRoot, projectId, resolved.relativePath, resolved.absolutePath, screenshotPath, {
+      createResourceScreenshotResponse(projectRoot, projectId, resolved.relativePath, screenshotPath, {
         changed: changed || latestChanged,
         latestPath: screenshotPath === latestScreenshotPath ? undefined : latestScreenshotPath,
         width: normalizeScreenshotDimension(body?.width),
@@ -543,6 +554,7 @@ function createResourceCanvasResponse(
   relativePath: string,
   canvasPath: string,
   created = false,
+  sceneRevision?: string,
 ) {
   return {
     success: true,
@@ -551,6 +563,8 @@ function createResourceCanvasResponse(
     displayName: path.basename(relativePath, CANVAS_EXT),
     path: path.relative(projectRoot, canvasPath).split(path.sep).join('/'),
     absoluteFilePath: canvasPath,
+    ...(sceneRevision ? { sceneRevision } : {}),
+    dirty: false,
   };
 }
 
@@ -574,13 +588,13 @@ function handleResourceCanvasApi(
     sendJson(res, { error: 'Canvas not found' }, { status: 404 });
     return true;
   }
-  const resolved = resolveResourceFilePath(projectRoot, decodedPath);
+  const resolved = resolveResourceFilePath(projectRoot, decodedPath, { allowAssetPath: true });
   if (!resolved) {
     sendJson(res, { error: 'Invalid resource canvas path' }, { status: 403 });
     return true;
   }
 
-  const assetOptions = createResourceCanvasAssetStorageOptions(resolved.absolutePath);
+  const assetOptions = createResourceCanvasAssetStorageOptions(resolved.resourcesDir, resolved.relativePath);
   if (req.method === 'GET') {
     if (!sendCanvasJsonFile(res, resolved.absolutePath, assetOptions)) {
       sendJson(res, { error: 'Canvas not found' }, { status: 404 });
@@ -601,8 +615,9 @@ function handleResourceCanvasApi(
       fs.mkdirSync(path.dirname(resolved.absolutePath), { recursive: true });
       const existedBefore = fs.existsSync(resolved.absolutePath);
       const { changed } = saveCanvasContent(resolved.absolutePath, body, assetOptions);
+      const sceneRevision = createHash('sha256').update(fs.readFileSync(resolved.absolutePath)).digest('hex');
       sendJson(res, {
-        ...createResourceCanvasResponse(projectRoot, resolved.relativePath, resolved.absolutePath, !existedBefore),
+        ...createResourceCanvasResponse(projectRoot, resolved.relativePath, resolved.absolutePath, !existedBefore, sceneRevision),
         changed,
       }, { status: !existedBefore ? 201 : 200 });
     }).catch((error) => sendJson(res, { error: error.message }, { status: 400 }));

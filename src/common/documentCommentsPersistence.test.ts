@@ -32,10 +32,6 @@ describe('document comments persistence adapter', () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ adminOrigin: 'http://localhost:32124' }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
         json: async () => ({ exists: true, document }),
       })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
@@ -44,6 +40,7 @@ describe('document comments persistence adapter', () => {
     const adapter = createDocumentCommentsPersistenceAdapter(() => ({
       projectId: 'project-a',
       documentPath: 'src/resources/prd/order.md',
+      makeServerOrigin: 'http://localhost:53817',
     }));
 
     await expect(adapter.read(scope)).resolves.toEqual(document);
@@ -56,12 +53,12 @@ describe('document comments persistence adapter', () => {
       }],
     });
 
-    expect(fetchMock).toHaveBeenNthCalledWith(2,
-      'http://localhost:32124/api/document-comments?path=src%2Fresources%2Fprd%2Forder.md&projectId=project-a&hydrateImages=1',
+    expect(fetchMock).toHaveBeenNthCalledWith(1,
+      'http://localhost:53817/api/document-comments?path=src%2Fresources%2Fprd%2Forder.md&projectId=project-a&hydrateImages=1',
       { method: 'GET' },
     );
-    expect(fetchMock).toHaveBeenNthCalledWith(3,
-      'http://localhost:32124/api/document-comments?path=src%2Fresources%2Fprd%2Forder.md&projectId=project-a',
+    expect(fetchMock).toHaveBeenNthCalledWith(2,
+      'http://localhost:53817/api/document-comments?path=src%2Fresources%2Fprd%2Forder.md&projectId=project-a',
       expect.objectContaining({
         method: 'PUT',
         body: JSON.stringify({
@@ -84,20 +81,37 @@ describe('document comments persistence adapter', () => {
     const adapter = createDocumentCommentsPersistenceAdapter(() => null);
 
     await expect(adapter.read(scope)).resolves.toBeNull();
-    await expect(adapter.write(scope, document, 'changes')).rejects.toThrow('context is unavailable');
+    await expect(adapter.write(scope, document, 'changes')).rejects.toThrow(
+      'Document comment context is unavailable',
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('propagates API failures to the caller', async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ adminOrigin: '' }) })
       .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) });
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = createDocumentCommentsPersistenceAdapter(() => ({
+      projectId: 'project-a',
+      documentPath: 'src/resources/prd/order.md',
+      makeServerOrigin: 'http://localhost:53817',
+    }));
+
+    await expect(adapter.read(scope)).rejects.toThrow('503');
+  });
+
+  it('fails closed when a standalone preview has no Make server origin', async () => {
+    const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     const adapter = createDocumentCommentsPersistenceAdapter(() => ({
       projectId: 'project-a',
       documentPath: 'src/resources/prd/order.md',
     }));
 
-    await expect(adapter.read(scope)).rejects.toThrow('503');
+    await expect(adapter.read(scope)).resolves.toBeNull();
+    await expect(adapter.write(scope, document, 'changes')).rejects.toThrow(
+      'Make server origin is unavailable; standalone previews do not support comments.',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

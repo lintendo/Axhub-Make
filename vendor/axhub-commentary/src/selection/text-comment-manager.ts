@@ -17,6 +17,8 @@
  *   by iterating text nodes within the Range.
  */
 
+import { resolveCspNonce } from '../ui/csp-nonce';
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -278,6 +280,8 @@ function ensureHighlightStyle(): void {
 
   const style = document.createElement('style');
   style.id = TEXT_COMMENT_HIGHLIGHT_STYLE_ID;
+  const cspNonce = resolveCspNonce(document);
+  if (cspNonce) style.nonce = cspNonce;
   style.textContent = `
     ::highlight(${TEXT_COMMENT_HIGHLIGHT_NAME}) {
       background: rgba(0, 143, 93, 0.18);

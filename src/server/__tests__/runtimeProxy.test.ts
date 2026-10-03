@@ -203,7 +203,7 @@ describe('runtime proxy route ownership', () => {
     const proxy = http.createServer((req, res) => proxyToRuntime(req, res, runtimeOrigin));
     const proxyOrigin = await listen(proxy);
 
-    const response = await fetch(`${proxyOrigin}/prototypes/home/index.tsx?projectId=make-project`, {
+    const response = await fetch(`${proxyOrigin}/prototypes/home/index.tsx?projectId=make-project&publishedShareId=share-a`, {
       headers: {
         referer: `${proxyOrigin}/@id/__x00__/prototypes/home/index.html?html-proxy&index=0.js`,
       },
@@ -211,10 +211,10 @@ describe('runtime proxy route ownership', () => {
     const body = await response.text();
 
     expect(response.status).toBe(200);
-    expect(body).toContain('import "/@fs/workspace/make14/node_modules/.pnpm/vite@5.4.21/node_modules/vite/dist/client/env.mjs?projectId=make-project";');
+    expect(body).toContain('import "/@fs/workspace/make14/node_modules/.pnpm/vite@5.4.21/node_modules/vite/dist/client/env.mjs?projectId=make-project&publishedShareId=share-a";');
     expect(body).not.toContain('import "/@fs/workspace/make14/node_modules/.pnpm/vite@5.4.21/node_modules/vite/dist/client/env.mjs";');
-    expect(body).toContain('import React from "/@fs/workspace/make14/node_modules/.vite/deps/react.js?projectId=make-project";');
-    expect(body).toContain('const lazy = () => import("/@fs/workspace/make14/src/prototypes/home/Lazy.tsx?projectId=make-project");');
+    expect(body).toContain('import React from "/@fs/workspace/make14/node_modules/.vite/deps/react.js?projectId=make-project&publishedShareId=share-a";');
+    expect(body).toContain('const lazy = () => import("/@fs/workspace/make14/src/prototypes/home/Lazy.tsx?projectId=make-project&publishedShareId=share-a");');
   });
 
   it('keeps git-version preview context on proxied runtime module imports', async () => {

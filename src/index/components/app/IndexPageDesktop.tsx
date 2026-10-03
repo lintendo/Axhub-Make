@@ -9,7 +9,10 @@ import type {
     PresentationAreaGroupedProps,
 } from '../../types/index-page.types';
 import type { AcpContextItem } from '../../domains/assistant/assistantAcpContext';
-import { resolveResponsiveSidebarDefaultCollapsed } from '../sidebar/responsiveSidebarState';
+import {
+    resolveResponsiveSidebarDefaultCollapsed,
+    resolveResponsiveWorkspaceAvailableWidth,
+} from '../sidebar/responsiveSidebarState';
 
 interface IndexPageDesktopProps {
     sidebarProps: NewSidebarGroupedProps;
@@ -32,6 +35,9 @@ interface IndexPageDesktopProps {
         defaultCollapsed: boolean;
         onDefaultCollapsedChange: (collapsed: boolean) => void;
     };
+    workspaceMetrics: {
+        onExternalAvailableWidthChange: (width: number) => void;
+    };
 }
 
 export default function IndexPageDesktop({
@@ -39,6 +45,7 @@ export default function IndexPageDesktop({
     presentationAreaProps,
     assistantPanel,
     responsiveSidebar,
+    workspaceMetrics,
 }: IndexPageDesktopProps) {
     const workspaceRef = React.useRef<HTMLDivElement | null>(null);
     const lastResponsiveSidebarDefaultRef = React.useRef(responsiveSidebar.defaultCollapsed);
@@ -47,25 +54,30 @@ export default function IndexPageDesktop({
         const workspace = workspaceRef.current;
         if (!workspace) return;
 
-        const updateResponsiveSidebarDefault = () => {
-            const nextCollapsed = resolveResponsiveSidebarDefaultCollapsed({
+        const updateWorkspaceMeasurements = () => {
+            const measurement = {
                 workspaceWidth: workspaceRef.current ? workspaceRef.current.clientWidth : 0,
                 assistantVisible: assistantPanel.visible,
                 assistantWidth: assistantPanel.width,
-            });
+            };
+            const externalAvailableWidth = resolveResponsiveWorkspaceAvailableWidth(measurement);
+            workspaceMetrics.onExternalAvailableWidthChange(externalAvailableWidth);
+
+            const nextCollapsed = resolveResponsiveSidebarDefaultCollapsed(measurement);
             if (nextCollapsed === lastResponsiveSidebarDefaultRef.current) return;
             lastResponsiveSidebarDefaultRef.current = nextCollapsed;
             responsiveSidebar.onDefaultCollapsedChange(nextCollapsed);
         };
 
-        updateResponsiveSidebarDefault();
-        const observer = new ResizeObserver(updateResponsiveSidebarDefault);
+        updateWorkspaceMeasurements();
+        const observer = new ResizeObserver(updateWorkspaceMeasurements);
         observer.observe(workspace);
         return () => observer.disconnect();
     }, [
         assistantPanel.visible,
         assistantPanel.width,
         responsiveSidebar.onDefaultCollapsedChange,
+        workspaceMetrics.onExternalAvailableWidthChange,
     ]);
 
     return (

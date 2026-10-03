@@ -266,6 +266,36 @@ describe('runtime-export-core captureDocumentScreenshot', () => {
     });
   });
 
+  it('captures only the requested viewport without expanding to the full scroll size', async () => {
+    const element = new FakeHTMLElement();
+    element.clientWidth = 390;
+    element.clientHeight = 846;
+    element.offsetWidth = 390;
+    element.offsetHeight = 846;
+    element.scrollWidth = 390;
+    element.scrollHeight = 1995;
+    snapdomToPng.mockResolvedValue({
+      src: 'data:image/png;base64,c25hcGRvbQ==',
+      getAttribute: vi.fn(),
+    });
+
+    const result = await captureDocumentScreenshot(element as any, {
+      targetWidth: 390,
+      targetHeight: 846,
+      scope: 'viewport',
+    });
+
+    expect(snapdomToPng.mock.calls[0]?.[1]).toEqual(expect.objectContaining({
+      width: 390,
+      height: 846,
+    }));
+    expect(result).toEqual({
+      dataUrl: 'data:image/png;base64,c25hcGRvbQ==',
+      width: 390,
+      height: 846,
+    });
+  });
+
   it('temporarily anchors the screenshot root and page chrome to the top-left viewport', async () => {
     const element = new FakeHTMLElement();
     const documentElement = new FakeHTMLElement();

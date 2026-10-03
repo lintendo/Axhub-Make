@@ -151,6 +151,19 @@ describe('useIndexPagePreviewActions source', () => {
     expect(source).not.toContain('setPreviewConfig(previewConfigBeforeWebEditorRef.current)');
   });
 
+  it('exits legacy quick edit in every preview when selection mode is closed', () => {
+    const source = readPreviewActionsSource();
+    const hostActionSource = getSourceSegment(
+      source,
+      'const runResolvedHostToolbarAction = async (nextAction: CommentaryHostToolbarAction) => {',
+      "if (nextAction.type === 'play-notification-sound')",
+    );
+
+    expect(hostActionSource).toContain("if (nextAction.type === 'toggle-selection-mode' && nextAction.active === false)");
+    expect(hostActionSource).toContain('getPreviewIframes().forEach((iframe) => {');
+    expect(hostActionSource).toContain('exitQuickEditRuntime(iframe);');
+  });
+
   it('keeps preview device state and actions in a dedicated hook module', () => {
     const source = readPreviewActionsSource();
 
@@ -162,7 +175,7 @@ describe('useIndexPagePreviewActions source', () => {
     expect(source).not.toContain('const [previewConfig, setPreviewConfig] = useState<PreviewConfig>');
   });
 
-  it('locks automatic viewport selection while annotation mode changes sidebar width', () => {
+  it('owns annotation sidebar stabilization only on system collapse paths', () => {
     const source = readPreviewRootSource();
     const completeOpenSource = getSourceSegment(
       source,
@@ -185,16 +198,27 @@ describe('useIndexPagePreviewActions source', () => {
       'exitWebEditorRef.current = handleExitWebEditor;',
     );
 
-    expect(source).toContain('const lockAdaptiveDesktopPreview = previewDeviceActions.lockAdaptiveDesktopPreview;');
-    expect(source).toContain('const unlockAdaptiveDesktopPreview = previewDeviceActions.unlockAdaptiveDesktopPreview;');
-    expect(completeOpenSource.indexOf('lockAdaptiveDesktopPreview();'))
-      .toBeLessThan(completeOpenSource.indexOf('setCollapsed(true);'));
-    expect(enterDocumentSource).not.toContain('lockAdaptiveDesktopPreview();');
-    expect(enterHtmlSource).toContain('lockAdaptiveDesktopPreview();');
-    expect(exitSource).toContain('unlockAdaptiveDesktopPreview();');
+    expect(source).toContain('const startPreviewLayoutStabilization = previewDeviceActions.startPreviewLayoutStabilization;');
+    expect(source).toContain('const endPreviewLayoutStabilization = previewDeviceActions.endPreviewLayoutStabilization;');
+    expect(completeOpenSource).toContain("if (!collapsed) {");
+    expect(completeOpenSource.indexOf("startPreviewLayoutStabilization('annotation-sidebar');"))
+      .toBeLessThan(completeOpenSource.indexOf('setSystemCollapsed(true);'));
+    expect(completeOpenSource).not.toContain('setCollapsed(true);');
+    expect(enterDocumentSource).not.toContain("startPreviewLayoutStabilization('annotation-sidebar');");
+    expect(enterHtmlSource).toContain("startPreviewLayoutStabilization('annotation-sidebar');");
+    expect(enterHtmlSource).toContain('if (!options?.preserveSidebar) {');
+    expect(enterHtmlSource).toContain('if (!collapsed) {');
+    expect(enterHtmlSource).toContain('setSystemCollapsed(true);');
+    expect(exitSource).toContain("endPreviewLayoutStabilization('annotation-sidebar');");
+    expect(exitSource).toContain('setSystemCollapsed(null);');
+    expect(exitSource.indexOf('setSystemCollapsed(null);'))
+      .toBeGreaterThan(exitSource.indexOf('} finally {'));
+    expect(source).not.toContain('lockedAdaptiveDesktop');
+    expect(source).not.toContain('lockAdaptiveDesktopPreview');
+    expect(source).not.toContain('unlockAdaptiveDesktopPreview');
   });
 
-  it('keeps the preview layout stable while opening the review sidebar', () => {
+  it('owns review panel stabilization for the rendered panel lifetime', () => {
     const source = readPreviewRootSource();
     const toggleSource = getSourceSegment(
       source,
@@ -202,10 +226,13 @@ describe('useIndexPagePreviewActions source', () => {
       'const openReviewReportDetail = useCallback',
     );
 
-    expect(toggleSource).toContain('const nextOpen = !reviewPanelOpen;');
-    expect(toggleSource).toContain('lockAdaptiveDesktopPreview();');
-    expect(toggleSource).toContain('unlockAdaptiveDesktopPreview();');
-    expect(toggleSource).toContain('setReviewPanelOpen(nextOpen);');
+    expect(source).toContain('useLayoutEffect(() => {');
+    expect(source).toContain('const reviewPanelStabilizationActive = reviewPanelOpen && reviewPanelVisible;');
+    expect(source).toContain("startPreviewLayoutStabilization('review-panel');");
+    expect(source).toContain("endPreviewLayoutStabilization('review-panel');");
+    expect(toggleSource).toContain('setReviewPanelOpen((previous) => !previous);');
+    expect(toggleSource).not.toContain('startPreviewLayoutStabilization');
+    expect(toggleSource).not.toContain('endPreviewLayoutStabilization');
   });
 
   it('uses shared content mode resolution so resource tab browsing does not exit prototype canvas', () => {
@@ -484,6 +511,19 @@ describe('useIndexPagePreviewActions source', () => {
     expect(combinedSource).toContain('QUICK_EDIT_RUNTIME_MISSING_TIMEOUT_MS');
     expect(combinedSource).toContain("postProjectCommunicationRecord(selectedItem, 'sessions'");
     expect(combinedSource).toContain('getClientUrlOrigin(selectedItem.clientUrl)');
+  });
+
+  it('pushes managed annotation document sources into mounted previews before falling back to reload', () => {
+    const source = readPreviewRootSource();
+    const documentMutationSource = getSourceSegment(
+      source,
+      'const mutatePrototypeAnnotationDocuments = useCallback',
+      'const handleCreatePrototypeAnnotationDocument = useCallback',
+    );
+
+    expect(documentMutationSource).toContain('replaceMountedPrototypeAnnotationSource(result.source)');
+    expect(documentMutationSource).toContain('if (!result.source || !replaceMountedPrototypeAnnotationSource(result.source))');
+    expect(documentMutationSource).toContain('handleRefreshElement();');
   });
 
   it('does not mount host-owned Space temporary interaction forwarding', () => {
@@ -1036,7 +1076,9 @@ describe('useIndexPagePreviewActions source', () => {
     expect(source).toContain('postPrototypeEditorEnable');
     expect(source).toContain('postPrototypeEditorDisable');
     expect(source).toContain('postPrototypeEditorHostToolbarAction');
-    expect(source).toContain('postPrototypeEditorSaveAction');
+    expect(source).toContain('postPrototypeEditorPrepareSave');
+    expect(source).toContain('postPrototypeEditorPreflightSave');
+    expect(source).toContain('postPrototypeEditorCommitSave');
     expect(source).toContain('runQuickEditSaveAction');
     expect(source).toContain("saveWebEditorTextChanges");
     expect(source).toContain("saveWebEditorStyleChanges");
@@ -1196,6 +1238,7 @@ describe('useIndexPagePreviewActions source', () => {
     expect(enableAnnotationSource).toContain("fetch(withProjectScope('/api/prototype-annotation/enable', projectScope)");
     expect(enableAnnotationSource).toContain('const targetPath = resolvePrototypeAnnotationTargetPath(selectedItem);');
     expect(enableAnnotationSource).toContain('targetPath,');
+    expect(enableAnnotationSource).toContain('pages: normalizePrototypeRoutePages(selectedItem?.pages),');
     expect(enableAnnotationSource).toContain('projectId: projectScope.projectId,');
     expect(enableAnnotationSource).not.toContain('window.location.search');
     expect(enableAnnotationSource).toContain('annotationEnabled: true');
@@ -1259,7 +1302,7 @@ describe('useIndexPagePreviewActions source', () => {
     expect(exitSource).toContain(': standalonePanelBeforeQuickEditRef.current;');
   });
 
-  it('marks quick edit inactive before exit state changes can queue an iframe restore', () => {
+  it('keeps the active iframe context until exit cleanup has completed', () => {
     const source = readPreviewRootSource();
     const exitSource = getSourceSegment(
       source,
@@ -1270,11 +1313,14 @@ describe('useIndexPagePreviewActions source', () => {
     const launchOptionsResetIndex = exitSource.indexOf(
       'activePrototypeEditorLaunchOptionsRef.current = null;',
     );
-    const firstAwaitIndex = exitSource.indexOf('await ');
+    const firstAwaitIndex = exitSource.indexOf('await Promise.resolve(editorApi?.disableDocumentEditor?.());');
 
     expect(runtimeInactiveIndex).toBeGreaterThan(-1);
     expect(runtimeInactiveIndex).toBeLessThan(launchOptionsResetIndex);
     expect(runtimeInactiveIndex).toBeLessThan(firstAwaitIndex);
+    expect(launchOptionsResetIndex).toBeGreaterThan(firstAwaitIndex);
+    expect(exitSource).toContain('const pendingExit = exitWebEditorInFlightRef.current;');
+    expect(exitSource).toContain('if (pendingExit) {');
   });
 
   it('handles in-card full exit in the Make host without routing back into the iframe editor', () => {
@@ -1342,7 +1388,7 @@ describe('useIndexPagePreviewActions source', () => {
     expect(runHostToolbarActionSource).toContain('return runResolvedHostToolbarAction(requestedAction);');
   });
 
-  it('maps annotation host toolbar AI actions to abortable API direct ACP runs without opening the assistant panel', () => {
+  it('keeps manual annotation execution on the established direct-run path instead of the voice adapter', () => {
     const source = readPreviewActionsSource();
     const directRunSource = getSourceSegment(
       source,
@@ -1357,7 +1403,7 @@ describe('useIndexPagePreviewActions source', () => {
     const fallbackActionSource = getSourceSegment(
       source,
       'const runQuickEditHostToolbarAction = useCallback(async (action: CommentaryHostToolbarAction) => {',
-      'const runHostToolbarAction = useCallback(async (action: CommentaryHostToolbarAction) => {',
+      'const collectPrototypePrompt = useCallback(async (',
     );
 
     expect(source).toContain('openAnnotationAssistantWithContext');
@@ -1370,6 +1416,10 @@ describe('useIndexPagePreviewActions source', () => {
     expect(source).toContain("messageApi.success('本地 AI 已连接');");
 
     expect(source).toContain('runAnnotationAcpChatPrompt');
+    expect(source).not.toContain('onSubmitCommentExecution');
+    expect(source).not.toContain('submitPersistedCommentExecutions');
+    expect(runHostToolbarActionSource).toContain('return runAnnotationAcpChatPrompt(panePrompt);');
+    expect(fallbackActionSource).toContain('return runAnnotationAcpChatPrompt(null);');
     expect(source).toContain('onRunAnnotationAssistantPromptViaApi');
     expect(source).toContain('resolveAnnotationActionEditingTargets');
     expect(source).toContain('editors?.getEditedSnapshot?.()?.modifiedElements ?? []');
@@ -1388,9 +1438,16 @@ describe('useIndexPagePreviewActions source', () => {
     expect(source).toContain("case 'accepted':");
     expect(source).toContain("case 'completed':");
     expect(source).toContain("case 'aborted':");
+    expect(source).toContain("case 'skipped':");
     expect(source).toContain("case 'error':");
     expect(directRunSource).toContain("await applyAnnotationEditingTaskState(event.editingTargets, 'editing', event.taskRef);");
     expect(directRunSource).toContain("await applyAnnotationEditingTaskState(event.editingTargets, 'completed', event.taskRef);");
+    expect(directRunSource).toContain('await clearCompletedCommentsForTargets(event.editingTargets);');
+    expect(directRunSource).toContain('request.notifyCommentaryVoiceOnCompletion');
+    expect(directRunSource).toContain('onCommentaryVoiceTaskCompleted');
+    expect(source).toContain('shouldSkipCompletedCommentAutoCleanup(targets)');
+    expect(source).toContain('autoClearCompletedComments = true');
+    expect(source).toContain("target: 'completed'");
     expect(directRunSource).toContain("await applyAnnotationEditingTaskState(event.editingTargets, 'idle', event.taskRef);");
     expect(directRunSource).toContain("await applyAnnotationEditingTaskState(event.editingTargets, 'error', terminalTaskRef);");
     expect(source).toContain('editors.setNodeEditingState(target.elementKey, nextState, taskRef, target.targetRef ?? null)');
@@ -1561,7 +1618,7 @@ describe('useIndexPagePreviewActions source', () => {
     expect(messageListenerSource).toContain('const action = sourcePane');
     expect(messageListenerSource).toContain('? { ...data.action, pane: sourcePane } as CommentaryHostToolbarAction');
     expect(messageListenerSource).toContain(': data.action;');
-    expect(runHostToolbarActionSource).toContain("if (nextAction.type === 'send-to-agent' && nextAction.elementKey && nextAction.pane) {");
+    expect(runHostToolbarActionSource).toContain('if (nextAction.elementKey && nextAction.pane) {');
     expect(webEditorTypesSource).toContain('promptText?: string;');
     expect(source).toContain("if (action?.type === 'send-to-agent' && typeof action.promptText === 'string')");
     expect(runHostToolbarActionSource).toContain('const panePrompt = await collectPrototypePrompt(nextAction.pane, nextAction);');
@@ -1618,6 +1675,40 @@ describe('useIndexPagePreviewActions source', () => {
     expect(runHostToolbarActionSource).toContain("if (nextAction.type === 'toggle-selection-mode' && typeof nextAction.active === 'boolean') {");
     expect(runHostToolbarActionSource).toContain('selectionModeActive: nextAction.active');
     expect(runHostToolbarActionSource).toContain('resolveHostToolbarStateForDisplay(hostToolbarStateRef.current, explicitSelectionState, isDarkMode)');
+    expect(runHostToolbarActionSource).toContain('const shouldFanOutPrototypeToolbarToggle = quickEditRuntimeActiveRef.current');
+    expect(runHostToolbarActionSource).toContain("nextAction.type === 'toggle-selection-mode'");
+    expect(runHostToolbarActionSource).toContain("nextAction.type === 'toggle-target-screenshot'");
+    expect(runHostToolbarActionSource).toContain('await Promise.all(getPreviewIframes().map(async (iframe) => {');
+    expect(runHostToolbarActionSource).toContain("if (handled && nextAction.type === 'toggle-selection-mode'");
+  });
+
+  it('keeps explicit target screenshot actions reflected in host toolbar state', () => {
+    const source = readPreviewRootSource();
+    const runHostToolbarActionSource = getSourceSegment(
+      source,
+      'const runHostToolbarAction = useCallback(async (action: CommentaryHostToolbarAction) => {',
+      'const runQuickEditSaveAction = useCallback',
+    );
+
+    expect(runHostToolbarActionSource).toContain(
+      "if (nextAction.type === 'toggle-target-screenshot' && typeof nextAction.enabled === 'boolean') {",
+    );
+    expect(runHostToolbarActionSource).toContain(
+      'captureTargetScreenshot: nextAction.enabled',
+    );
+    expect(runHostToolbarActionSource).toContain(
+      'resolveHostToolbarStateForDisplay(hostToolbarStateRef.current, explicitTargetScreenshotState, isDarkMode)',
+    );
+    expect(runHostToolbarActionSource).toContain('const shouldFanOutPrototypeToolbarToggle = quickEditRuntimeActiveRef.current');
+    expect(runHostToolbarActionSource).toContain(
+      'await Promise.all(getPreviewIframes().map(async (iframe) => {',
+    );
+    expect(runHostToolbarActionSource).toContain(
+      'await Promise.resolve(paneEditors.runHostToolbarAction(nextAction))',
+    );
+    expect(runHostToolbarActionSource).toContain(
+      'await postPrototypeEditorHostToolbarAction(iframe, nextAction)',
+    );
   });
 
   it('does not keep Web Editor Agent request handling in the preview host', () => {
@@ -1644,7 +1735,21 @@ describe('useIndexPagePreviewActions source', () => {
     expect(runHostToolbarActionSource).not.toContain("nextAction.type === 'copy-prompt' && !editors?.runHostToolbarAction");
   });
 
-  it('aggregates split prototype prompts for top host toolbar copy and send actions', () => {
+  it('routes document comment execution through the established direct-run entry', () => {
+    const source = readPreviewRootSource();
+    const documentBranch = getSourceSegment(
+      source,
+      'if (documentEditorActiveRef.current) {',
+      'if (quickEditRuntimeActiveRef.current) {',
+    );
+
+    expect(documentBranch).toContain("nextAction.type === 'send-to-agent'");
+    expect(documentBranch).toContain('return runAnnotationAcpChatPrompt({');
+    expect(documentBranch).toContain('promptText: editorApi?.getCopyPromptText?.()');
+    expect(documentBranch).not.toContain('submitPersistedCommentExecutions');
+  });
+
+  it('aggregates split prototype comments for send while preserving combined prompt copy', () => {
     const source = readPreviewActionsSource();
     const runHostToolbarActionSource = getSourceSegment(
       readPreviewRootSource(),
@@ -1659,14 +1764,12 @@ describe('useIndexPagePreviewActions source', () => {
     expect(source).toContain('collectSplitPrototypePrompts(nextAction)');
     expect(runHostToolbarActionSource).toContain("previewConfig.previewMode === 'split'");
     expect(runHostToolbarActionSource).toContain('const splitPrompts = await collectSplitPrototypePrompts(nextAction);');
-    expect(runHostToolbarActionSource).toContain('const combinedPrompt = buildCombinedPrototypePrompt(splitPrompts);');
+    expect(runHostToolbarActionSource).toContain('const combinedPrompt = buildCombinedPrototypePrompt(await collectSplitPrototypePrompts());');
     expect(runHostToolbarActionSource).toContain('return copyHostToolbarPromptText(combinedPrompt);');
     expect(runHostToolbarActionSource).toContain('return runAnnotationAcpChatPrompt({');
-    expect(runHostToolbarActionSource).toContain('editingTargets: splitPrompts.flatMap((item) => item.editingTargets || []),');
-    expect(runHostToolbarActionSource).toContain("await collectPrototypePrompt('primary', nextAction)");
-    expect(runHostToolbarActionSource).toMatch(
-      /if \(previewConfig\.previewMode === 'split'\) \{[\s\S]*?return runAnnotationAcpChatPrompt\(\{[\s\S]*?editingTargets: splitPrompts\.flatMap[\s\S]*?\}\);[\s\S]*?\}\s*return runAnnotationAcpChatPrompt\([\s\S]*?await collectPrototypePrompt\('primary', nextAction\)/,
-    );
+    expect(runHostToolbarActionSource).toContain('promptText: combinedPrompt,');
+    expect(runHostToolbarActionSource).toContain('splitPrompts.flatMap((item) => item.editingTargets || [])');
+    expect(runHostToolbarActionSource).not.toContain('submitPersistedCommentExecutions');
     expect(runHostToolbarActionSource).toMatch(
       /if \(previewConfig\.previewMode === 'split'\) \{[\s\S]*?return copyHostToolbarPromptText\(combinedPrompt\);[\s\S]*?\}\s*const promptText = editors\?\.getCopyPromptText\?\.\(\);/,
     );
@@ -1686,7 +1789,8 @@ describe('useIndexPagePreviewActions source', () => {
     );
 
     expect(collectPrototypePromptSource).toContain('resolveAnnotationActionEditingTargets(action, bridgeResult?.modifiedElements ?? [])');
-    expect(runHostToolbarActionSource).toContain("await collectPrototypePrompt('primary', nextAction)");
+    expect(runHostToolbarActionSource).toContain('promptText: bridgeResult?.promptText');
+    expect(runHostToolbarActionSource).toContain('editors?.getEditedSnapshot?.()?.modifiedElements ?? []');
   });
 
   it('exposes pane-scoped prototype prompt actions for split preview title buttons', () => {
@@ -1786,13 +1890,13 @@ describe('useIndexPagePreviewActions source', () => {
     );
 
     expect(source).toContain('const decisionPanelAutoOpenSeqRef = useRef(0);');
-    expect(source).toContain('function hasHostToolbarDecisionData(state: CommentaryHostToolbarState | null | undefined): boolean');
+    expect(source).toContain('hasPrototypeDecisionData,');
     expect(loadSegment).toContain('const decisionPanelAutoOpenSeq = decisionPanelAutoOpenSeqRef.current + 1;');
     expect(loadSegment).toContain('decisionPanelAutoOpenSeqRef.current = decisionPanelAutoOpenSeq;');
     expect(loadSegment).toContain('void maybeAutoOpenStandaloneDecisionPanel(primaryIframe, decisionPanelAutoOpenSeq);');
     expect(source).toContain('const maybeAutoOpenStandaloneDecisionPanel = useCallback(async (iframe: HTMLIFrameElement | null, sequence: number) => {');
     expect(source).toContain('if (sequence !== decisionPanelAutoOpenSeqRef.current)');
-    expect(source).toContain('hasHostToolbarDecisionData(nextState)');
+    expect(source).toContain('hasPrototypeDecisionData(nextState, decisionDataCount)');
     expect(source).toContain('decisionDataCount');
     expect(source).toContain('queryPrototypeEditorState(iframe)');
     expect(source).toContain('await enterPrototypeEditorPanelOnly(iframe)');
@@ -1815,7 +1919,7 @@ describe('useIndexPagePreviewActions source', () => {
 
     expect(source).toContain('const [prototypeDecisionDataAvailable, setPrototypeDecisionDataAvailable] = useState(false);');
     expect(source).toContain('const loadedPrototypeDecisionDataAvailableRef = useRef(false);');
-    expect(source).toContain('function hasPrototypeDecisionData(');
+    expect(source).toContain('hasPrototypeDecisionData,');
     expect(source).toContain('const setTrackedHostToolbarState = useCallback((nextState: SetStateAction<CommentaryHostToolbarState | null>) => {');
     expect(source).toContain('setHostToolbarState: setTrackedHostToolbarState,');
     expect(loadSegment).toContain('const hasDecisionData = hasPrototypeDecisionData(nextState, decisionDataCount);');
@@ -1826,7 +1930,7 @@ describe('useIndexPagePreviewActions source', () => {
     expect(returnSegment).toContain('prototypeDecisionDataAvailable,');
   });
 
-  it('runs quick edit save text and style through direct editor APIs before bridge fallback', () => {
+  it('coordinates quick edit saves through prepare, preflight, confirm, and one commit', () => {
     const source = readPreviewRootSource();
     const saveActionSource = getSourceSegment(
       source,
@@ -1834,10 +1938,12 @@ describe('useIndexPagePreviewActions source', () => {
       'useEffect(() => {',
     );
 
-    expect(saveActionSource).toMatch(/if \(action === 'save-text'\) \{[\s\S]*editors\.saveWebEditorTextChanges[\s\S]*return true;/);
-    expect(saveActionSource).toMatch(/else if \(action === 'save-style'\) \{[\s\S]*editors\.saveWebEditorStyleChanges[\s\S]*return true;/);
-    expect(saveActionSource).toContain('const bridgeResult = await postPrototypeEditorSaveAction(iframe, action);');
-    expect(saveActionSource).toContain('return Boolean(bridgeResult?.handled ?? bridgeResult?.success);');
+    expect(saveActionSource).toContain('const targets: QuickEditSaveTarget[] = getPreviewIframes().map');
+    expect(saveActionSource).toContain('prepareQuickEditSave');
+    expect(saveActionSource).toContain('preflightQuickEditSave');
+    expect(saveActionSource).toContain('commitQuickEditSave');
+    expect(saveActionSource).toContain('quickEditSaveCoordinatorRef.current.run');
+    expect(saveActionSource).toContain('confirm: (dialog) => appDialog.confirm(dialog)');
   });
 
   it('keeps annotation and selection state active until the refreshed runtime is ready', () => {
@@ -2286,7 +2392,7 @@ describe('useIndexPagePreviewActions source', () => {
     const source = readPreviewRootSource();
     const requestCurrentScreenshotSegment = getSourceSegment(
       source,
-      'const requestCurrentScreenshot = useCallback(() => {',
+      'const requestCurrentScreenshot = useCallback(',
       'const checkAxureAvailable = useCallback',
     );
 
@@ -2294,12 +2400,32 @@ describe('useIndexPagePreviewActions source', () => {
     expect(source).toContain('const requestCurrentScreenshot = useCallback');
     expect(source).toContain('getPrimaryPreviewIframe()');
     expect(source).toContain("type: 'axhub.quickEdit.export.captureScreenshot'");
+    expect(requestCurrentScreenshotSegment).toContain('buildCurrentScreenshotPayload(scope, screenshotSize, options)');
     expect(source).toContain('const screenshotSize = resolveCurrentPreviewScreenshotSize(previewConfig, screenshotDefaultSize);');
-    expect(requestCurrentScreenshotSegment).toContain('targetWidth: screenshotSize.width');
-    expect(requestCurrentScreenshotSegment).toContain('targetHeight: screenshotSize.height');
+    expect(requestCurrentScreenshotSegment).toContain('scope,');
     expect(source).toContain('await copyImageDataUrlToClipboard(result.dataUrl);');
     expect(source).toContain("messageApi.success('截图已复制到剪贴板');");
     expect(source).toContain('handleCopyCurrentScreenshot,');
+  });
+
+  it('falls back to the validated preview RPC when document voice APIs are cross-origin', () => {
+    const source = readPreviewActionsSource();
+    const voiceSource = getSourceSegment(
+      source,
+      'const getCommentaryVoiceTargets = useCallback',
+      'const refreshCommentaryVoicePersistedComments = useCallback',
+    );
+
+    expect(voiceSource).toContain('prototypeEditorBridgeActions.getPrototypeEditorVoiceTargets()');
+    expect(voiceSource).toContain('prototypeEditorBridgeActions.findPrototypeEditorVoiceElements(query)');
+    expect(voiceSource).toContain('prototypeEditorBridgeActions.getPrototypeEditorVoiceElementStructure(query)');
+    expect(voiceSource).toContain('prototypeEditorBridgeActions.activatePrototypeEditorVoiceElement(targetRef)');
+    expect(voiceSource).toContain('prototypeEditorBridgeActions.createPrototypeEditorVoiceComment(');
+    expect(voiceSource).toMatch(/typeof editors\?\.getVoiceTargets === 'function'/u);
+    expect(voiceSource).toMatch(/typeof editors\?\.createVoiceComment === 'function'/u);
+    expect(source).toContain('prototypeEditorBridgeActions.refreshPrototypeEditorVoiceComments(deletedCommentIds)');
+    expect(source).toContain('const resolveCommentaryExecutionContext = useCallback');
+    expect(source).toContain('resolveAnnotationActionEditingTargets(action, bridgeResult?.modifiedElements ?? [])');
   });
 
   it('does not keep the legacy standalone TEXT_EDIT parent-window protocol', () => {

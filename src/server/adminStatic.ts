@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { createProjectMetadataStore, isPathInside, type PrototypeResource } from './projectCore/index.ts';
 
-import { getRequestUrl, sendFile, sendText } from './http.ts';
+import { getLocalNetworkHosts, getRequestUrl, sendFile, sendText } from './http.ts';
 import { AXHUB_CANVAS_MCP_PATH } from './axhubCanvasMcp.ts';
 import { AXHUB_PREVIEW_MCP_PATH } from './axhubPreviewMcp.ts';
 import { PREVIEW_BRIDGE_WS_PATH } from './previewBridge.ts';
@@ -58,9 +58,21 @@ function readProjectServerShareHosts(projectRoot?: string): { localHost: string;
     const localHost = typeof server.host === 'string' && server.host.trim()
       ? server.host.trim()
       : 'localhost';
-    const lanHost = typeof server.lanHost === 'string' && server.lanHost.trim()
+    const configuredLanHost = typeof server.lanHost === 'string' && server.lanHost.trim()
       ? server.lanHost.trim()
       : '';
+    const detectedHosts = getLocalNetworkHosts();
+    const configuredIpv4 = configuredLanHost.match(/^(\d+)\.(\d+)\.(\d+)\.\d+$/u);
+    const detectedSameSubnet = configuredIpv4
+      ? detectedHosts.find((candidate) => {
+        const detectedIpv4 = candidate.match(/^(\d+)\.(\d+)\.(\d+)\.\d+$/u);
+        return detectedIpv4
+          && detectedIpv4[1] === configuredIpv4[1]
+          && detectedIpv4[2] === configuredIpv4[2]
+          && detectedIpv4[3] === configuredIpv4[3];
+      }) || ''
+      : '';
+    const lanHost = detectedSameSubnet || configuredLanHost;
     return { localHost, lanHost };
   } catch {
     return { localHost: 'localhost', lanHost: '' };

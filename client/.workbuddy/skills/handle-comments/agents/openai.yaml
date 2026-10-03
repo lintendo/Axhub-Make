@@ -1,0 +1,4 @@
+interface:
+  display_name: "批注处理"
+  short_description: "处理原型与文档 Commentary 批注"
+  default_prompt: "使用 $handle-comments 读取并处理当前原型或文档批注。"

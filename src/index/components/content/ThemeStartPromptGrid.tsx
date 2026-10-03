@@ -1,4 +1,5 @@
 import { StartPromptCard, type StartPromptCardIcon } from './StartPromptCard';
+import { StartPromptGrid } from './StartPromptGrid';
 
 export type ThemeStartPromptCard = {
   id: string;
@@ -9,20 +10,23 @@ export type ThemeStartPromptCard = {
 
 export function ThemeStartPromptGrid({
   cards,
+  ariaLabel = '主题来源',
   disabled,
+  copyOnSelect = false,
   selectPrompt,
   onCopyPrompt,
+  onExecutePrompt,
 }: {
   cards: readonly ThemeStartPromptCard[];
+  ariaLabel?: string;
   disabled: boolean;
+  copyOnSelect?: boolean;
   selectPrompt: (prompt: string) => void;
   onCopyPrompt: (card: ThemeStartPromptCard) => void | Promise<void>;
+  onExecutePrompt?: (card: ThemeStartPromptCard) => void | Promise<void>;
 }) {
   return (
-    <ul
-      className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
-      aria-label="主题来源"
-    >
+    <StartPromptGrid ariaLabel={ariaLabel}>
       {cards.map((card) => (
         <StartPromptCard
           key={card.id}
@@ -31,11 +35,16 @@ export function ThemeStartPromptGrid({
           selectionDisabled={disabled}
           onSelect={() => {
             if (disabled || !card.prompt.trim()) return;
+            if (copyOnSelect) {
+              void onCopyPrompt(card);
+              return;
+            }
             selectPrompt(card.prompt);
           }}
           onCopy={() => onCopyPrompt(card)}
+          onExecute={onExecutePrompt ? () => onExecutePrompt(card) : undefined}
         />
       ))}
-    </ul>
+    </StartPromptGrid>
   );
 }

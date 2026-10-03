@@ -1,0 +1,4 @@
+interface:
+  display_name: "PLAN 原型"
+  short_description: "对齐多原型方案并创建规格与页面占位骨架"
+  default_prompt: "使用 $plan-prototypes 先对齐多个原型的初步方案，确认各自主规格后创建 HTML 规格和可运行页面占位骨架。"

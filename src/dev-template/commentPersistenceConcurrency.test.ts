@@ -58,13 +58,6 @@ function createFetchConcurrencyProbe(delayMs = 20) {
   const putBodies: Record<string, any>[] = [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url === '/__axhub/make-server/status') {
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({ adminOrigin: 'http://localhost:32124' }),
-      };
-    }
     if (init?.method === 'PUT') {
       activePuts += 1;
       maxActivePuts = Math.max(maxActivePuts, activePuts);
@@ -96,7 +89,10 @@ describe('comment persistence adapter concurrency', () => {
   it('keeps the prototype adapter as a transport-only concurrent writer', async () => {
     const probe = createFetchConcurrencyProbe();
     vi.stubGlobal('fetch', probe.fetchMock);
-    const adapter = createPrototypeCommentsPersistenceAdapter({ getProjectId: () => 'project-a' });
+    const adapter = createPrototypeCommentsPersistenceAdapter({
+      getProjectId: () => 'project-a',
+      getMakeServerOrigin: () => 'http://localhost:53817',
+    });
     await adapter.read(prototypeScope);
 
     await Promise.all(['first', 'second', 'third'].map((label) => adapter.write(
@@ -119,6 +115,7 @@ describe('comment persistence adapter concurrency', () => {
     const adapter = createDocumentCommentsPersistenceAdapter(() => ({
       projectId: 'project-a',
       documentPath: 'src/resources/prd/order.md',
+      makeServerOrigin: 'http://localhost:53817',
     }));
     await adapter.read(documentScope);
 
@@ -139,7 +136,10 @@ describe('comment persistence adapter concurrency', () => {
   it('allows independent prototype storage scopes to save concurrently', async () => {
     const probe = createFetchConcurrencyProbe();
     vi.stubGlobal('fetch', probe.fetchMock);
-    const adapter = createPrototypeCommentsPersistenceAdapter({ getProjectId: () => 'project-a' });
+    const adapter = createPrototypeCommentsPersistenceAdapter({
+      getProjectId: () => 'project-a',
+      getMakeServerOrigin: () => 'http://localhost:53817',
+    });
     await adapter.read(prototypeScope);
     const checkoutScope = {
       ...prototypeScope,

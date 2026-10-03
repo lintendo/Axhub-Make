@@ -4,7 +4,6 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
-import { forceInlineDynamicImportsOff } from './vite-plugins/forceInlineDynamicImportsOff';
 import { injectStablePageIds } from './vite-plugins/injectStablePageIds';
 import { clientPreviewPlugin } from './vite-plugins/clientPreviewPlugin';
 import { autoStartMakeServerPlugin } from './vite-plugins/autoStartMakeServerPlugin';
@@ -71,7 +70,6 @@ export default defineConfig(({ command }) => {
       isServe ? websocketPlugin() : null,
       isServe ? clientPreviewPlugin() : null,
       createAnnotationSourceMarkdownPlugin(projectRoot, { mode: isServe ? 'serve' : 'build' }),
-      forceInlineDynamicImportsOff(isIifeBuild),
       isIifeBuild ? axhubComponentEnforcer(jsEntries[entryKey as string]) : null,
       react({
         jsxRuntime: 'classic',
@@ -144,6 +142,7 @@ export default defineConfig(({ command }) => {
         output: {
           entryFileNames: (chunkInfo: { name: string }) => `${chunkInfo.name}.js`,
           format: isIifeBuild ? 'iife' : 'es',
+          inlineDynamicImports: isIifeBuild,
           name: 'UserComponent',
           ...(isIifeBuild
             ? {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { buildEditorUrl, buildLANItemUrl, getItemSourcePath } from './url';
+import { buildEditorUrl, buildLANItemUrl, buildLANServerUrl, getItemSourcePath } from './url';
 
 describe('url helpers', () => {
   afterEach(() => {
@@ -44,6 +44,7 @@ describe('url helpers', () => {
       width: 390,
       mobileMode: true,
       hostToolbar: true,
+      mockExternalComments: true,
       agentBridge: {
         apiBaseUrl: 'http://localhost:32124/api',
         integrationChannel: '/workspace/demo/project',
@@ -71,12 +72,13 @@ describe('url helpers', () => {
     expect(url.searchParams.get('editorSessionId')).toBeNull();
     expect(url.searchParams.get('editorMobileMode')).toBe('true');
     expect(url.searchParams.get('agentToolbar')).toBe('host');
+    expect(url.searchParams.get('mockExternalComments')).toBe('1');
     expect(url.searchParams.get('width')).toBe('390');
   });
 
   it('rewrites localhost client URLs to the injected LAN host', () => {
     vi.stubGlobal('window', {
-      __LOCAL_IP__: '192.168.31.88',
+      __LOCAL_IP__: '192.168.1.88',
       location: {
         origin: 'http://localhost:5174',
         protocol: 'http:',
@@ -91,7 +93,7 @@ describe('url helpers', () => {
       jsUrl: '',
       specUrl: '',
       clientUrl: 'http://localhost:51720/prototypes/home?mode=demo#screen',
-    }, 'demo')).toBe('http://192.168.31.88:51720/prototypes/home?mode=demo#screen');
+    }, 'demo')).toBe('http://192.168.1.88:51720/prototypes/home?mode=demo#screen');
   });
 
   it('uses configured local and LAN hosts when building share URLs', () => {
@@ -100,7 +102,7 @@ describe('url helpers', () => {
         localHost: 'make.local',
         lanHost: '10.0.8.42',
       },
-      __LOCAL_IP__: '192.168.31.88',
+      __LOCAL_IP__: '192.168.1.88',
       location: {
         origin: 'http://localhost:5174',
         protocol: 'http:',
@@ -119,6 +121,23 @@ describe('url helpers', () => {
 
     expect(buildEditorUrl(item, 'demo')).toBe('http://make.local:51720/prototypes/home?mode=demo&axhubDisplayName=Home#screen');
     expect(buildLANItemUrl(item, 'demo')).toBe('http://10.0.8.42:51720/prototypes/home?mode=demo#screen');
+  });
+
+  it('rewrites published server URLs to the configured LAN host while preserving routes', () => {
+    vi.stubGlobal('window', {
+      __LOCAL_IP__: '192.168.1.88',
+      __AXHUB_SHARE_HOSTS__: {
+        localHost: '127.0.0.1',
+        lanHost: '10.0.8.42',
+      },
+      location: {
+        origin: 'http://127.0.0.1:51720',
+        hostname: '127.0.0.1',
+      },
+    });
+
+    expect(buildLANServerUrl('http://127.0.0.1:51720/published/html/id/index.html?version=1#top'))
+      .toBe('http://10.0.8.42:51720/published/html/id/index.html?version=1#top');
   });
 
   it('does not invent prototype canvas share URLs', () => {

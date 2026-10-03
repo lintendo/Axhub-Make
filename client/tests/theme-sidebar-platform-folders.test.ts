@@ -105,4 +105,17 @@ describe('theme sidebar platform folders', () => {
       expect([...sidebar.themes].sort()).toEqual(actualThemeIds);
     }
   });
+
+  it('excludes spec-only directories from sidebar import candidates', () => {
+    const sidebar = JSON.parse(fs.readFileSync(sidebarPath, 'utf8')) as { themesTree: SidebarNode[] };
+    const imported = new Set(collectItemKeys(sidebar.themesTree));
+    for (const entry of fs.readdirSync(themesRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const themeDir = path.join(themesRoot, entry.name);
+      const specOnly = fs.existsSync(path.join(themeDir, 'DESIGN.md'))
+        && fs.existsSync(path.join(themeDir, 'SOURCE.md'))
+        && !fs.existsSync(path.join(themeDir, 'index.tsx'));
+      if (specOnly) expect(imported.has(`themes/${entry.name}`)).toBe(false);
+    }
+  });
 });

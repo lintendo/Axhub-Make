@@ -6,6 +6,7 @@ import type { PromptImageAttachment } from '../../core/editor/state';
 export interface PromptImageStripProps {
   images: readonly PromptImageAttachment[];
   onRemoveImage: (imageId: string) => void;
+  readOnly?: boolean;
 }
 
 const THUMB_SIZE = 28;
@@ -14,7 +15,7 @@ const PREVIEW_HEIGHT = 160;
 const IMAGE_RADIUS = 12;
 
 export function PromptImageStrip(props: PromptImageStripProps): React.ReactElement | null {
-  const { images, onRemoveImage } = props;
+  const { images, onRemoveImage, readOnly = false } = props;
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
 
   if (images.length === 0) return null;
@@ -30,6 +31,7 @@ export function PromptImageStrip(props: PromptImageStripProps): React.ReactEleme
     >
       {images.map((image) => {
         const hovered = hoveredId === image.id;
+        const canRemove = !readOnly;
         return (
           <div
             key={image.id}
@@ -77,7 +79,7 @@ export function PromptImageStrip(props: PromptImageStripProps): React.ReactEleme
             <button
               type="button"
               onClick={() => {
-                if (hovered) {
+                if (hovered && canRemove) {
                   onRemoveImage(image.id);
                 }
               }}
@@ -86,17 +88,17 @@ export function PromptImageStrip(props: PromptImageStripProps): React.ReactEleme
                 height: THUMB_SIZE,
                 borderRadius: IMAGE_RADIUS,
                 overflow: 'hidden',
-                border: `1px solid ${hovered ? EDITOR_CHROME.borderStrong : EDITOR_CHROME.border}`,
-                background: hovered ? EDITOR_CHROME.surfaceElevated : EDITOR_CHROME.surfaceMuted,
+                border: `1px solid ${hovered && canRemove ? EDITOR_CHROME.borderStrong : EDITOR_CHROME.border}`,
+                background: hovered && canRemove ? EDITOR_CHROME.surfaceElevated : EDITOR_CHROME.surfaceMuted,
                 padding: 0,
-                cursor: hovered ? 'pointer' : 'default',
+                cursor: hovered && canRemove ? 'pointer' : 'default',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxShadow: hovered ? EDITOR_CHROME.shadow : 'none',
               }}
             >
-              {hovered ? (
+              {hovered && canRemove ? (
                 <CloseOutlined style={{ fontSize: 12, color: EDITOR_CHROME.textPrimary }} />
               ) : (
                 <img

@@ -7,21 +7,40 @@ import type {
   CommentaryHostToolbarState,
   CommentaryHostToolbarStateListener,
   CommentaryModifiedElementSummary,
+  CommentaryPageElementActivationResult,
+  CommentaryPageElementSearchQuery,
+  CommentaryPageElementSearchResult,
+  CommentaryPageElementStructureQuery,
+  CommentaryPageElementStructureResult,
   CommentaryState,
   CommentaryStyleChangeSet,
   CommentaryTargetedTextChange,
   CommentaryStatus,
   CommentaryStatusListener,
   CommentaryTextChange,
+  CommentaryVoiceTarget,
+  CommentaryVoiceCommentOptions,
+  CommentaryVoiceCommentResult,
+  CommentaryVoiceTargets,
+  CommentaryVoiceTargetsListener,
   CommentaryExternalEditingStateResult,
   CommentaryExternalEditingTargetRef,
   SelectedElementSummary,
   WebEditorElementKey,
   WebEditorRevertElementResponse,
 } from '../../web-editor-types';
-import { WEB_EDITOR_V2_VERSION } from '../../constants';
+import {
+  WEB_EDITOR_V2_HOST_ID,
+  WEB_EDITOR_V2_OVERLAY_ID,
+  WEB_EDITOR_V2_UI_ID,
+  WEB_EDITOR_V2_VERSION,
+} from '../../constants';
 import { createElementLocator, locateElement } from '../locator';
 import { generateFullElementLabel, generateStableElementKey } from '../element-key';
+import {
+  createCommentaryVoiceTarget,
+  resolveCommentaryVoiceTargetElement,
+} from '../../voice/target';
 import type { EditorServices, ExternalEditingElementTarget } from './contracts';
 import { createChangesService } from './changes';
 import { createFeedbackService } from './feedback';
@@ -50,6 +69,10 @@ import { createEditorSummariesService } from './summaries';
 import { createTextSessionService } from './text-session';
 import { pushMobileModeOverride } from '../../utils/mobile-detect';
 import { installGlobalCommentaryReviewCommentProtocol } from '../../review/comment-protocol';
+import { createCommentaryVoicePageTools } from '../../voice/page-tools';
+
+const VOICE_HOVER_STABILITY_MS = 250;
+const VOICE_TARGET_UNAVAILABLE_ERROR = '目标当前不可交互，请重新查找';
 
 export type {
   CommentaryAgentBridgeOptions,
@@ -83,6 +106,7 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
   const cleanupMobileModeOverride = pushMobileModeOverride(resolvedOptions.mobileMode);
   const state = createEditorRuntimeState();
   const statusListeners = new Set<CommentaryStatusListener>();
+  const voiceTargetListeners = new Set<CommentaryVoiceTargetsListener>();
   const initialHostResource = (() => {
     try {
       return resolvedOptions.host.getResourceContext?.() ?? null;
@@ -113,6 +137,88 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
   let interaction: ReturnType<typeof createInteractionService> | null = null;
   let agentBridge: ReturnType<typeof createAgentBridgeService> | null = null;
   let destroyed = false;
+  let voiceHoverTimer: ReturnType<typeof setTimeout> | null = null;
+  let voiceMutationObserver: MutationObserver | null = null;
+  const voicePageTools = createCommentaryVoicePageTools({
+    getSelectedElement: () => state.selectedElement,
+    getHoveredElement: () =>
+      resolvedOptions.host.getCurrentHoveredElement?.() ?? state.hoveredElement,
+  });
+
+  function getVoiceTargets(): CommentaryVoiceTargets {
+    return voicePageTools.getTargets();
+  }
+
+  function notifyVoiceTargets(): void {
+    if (destroyed) return;
+    const targets = getVoiceTargets();
+    for (const listener of voiceTargetListeners) {
+      try {
+        listener(targets);
+      } catch (error) {
+        console.error('[Commentary] Voice target listener failed:', error);
+      }
+    }
+  }
+
+  function notifyVoiceSelectionChange(): void {
+    if (voiceHoverTimer !== null) {
+      clearTimeout(voiceHoverTimer);
+      voiceHoverTimer = null;
+    }
+    notifyVoiceTargets();
+  }
+
+  function notifyVoiceHoverChange(): void {
+    if (voiceHoverTimer !== null) clearTimeout(voiceHoverTimer);
+    voiceHoverTimer = setTimeout(() => {
+      voiceHoverTimer = null;
+      notifyVoiceTargets();
+    }, VOICE_HOVER_STABILITY_MS);
+  }
+
+  function isCommentaryOverlayNode(node: unknown): boolean {
+    let element = node as {
+      getAttribute?: (name: string) => string | null;
+      parentElement?: unknown;
+    } | null;
+    while (element && typeof element.getAttribute === 'function') {
+      const id = element.getAttribute('id') ?? '';
+      if (
+        id === WEB_EDITOR_V2_HOST_ID ||
+        id === WEB_EDITOR_V2_OVERLAY_ID ||
+        id === WEB_EDITOR_V2_UI_ID ||
+        element.getAttribute('data-axhub-commentary-overlay') === 'true'
+      ) {
+        return true;
+      }
+      element = element.parentElement as typeof element;
+    }
+    return false;
+  }
+
+  function mutationOnlyTouchesCommentaryOverlay(record: MutationRecord): boolean {
+    if (isCommentaryOverlayNode(record.target)) return true;
+    const changedNodes = [...Array.from(record.addedNodes), ...Array.from(record.removedNodes)];
+    return changedNodes.length > 0 && changedNodes.every(isCommentaryOverlayNode);
+  }
+
+  if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
+    const mutationRoot = document.documentElement;
+    if (mutationRoot) {
+      voiceMutationObserver = new MutationObserver((records) => {
+        if (records.some((record) => !mutationOnlyTouchesCommentaryOverlay(record))) {
+          voicePageTools.invalidate();
+        }
+      });
+      voiceMutationObserver.observe(mutationRoot, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        characterData: true,
+      });
+    }
+  }
 
   function buildSelectedElementSummary(): SelectedElementSummary | null {
     const element = state.selectedElement;
@@ -132,6 +238,14 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
       tagName: element.tagName.toLowerCase(),
       updatedAt: Date.now(),
     };
+  }
+
+  function getVoiceTarget(): CommentaryVoiceTarget | null {
+    const resolved = resolveCommentaryVoiceTargetElement(
+      state.selectedElement,
+      () => resolvedOptions.host.getCurrentHoveredElement?.() ?? state.hoveredElement,
+    );
+    return resolved ? createCommentaryVoiceTarget(resolved.element, resolved.source) : null;
   }
 
   function getHistoryCounts(): { undoCount: number; redoCount: number } {
@@ -236,6 +350,7 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
         elementKey: task.elementKey,
         status: task.status,
         sessionId: task.sessionId,
+        requestId: task.requestId,
         provider: task.provider,
         message: task.message,
         updatedAt: task.updatedAt,
@@ -302,6 +417,8 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
       aiExecutionProviderOptions: [],
       darkMode: false,
       disablePageAnimations: false,
+      captureTargetScreenshotAvailable: false,
+      captureTargetScreenshot: false,
       pageZoomEnabled: false,
       copySkillInstallPromptDisabled: true,
       selectionModeActive: resolvedOptions.ui.initialSelectionModeActive,
@@ -414,6 +531,20 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
     } catch {
       return null;
     }
+  }
+
+  function validateExternalEditingTarget(
+    elementKey: string,
+    targetRef?: CommentaryExternalEditingTargetRef | null,
+  ): boolean {
+    const normalizedElementKey = String(elementKey || '').trim();
+    const element = resolveElementByKey(normalizedElementKey, targetRef);
+    if (!element) return false;
+    const annotationIdentity = resolveAnnotationElementIdentity(element);
+    const locator = createElementLocator(element);
+    const liveElementKey = annotationIdentity?.elementKey
+      ?? generateStableElementKey(element, locator.shadowHostChain);
+    return liveElementKey === normalizedElementKey;
   }
 
   function resolveExternalEditingTargetByKey(
@@ -695,10 +826,11 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
     targetRef?: CommentaryExternalEditingTargetRef | null,
   ): Promise<CommentaryExternalEditingStateResult> {
     const normalizedTaskRef = normalizeExternalTaskRef(taskRef);
-    const reconcilePersistedEditingTask = async (): Promise<void> => {
-      if (nextState !== 'editing') return;
+    const settlePersistedEditingTask = async (): Promise<void> => {
       await persistence?.waitForPendingWrites();
-      conversationTaskMonitor?.reconcile();
+      if (nextState === 'editing') {
+        conversationTaskMonitor?.reconcile();
+      }
     };
     const recordNodeTaskState = (targetElementKey: WebEditorElementKey): void => {
       if (nextState === 'completed') return;
@@ -734,7 +866,7 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
       if (nextState === 'editing' && target && agentBridge?.setExternalEditingStateByElementKey) {
         const task = agentBridge.setExternalEditingStateByElementKey(target, taskRef);
         recordNodeTaskState(target.elementKey);
-        await reconcilePersistedEditingTask();
+        await settlePersistedEditingTask();
         notifyStatusChange();
         return {
           elementKey: target.elementKey,
@@ -755,6 +887,7 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
         );
         if (!task) {
           if (forceCompleteStateByTarget(target)) {
+            await settlePersistedEditingTask();
             notifyStatusChange();
             return {
               elementKey: target.elementKey,
@@ -772,6 +905,7 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
           };
         }
         recordNodeTaskState(target.elementKey);
+        await settlePersistedEditingTask();
         notifyStatusChange();
         return {
           elementKey: target.elementKey,
@@ -783,6 +917,7 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
       if (nextState !== 'editing' && agentBridge?.clearExternalEditingStateByElementKey) {
         const applied = agentBridge.clearExternalEditingStateByElementKey(elementKey, taskRef);
         recordNodeTaskState(elementKey);
+        await settlePersistedEditingTask();
         notifyStatusChange();
         return {
           elementKey,
@@ -822,6 +957,7 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
         task = agentBridge.setExternalEditingTerminalStateByElementKey(target, nextState, taskRef);
         if (!task) {
           if (forceCompleteStateByTarget(target)) {
+            await settlePersistedEditingTask();
             notifyStatusChange();
             return {
               elementKey,
@@ -866,7 +1002,7 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
     notifyStatusChange();
 
     recordNodeTaskState(elementKey);
-    await reconcilePersistedEditingTask();
+    await settlePersistedEditingTask();
     return {
       elementKey,
       state: nextState,
@@ -892,7 +1028,9 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
     persistMarkerVisibility: (visible) => persistence?.setMarkerVisibility(visible),
     getCommentTaskState: (elementKey) => persistence?.getCommentTaskState?.(elementKey) ?? null,
     onCommentEdited: (elementKey) => {
-      persistence?.resetCompletedCommentStateForElement(elementKey);
+      if (persistence?.resetTerminalCommentStateForElement(elementKey)) {
+        agentBridge?.clearExternalEditingStateByElementKey?.(elementKey);
+      }
     },
     onSelectMarkedElement: (element, anchor) => {
       if (!element.isConnected) return;
@@ -924,11 +1062,16 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
     getResourceContext: resolvedOptions.host.getResourceContext,
     getPersistenceScope: resolvedOptions.host.getPersistenceScope,
     persistenceAdapter: resolvedOptions.host.persistenceAdapter,
-    interactionProfile: resolvedOptions.interactionProfile,
+    interactionProfile:
+      resolvedOptions.interactionProfile === 'text-comment' ? 'text-comment' : 'design',
     getInteractionProfile: () =>
       resolvedOptions.interactionProfile === 'text-comment' || state.uiSettings.documentCommentMode
         ? 'text-comment'
         : 'design',
+    onSaveStatusChange: () => {
+      state.propertyPanel?.refresh();
+      notifyStatusChange();
+    },
   });
   conversationTaskMonitor = createConversationTaskMonitor({
     persistence,
@@ -1024,6 +1167,8 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
     agentBridge,
     logPrefix: '[WebEditorV2]',
     onStatusChange: notifyStatusChange,
+    onSelectionChange: notifyVoiceSelectionChange,
+    onHoverChange: notifyVoiceHoverChange,
   });
 
   const localActions = createLocalActionsService({
@@ -1103,6 +1248,67 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
     };
   }
 
+  function subscribeVoiceTargets(listener: CommentaryVoiceTargetsListener): () => void {
+    voiceTargetListeners.add(listener);
+    listener(getVoiceTargets());
+    return () => {
+      voiceTargetListeners.delete(listener);
+    };
+  }
+
+  function findVoiceElements(
+    query: CommentaryPageElementSearchQuery,
+  ): CommentaryPageElementSearchResult {
+    return voicePageTools.findElements(query);
+  }
+
+  function getVoiceElementStructure(
+    query: CommentaryPageElementStructureQuery,
+  ): CommentaryPageElementStructureResult {
+    return voicePageTools.getStructure(query);
+  }
+
+  async function activateVoiceElement(
+    targetRef: string,
+  ): Promise<CommentaryPageElementActivationResult> {
+    const element = voicePageTools.resolveTarget(targetRef);
+    if (!interaction?.activatePageTarget(element)) {
+      return { activated: false, targetRef, error: VOICE_TARGET_UNAVAILABLE_ERROR };
+    }
+    element.scrollIntoView?.({ block: 'center', inline: 'nearest' });
+    return { activated: true, targetRef };
+  }
+
+  async function createVoiceComment(
+    targetRef: string,
+    content: string,
+    options: CommentaryVoiceCommentOptions,
+  ): Promise<CommentaryVoiceCommentResult> {
+    const element = voicePageTools.resolveTarget(targetRef);
+    const target = voicePageTools.summarizeTarget(targetRef);
+    const rect = element.getBoundingClientRect();
+    const activated = interaction?.activatePageTarget(element, {
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top,
+    });
+    if (!activated) {
+      return { applied: false, targetRef, error: VOICE_TARGET_UNAVAILABLE_ERROR };
+    }
+    const commentId = changes.setNoteForElement(element, content, {
+      voiceCreateOperationId: String(options.operationId || '').trim() || undefined,
+      voiceTargetRef: targetRef,
+      voiceTarget: target,
+      anchorPlacement: 'target',
+      ...(options.skillIds?.length ? { skillIds: options.skillIds } : {}),
+    });
+    if (!commentId) {
+      return { applied: false, targetRef, error: '批注内容不能为空' };
+    }
+    persistence?.flushPendingWrite();
+    await persistence?.waitForPendingWrites();
+    return { applied: true, targetRef, commentId, target };
+  }
+
   function clearSelection(): void {
     if (destroyed) return;
     interaction?.clearSelection();
@@ -1172,12 +1378,25 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
     externallyDeletedCommentIds: readonly string[] = [],
   ): Promise<void> {
     if (destroyed || !persistence) return;
+    await persistence.waitForPendingWrites();
     const deletedCommentIds = new Set(
       externallyDeletedCommentIds.map((id) => String(id ?? '').trim()).filter(Boolean),
     );
     const externallyDeletedElementKeys = Array.from(state.editMetaByKey.values())
       .filter((meta) => Boolean(meta.commentId && deletedCommentIds.has(meta.commentId)))
       .map((meta) => meta.elementKey);
+    const externallyDeletedElementKeySet = new Set(externallyDeletedElementKeys);
+    const linkedDeleteTransactions = Array.from(
+      state.deleteElementAnnotationsByTransactionId.values(),
+    )
+      .filter(
+        (link) => link.active && externallyDeletedElementKeySet.has(link.parentElementKey),
+      )
+      .reverse();
+    for (const link of linkedDeleteTransactions) {
+      if (state.transactionManager?.restoreDeletedElement(link.transactionId)) continue;
+      feedback.toast('warning', '删除批注后未能还原对应元素，请刷新页面恢复。');
+    }
     const persistedDeletedElementKeys = await persistence.restoreCachedChanges();
     conversationTaskMonitor?.reconcile();
     agentBridge?.discardDeletedElementStates?.([
@@ -1210,6 +1429,14 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
   function destroy(): void {
     if (destroyed) return;
     destroyed = true;
+    if (voiceHoverTimer !== null) {
+      clearTimeout(voiceHoverTimer);
+      voiceHoverTimer = null;
+    }
+    voiceTargetListeners.clear();
+    voiceMutationObserver?.disconnect();
+    voiceMutationObserver = null;
+    voicePageTools.destroy();
     reviewCommentInstallation.dispose();
     conversationTaskMonitor?.stop();
     lifecycle.stop();
@@ -1227,8 +1454,16 @@ export function createCommentary(options: CommentaryInitOptions = {}): Commentar
     getState,
     getStatus,
     subscribeStatus,
+    getVoiceTargets,
+    subscribeVoiceTargets,
+    findVoiceElements,
+    getVoiceElementStructure,
+    activateVoiceElement,
+    createVoiceComment,
+    validateExternalEditingTarget,
     refresh,
     getSelectedElement: buildSelectedElementSummary,
+    getVoiceTarget,
     getModifiedElements,
     getTextChanges,
     getTargetedTextChanges,

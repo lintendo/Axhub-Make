@@ -40,6 +40,7 @@ import {
   Typography,
 } from 'antd';
 import { setPageZoomEnabled } from '../../utils/page-zoom-toggle';
+import { resolveCspNonce } from '../csp-nonce';
 import { installFloatingDrag, type FloatingPosition } from '../floating-drag';
 import {
   clampFloatingPosition,
@@ -99,7 +100,10 @@ import {
 } from './theme';
 import type { PropertyPanelHandle, PropertyPanelViewProps } from './types';
 import type { SessionActivityItem, SessionActivityTarget } from '../../core/editor/contracts';
-import type { CommentaryHostToolbarAction, CommentaryHostToolbarState } from '../../web-editor-types';
+import type {
+  CommentaryHostToolbarAction,
+  CommentaryHostToolbarState,
+} from '../../web-editor-types';
 
 const AGENT_WAKE_FAILURE_MESSAGE = 'AI 唤醒失败，请在终端执行 npx @axhub/acp@latest，再重试';
 const AGENT_WAKE_TIMEOUT_MS = 12000;
@@ -116,7 +120,39 @@ const PROPERTY_PANEL_HELP_TOOLTIP =
 const SELECTION_MODE_TOGGLE_SHORTCUT_LABEL = 'Ctrl / Cmd + S';
 const PARENT_SELECT_SHORTCUT_LABEL = '↑';
 const PARENT_RETURN_SHORTCUT_LABEL = '↓';
+const DELETE_ELEMENT_SHORTCUT_LABEL = 'Delete / Backspace';
 const PARENT_SELECT_INPUT_TOUCHED_ATTR = 'data-we-parent-select-input-touched';
+
+export function CommenterNameSettingsInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (name: string) => void;
+}) {
+  const [draft, setDraft] = React.useState(value);
+
+  React.useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  return (
+    <Input
+      aria-label="批注者名称"
+      size="small"
+      value={draft}
+      maxLength={120}
+      placeholder="请输入称呼"
+      style={{ width: 132 }}
+      onClick={(event) => event.stopPropagation()}
+      onChange={(event) => {
+        const nextValue = event.target.value;
+        setDraft(nextValue);
+        onChange(nextValue);
+      }}
+    />
+  );
+}
 
 function buildCommentarySkillGuidancePrompt(skillInstallSource?: string | null): string {
   const resolvedSkillInstallSource =
@@ -362,7 +398,10 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
     } = props;
     const toolbarMode = props.toolbarMode ?? options.toolbarMode ?? 'inline';
     const isHostToolbarMode = toolbarMode === 'host';
+    const compactToolbar = Boolean(options.compactToolbar);
+    const toolbarExtraContent = options.toolbarExtraContent ?? null;
     const hideExecutionControls = Boolean(options.hideExecutionControls);
+    const externalAnnotationMode = Boolean(options.externalAnnotationMode);
     const hostSurfaceVisibilityControl = options.hostSurfaceVisibilityControl;
     const selectionModeAvailable = interactionProfile !== 'text-comment';
 
@@ -1285,6 +1324,9 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
 
     const copyReason = options.getCopyPromptBlockReason?.();
     const copyBlocked = !options.onCopyPrompt || !!copyReason;
+    const liveCopyPromptText = options.getCopyPromptText?.();
+    const copyPromptUnavailable =
+      typeof options.getCopyPromptText === 'function' && !liveCopyPromptText?.trim();
     const agentPromptToolbarAction = getAgentPromptToolbarActionState({
       toolMinimized,
       visualState: effectiveVisualState,
@@ -1551,7 +1593,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
     const hasClearableEdits =
       modifiedCount + visibleTerminalTaskCount > 0 || hasPrototypeClearableEdits;
     const clearAllEditsDisabled = actionBusy || !hasClearableEdits || !options.onClearEdits;
-    const copyPromptDisabled = clearAllEditsDisabled || copyBlocked;
+    const copyPromptDisabled = clearAllEditsDisabled || copyBlocked || copyPromptUnavailable;
     const copyToolbarButton = showCopyPromptAction ? (
       <AgentToolbarIconButton
         title={copyReason ?? '复制 Prompt'}
@@ -1673,14 +1715,45 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
     const agentPrimaryMenuLabel = agentPromptToolbarAction.sendTitle.includes('追加')
       ? '追加'
       : '快速执行';
-    const clearEditsTitle = hasPrototypeClearableEdits ? '清空批注' : '清空全部编辑';
-    const clearAllEditsToolbarButton = clearAllEditsDisabled ? (
+    const clearEditsTitle = externalAnnotationMode
+      ? '清空我的外部批注'
+      : hasPrototypeClearableEdits
+        ? '清空批注'
+        : '清空全部编辑';
+    const clearAllEditsToolbarButton = options.hideClearEditsAction ? null : clearAllEditsDisabled ? (
       <AgentToolbarIconButton
         title={clearEditsTitle}
         icon={<DeleteOutlined />}
         awake={agentShellAwake}
         disabled
       />
+    ) : externalAnnotationMode ? (
+      <Popconfirm
+        title="清空我的外部批注"
+        description="确认后只会清空当前评论者自己写的外部批注，不影响其他评论者。"
+        arrow={{ pointAtCenter: true }}
+        getPopupContainer={resolveRuntimePopupContainer}
+        okText="清空"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+        onConfirm={() =>
+          runAction(() =>
+            options.onClearEdits?.({
+              skipConfirm: true,
+              scope: 'prototype',
+              target: 'all',
+            }),
+          )
+        }
+      >
+        <span style={{ display: 'inline-flex' }}>
+          <AgentToolbarIconButton
+            title={clearEditsTitle}
+            icon={<DeleteOutlined />}
+            awake={agentShellAwake}
+          />
+        </span>
+      </Popconfirm>
     ) : hasPrototypeClearableEdits ? (
       <Popconfirm
         title="清空当前原型批注"
@@ -2106,11 +2179,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       } finally {
         setDirectoryPickerBusy(false);
       }
-    }, [
-      directoryPickerRecentWorkspaces,
-      directoryPickerState?.path,
-      options,
-    ]);
+    }, [directoryPickerRecentWorkspaces, directoryPickerState?.path, options]);
     const aiExecutionWorkspaceDisplayName = getPathDisplayName(aiExecutionWorkspacePath);
     const toggleSelectionMode = React.useCallback(() => {
       const nextSelectionModeActive = !selectionModeActive;
@@ -2170,7 +2239,8 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         </Tooltip>
       ),
     };
-    const aiWorkspaceSettingsItem: SettingsItem | null = !options.onHostToolbarAction
+    const aiWorkspaceSettingsItem: SettingsItem | null = externalAnnotationMode
+      || !options.onHostToolbarAction
       ? null
       : {
           key: 'ai-workspace',
@@ -2188,7 +2258,8 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
             </span>
           ),
         };
-    const propertyPanelSettingsItem: SettingsItem | null = showPropertyPanelSettingsItem
+    const propertyPanelSettingsItem: SettingsItem | null = !externalAnnotationMode
+      && showPropertyPanelSettingsItem
       ? {
           key: 'property-panel',
           label: '设计决策',
@@ -2203,9 +2274,44 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         }
       : null;
     const settingsItems: SettingsItem[] = [
-      commentarySkillInstallSettingsItem,
+      ...(externalAnnotationMode && options.onCommenterNameChange
+        ? [
+            {
+              key: 'commenter-name',
+              label: '批注者',
+              control: (
+                <CommenterNameSettingsInput
+                  value={options.commenterName ?? ''}
+                  onChange={(name) => {
+                    void options.onCommenterNameChange?.(name);
+                  }}
+                />
+              ),
+            },
+          ]
+        : []),
+      ...(!externalAnnotationMode ? [commentarySkillInstallSettingsItem] : []),
       ...(aiWorkspaceSettingsItem ? [aiWorkspaceSettingsItem] : []),
       ...(propertyPanelSettingsItem ? [propertyPanelSettingsItem] : []),
+      ...(externalAnnotationMode || interactionProfile === 'text-comment'
+        ? []
+        : [
+            {
+              key: 'capture-target-screenshot',
+              label: '附带目标截图',
+              control: (
+                <Switch
+                  checked={uiSettings.captureTargetScreenshot}
+                  onChange={(checked) => {
+                    onUiSettingsChange({
+                      ...uiSettings,
+                      captureTargetScreenshot: checked,
+                    });
+                  }}
+                />
+              ),
+            },
+          ]),
       ...(pageEditingSettingsAvailable
         ? [
             {
@@ -2422,7 +2528,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         disabled={actionBusy}
         onClick={() => {
           if (options.onRequestFullExit) {
-            void options.onRequestFullExit();
+            void runAction(options.onRequestFullExit);
             return;
           }
           minimizeTool();
@@ -2486,6 +2592,8 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       onUiSettingsChange({ ...uiSettings, pageZoomEnabled: nextPageZoomEnabled });
     }, [dockPagePanelRight, onDismissSelection, onTargetChange, onUiSettingsChange, uiSettings]);
 
+    const annotationSaveStatus = options.getAnnotationSaveStatus?.() ?? 'saved';
+
     const hostToolbarState = React.useMemo<CommentaryHostToolbarState>(() => {
       const agentOptions = [
         { value: null, label: '默认' },
@@ -2527,6 +2635,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         propertyPanelTitle: propertyPanelOpen ? '关闭设计决策' : '打开设计决策',
         modifiedCount,
         terminalTaskCount: visibleTerminalTaskCount,
+        annotationSaveStatus,
         selectedAgent: hideExecutionControls ? null : uiSettings.agentProvider,
         agentOptions: hideExecutionControls ? [] : agentOptions,
         aiExecutionConfigSummary: options.aiExecutionConfigSummary ?? '',
@@ -2538,6 +2647,8 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         aiExecutionProviderOptions: options.aiExecutionProviderOptions ?? [],
         darkMode: uiSettings.darkMode,
         disablePageAnimations: uiSettings.disablePageAnimations,
+        captureTargetScreenshotAvailable: interactionProfile !== 'text-comment',
+        captureTargetScreenshot: uiSettings.captureTargetScreenshot,
         pageZoomEnabled: uiSettings.pageZoomEnabled,
         copySkillInstallPromptDisabled: actionBusy,
         selectionModeActive: selectionModeAvailable && selectionModeActive,
@@ -2555,6 +2666,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       };
     }, [
       actionBusy,
+      annotationSaveStatus,
       annotationToolbarTick,
       clearAllEditsDisabled,
       clearEditsTitle,
@@ -2584,6 +2696,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
       selectionModeActive,
       toolbarMode,
       uiSettings.disablePageAnimations,
+      uiSettings.captureTargetScreenshot,
       uiSettings.darkMode,
       uiSettings.agentProvider,
       uiSettings.pageZoomEnabled,
@@ -2693,6 +2806,13 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
               disablePageAnimations: !uiSettings.disablePageAnimations,
             });
             return true;
+          case 'toggle-target-screenshot':
+            if (interactionProfile === 'text-comment') return false;
+            onUiSettingsChange({
+              ...uiSettings,
+              captureTargetScreenshot: action.enabled ?? !uiSettings.captureTargetScreenshot,
+            });
+            return true;
           case 'toggle-page-zoom':
             handleTogglePageZoom();
             return true;
@@ -2744,6 +2864,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         handleInterruptSendPromptToAgent,
         handleTogglePageZoom,
         hostSendVisible,
+        interactionProfile,
         onDismissSelection,
         onAgentVisualStateChange,
         onHoverSelectionSuppressedChange,
@@ -2798,11 +2919,11 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
           onUiModeChange(mode);
           onRefreshNoteState();
         },
-        enterInlineTextEdit() {
+        enterInlineTextEdit(element?: HTMLElement | null) {
           if (toolMinimized) {
             restoreTool();
           }
-          onInlineTextEditingChange?.(true);
+          onInlineTextEditingChange?.(true, element);
         },
         getHostToolbarState() {
           return hostToolbarState;
@@ -2898,14 +3019,18 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
         >
           <Space size={4} style={{ minWidth: 0, flex: '0 0 auto' }}>
             {selectionModeToolbarButton}
-            {markdownSourceEditorToolbarButton}
-            {hostSurfaceVisibilityToolbarButton ?? agentExecutionToolbarButton}
-            {copyToolbarButton}
-            {propertyPanelToggleButton}
-            {clearAllEditsToolbarButton}
-            {htmlFileSaveToolbarButton}
-            {settingsToolbarButton}
-            {closeToolbarButton}
+            {compactToolbar ? toolbarExtraContent : (
+              <>
+                {markdownSourceEditorToolbarButton}
+                {hostSurfaceVisibilityToolbarButton ?? agentExecutionToolbarButton}
+                {copyToolbarButton}
+                {propertyPanelToggleButton}
+                {clearAllEditsToolbarButton}
+                {htmlFileSaveToolbarButton}
+                {settingsToolbarButton}
+              </>
+            )}
+            {options.hideToolbarCloseAction ? null : closeToolbarButton}
           </Space>
         </div>
       </AgentToolbarShell>
@@ -3102,7 +3227,7 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
           }}
           onPointerLeave={() => onHoverSelectionSuppressedChange(false)}
         >
-          <style>{PROPERTY_PANEL_LOCAL_STYLES}</style>
+          <style nonce={resolveCspNonce()}>{PROPERTY_PANEL_LOCAL_STYLES}</style>
           {isHostToolbarMode ? null : toolMinimized ? minimizedToolbar : expandedToolbar}
           <Modal
             title="语音快捷键"
@@ -3596,6 +3721,15 @@ export const PropertyPanelView = React.forwardRef<PropertyPanelHandle, PropertyP
                   label: '选择上 / 下级元素',
                   desc: '↑ 切换到当前元素的上一级，↓ 返回刚才选中的下一级',
                 },
+                ...(selectionModeAvailable
+                  ? [
+                      {
+                        keys: [DELETE_ELEMENT_SHORTCUT_LABEL],
+                        label: '删除当前元素',
+                        desc: '焦点不在输入框或文本编辑区时，删除已选元素并在父级创建可恢复批注',
+                      },
+                    ]
+                  : []),
               ].map((item) => (
                 <div
                   key={item.label}

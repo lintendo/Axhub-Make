@@ -271,11 +271,11 @@ describe('make-server admin static assets', () => {
       adminRoot: '/tmp/admin',
       projectRoot: '/tmp/project',
       host: 'localhost',
-      lanHost: '192.168.31.88',
+      lanHost: '192.168.1.88',
       port: 5174,
     });
 
-    expect(script).toContain("window.__LOCAL_IP__ = '192.168.31.88';");
+    expect(script).toContain("window.__LOCAL_IP__ = '192.168.1.88';");
   });
 
   it('injects configured local and LAN share hosts from project config', () => {
@@ -292,7 +292,7 @@ describe('make-server admin static assets', () => {
       adminRoot: '/tmp/admin',
       projectRoot,
       host: 'localhost',
-      lanHost: '192.168.31.88',
+      lanHost: '192.168.1.88',
       port: 5174,
     });
 
@@ -300,6 +300,26 @@ describe('make-server admin static assets', () => {
     expect(script).toContain("window.__AXHUB_SHARE_HOSTS__ = {");
     expect(script).toContain("localHost: '127.0.0.1'");
     expect(script).toContain("lanHost: '10.0.8.42'");
+  });
+
+  it('falls back to the detected LAN host when the project has no LAN setting', () => {
+    const projectRoot = createTempRoot('axhub-admin-stale-share-host-project-');
+    writeJson(path.join(projectRoot, '.axhub', 'make', 'axhub.config.json'), {
+      server: {
+        host: 'localhost',
+      },
+    });
+
+    const script = buildInjectScript({
+      adminRoot: '/tmp/admin',
+      projectRoot,
+      host: 'localhost',
+      lanHost: '198.51.100.121',
+      port: 5174,
+    });
+
+    expect(script).toContain("window.__LOCAL_IP__ = '198.51.100.121';");
+    expect(script).toContain("lanHost: '198.51.100.121'");
   });
 
   it('serves only admin-root HTML and assets for admin static routes', async () => {

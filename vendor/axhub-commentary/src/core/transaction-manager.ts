@@ -22,13 +22,21 @@ import type {
 import { Disposer } from '../utils/disposables';
 import { generateStableElementKey } from './element-key';
 import { createElementLocator, locateElement, locatorKey } from './locator';
+import { writeEditableText } from './text-content';
 
 // =============================================================================
 // Types
 // =============================================================================
 
 /** Change event action types */
-export type TransactionChangeAction = 'push' | 'merge' | 'undo' | 'redo' | 'clear' | 'rollback';
+export type TransactionChangeAction =
+  | 'push'
+  | 'merge'
+  | 'undo'
+  | 'redo'
+  | 'restore'
+  | 'clear'
+  | 'rollback';
 
 /** Change event emitted when transaction state changes */
 export interface TransactionChangeEvent {
@@ -148,6 +156,8 @@ export interface TransactionManager {
   undo(): Transaction | null;
   /** Redo the last undone transaction */
   redo(): Transaction | null;
+  /** Restore and permanently discard a tracked element-delete transaction. */
+  restoreDeletedElement(transactionId: string): Transaction | null;
   /** Check if undo is available */
   canUndo(): boolean;
   /** Check if redo is available */
@@ -1171,7 +1181,7 @@ function applyTransaction(tx: Transaction, direction: 'undo' | 'redo'): boolean 
 
   // Phase 2.7: Apply text content change
   if (tx.type === 'text') {
-    target.textContent = snapshot.text ?? '';
+    writeEditableText(target, snapshot.text ?? '');
     return true;
   }
 
@@ -1284,7 +1294,9 @@ export function createTransactionManager(
     const locator = createElementLocator(target);
     const timestamp = now();
     const id = generateTransactionId(timestamp);
-    const elementKey = generateStableElementKey(target, locator.shadowHostChain);
+    const elementKey = locator.textFragment
+      ? locatorKey(locator)
+      : generateStableElementKey(target, locator.shadowHostChain);
     const tx = createTextTransaction(id, locator, before, after, timestamp, elementKey);
 
     // No merge for text transactions in Phase 2
@@ -1858,6 +1870,28 @@ export function createTransactionManager(
     return tx;
   }
 
+  function restoreDeletedElement(transactionId: string): Transaction | null {
+    if (disposer.isDisposed) return null;
+
+    const normalizedId = String(transactionId ?? '').trim();
+    if (!normalizedId) return null;
+
+    const transactionIndex = undoStack.findIndex((tx) => tx.id === normalizedId);
+    if (transactionIndex < 0) return null;
+
+    const tx = undoStack[transactionIndex];
+    if (tx.type !== 'structure' || tx.structureData?.action !== 'delete') return null;
+    if (!applyTransaction(tx, 'undo')) {
+      options.onApplyError?.(new Error(`Failed to restore deleted element: ${tx.id}`));
+      return null;
+    }
+
+    undoStack.splice(transactionIndex, 1);
+    redoStack.length = 0;
+    emit('restore', tx);
+    return tx;
+  }
+
   function canUndo(): boolean {
     return undoStack.length > 0;
   }
@@ -1940,6 +1974,7 @@ export function createTransactionManager(
     applyStructure,
     undo,
     redo,
+    restoreDeletedElement,
     canUndo,
     canRedo,
     getUndoStack,

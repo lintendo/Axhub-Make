@@ -54,6 +54,18 @@ describe('open-source audit', () => {
     assert.equal(findings.some((finding) => finding.rule === 'posix-home-path'), false);
   });
 
+  it('allows only synthetic home paths in test fixtures', () => {
+    const macDemo = ['', 'Users', 'demo', 'project'].join('/');
+    const linuxTester = ['', 'home', 'tester', 'project'].join('/');
+    const windowsDemo = ['C:', 'Users', 'demo', 'project'].join('\\');
+    const realUser = ['', 'Users', 'private-user', 'project'].join('/');
+
+    assert.deepEqual(findSensitiveTextFindings('fixture.test.ts', [macDemo, linuxTester, windowsDemo].join('\n')), []);
+    assert.equal(findSensitiveTextFindings('fixture.ts', macDemo).length, 1);
+    assert.equal(findSensitiveTextFindings('fixture.test.ts', realUser).length, 1);
+    assert.equal(findSensitiveTextFindings('fixture.test.ts', `${macDemo} ${realUser}`).length, 1);
+  });
+
   it('keeps Gitleaks defaults enabled with narrow false-positive allowlists', () => {
     const config = fs.readFileSync(path.resolve('.gitleaks.toml'), 'utf8');
 

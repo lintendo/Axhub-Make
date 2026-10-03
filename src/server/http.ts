@@ -12,7 +12,7 @@ export interface JsonResponseOptions {
 export const LOCAL_API_CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Axhub-Published-Commenter',
 };
 
 export type NetworkInterfaceMap = ReturnType<typeof networkInterfaces>;

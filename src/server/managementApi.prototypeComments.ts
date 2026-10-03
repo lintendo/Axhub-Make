@@ -1,16 +1,20 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
 import { isPathInside, resolveProjectPath, type ProjectMetadata } from './projectCore/index.ts';
 
-import { readCommentAsset, removeCommentAssets, writeCommentAssets } from './commentAssetFiles.ts';
-import { readJsonBody, sendCorsJson, sendCorsPreflight, sendJson } from './http.ts';
+import { readJsonBody, sendCorsJson, sendCorsPreflight, sendFile, sendJson } from './http.ts';
 import {
   normalizePrototypeCommentTargetPath,
   resolvePrototypeCommentStorage,
+  type PrototypeCommentStorageOptions,
   type PrototypeCommentStorage,
 } from './documentCommentsStorage.ts';
+import { readRealtimeManifest } from './lanPublishingStorage.ts';
+import { isLanAccessRequestLocal } from './lanAccessControl.ts';
+import { resolveRequestIp } from './localPublishingPublic.ts';
 
 type PrototypeCommentsWriteReason = 'changes' | 'state' | 'restore' | 'clear';
 
@@ -32,6 +36,7 @@ export type ObservedTombstone = ObservedCommentTombstone | ObservedImageTombston
 type PrototypeCommentsContext = {
   project: {
     root: string;
+    id?: string;
   };
   metadata?: ProjectMetadata;
 };
@@ -59,7 +64,7 @@ function normalizeTargetPath(rawValue: string | null): { ok: true; value: string
   return { ok: true, value: normalized, id: normalized.slice('prototypes/'.length) };
 }
 
-function isResolveError(result: ResolveResult): result is Extract<ResolveResult, { ok: false }> {
+function isResolveError<T extends { ok: boolean }>(result: T): result is Extract<T, { ok: false }> {
   return result.ok === false;
 }
 
@@ -79,6 +84,7 @@ function resolvePrototypeCommentsPath(
   projectRoot: string,
   rawTargetPath: string | null,
   metadata?: ProjectMetadata,
+  storageOptions?: PrototypeCommentStorageOptions,
 ): ResolveResult {
   const normalized = normalizeTargetPath(rawTargetPath);
   if (normalized.ok === false) {
@@ -98,7 +104,7 @@ function resolvePrototypeCommentsPath(
     return { ok: false, status: 403, error: 'Prototype comment persistence is limited to src/prototypes' };
   }
 
-  const storage = resolvePrototypeCommentStorage(projectRoot, normalized.value);
+  const storage = resolvePrototypeCommentStorage(projectRoot, normalized.value, storageOptions);
   return storage
     ? { ok: true, ...storage }
     : { ok: false, status: 403, error: 'Prototype comment path crosses a symbolic link boundary' };
@@ -194,7 +200,9 @@ export function mergeStoredTombstones(
   previous: Record<string, unknown> | null,
   incoming: Record<string, unknown>,
 ): Record<string, unknown> {
-  if (!previous) return incoming;
+  if (!previous) {
+    return incoming;
+  }
   const previousComments = Array.isArray(previous.comments) ? previous.comments : [];
   const incomingComments = Array.isArray(incoming.comments) ? incoming.comments : [];
   const commentTombstones = previousComments.filter(
@@ -207,8 +215,31 @@ export function mergeStoredTombstones(
     if (!isRecord(value)) return true;
     return !commentBarriers.has(buildCommentIdentity(value));
   });
+  const previousCommentsByIdentity = new Map(
+    previousComments
+      .filter(isRecord)
+      .map((value) => [buildCommentIdentity(value), value] as const)
+      .filter(([identity]) => Boolean(identity)),
+  );
+  const incomingCommentsWithExternalPreserved = incomingActiveComments.map((value) => {
+    if (!isRecord(value)) return value;
+    const identity = buildCommentIdentity(value);
+    const previousValue = identity ? previousCommentsByIdentity.get(identity) : undefined;
+    const previousExternal = previousValue && Array.isArray(previousValue.externalComments)
+      ? previousValue.externalComments
+      : [];
+    if (!previousExternal.length) {
+      if (!Array.isArray(value.externalComments)) return value;
+      const { externalComments: _ignoredExternalComments, ...withoutExternalComments } = value;
+      return withoutExternalComments;
+    }
+    return {
+      ...value,
+      externalComments: previousExternal.map((entry) => ({ ...entry })),
+    };
+  });
   const incomingCommentIdentities = new Set(
-    incomingActiveComments
+    incomingCommentsWithExternalPreserved
       .filter(isRecord)
       .map(buildCommentIdentity)
       .filter(Boolean),
@@ -255,7 +286,7 @@ export function mergeStoredTombstones(
   return {
     ...incoming,
     comments: [
-      ...incomingActiveComments,
+      ...incomingCommentsWithExternalPreserved,
       ...preservedActiveComments,
       ...commentTombstones,
     ],
@@ -349,40 +380,353 @@ function normalizeCommentDocument(input: unknown, resolved: Extract<ResolveResul
       targetPath: `prototypes/${resolved.prototypeId}`,
       filePath: resolved.projectRelativeCommentPath,
     },
-    comments: record.comments,
+    comments: record.comments.map((comment) => {
+      if (!isRecord(comment)) return comment;
+      return {
+        ...comment,
+        ...(Array.isArray(comment.externalComments)
+          ? { externalComments: normalizeExternalComments(comment.externalComments) }
+          : {}),
+      };
+    }),
     images: record.images,
+  };
+}
+
+type PublishedCommentIdentity = {
+  author: string;
+  authorIp: string;
+  commenterId: string;
+  viewer: boolean;
+};
+
+const PUBLISHED_COMMENTER_HEADER = 'x-axhub-published-commenter';
+
+function getHeaderValue(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] || '' : value || '';
+}
+
+function resolvePublishedCommenterId(req: IncomingMessage, shareId: string): string {
+  const token = getHeaderValue(req.headers[PUBLISHED_COMMENTER_HEADER]).trim();
+  if (!/^[a-z0-9_-]{32,160}$/iu.test(token)) return '';
+  return crypto.createHash('sha256').update(`${shareId}\0${token}`).digest('hex');
+}
+
+function normalizePublishedTargetPath(resourcePath: string): string {
+  return String(resourcePath || '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^src\//u, '')
+    .replace(/\/index\.(t|j)sx?$/iu, '')
+    .replace(/^\/+|\/+$/gu, '');
+}
+
+function resolvePublishedCommentIdentity(
+  req: IncomingMessage,
+  url: URL,
+  context: PrototypeCommentsContext,
+  resolved: Extract<ResolveResult, { ok: true }>,
+): { identity: PublishedCommentIdentity } | { status: number; error: string } | null {
+  const shareId = String(url.searchParams.get('publishedShareId') || '').trim();
+  if (!shareId) return null;
+  const manifest = readRealtimeManifest(context.project.root, shareId);
+  if (!manifest) {
+    return { status: 404, error: 'Published realtime share not found' };
+  }
+  if (context.project.id && manifest.projectId !== context.project.id) {
+    return { status: 403, error: 'Published realtime share does not belong to this project' };
+  }
+  if (normalizePublishedTargetPath(manifest.resourcePath) !== resolved.targetPath) {
+    return { status: 403, error: 'Published realtime share does not match this prototype' };
+  }
+  if (!manifest.commentable) {
+    return { status: 403, error: 'Published realtime comments are disabled' };
+  }
+  const authorIp = resolveRequestIp(req);
+  const commenterName = String(url.searchParams.get('commenterName') || '').trim().slice(0, 120);
+  const commenterId = resolvePublishedCommenterId(req, shareId);
+  const remoteViewer = !isLanAccessRequestLocal(req);
+  if (remoteViewer && !commenterId) {
+    return { status: 401, error: 'Published commenter identity is required' };
+  }
+  return {
+    identity: {
+      author: commenterName || authorIp,
+      authorIp,
+      commenterId,
+      viewer: Boolean(commenterId),
+    },
+  };
+}
+
+function normalizeExternalCommentEntry(value: unknown): Record<string, unknown> | null {
+  if (!isRecord(value)) return null;
+  const id = normalizeIdentityPart(value.id);
+  const authorId = normalizeIdentityPart(value.authorId);
+  const authorName = normalizeIdentityPart(value.authorName) || '评审者';
+  const content = normalizeIdentityPart(value.content).slice(0, 2000);
+  const createdAt = Number(value.createdAt);
+  if (!id || !authorId || !content || !Number.isFinite(createdAt) || createdAt <= 0) return null;
+  return {
+    ...value,
+    id,
+    authorId,
+    authorName,
+    content,
+    createdAt,
+    ...(Number(value.updatedAt) > 0 ? { updatedAt: Number(value.updatedAt) } : {}),
+  };
+}
+
+function normalizeExternalComments(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const candidate of value) {
+    const normalized = normalizeExternalCommentEntry(candidate);
+    if (normalized) byId.set(String(normalized.id), normalized);
+  }
+  return [...byId.values()].sort((left, right) => (
+    Number(left.createdAt) - Number(right.createdAt)
+    || String(left.id).localeCompare(String(right.id))
+  ));
+}
+
+function projectPublishedExternalCommentsForViewer(
+  document: Record<string, unknown> | null,
+  identity: PublishedCommentIdentity,
+): Record<string, unknown> | null {
+  if (!document) return null;
+  const comments: Record<string, unknown>[] = (Array.isArray(document.comments) ? document.comments : [])
+    .filter(isRecord)
+    .map((comment) => {
+      const externalComments = normalizeExternalComments(comment.externalComments)
+        .filter((entry) => normalizeIdentityPart(entry.authorId) === identity.commenterId);
+      const { comment: _localComment, author: _author, commenterId: _commenterId, authorIp: _authorIp, ...projected } = comment;
+      return {
+        ...projected,
+        ...(externalComments.length > 0 ? { externalComments } : {}),
+      };
+    })
+    .filter((comment) => Array.isArray(comment.externalComments) && comment.externalComments.length > 0);
+  const ownedCommentIds = new Set(
+    comments
+      .map((comment) => normalizeIdentityPart(comment.id))
+      .filter(Boolean),
+  );
+  const images = (Array.isArray(document.images) ? document.images : [])
+    .filter(isRecord)
+    .filter((image) => {
+      const commentId = normalizeIdentityPart(image.commentId);
+      if (!commentId) return false;
+      return ownedCommentIds.has(commentId);
+    });
+  return {
+    ...document,
+    comments,
+    images,
+  };
+}
+
+function mergePublishedExternalComments(
+  previous: Record<string, unknown> | null,
+  incoming: Record<string, unknown>,
+  identity: PublishedCommentIdentity,
+  reason: PrototypeCommentsWriteReason,
+  observedTombstones: ObservedTombstone[],
+): Record<string, unknown> {
+  if (!previous) {
+    return {
+      ...incoming,
+      comments: (Array.isArray(incoming.comments) ? incoming.comments : []).filter(isRecord).map((comment) => ({
+        ...comment,
+        externalComments: normalizeExternalComments(comment.externalComments).map((entry) => ({
+          ...entry,
+          authorId: identity.commenterId,
+          authorName: identity.author || '评审者',
+        })),
+      })),
+    };
+  }
+  const previousComments = Array.isArray(previous.comments) ? previous.comments : [];
+  const incomingComments = Array.isArray(incoming.comments) ? incoming.comments : [];
+  const incomingById = new Map(incomingComments.filter(isRecord).map((comment) => [normalizeIdentityPart(comment.id), comment]));
+  const comments: Record<string, unknown>[] = previousComments.filter(isRecord).map((comment) => {
+    const id = normalizeIdentityPart(comment.id);
+    const own = normalizeExternalComments(comment.externalComments)
+      .filter((entry) => normalizeIdentityPart(entry.authorId) === identity.commenterId);
+    const others = normalizeExternalComments(comment.externalComments)
+      .filter((entry) => normalizeIdentityPart(entry.authorId) !== identity.commenterId);
+    const incomingComment = incomingById.get(id);
+    const incomingExternal = incomingComment ? normalizeExternalComments(incomingComment.externalComments) : [];
+    const incomingContent = incomingComment ? normalizeIdentityPart(incomingComment.comment) : '';
+    const hasIncomingExternalField = Boolean(incomingComment && Array.isArray(incomingComment.externalComments));
+    const requested = incomingContent
+        ? [{
+            id: own[0]?.id || `${identity.commenterId}-${id || crypto.randomUUID()}`,
+            authorId: identity.commenterId,
+            authorName: identity.author || '评审者',
+            content: incomingContent,
+            createdAt: Number(own[0]?.createdAt) > 0 ? Number(own[0].createdAt) : Date.now(),
+            updatedAt: Date.now(),
+          }]
+        : hasIncomingExternalField
+          ? incomingExternal.map((entry) => ({
+              ...entry,
+              authorId: identity.commenterId,
+              authorName: identity.author || '评审者',
+            }))
+          : own;
+    return {
+      ...comment,
+      externalComments: [...others, ...requested],
+    };
+  });
+  const existingIds = new Set(comments.map((comment) => normalizeIdentityPart(comment.id)));
+  for (const incomingComment of incomingComments.filter(isRecord)) {
+    const id = normalizeIdentityPart(incomingComment.id);
+    if (!id || existingIds.has(id)) continue;
+    const external: Record<string, unknown>[] = normalizeExternalComments(incomingComment.externalComments).map((entry) => ({
+      ...entry,
+      authorId: identity.commenterId,
+      authorName: identity.author || '评审者',
+    }));
+    const content = normalizeIdentityPart(incomingComment.comment);
+    if (!external.length && content) {
+      external.push({
+        id: `${identity.commenterId}-${id}`,
+        authorId: identity.commenterId,
+        authorName: identity.author || '评审者',
+        content,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    }
+    comments.push({ ...incomingComment, externalComments: external });
+  }
+  if (reason === 'clear') {
+    return {
+      ...previous,
+      comments: previousComments.filter(isRecord).map((comment) => ({
+        ...comment,
+        externalComments: normalizeExternalComments(comment.externalComments)
+          .filter((entry) => normalizeIdentityPart(entry.authorId) !== identity.commenterId),
+      })),
+      images: Array.isArray(previous.images) ? previous.images : [],
+    };
+  }
+  return {
+    ...previous,
+    comments,
+    images: Array.isArray(previous.images) ? previous.images : [],
+  };
+}
+
+type PrototypeCommentsRequestResolution =
+  | {
+      ok: true;
+      resolved: Extract<ResolveResult, { ok: true }>;
+      publishedIdentity: PublishedCommentIdentity | null;
+    }
+  | Extract<ResolveResult, { ok: false }>;
+
+function resolvePrototypeCommentsRequest(
+  req: IncomingMessage,
+  url: URL,
+  context: PrototypeCommentsContext,
+): PrototypeCommentsRequestResolution {
+  const authorResolved = resolvePrototypeCommentsPath(
+    context.project.root,
+    url.searchParams.get('targetPath'),
+    context.metadata,
+  );
+  if (isResolveError(authorResolved)) return authorResolved;
+
+  const publishedIdentity = resolvePublishedCommentIdentity(req, url, context, authorResolved);
+  if (publishedIdentity && 'error' in publishedIdentity) {
+    return {
+      ok: false,
+      status: publishedIdentity.status,
+      error: publishedIdentity.error,
+    };
+  }
+
+  if (!publishedIdentity && !isLanAccessRequestLocal(req)) {
+    return { ok: false, status: 401, error: 'Published share identity is required' };
+  }
+
+  return {
+    ok: true,
+    resolved: authorResolved,
+    publishedIdentity: publishedIdentity && 'identity' in publishedIdentity
+      ? publishedIdentity.identity
+      : null,
   };
 }
 
 function persistImageAssets(
   document: Record<string, unknown>,
   resolved: Extract<ResolveResult, { ok: true }>,
-  projectRoot: string,
+  publishedIdentity: PublishedCommentIdentity | null = null,
 ): Record<string, unknown> {
   const rawImages = Array.isArray(document.images) ? document.images : [];
-  const writes: Array<{ relativePath: string; data: Buffer }> = [];
+  const ownedCommentIds = new Set(
+    (Array.isArray(document.comments) ? document.comments : [])
+      .filter(isRecord)
+      .filter((comment) => {
+        if (!publishedIdentity?.viewer) return true;
+        return normalizeExternalComments(comment.externalComments)
+          .some((entry) => normalizeIdentityPart(entry.authorId) === publishedIdentity.commenterId);
+      })
+      .map((comment) => normalizeIdentityPart(comment.id))
+      .filter(Boolean),
+  );
   const images = rawImages.map((rawImage, index) => {
     const image = rawImage && typeof rawImage === 'object' && !Array.isArray(rawImage)
       ? { ...(rawImage as Record<string, unknown>) }
       : {};
+    const ownedPublishedImage = Boolean(
+      publishedIdentity?.viewer
+      && ownedCommentIds.has(normalizeIdentityPart(image.commentId)),
+    );
     const parsed = parseImageDataUrl(image.data);
+    if (publishedIdentity?.viewer && !ownedPublishedImage) {
+      delete image.data;
+      return image;
+    }
     if (parsed) {
       const id = sanitizeAssetBaseName(image.id, `image-${index + 1}`);
+      const commentId = sanitizeAssetBaseName(image.commentId, 'comment');
       const extension = inferImageExtension(String(image.mimeType || parsed.mimeType));
-      const fileName = `${id}.${extension}`;
-      const assetPath = path.join(resolved.assetDir, fileName);
+      const fileName = ownedPublishedImage
+        ? `${commentId}-${id}.${extension}`
+        : `${id}.${extension}`;
+      const ownerAssetDir = ownedPublishedImage
+        ? path.join(resolved.assetDir, publishedIdentity!.commenterId)
+        : resolved.assetDir;
+      const assetPath = path.join(ownerAssetDir, fileName);
       if (!isPathInside(resolved.assetDir, assetPath)) {
         throw new Error('Invalid comment asset path');
       }
-      writes.push({ relativePath: fileName, data: parsed.buffer });
-      image.assetPath = `${resolved.projectRelativeAssetRoot}/${fileName}`;
+      fs.mkdirSync(ownerAssetDir, { recursive: true });
+      fs.writeFileSync(assetPath, parsed.buffer);
+      image.assetPath = ownedPublishedImage
+        ? `${resolved.projectRelativeAssetRoot}/${publishedIdentity!.commenterId}/${fileName}`
+        : `${resolved.projectRelativeAssetRoot}/${fileName}`;
       image.mimeType = image.mimeType || parsed.mimeType;
       image.size = Number(image.size ?? parsed.buffer.length);
+    } else if (ownedPublishedImage) {
+      const normalizedAssetPath = normalizeAssetPath(
+        typeof image.assetPath === 'string' ? image.assetPath : null,
+        resolved,
+      );
+      const expectedOwnerPrefix = `${resolved.projectRelativeAssetRoot}/${publishedIdentity.commenterId}/`;
+      if (!normalizedAssetPath?.startsWith(expectedOwnerPrefix)) {
+        delete image.assetPath;
+      }
     }
     delete image.data;
     return image;
   });
-  writeCommentAssets(projectRoot, resolved.assetDir, writes);
   return {
     ...document,
     images,
@@ -421,33 +765,66 @@ function collectImageAssetPaths(
   return paths;
 }
 
+function resolveExistingImageAssetPath(
+  assetPath: string,
+  resolved: Extract<ResolveResult, { ok: true }>,
+): string | null {
+  const relativeAssetPath = assetPath.slice(`${resolved.projectRelativeAssetRoot}/`.length);
+  const fullPath = path.resolve(resolved.assetDir, relativeAssetPath);
+  if (!isPathInside(resolved.assetDir, fullPath) || !fs.existsSync(fullPath)) return null;
+  try {
+    const realAssetDir = fs.realpathSync.native(resolved.assetDir);
+    const realFullPath = fs.realpathSync.native(fullPath);
+    return fs.statSync(realFullPath).isFile() && isPathInside(realAssetDir, realFullPath)
+      ? fullPath
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCommentDocumentAtomic(filePath: string, document: Record<string, unknown>): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+  try {
+    fs.writeFileSync(tempPath, `${JSON.stringify(document, null, 2)}\n`, 'utf8');
+    fs.renameSync(tempPath, filePath);
+  } finally {
+    if (fs.existsSync(tempPath)) fs.rmSync(tempPath, { force: true });
+  }
+}
+
 function removeUnreferencedImageAssets(
   previous: Record<string, unknown> | null,
   next: Record<string, unknown>,
   resolved: Extract<ResolveResult, { ok: true }>,
-  projectRoot: string,
 ): void {
   const previousPaths = collectImageAssetPaths(previous, resolved);
   const nextPaths = collectImageAssetPaths(next, resolved);
-  const relativePaths: string[] = [];
+  let realAssetDir = '';
+  try {
+    if (fs.lstatSync(resolved.assetDir).isSymbolicLink()) return;
+    realAssetDir = fs.realpathSync(resolved.assetDir);
+  } catch {
+    return;
+  }
   for (const assetPath of previousPaths) {
     if (nextPaths.has(assetPath)) continue;
     const relativeAssetPath = assetPath.slice(`${resolved.projectRelativeAssetRoot}/`.length);
-    relativePaths.push(relativeAssetPath);
-  }
-  try {
-    removeCommentAssets(projectRoot, resolved.assetDir, relativePaths);
-  } catch (error) {
-    console.warn('[Make] Failed to remove prototype comment assets:', error);
+    const fullPath = path.resolve(resolved.assetDir, relativeAssetPath);
+    if (!isPathInside(resolved.assetDir, fullPath)) continue;
+    try {
+      if (!fs.existsSync(fullPath)) continue;
+      const realFullPath = fs.realpathSync(fullPath);
+      if (!isPathInside(realAssetDir, realFullPath)) continue;
+      fs.rmSync(fullPath, { force: true });
+    } catch (error) {
+      console.warn('[Make] Failed to remove prototype comment asset:', error);
+    }
   }
 }
 
-function hydrateImageData(
-  document: unknown,
-  resolved: Extract<ResolveResult, { ok: true }>,
-  url: URL,
-  projectRoot: string,
-): unknown {
+function hydrateImageData(document: unknown, resolved: Extract<ResolveResult, { ok: true }>, url: URL): unknown {
   if (url.searchParams.get('hydrateImages') !== '1') {
     return document;
   }
@@ -462,11 +839,10 @@ function hydrateImageData(
       : {};
     const assetPath = normalizeAssetPath(typeof image.assetPath === 'string' ? image.assetPath : null, resolved);
     if (!assetPath) return image;
-    const relativeAssetPath = assetPath.slice(`${resolved.projectRelativeAssetRoot}/`.length);
-    const loaded = readCommentAsset(projectRoot, resolved.assetDir, relativeAssetPath);
-    if (!loaded) return image;
-    const mimeType = String(image.mimeType || '').trim() || mimeTypeFromFileName(loaded.filePath);
-    image.data = `data:${mimeType};base64,${loaded.data.toString('base64')}`;
+    const fullPath = resolveExistingImageAssetPath(assetPath, resolved);
+    if (!fullPath) return image;
+    const mimeType = String(image.mimeType || '').trim() || mimeTypeFromFileName(fullPath);
+    image.data = `data:${mimeType};base64,${fs.readFileSync(fullPath).toString('base64')}`;
     return image;
   });
   return record;
@@ -493,11 +869,12 @@ function handleAssetRequest(
     return true;
   }
 
-  const resolved = resolvePrototypeCommentsPath(context.project.root, url.searchParams.get('targetPath'), context.metadata);
-  if (isResolveError(resolved)) {
-    sendJson(res, { error: resolved.error }, { status: resolved.status });
+  const resolution = resolvePrototypeCommentsRequest(req, url, context);
+  if (isResolveError(resolution)) {
+    sendJson(res, { error: resolution.error }, { status: resolution.status });
     return true;
   }
+  const { resolved } = resolution;
   const normalizedAsset = normalizeAssetPath(url.searchParams.get('asset'), resolved);
   if (!normalizedAsset) {
     const rawAsset = String(url.searchParams.get('asset') ?? '');
@@ -514,16 +891,25 @@ function handleAssetRequest(
     sendJson(res, { error: 'Asset not found' }, { status: 404 });
     return true;
   }
-  const loaded = readCommentAsset(context.project.root, resolved.assetDir, relativeAssetPath);
-  if (!loaded) {
+  if (resolution.publishedIdentity?.viewer) {
+    const storedDocument = readStoredCommentDocument(resolved.commentFilePath);
+    const visibleDocument = projectPublishedExternalCommentsForViewer(
+      storedDocument,
+      resolution.publishedIdentity,
+    );
+    if (!collectImageAssetPaths(visibleDocument, resolved).has(normalizedAsset)) {
+      sendJson(res, { error: 'Asset not found' }, { status: 404 });
+      return true;
+    }
+  }
+  const safeAssetPath = resolveExistingImageAssetPath(normalizedAsset, resolved);
+  if (!safeAssetPath) {
     sendJson(res, { error: 'Invalid asset path' }, { status: 403 });
     return true;
   }
-  res.statusCode = 200;
-  res.setHeader('Content-Type', mimeTypeFromFileName(loaded.filePath));
-  res.setHeader('Content-Length', String(loaded.data.length));
-  res.setHeader('Cache-Control', 'no-store');
-  res.end(loaded.data);
+  if (!sendFile(res, safeAssetPath, { cacheControl: 'no-store' })) {
+    sendJson(res, { error: 'Asset not found' }, { status: 404 });
+  }
   return true;
 }
 
@@ -541,11 +927,12 @@ export function handlePrototypeCommentsApi(
     return true;
   }
 
-  const resolved = resolvePrototypeCommentsPath(context.project.root, url.searchParams.get('targetPath'), context.metadata);
-  if (isResolveError(resolved)) {
-    sendCorsJson(res, { error: resolved.error }, { status: resolved.status });
+  const resolution = resolvePrototypeCommentsRequest(req, url, context);
+  if (isResolveError(resolution)) {
+    sendCorsJson(res, { error: resolution.error }, { status: resolution.status });
     return true;
   }
+  const { resolved, publishedIdentity } = resolution;
 
   if (req.method === 'GET') {
     if (!fs.existsSync(resolved.commentFilePath)) {
@@ -557,10 +944,17 @@ export function handlePrototypeCommentsApi(
       return true;
     }
     try {
-      const document = JSON.parse(fs.readFileSync(resolved.commentFilePath, 'utf8'));
+      const storedDocument = JSON.parse(fs.readFileSync(resolved.commentFilePath, 'utf8')) as Record<string, unknown>;
+      const document = publishedIdentity?.viewer
+        ? projectPublishedExternalCommentsForViewer(storedDocument, publishedIdentity)
+        : storedDocument;
       sendCorsJson(res, {
         exists: true,
-        document: hydrateImageData(document, resolved, url, context.project.root),
+        document: hydrateImageData(
+          document,
+          resolved,
+          url,
+        ),
         path: resolved.projectRelativeCommentPath,
       });
     } catch (error) {
@@ -578,24 +972,33 @@ export function handlePrototypeCommentsApi(
         const observedTombstones = normalizeObservedTombstones(
           isRecord(body) ? body.observedTombstones : undefined,
         );
-        const merged = reason === 'restore' && previousDocument
-          ? normalizeCommentDocument(
-              compactObservedTombstones(previousDocument, observedTombstones),
-              resolved,
+        const merged = publishedIdentity?.viewer
+          ? mergePublishedExternalComments(
+              previousDocument,
+              normalized,
+              publishedIdentity,
+              reason,
+              observedTombstones,
             )
-          : reason === 'clear'
-            ? normalized
-            : mergeStoredTombstones(previousDocument, normalized);
-        const document = persistImageAssets(merged, resolved, context.project.root);
-        fs.mkdirSync(path.dirname(resolved.commentFilePath), { recursive: true });
-        fs.writeFileSync(resolved.commentFilePath, `${JSON.stringify(document, null, 2)}\n`, 'utf8');
+          : reason === 'restore' && previousDocument
+            ? normalizeCommentDocument(
+                compactObservedTombstones(previousDocument, observedTombstones),
+                resolved,
+              )
+            : reason === 'clear'
+              ? normalized
+              : mergeStoredTombstones(previousDocument, normalized);
+        const document = persistImageAssets(merged, resolved, publishedIdentity);
+        writeCommentDocumentAtomic(resolved.commentFilePath, document);
         if (reason === 'restore' || reason === 'clear') {
-          removeUnreferencedImageAssets(previousDocument, document, resolved, context.project.root);
+          removeUnreferencedImageAssets(previousDocument, document, resolved);
         }
         sendCorsJson(res, {
           ok: true,
           exists: true,
-          document,
+          document: publishedIdentity?.viewer
+            ? projectPublishedExternalCommentsForViewer(document, publishedIdentity)
+            : document,
           path: resolved.projectRelativeCommentPath,
         });
       })

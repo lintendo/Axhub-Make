@@ -418,6 +418,36 @@ describe('AI runs API', () => {
     }
   });
 
+  it('sends direct-run reference images as ACP image message parts', async () => {
+    const projectRoot = createTempRoot('axhub-ai-runs-direct-image-context-');
+    writeProjectMetadata(projectRoot, {
+      project: { id: 'ai-runs-direct-image-context', name: 'AI Runs Direct Image Context' },
+    });
+    const acp = await startAcpRunTestServer();
+    const server = await startRegisteredTestServer(projectRoot, acp);
+
+    try {
+      const response = await fetch(projectAiRunsUrl(server), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scene: 'direct',
+          prompt: '根据当前画布继续。',
+          referenceImages: ['data:image/png;base64,dmVycG9ydA=='],
+        }),
+      });
+      await collectRunEvents(response);
+
+      expect(response.status).toBe(200);
+      expect(acp.requests[0].body.messages[0].parts).toEqual([
+        { type: 'text', text: '根据当前画布继续。' },
+        { type: 'image', image: 'data:image/png;base64,dmVycG9ydA==' },
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
   it('returns a structured open-settings run error when ACP runtime is unavailable', async () => {
     const projectRoot = createTempRoot('axhub-ai-runs-runtime-unavailable-');
     writeProjectMetadata(projectRoot, {
@@ -677,6 +707,58 @@ describe('AI runs API', () => {
         provider: 'cursor',
         workspacePath: projectRoot,
       });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('uses independent conversation, annotation, and canvas defaults with explicit request overrides', async () => {
+    const projectRoot = createTempRoot('axhub-ai-runs-purpose-defaults-');
+    writeProjectMetadata(projectRoot, {
+      project: { id: 'ai-runs-purpose-defaults', name: 'AI Runs Purpose Defaults' },
+    });
+    const acp = await startAcpRunTestServer();
+    const server = await startRegisteredTestServer(projectRoot, acp, {
+      automation: {
+        conversationPromptClient: 'acp:qoder',
+        conversationModel: 'conversation-model',
+        annotationPromptClient: 'acp:cursor',
+        annotationModel: 'annotation-model',
+        canvasPromptClient: 'acp:codebuddy',
+        canvasModel: 'canvas-model',
+      },
+    });
+
+    try {
+      for (const body of [
+        { scene: 'direct', prompt: '对话' },
+        { scene: 'prototype-review-direct', prompt: '评审' },
+        { scene: 'canvas-page-direct', prompt: '画布' },
+        {
+          scene: 'direct',
+          prompt: '显式覆盖',
+          preferredPromptClient: 'acp:reasonix',
+          model: 'explicit-model',
+        },
+      ]) {
+        const response = await fetch(projectAiRunsUrl(server), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        await collectRunEvents(response);
+        expect(response.status).toBe(200);
+      }
+
+      expect(acp.requests.map((request) => ({
+        provider: request.body.provider,
+        model: request.body.model,
+      }))).toEqual([
+        { provider: 'qoder', model: 'conversation-model' },
+        { provider: 'cursor', model: 'annotation-model' },
+        { provider: 'codebuddy', model: 'canvas-model' },
+        { provider: 'reasonix', model: 'explicit-model' },
+      ]);
     } finally {
       await server.close();
     }
@@ -968,6 +1050,33 @@ describe('AI runs API', () => {
           value: 'canvas-secret',
         }],
       }]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('forwards bypass permissions for direct file runs without MCP servers', async () => {
+    const projectRoot = createTempRoot('axhub-ai-runs-direct-file-');
+    writeProjectMetadata(projectRoot, {
+      project: { id: 'ai-runs-direct-file', name: 'AI Runs Direct File' },
+    });
+    const acp = await startAcpRunTestServer();
+    const server = await startRegisteredTestServer(projectRoot, acp);
+
+    try {
+      const response = await fetch(projectAiRunsUrl(server), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scene: 'direct',
+          prompt: '直接修改当前画布文件。',
+          permissionMode: 'bypassPermissions',
+        }),
+      });
+      await collectRunEvents(response);
+
+      expect(acp.requests[0].body.permissionMode).toBe('bypassPermissions');
+      expect(acp.requests[0].body.mcpServers).toBeUndefined();
     } finally {
       await server.close();
     }
@@ -1480,7 +1589,6 @@ describe('AI runs API', () => {
       expect(acp.requests[0].body.builtinToolSettings).toEqual({
         imageGeneration: {
           baseUrl: 'https://images.example.com/v1',
-          apiKey: 'sk-image',
           model: 'gpt-image-2',
           savePathPattern: 'src/prototypes/home/.spec/generation-assets/images/image-<index>.<ext>',
         },

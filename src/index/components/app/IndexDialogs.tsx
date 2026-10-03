@@ -3,7 +3,14 @@ import type { ItemData, PromptClientPreference, AxureCopyOptions, ImageConfig } 
 import type { IDEAvailabilityMap, MainIDEPreference } from '../../../common/ide';
 import type { DocReferencePromptDialogState } from '../../app/index-page.helpers';
 import type { ExportAvailability } from '../../types/index-page.types';
-import type { AxhubPublishResponse, CloudPublishingConfigResponse, MakeClientUpdateStatus, ReviewResult } from '../../services/api';
+import type {
+    AxhubPublishResponse,
+    CloudPublishingConfigResponse,
+    LanHtmlPublishResponse,
+    LanRealtimePublishResponse,
+    MakeClientUpdateStatus,
+    ReviewResult,
+} from '../../services/api';
 import type { CloudPublishTarget } from '../../services/api';
 import type { ResourceWriteCapabilities } from '../../services/projectResources';
 import type { ExcalidrawPropertyPanelMode, ExcalidrawPropertyPanelPosition } from '../../utils/excalidrawUiMode';
@@ -30,8 +37,9 @@ const ExportReviewDialogView = React.lazy(() => import('../dialogs/ExportReviewD
 const FigmaMakeExportDialog = React.lazy(() => import('../dialogs/FigmaMakeExportDialog'));
 const CloudPublishSettingsDialog = React.lazy(() => import('../dialogs/CloudPublishSettingsDialog'));
 const AxhubPublishDialog = React.lazy(() => import('../dialogs/AxhubPublishDialog'));
+const LocalPublishDialog = React.lazy(() => import('../dialogs/LocalPublishDialog'));
 const SettingsDialog = React.lazy(() => import('../SettingsDialog'));
-const WorkspaceVersionCollaborationDrawer = React.lazy(() => import('../WorkspaceVersionCollaborationDrawer'));
+const RemoteRepositorySettingsDialog = React.lazy(() => import('../RemoteRepositorySettingsDialog'));
 const VersionManager = React.lazy(() => import('../VersionManager'));
 
 interface IndexDialogsProps {
@@ -65,12 +73,8 @@ interface IndexDialogsProps {
     createThemeDialog: {
         visible: boolean;
         activeProjectId: string;
-        initialTab?: 'import' | 'onlineSelect';
         resourceWriteCapabilities: ResourceWriteCapabilities;
-        assistantOpen?: boolean;
         onClose: () => void;
-        onAfterCreatePromptAction: () => void;
-        onExecutePrompt?: (prompt: string, meta: { scene: string; targetPath?: string | null }) => Promise<boolean | void> | boolean | void;
         onImportSuccess: () => Promise<void> | void;
     };
     exportDialog: {
@@ -122,17 +126,30 @@ interface IndexDialogsProps {
         onOpenChange: (open: boolean) => void;
         onPublished?: (result: AxhubPublishResponse) => void;
     };
+    localPublishDialog: {
+        open: boolean;
+        mode: 'html' | 'realtime';
+        targetPath: string;
+        previewUrl: string;
+        projectId: string;
+        onOpenChange: (open: boolean) => void;
+        onPublished?: (result: LanHtmlPublishResponse | LanRealtimePublishResponse) => void;
+    };
     settingsDialogProjectId: string;
     settingsDialogOpen: boolean;
+    aiSettingsDialogOpen: boolean;
+    networkSettingsDialogOpen: boolean;
     settingsDialogInitialTab: SettingsDialogInitialTab;
     settingsDialogAIContext: SettingsDialogAIContext | null;
+    conversationUiEnabled?: boolean;
     setSettingsDialogOpen: (open: boolean) => void;
+    setAiSettingsDialogOpen: (open: boolean) => void;
+    setNetworkSettingsDialogOpen: (open: boolean) => void;
     makeClientUpdateReminderVisible: boolean;
     onMakeClientUpdateReminderSeen: () => void;
     onMakeClientUpdateAvailabilityChange: (status: MakeClientUpdateStatus | null) => void;
-    onOpenVersionCollaborationFromSettings: () => void;
-    versionCollaborationDrawerOpen: boolean;
-    setVersionCollaborationDrawerOpen: (open: boolean) => void;
+    remoteRepositorySettingsOpen: boolean;
+    setRemoteRepositorySettingsOpen: (open: boolean) => void;
     onSettingsSaved: () => void;
     excalidrawPropertyPanelMode: ExcalidrawPropertyPanelMode;
     setExcalidrawPropertyPanelMode: (mode: ExcalidrawPropertyPanelMode) => void;
@@ -159,17 +176,22 @@ export default function IndexDialogs({
     figmaMakeExportDialog,
     cloudPublishSettingsDialog,
     axhubPublishDialog,
+    localPublishDialog,
     settingsDialogProjectId,
     settingsDialogOpen,
+    aiSettingsDialogOpen,
+    networkSettingsDialogOpen,
     settingsDialogInitialTab,
     settingsDialogAIContext,
+    conversationUiEnabled,
     setSettingsDialogOpen,
+    setAiSettingsDialogOpen,
+    setNetworkSettingsDialogOpen,
     makeClientUpdateReminderVisible,
     onMakeClientUpdateReminderSeen,
     onMakeClientUpdateAvailabilityChange,
-    onOpenVersionCollaborationFromSettings,
-    versionCollaborationDrawerOpen,
-    setVersionCollaborationDrawerOpen,
+    remoteRepositorySettingsOpen,
+    setRemoteRepositorySettingsOpen,
     onSettingsSaved,
     excalidrawPropertyPanelMode,
     setExcalidrawPropertyPanelMode,
@@ -311,17 +333,10 @@ export default function IndexDialogs({
                     state={{
                         visible: createThemeDialog.visible,
                         activeProjectId: createThemeDialog.activeProjectId,
-                        initialTab: createThemeDialog.initialTab,
                         resourceWriteCapabilities: createThemeDialog.resourceWriteCapabilities,
-                        preferredPromptClient,
-                        preferredIDE,
-                        ideAvailability,
-                        assistantOpen: createThemeDialog.assistantOpen,
                     }}
                     actions={{
                         onClose: createThemeDialog.onClose,
-                        onAfterCreatePromptAction: createThemeDialog.onAfterCreatePromptAction,
-                        onExecutePrompt: createThemeDialog.onExecutePrompt,
                         onImportSuccess: createThemeDialog.onImportSuccess,
                     }}
                 />
@@ -424,6 +439,20 @@ export default function IndexDialogs({
                 </React.Suspense>
             ) : null}
 
+            {localPublishDialog.open ? (
+                <React.Suspense fallback={null}>
+                    <LocalPublishDialog
+                        open={localPublishDialog.open}
+                        mode={localPublishDialog.mode}
+                        targetPath={localPublishDialog.targetPath}
+                        previewUrl={localPublishDialog.previewUrl}
+                        projectId={localPublishDialog.projectId}
+                        onOpenChange={localPublishDialog.onOpenChange}
+                        onPublished={localPublishDialog.onPublished}
+                    />
+                </React.Suspense>
+            ) : null}
+
             {settingsDialogOpen ? (
                 <React.Suspense fallback={null}>
                     <SettingsDialog
@@ -433,12 +462,13 @@ export default function IndexDialogs({
                         initialAcpRuntime={settingsDialogAIContext?.runtime}
                         initialAcpFailureSource={settingsDialogAIContext?.failureSource}
                         initialAcpFailureMessage={settingsDialogAIContext?.failureMessage}
+                        initialVoiceSection={settingsDialogAIContext?.voiceSection}
+                        conversationUiEnabled={conversationUiEnabled}
                         makeClientUpdateReminderVisible={makeClientUpdateReminderVisible}
                         onMakeClientUpdateReminderSeen={onMakeClientUpdateReminderSeen}
                         onClose={() => setSettingsDialogOpen(false)}
                         onSaved={onSettingsSaved}
                         onMakeClientUpdateAvailabilityChange={onMakeClientUpdateAvailabilityChange}
-                        onOpenVersionCollaboration={onOpenVersionCollaborationFromSettings}
                         excalidrawPropertyPanelMode={excalidrawPropertyPanelMode}
                         onExcalidrawPropertyPanelModeChange={setExcalidrawPropertyPanelMode}
                         excalidrawPropertyPanelPosition={excalidrawPropertyPanelPosition}
@@ -447,12 +477,41 @@ export default function IndexDialogs({
                 </React.Suspense>
             ) : null}
 
-            {versionCollaborationDrawerOpen ? (
+            {aiSettingsDialogOpen ? (
                 <React.Suspense fallback={null}>
-                    <WorkspaceVersionCollaborationDrawer
+                    <SettingsDialog
+                        open={aiSettingsDialogOpen}
                         projectId={settingsDialogProjectId}
-                        open={versionCollaborationDrawerOpen}
-                        onOpenChange={setVersionCollaborationDrawerOpen}
+                        standalone="ai"
+                        initialAcpRuntime={settingsDialogAIContext?.runtime}
+                        initialAcpFailureSource={settingsDialogAIContext?.failureSource}
+                        initialAcpFailureMessage={settingsDialogAIContext?.failureMessage}
+                        initialVoiceSection={settingsDialogAIContext?.voiceSection}
+                        conversationUiEnabled={conversationUiEnabled}
+                        onClose={() => setAiSettingsDialogOpen(false)}
+                        onSaved={onSettingsSaved}
+                    />
+                </React.Suspense>
+            ) : null}
+
+            {networkSettingsDialogOpen ? (
+                <React.Suspense fallback={null}>
+                    <SettingsDialog
+                        open={networkSettingsDialogOpen}
+                        projectId={settingsDialogProjectId}
+                        standalone="network"
+                        onClose={() => setNetworkSettingsDialogOpen(false)}
+                        onSaved={onSettingsSaved}
+                    />
+                </React.Suspense>
+            ) : null}
+
+            {remoteRepositorySettingsOpen ? (
+                <React.Suspense fallback={null}>
+                    <RemoteRepositorySettingsDialog
+                        projectId={settingsDialogProjectId}
+                        open={remoteRepositorySettingsOpen}
+                        onOpenChange={setRemoteRepositorySettingsOpen}
                     />
                 </React.Suspense>
             ) : null}
@@ -464,7 +523,7 @@ export default function IndexDialogs({
                         visible={versionDialogVisible}
                         onCancel={() => setVersionDialogVisible(false)}
                         item={currentVersionItem}
-                        onOpenWorkspaceVersionCollaboration={onOpenVersionCollaborationFromSettings}
+                        onOpenRemoteRepositorySettings={() => setRemoteRepositorySettingsOpen(true)}
                     />
                 </React.Suspense>
             ) : null}

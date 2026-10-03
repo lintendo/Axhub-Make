@@ -10,6 +10,11 @@
       "types": "./src/index.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
+    },
+    "./prompt-card-skills": {
+      "types": "./src/prompt-card-skills.ts",
+      "import": "./dist/prompt-card-skills.mjs",
+      "require": "./dist/prompt-card-skills.js"
     }
   },
   "peerDependencies": {

@@ -429,6 +429,7 @@ describe('CanvasGenerationComposer source', () => {
     expect(displayPropsSegment).toContain('thought: string | null;');
     expect(displayPropsSegment).toContain('referenceImages: string[];');
     expect(displayPropsSegment).toContain('preferredPromptClient?: PromptClientPreference;');
+    expect(displayPropsSegment).toContain('preferredModel?: string | null;');
     expect(displayPropsSegment).toContain('showSelectors?: boolean;');
     expect(displayPropsSegment).toContain('workspacePath?: string | null;');
     expect(displayAcpSegment).toContain('const canvasAcpRuntime = useCanvasAcpRuntimeBridge({ enabled: showSelectors, projectId, workspacePath });');
@@ -439,7 +440,6 @@ describe('CanvasGenerationComposer source', () => {
     expect(displayAcpSegment).toContain('workspacePath ?? \'global\',');
     expect(displayAcpSegment).toContain('key={acpRuntimeKey}');
     expect(displayAcpSegment).toContain('defaultProvider={acpSelectorDefaults.defaultProvider}');
-    expect(displayAcpSegment).not.toContain('defaultModel=');
     expect(displayAcpSegment).toContain('providerOptions={acpSelectorDefaults.providerOptions}');
     expect(displayAcpSegment).toContain('showProviderSettings={false}');
     expect(displayAcpSegment).toContain('<AssistantRuntimeProvider runtime={runtime}>');
@@ -453,7 +453,7 @@ describe('CanvasGenerationComposer source', () => {
     expect(displayAcpSegment).toContain('referenceImages,');
   });
 
-  it('remounts both ACP composer runtimes when the configured default provider changes', () => {
+  it('remounts both ACP composer runtimes when the configured provider changes', () => {
     const source = readCanvasGenerationComposerSource();
     const displayAcpSegment = source.slice(
       source.indexOf('function CanvasGenerationDisplayComposerWithAcp'),
@@ -467,7 +467,6 @@ describe('CanvasGenerationComposer source', () => {
     for (const segment of [displayAcpSegment, runtimeAcpSegment]) {
       expect(segment).toContain('const acpRuntimeKey = useMemo(() => [');
       expect(segment).toContain('acpSelectorDefaults.defaultProvider,');
-      expect(segment).not.toContain('acpSelectorDefaults.defaultModel');
       expect(segment).toContain('acpSelectorDefaults.providerOptions.join(\',\'),');
       expect(segment).toContain('workspacePath ?? \'global\',');
       expect(segment).toContain('key={acpRuntimeKey}');
@@ -731,16 +730,18 @@ describe('CanvasGenerationComposer source', () => {
   it('renders Make-owned ACP provider selectors without ACP provider settings', () => {
     const source = readCanvasGenerationComposerSource();
     const selectorSegment = source.slice(
-      source.indexOf('const CANVAS_ACP_PROVIDER_LABELS'),
+      source.indexOf('const CANVAS_ACP_PROVIDER_OPTIONS'),
       source.indexOf('function CanvasAcpModelSelectorFallback'),
     );
 
-    expect(selectorSegment).toContain('CANVAS_ACP_PROVIDER_LABELS');
-    expect(selectorSegment).toContain("claude: 'Claude Code'");
-    expect(selectorSegment).toContain("codex: 'Codex'");
-    expect(selectorSegment).toContain("opencode: 'OpenCode'");
-    expect(selectorSegment).toContain("'grok-build': 'Grok Build'");
-    expect(source).toContain("const FIXED_CANVAS_ACP_PROVIDER_OPTIONS = ['claude', 'codex', 'opencode']");
+    expect(source).toContain("import { ACP_PROVIDER_OPTIONS, resolveAcpPromptClientProvider, type AcpProviderKey } from '../../../common/acpModelConfig';");
+    expect(source).toContain('const CANVAS_ACP_PROVIDER_KEYS = ACP_PROVIDER_OPTIONS.map((option) => option.provider);');
+    expect(selectorSegment).toContain('const CANVAS_ACP_PROVIDER_OPTIONS = ACP_PROVIDER_OPTIONS.map((option) => ({');
+    expect(selectorSegment).toContain('value: option.provider');
+    expect(selectorSegment).toContain('label: option.label');
+    expect(source).not.toContain('FIXED_CANVAS_ACP_PROVIDER_OPTIONS');
+    expect(source).not.toContain('CANVAS_ACP_PROVIDER_LABELS');
+    expect(source).not.toContain('CANVAS_ACP_PROVIDER_ORDER');
     expect(selectorSegment).toContain('resolveCanvasAcpRuntimeProviderOptions(contextProviderOptions, context.provider)');
     expect(selectorSegment).toContain('runtimeProviderOptions.includes(option.value)');
     expect(selectorSegment).not.toContain('useVisibleAcpProviders');
@@ -758,7 +759,7 @@ describe('CanvasGenerationComposer source', () => {
   it('positions the desktop ACP config submenu against the viewport', () => {
     const source = readCanvasGenerationComposerSource();
     const selectorSegment = source.slice(
-      source.indexOf('const CANVAS_ACP_PROVIDER_LABELS'),
+      source.indexOf('const CANVAS_ACP_PROVIDER_OPTIONS'),
       source.indexOf('function CanvasAcpModelSelectorFallback'),
     );
 

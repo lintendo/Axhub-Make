@@ -393,8 +393,6 @@ describe('auto make-server registration', () => {
     });
 
     const waitPromise = waitForAdminOrigin(projectRoot, {
-      requireDevMode: true,
-      runtimeOrigin: 'http://localhost:51720',
       timeoutMs: 5000,
       pollIntervalMs: 500,
       healthTimeoutMs: 1,
@@ -406,7 +404,7 @@ describe('auto make-server registration', () => {
     vi.useRealTimers();
   });
 
-  it('does not reuse a dev admin with a stale runtime origin', async () => {
+  it('reuses a healthy admin when the legacy runtime origin points at another project', async () => {
     const projectRoot = createTempProjectRoot();
     const fetchMock = mockFetch((url) => {
       expect(url.pathname).toBe('/api/health');
@@ -415,7 +413,8 @@ describe('auto make-server registration', () => {
         role: 'admin',
         projectRoot,
         runtimeOrigin: 'http://localhost:51721',
-        devMode: true,
+        devMode: false,
+        capabilities: { reviewReports: true },
         server: {
           pid: 12345,
           port: 5174,
@@ -427,11 +426,35 @@ describe('auto make-server registration', () => {
       });
     });
 
-    await expect(getReusableAdminOrigin(projectRoot, {
-      requireDevMode: true,
-      runtimeOrigin: 'http://localhost:51720',
-    })).resolves.toBeNull();
+    await expect(getReusableAdminOrigin(projectRoot)).resolves.toBe('http://localhost:53817');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses the same release admin for clients on two runtime ports', async () => {
+    const projectRoot = createTempProjectRoot();
+    const fetchMock = mockFetch((url) => {
+      expect(url.origin).toBe('http://localhost:53817');
+      expect(url.pathname).toBe('/api/health');
+      return jsonResponse({
+        ok: true,
+        role: 'admin',
+        origin: 'http://localhost:53817',
+        devMode: false,
+        capabilities: { reviewReports: true },
+        server: {
+          pid: 12345,
+          port: 53817,
+          host: 'localhost',
+          origin: 'http://localhost:53817',
+          projectRoot,
+          startedAt: '2026-05-03T00:01:00.000Z',
+        },
+      });
+    });
+
+    await expect(getReusableAdminOrigin(projectRoot)).resolves.toBe('http://localhost:53817');
+    await expect(getReusableAdminOrigin(projectRoot)).resolves.toBe('http://localhost:53817');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('does not reuse a client runtime that is listening on the default admin port', async () => {
@@ -480,14 +503,11 @@ describe('auto make-server registration', () => {
       });
     });
 
-    await expect(getReusableAdminOrigin(projectRoot, {
-      requireDevMode: true,
-      runtimeOrigin: 'http://localhost:51720',
-    })).resolves.toBeNull();
+    await expect(getReusableAdminOrigin(projectRoot)).resolves.toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('does not reuse a static local admin when dev admin is required', async () => {
+  it('reuses a healthy release admin even when devMode is false', async () => {
     const projectRoot = createTempProjectRoot();
     const fetchMock = mockFetch((url) => {
       expect(url.pathname).toBe('/api/health');
@@ -496,6 +516,7 @@ describe('auto make-server registration', () => {
         role: 'admin',
         projectRoot,
         devMode: false,
+        capabilities: { reviewReports: true },
         server: {
           pid: 12345,
           port: 5174,
@@ -507,7 +528,7 @@ describe('auto make-server registration', () => {
       });
     });
 
-    await expect(getReusableAdminOrigin(projectRoot, { requireDevMode: true })).resolves.toBeNull();
+    await expect(getReusableAdminOrigin(projectRoot)).resolves.toBe('http://localhost:53817');
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

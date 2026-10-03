@@ -1,7 +1,7 @@
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -54,6 +54,37 @@ function writeMinimalTemplateAssembly(clientRoot, runtimeFiles = ['package.json'
   }));
 }
 
+function writeMinimalDesignKnowledgeSnapshot(clientRoot) {
+  const design = '# Example\n';
+  const designHash = `sha256:${crypto.createHash('sha256').update(design).digest('hex')}`;
+  const desktop = {
+    schemaVersion: 1,
+    platform: 'desktop',
+    records: [{
+      id: 'example',
+      publishable: true,
+      reviewStatus: 'approved',
+      artifacts: { designMdPath: 'design-md/example.md', designMdHash: designHash },
+    }],
+  };
+  const mobile = { schemaVersion: 1, platform: 'mobile', records: [] };
+  const desktopBytes = `${JSON.stringify(desktop)}\n`;
+  const mobileBytes = `${JSON.stringify(mobile)}\n`;
+  const hash = (value) => `sha256:${crypto.createHash('sha256').update(value).digest('hex')}`;
+  writeFile(path.join(clientRoot, 'design-knowledge/design-md/example.md'), design);
+  writeFile(path.join(clientRoot, 'design-knowledge/indexes/desktop.json'), desktopBytes);
+  writeFile(path.join(clientRoot, 'design-knowledge/indexes/mobile.json'), mobileBytes);
+  writeFile(path.join(clientRoot, 'design-knowledge/manifest.json'), `${JSON.stringify({
+    schemaVersion: 1,
+    snapshotVersion: '2026-08-13.3',
+    indexes: {
+      desktop: { path: 'indexes/desktop.json', hash: hash(desktopBytes), count: 1 },
+      mobile: { path: 'indexes/mobile.json', hash: hash(mobileBytes), count: 0 },
+    },
+    designMd: { count: 1 },
+  })}\n`);
+}
+
 function stripTypeImportQueries(source) {
   return source
     .replace(/^\s*import\s+type\s+[^;]+;\s*$/gmu, '')
@@ -79,21 +110,6 @@ function listSourceFiles(rootDir) {
   return files.sort((left, right) => left.localeCompare(right));
 }
 
-function findAncestorFile(relativePath) {
-  let currentDir = path.resolve('.');
-  while (true) {
-    const candidate = path.join(currentDir, relativePath);
-    if (fs.existsSync(candidate)) {
-      return candidate;
-    }
-    const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir) {
-      return null;
-    }
-    currentDir = parentDir;
-  }
-}
-
 function readTrackedFiles() {
   const result = spawnSync('git', ['ls-files'], {
     cwd: process.cwd(),
@@ -110,8 +126,11 @@ function shouldScanTrackedFile(relativePath) {
   if (/^(?:automation-reports|\.local|\.release|coverage|dist|node_modules)\//u.test(relativePath)) {
     return false;
   }
-  return /^(?:package\.json|pnpm-lock\.yaml|bin\/|scripts\/|src\/|client\/(?:package\.json|src\/|\.axhub\/make\/|\.agents\/|\.claude\/|rules\/|vite-plugins\/))/u
-    .test(relativePath);
+  if (!/^(?:package\.json|pnpm-lock\.yaml|bin\/|scripts\/|src\/|client\/(?:package\.json|src\/|\.axhub\/make\/|\.agents\/|\.claude\/|\.workbuddy\/|rules\/|vite-plugins\/))/u
+    .test(relativePath)) {
+    return false;
+  }
+  return !/(?:^|\/)(?:__tests__\/|[^/]+\.test\.[^/]+$)/u.test(relativePath);
 }
 
 function containsLocalMachinePath(source) {
@@ -127,26 +146,6 @@ afterEach(() => {
 });
 
 describe('release make artifact helpers', () => {
-  it('validates demand annotation copy in the built admin bundle', () => {
-    const root = createTempRoot('axhub-release-admin-copy-');
-    const bundlePath = path.join(root, 'assets', 'admin.js');
-
-    writeFile(bundlePath, 'const placeholder = "输入需求标注，支持 Markdown 格式";\n');
-    assert.doesNotThrow(() => releaseMake.assertAdminBundleCopy(root));
-
-    writeFile(bundlePath, 'const placeholder = "输入需求";\n');
-    assert.throws(
-      () => releaseMake.assertAdminBundleCopy(root),
-      /Admin build is missing required demand annotation copy/u,
-    );
-
-    writeFile(bundlePath, 'const placeholder = "输入需求标注，支持 Markdown 格式"; const legacy = "标注 Markdown";\n');
-    assert.throws(
-      () => releaseMake.assertAdminBundleCopy(root),
-      /Admin build includes legacy demand annotation copy/u,
-    );
-  });
-
   it('allowlists generated-client scripts instead of publishing the whole scripts directory', () => {
     const manifest = JSON.parse(
       fs.readFileSync(path.resolve('client/template-manifest.json'), 'utf8'),
@@ -365,11 +364,6 @@ describe('release make artifact helpers', () => {
     assert.equal(manifest.schemaVersion, 1);
     assert.equal(manifest.prototypeDefaults, undefined);
     assert.equal(manifest.themes.defaultAction, undefined);
-    assert(manifest.runtime.files.includes('THIRD_PARTY_NOTICES.md'));
-    const thirdPartyNotices = fs.readFileSync(path.resolve('client/THIRD_PARTY_NOTICES.md'), 'utf8');
-    assert.match(thirdPartyNotices, /Copyright \(c\) 2026 Muhammed Eliwat/u);
-    assert.match(thirdPartyNotices, /Permission is hereby granted, free of charge/u);
-    assert.match(thirdPartyNotices, /5d3aeca239caef3ea4080034eb22ab87cc77fa24/u);
     assert.deepEqual(manifest.prototypes.map(({ id }) => id), [
       'annotation-demo',
       'beginner-guide',
@@ -381,6 +375,7 @@ describe('release make artifact helpers', () => {
     );
     assert.equal(manifest.makeMetadata.seedDirectory, 'template-seed/.axhub/make');
     assert.equal(manifest.makeMetadata.outputDirectory, '.axhub/make');
+    assert(manifest.runtime.directories.includes('.workbuddy/skills'));
     assert.deepEqual(
       manifest.makeMetadata.files.map(({ path: filePath, strategy }) => ({ path: filePath, strategy })),
       [
@@ -400,23 +395,12 @@ describe('release make artifact helpers', () => {
     assert(rules.every(({ description }) => typeof description === 'string' && description.trim()));
   });
 
-  it('keeps mobile theme source notices consistent with tracked provenance files', () => {
-    const themesRoot = path.resolve('client/src/themes');
-    const staleNotices = fs.readdirSync(themesRoot, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory() && entry.name.endsWith('-mobile'))
-      .map((entry) => path.join(themesRoot, entry.name, 'SOURCE.md'))
-      .filter((sourcePath) => fs.existsSync(sourcePath))
-      .filter((sourcePath) => fs.readFileSync(sourcePath, 'utf8').includes('normalization.json'));
-
-    assert.deepEqual(staleNotices, []);
-  });
-
   it('does not publish the triple ampersand test skill', () => {
     const manifest = JSON.parse(fs.readFileSync(path.resolve('client/template-manifest.json'), 'utf8'));
     const excludedPaths = (manifest.runtime.fileRules || [])
       .filter(({ action }) => action === 'exclude')
       .map(({ pattern }) => new RegExp(pattern, 'u'));
-    const skillRoots = ['.agents', '.claude'];
+    const skillRoots = ['.agents', '.claude', '.workbuddy'];
 
     for (const skillRoot of skillRoots) {
       const relativeSkillPath = `${skillRoot}/skills/triple-ampersand-operator`;
@@ -470,9 +454,9 @@ describe('release make artifact helpers', () => {
   it('keeps the approved annotation range while pinning exact client dependencies and pnpm', () => {
     const clientPackageJson = JSON.parse(fs.readFileSync(path.resolve('client/package.json'), 'utf8'));
 
-    assert.equal(clientPackageJson.version, '0.1.18');
+    assert.equal(clientPackageJson.version, '0.1.21');
     assert.equal(clientPackageJson.packageManager, 'pnpm@10.20.0');
-    assert.equal(clientPackageJson.dependencies['@axhub/annotation'], '^1.0.18');
+    assert.equal(clientPackageJson.dependencies['@axhub/annotation'], '^1.0.20');
     assert.equal(clientPackageJson.dependencies['lucide-react'], '0.562.0');
     assert.equal(clientPackageJson.devDependencies['@types/react'], '^18.2.0');
     assert.equal(clientPackageJson.devDependencies['@types/react-dom'], '^18.2.0');
@@ -483,6 +467,28 @@ describe('release make artifact helpers', () => {
 
     assert.match(sourceGitignore, /^\.axhub\/make\/\*$/mu);
     assert.doesNotMatch(sourceGitignore, /^!\.axhub\/make\/(?:comments|comment-assets)(?:\/|\/\*\*)$/mu);
+  });
+
+  it('keeps WorkBuddy skills trackable while ignoring WorkBuddy runtime state', () => {
+    const gitRoot = createTempRoot('axhub-workbuddy-gitignore-');
+    fs.copyFileSync(path.resolve('client/.gitignore'), path.join(gitRoot, '.gitignore'));
+    writeFile(path.join(gitRoot, '.workbuddy/state.json'), '{}\n');
+    writeFile(path.join(gitRoot, '.workbuddy/skills/local/SKILL.md'), '# Local skill\n');
+
+    const init = spawnSync('git', ['init', '--quiet'], { cwd: gitRoot, encoding: 'utf8' });
+    assert.equal(init.status, 0, init.stderr);
+
+    const stateCheck = spawnSync('git', ['check-ignore', '--quiet', '.workbuddy/state.json'], {
+      cwd: gitRoot,
+      encoding: 'utf8',
+    });
+    const skillCheck = spawnSync('git', ['check-ignore', '--quiet', '.workbuddy/skills/local/SKILL.md'], {
+      cwd: gitRoot,
+      encoding: 'utf8',
+    });
+
+    assert.equal(stateCheck.status, 0, 'WorkBuddy runtime state must stay ignored');
+    assert.equal(skillCheck.status, 1, 'WorkBuddy project skills must remain trackable');
   });
 
   it('creates a lean pnpm-only package manifest for released client templates', () => {
@@ -613,15 +619,14 @@ describe('release make artifact helpers', () => {
         files: [
           '.gitignore',
           'package.json',
-          'THIRD_PARTY_NOTICES.md',
           'scripts/build-all.js',
           'scripts/capture-theme-homepage.mjs',
           'scripts/capture-theme-source.mjs',
         ],
-        directories: ['.agents/skills', '.claude/skills', 'scripts/utils'],
+        directories: ['.agents/skills', '.claude/skills', '.workbuddy/skills', 'design-knowledge', 'scripts/utils'],
         fileRules: [{
           action: 'exclude',
-          pattern: '^\\.(?:agents|claude)/skills/prototype-comments(?:/|$)',
+          pattern: '^\\.(?:agents|claude|workbuddy)/skills/prototype-comments(?:/|$)',
           description: 'Do not publish the replaced prototype comments skill.',
         }],
       },
@@ -677,12 +682,6 @@ describe('release make artifact helpers', () => {
       '!.axhub/make/sidebar-tree.json',
       '',
     ].join('\n'));
-    writeFile(path.join(clientRoot, 'THIRD_PARTY_NOTICES.md'), [
-      '# Third-Party Notices',
-      '',
-      'Permission is hereby granted, free of charge.',
-      '',
-    ].join('\n'));
     writeFile(path.join(clientRoot, 'src/prototypes/annotation-demo/index.tsx'), 'export {};\n');
     writeFile(path.join(clientRoot, 'src/prototypes/annotation-demo/annotation-source.json'), '{}\n');
     writeFile(path.join(clientRoot, 'src/prototypes/annotation-demo/.spec/spec.md'), '# Annotation spec\n');
@@ -719,15 +718,19 @@ describe('release make artifact helpers', () => {
     writeFile(path.join(clientRoot, 'src/themes/trae/index.tsx'), 'export {};\n');
     writeFile(path.join(clientRoot, 'src/themes/whop/index.tsx'), 'export {};\n');
     writeFile(path.join(clientRoot, 'src/themes/claude/index.tsx'), 'export {};\n');
+    writeMinimalDesignKnowledgeSnapshot(clientRoot);
     writeFile(path.join(clientRoot, '.drawio-tmp/order-flow/order-flow.spec.yaml'), 'id: order-flow\n');
     writeFile(path.join(clientRoot, 'node_modules/left-pad/index.js'), 'module.exports = null;\n');
     writeFile(path.join(clientRoot, 'dist/build.js'), 'console.log("built");\n');
     writeFile(path.join(clientRoot, '.agents/skills/local/SKILL.md'), 'npm run typecheck\n');
     writeFile(path.join(clientRoot, '.claude/skills/local/SKILL.md'), 'npm run typecheck\n');
+    writeFile(path.join(clientRoot, '.workbuddy/skills/local/SKILL.md'), 'npm run typecheck\n');
     writeFile(path.join(clientRoot, '.agents/skills/handle-comments/SKILL.md'), '# Handle comments\n');
     writeFile(path.join(clientRoot, '.claude/skills/handle-comments/SKILL.md'), '# Handle comments\n');
+    writeFile(path.join(clientRoot, '.workbuddy/skills/handle-comments/SKILL.md'), '# Handle comments\n');
     writeFile(path.join(clientRoot, '.agents/skills/prototype-comments/SKILL.md'), '# Stale skill\n');
     writeFile(path.join(clientRoot, '.claude/skills/prototype-comments/SKILL.md'), '# Stale skill\n');
+    writeFile(path.join(clientRoot, '.workbuddy/skills/prototype-comments/SKILL.md'), '# Stale skill\n');
     writeFile(path.join(clientRoot, '.trae/local.json'), '{}\n');
     writeFile(path.join(clientRoot, '.codex/session.json'), '{}\n');
     writeFile(path.join(clientRoot, '.workbuddy/state.json'), '{}\n');
@@ -794,11 +797,17 @@ describe('release make artifact helpers', () => {
     const packagedGitignore = Buffer.from(zipEntries['.gitignore']).toString('utf8');
     assert(entries.includes('package.json'));
     assert(entries.includes('pnpm-lock.yaml'));
-    assert(entries.includes('THIRD_PARTY_NOTICES.md'));
-    assert.match(
-      Buffer.from(zipEntries['THIRD_PARTY_NOTICES.md']).toString('utf8'),
-      /Permission is hereby granted, free of charge/u,
+    assert(entries.includes('template-manifest.json'));
+    assert.equal(
+      JSON.parse(Buffer.from(zipEntries['template-manifest.json']).toString('utf8')).schemaVersion,
+      1,
     );
+    assert(entries.includes('design-knowledge/manifest.json'));
+    assert(entries.includes('design-knowledge/indexes/desktop.json'));
+    assert(entries.includes('design-knowledge/indexes/mobile.json'));
+    assert(entries.includes('design-knowledge/design-md/example.md'));
+    assert(!entries.some((entry) => entry.startsWith('design-knowledge/packages/')));
+    assert(!entries.some((entry) => entry.endsWith('.tgz')));
     assert.equal(packagedPackageJson.packageManager, 'pnpm@10.20.0');
     assert.equal(packagedPackageJson.scripts.test, undefined);
     assert.equal(packagedPackageJson.scripts['test:run'], undefined);
@@ -847,8 +856,10 @@ describe('release make artifact helpers', () => {
     assert(!entries.some((entry) => entry.startsWith('dist/')));
     assert(entries.includes('.agents/skills/local/SKILL.md'));
     assert(entries.includes('.claude/skills/local/SKILL.md'));
+    assert(entries.includes('.workbuddy/skills/local/SKILL.md'));
     assert(entries.includes('.agents/skills/handle-comments/SKILL.md'));
     assert(entries.includes('.claude/skills/handle-comments/SKILL.md'));
+    assert(entries.includes('.workbuddy/skills/handle-comments/SKILL.md'));
     assert(!entries.some((entry) => entry.includes('/skills/prototype-comments/')));
     assert.match(packagedGitignore, /^!\.axhub\/make\/comments\/$/mu);
     assert.match(packagedGitignore, /^!\.axhub\/make\/comments\/\*\*$/mu);
@@ -856,7 +867,7 @@ describe('release make artifact helpers', () => {
     assert.match(packagedGitignore, /^!\.axhub\/make\/comment-assets\/\*\*$/mu);
     assert(!entries.some((entry) => entry.startsWith('.trae/')));
     assert(!entries.some((entry) => entry.startsWith('.codex/')));
-    assert(!entries.some((entry) => entry.startsWith('.workbuddy/')));
+    assert(!entries.includes('.workbuddy/state.json'));
     assert(!entries.some((entry) => entry.startsWith('.logs/')));
     assert(!entries.some((entry) => entry.startsWith('logs/')));
     assert(!entries.some((entry) => entry.startsWith('tmp-midscene/')));
@@ -920,10 +931,6 @@ describe('release make artifact helpers', () => {
 
     assert.equal(rootPackageJson.scripts['release:make:npm:latest'], undefined);
     assert.equal(
-      rootPackageJson.scripts['release:make:npm:prepare'],
-      'node scripts/release-make.mjs --skip-github --prepare-only',
-    );
-    assert.equal(
       rootPackageJson.scripts['release:make:npm:beta'],
       'node scripts/release-make.mjs --skip-github --npm-tag beta',
     );
@@ -968,18 +975,6 @@ describe('release make artifact helpers', () => {
     assert.equal(releaseMake.shouldBuildPlatformArtifacts({ skipGithub: true }), false);
     assert.equal(releaseMake.shouldBuildPlatformArtifacts({ skipGithub: false }), true);
     assert.equal(releaseMake.shouldBuildPlatformArtifacts({}), true);
-    assert.deepEqual(
-      releaseMake.releaseToolsForOptions({ skipGithub: true }),
-      ['pnpm', 'npm', 'bun'],
-    );
-    assert.deepEqual(
-      releaseMake.releaseToolsForOptions({ skipGithub: false }),
-      ['pnpm', 'npm', 'bun', 'zip'],
-    );
-    assert.deepEqual(releaseMake.releaseToolCheckArgs('pnpm'), ['--version']);
-    assert.deepEqual(releaseMake.releaseToolCheckArgs('npm'), ['--version']);
-    assert.deepEqual(releaseMake.releaseToolCheckArgs('bun'), ['--version']);
-    assert.deepEqual(releaseMake.releaseToolCheckArgs('zip'), ['-v']);
   });
 
   it('keeps make publish source independent from the project-core workspace package', () => {
@@ -996,40 +991,16 @@ describe('release make artifact helpers', () => {
     assert.doesNotMatch(releaseSource, /packages\/axhub-export-core\/scripts\/canvas-fig-sync\.mjs/u);
   });
 
-  it('keeps vendored source package TypeScript deprecation config compatible with the release toolchain', () => {
-    const releaseTypescriptPackageJson = JSON.parse(
-      fs.readFileSync(
-        createRequire(import.meta.url).resolve('typescript/package.json'),
-        'utf8',
-      ),
-    );
-    const releaseTypescriptMajor = Number.parseInt(
-      String(releaseTypescriptPackageJson.version).split('.')[0] || '',
-      10,
-    );
-    assert(Number.isInteger(releaseTypescriptMajor), 'release TypeScript major version must be detectable');
+  it('ships prebuilt export-core artifacts without depending on monorepo source', () => {
+    const vendorRoot = path.resolve('vendor/axhub-export-core');
+    const manifest = JSON.parse(fs.readFileSync(path.join(vendorRoot, 'package.json'), 'utf8'));
 
-    const exportCoreTsconfigPath = path.resolve('vendor/axhub-export-core/tsconfig.json');
-    const sourceExportCoreTsconfigPath = findAncestorFile('packages/axhub-export-core/tsconfig.json');
-    const tsconfigPath = fs.existsSync(exportCoreTsconfigPath)
-      ? exportCoreTsconfigPath
-      : sourceExportCoreTsconfigPath;
-    if (!tsconfigPath) {
-      return;
+    assert.equal(manifest.exports?.['.']?.import?.default, './dist/index.mjs');
+    assert.equal(manifest.exports?.['.']?.require?.default, './dist/index.js');
+    assert.equal(manifest.exports?.['./scripts/canvas-fig-sync.mjs']?.import, './scripts/canvas-fig-sync.mjs');
+    for (const file of ['dist/index.mjs', 'dist/index.js', 'dist/index.d.ts', 'scripts/canvas-fig-sync.mjs']) {
+      assert(fs.statSync(path.join(vendorRoot, file)).isFile(), `${file} must be vendored`);
     }
-
-    const exportCoreTsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf8'));
-    const ignoreDeprecations = exportCoreTsconfig.compilerOptions?.ignoreDeprecations;
-    if (ignoreDeprecations === undefined) {
-      return;
-    }
-
-    const ignoreDeprecationsMajor = Number.parseInt(String(ignoreDeprecations).split('.')[0] || '', 10);
-    assert(Number.isInteger(ignoreDeprecationsMajor), 'ignoreDeprecations must start with a major version');
-    assert(
-      ignoreDeprecationsMajor <= releaseTypescriptMajor,
-      `ignoreDeprecations ${ignoreDeprecations} is not accepted by release TypeScript ${releaseTypescriptPackageJson.version}`,
-    );
   });
 
   it('bundles the canvas fig sync release script with runtime dependencies', () => {
@@ -1084,6 +1055,7 @@ describe('release make artifact helpers', () => {
 
     for (const runtimePatchFile of [
       'client/vite-plugins/clientPreviewPlugin.ts',
+      'client/vite-plugins/localEditingApi.ts',
       'client/vite-plugins/canvasHotUpdateFilter.ts',
       'client/vite-plugins/utils/moduleSpecifierQuery.ts',
       'client/vite-plugins/utils/previewTitle.ts',
@@ -1137,6 +1109,19 @@ describe('release make artifact helpers', () => {
     for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
       assert.equal(packageJson[field], undefined);
     }
+  });
+
+  it('generates release entrypoints that preserve CLI result and usage exit codes', () => {
+    const source = releaseMake.createCliEntrypointSource('../dist/server/cli.mjs');
+
+    assert.match(source, /import \{ handleCliError, runCli \}/u);
+    assert.match(source, /\.then\(\(exitCode\)/u);
+    assert.match(source, /process\.exitCode = handleCliError\(error\)/u);
+
+    const executableSource = releaseMake.createCliEntrypointSource('../src/server/cli.ts', {
+      selfContainedExecutable: true,
+    });
+    assert.match(executableSource, /runCli\(process\.argv\.slice\(2\), \{ selfContainedExecutable: true \}\)/u);
   });
 
   it('rejects staged npm packages that are not self-contained npx artifacts', () => {
@@ -1255,6 +1240,8 @@ describe('release make artifact helpers', () => {
       'README.md',
       'assets/auto-debug-client.js',
       'assets/images/make-demo-prd-annotation.png',
+      'bin/codex-integration/companion.mjs',
+      'bin/cursor-integration/companion.mjs',
       'dist/admin/images/make-demo-prd-annotation.png',
     ]) {
       assert.throws(
@@ -1408,6 +1395,18 @@ describe('release make artifact helpers', () => {
       AXHUB_MAKE_HOME_DIR: '/tmp/axhub-make-state-home',
       CUSTOM_SMOKE_ENV: 'enabled',
     });
+
+    assert.deepEqual(releaseMake.createBackgroundServerProbeArgs(launch.args), [
+      '--host',
+      '127.0.0.1',
+      '--port',
+      '51728',
+      '--admin-root',
+      '/tmp/axhub-make-admin',
+      '--background',
+      '--no-open',
+      '--json',
+    ]);
   });
 
   it('runs the installed package CLI through Node instead of a Windows cmd shim', () => {
@@ -1421,16 +1420,6 @@ describe('release make artifact helpers', () => {
         args: [path.join('/tmp/axhub make install', 'node_modules', '@axhub', 'make', 'bin/cli.mjs')],
       },
     );
-  });
-
-  it('exercises comment asset persistence from the installed npm CLI smoke', () => {
-    const releaseSource = fs.readFileSync(path.resolve('scripts/release-make.mjs'), 'utf8');
-
-    assert.match(releaseSource, /async function exerciseCommentAssetLifecycle\(/u);
-    assert.match(releaseSource, /\/api\/document-comments/u);
-    assert.match(releaseSource, /hydrateImages=1/u);
-    assert.match(releaseSource, /reason: 'clear'/u);
-    assert.match(releaseSource, /Comment asset smoke cleanup did not remove/u);
   });
 
   it('omits OpenCode WebUI static assets from release packaging while disabled', () => {

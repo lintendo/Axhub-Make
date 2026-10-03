@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { resolveAcpPromptClientProvider, type AcpProviderKey } from '../../../common/acpModelConfig';
+import { ACP_PROVIDER_OPTIONS, resolveAcpPromptClientProvider, type AcpProviderKey } from '../../../common/acpModelConfig';
 import {
   Popover,
   PopoverContent,
@@ -74,7 +74,7 @@ type CanvasGenerationComposerPlacementMode = 'absolute' | 'fixed-bottom-center';
 
 export type CanvasAiScene = 'page' | 'design' | 'document';
 
-const FIXED_CANVAS_ACP_PROVIDER_OPTIONS = ['claude', 'codex', 'opencode'] as const satisfies readonly AcpProviderKey[];
+const CANVAS_ACP_PROVIDER_KEYS = ACP_PROVIDER_OPTIONS.map((option) => option.provider);
 
 export interface CanvasAcpSelectorDefaults {
   defaultProvider: AcpProviderKey;
@@ -128,12 +128,10 @@ export function resolveCanvasAcpSelectorDefaults(
 }
 
 export function resolveCanvasAcpRuntimeProviderOptions(
-  providerOptions?: readonly AcpProviderKey[] | null,
+  _providerOptions?: readonly AcpProviderKey[] | null,
   selectedProvider?: string | null,
 ): readonly AcpProviderKey[] {
-  const resolvedOptions = providerOptions?.length
-    ? [...providerOptions]
-    : [...FIXED_CANVAS_ACP_PROVIDER_OPTIONS];
+  const resolvedOptions = [...CANVAS_ACP_PROVIDER_KEYS];
   const currentProvider = resolveAcpPromptClientProvider(selectedProvider);
   return currentProvider && !resolvedOptions.some((provider) => provider === currentProvider)
     ? [...resolvedOptions, currentProvider]
@@ -277,6 +275,7 @@ export interface CanvasGenerationDisplayComposerProps {
   leadingActions?: React.ReactNode;
   onPasteReferenceImages?: () => Promise<CanvasReferencePasteResult>;
   postSelectorActions?: CanvasGenerationDisplayPostSelectorActions;
+  preferredModel?: string | null;
   preferredPromptClient?: PromptClientPreference;
   projectResourceItems?: CanvasProjectResourceItems;
   projectResourceTrees?: CanvasProjectResourceTrees;
@@ -295,6 +294,7 @@ interface CanvasGenerationRuntimeComposerProps {
   initialReferenceImages?: string[];
   onPasteReferenceImages?: () => Promise<CanvasReferencePasteResult>;
   placeholder: string;
+  preferredModel?: string | null;
   preferredPromptClient?: PromptClientPreference;
   renderActions?: (props: { submitting: boolean }) => React.ReactNode;
   renderLeadingActions?: (props: { submitting: boolean }) => React.ReactNode;
@@ -1388,7 +1388,7 @@ function CanvasPromptOptimizeButton({
       title="优化提示词"
       disabled={disabled}
       aria-live="polite"
-      className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
       onClick={onClick}
     >
       {optimizing ? (
@@ -2233,31 +2233,9 @@ interface CanvasAcpSelectorSection {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-const CANVAS_ACP_PROVIDER_LABELS: Record<AcpProviderKey, string> = {
-  claude: 'Claude Code',
-  codex: 'Codex',
-  opencode: 'OpenCode',
-  cursor: 'Cursor',
-  qoder: 'Qoder',
-  codebuddy: 'CodeBuddy',
-  reasonix: 'Reasonix',
-  'grok-build': 'Grok Build',
-};
-
-const CANVAS_ACP_PROVIDER_ORDER = [
-  'claude',
-  'codex',
-  'opencode',
-  'cursor',
-  'qoder',
-  'codebuddy',
-  'reasonix',
-  'grok-build',
-] as const satisfies readonly AcpProviderKey[];
-
-const CANVAS_ACP_PROVIDER_OPTIONS = CANVAS_ACP_PROVIDER_ORDER.map((provider) => ({
-  value: provider,
-  label: CANVAS_ACP_PROVIDER_LABELS[provider],
+const CANVAS_ACP_PROVIDER_OPTIONS = ACP_PROVIDER_OPTIONS.map((option) => ({
+  value: option.provider,
+  label: option.label,
 }));
 
 const CANVAS_ACP_CONFIG_MENU_DESKTOP_QUERY = '(min-width: 640px)';
@@ -3091,6 +3069,7 @@ export default function CanvasGenerationComposer({
   placement,
   placementMode = 'absolute',
   placeholder,
+  preferredModel,
   preferredPromptClient,
   renderActions,
   renderLeadingActions,
@@ -3148,6 +3127,7 @@ export default function CanvasGenerationComposer({
         onPasteReferenceImages={onPasteReferenceImages}
         onSubmitPrompt={onSubmitPrompt}
         placeholder={placeholder}
+        preferredModel={preferredModel}
         preferredPromptClient={preferredPromptClient}
         renderActions={renderActions}
         renderLeadingActions={renderLeadingActions}

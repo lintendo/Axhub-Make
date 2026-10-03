@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  createAnnotationDirectRunPreflightResult,
   createAnnotationDirectRunRegistry,
   type AnnotationDirectRunEvent,
   type AnnotationDirectRunSubmitRequest,
@@ -13,6 +14,60 @@ function createAbortError(): Error {
 }
 
 describe('annotation direct run registry', () => {
+  it('reuses the same run handle when the host retries an operationId', async () => {
+    let release: (() => void) | null = null;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const submit = vi.fn(async () => {
+      await pending;
+      return true;
+    });
+    const registry = createAnnotationDirectRunRegistry();
+    const input = {
+      context: {},
+      prompt: 'Update the selected card',
+      requestId: 'voice-operation-1',
+      maxActiveRuns: 3,
+      submit,
+    };
+
+    const first = registry.startRun(input);
+    const retry = registry.startRun(input);
+
+    expect(retry).toBe(first);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(registry.getOperation('voice-operation-1')).toEqual({
+      operationId: 'voice-operation-1',
+      executionId: 'voice-operation-1',
+      phase: 'running',
+    });
+    release?.();
+    if (first.started) await expect(first.promise).resolves.toBe(true);
+    expect(registry.getOperation('voice-operation-1')?.phase).toBe('completed');
+  });
+
+  it('forwards source stream events through the existing run lifecycle', async () => {
+    const streamEvents: unknown[] = [];
+    const registry = createAnnotationDirectRunRegistry({ createRequestId: () => 'stream' });
+
+    const result = registry.startRun({
+      context: { page: 'home' },
+      prompt: 'Inspect the selected element.',
+      maxActiveRuns: 1,
+      onStreamEvent: (event) => streamEvents.push(event),
+      submit: async (request) => {
+        await request.onEvent?.({ event: 'run.text.delta', data: { delta: 'Hello' } });
+        return true;
+      },
+    });
+
+    if (!result.started) throw new Error('Expected the direct run to start');
+    await expect(result.promise).resolves.toBe(true);
+    expect(streamEvents).toEqual([{ event: 'run.text.delta', data: { delta: 'Hello' } }]);
+  });
+
   it('broadcasts a single run lifecycle without mutating UI state itself', async () => {
     const events: AnnotationDirectRunEvent[] = [];
     const submit = vi.fn(async (request: AnnotationDirectRunSubmitRequest<Record<string, unknown>>) => {
@@ -105,6 +160,35 @@ describe('annotation direct run registry', () => {
     expect(registry.getActiveRunCount()).toBe(0);
   });
 
+  it('treats a feedback-handled preflight result as skipped instead of an execution error', async () => {
+    const events: AnnotationDirectRunEvent[] = [];
+    const registry = createAnnotationDirectRunRegistry({
+      createRequestId: () => 'ai-settings-required',
+    });
+
+    const started = registry.startRun({
+      context: {},
+      prompt: 'Update the selected card',
+      maxActiveRuns: 1,
+      submit: async () => createAnnotationDirectRunPreflightResult(),
+      onEvent: (event) => {
+        events.push(event);
+      },
+    });
+
+    expect(started.started).toBe(true);
+    if (!started.started) return;
+
+    await expect(started.promise).resolves.toBe(true);
+    expect(events.map((event) => event.type)).toEqual([
+      'started',
+      'skipped',
+      'settled',
+    ]);
+    expect(events.some((event) => event.type === 'error')).toBe(false);
+    expect(registry.getActiveRunCount()).toBe(0);
+  });
+
   it('allows multiple listeners for the same conversation and aborts each run exactly once', async () => {
     const events: AnnotationDirectRunEvent[] = [];
     let preparedResolve: (() => void) | null = null;
@@ -179,6 +263,44 @@ describe('annotation direct run registry', () => {
       }),
     ]);
     expect(events.filter((event) => event.type === 'settled')).toHaveLength(2);
+    expect(registry.getActiveRunCount()).toBe(0);
+  });
+
+  it('aborts only the run matching a task session or request id', async () => {
+    const registry = createAnnotationDirectRunRegistry({
+      createRequestId: (() => {
+        let next = 0;
+        return () => `request-${++next}`;
+      })(),
+    });
+    let preparedCount = 0;
+    let resolvePrepared!: () => void;
+    const prepared = new Promise<void>((resolve) => {
+      resolvePrepared = resolve;
+    });
+    const waitForAbort = async (request: AnnotationDirectRunSubmitRequest<Record<string, unknown>>) => {
+      await request.onPrepared?.({
+        provider: 'codex',
+        threadId: request.prompt === 'first' ? 'thread-first' : 'thread-second',
+        runId: request.prompt === 'first' ? 'run-first' : 'run-second',
+      });
+      preparedCount += 1;
+      if (preparedCount === 2) resolvePrepared();
+      await new Promise<void>((_resolve, reject) => {
+        request.signal.addEventListener('abort', () => reject(createAbortError()), { once: true });
+      });
+      return false;
+    };
+    const first = registry.startRun({ context: {}, prompt: 'first', maxActiveRuns: 2, submit: waitForAbort });
+    const second = registry.startRun({ context: {}, prompt: 'second', maxActiveRuns: 2, submit: waitForAbort });
+    if (!first.started || !second.started) throw new Error('Expected both direct runs to start');
+
+    await prepared;
+    await expect(registry.abortRun('thread-first')).resolves.toBe(true);
+    await expect(first.promise).resolves.toBe(false);
+    expect(registry.getActiveRunCount()).toBe(1);
+    await expect(registry.abortRun('thread-second')).resolves.toBe(true);
+    await expect(second.promise).resolves.toBe(false);
     expect(registry.getActiveRunCount()).toBe(0);
   });
 

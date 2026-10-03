@@ -13,6 +13,7 @@ interface IndexPageLayoutProps {
     presentationAreaProps: PresentationAreaGroupedProps;
     assistantPanelProps: React.ComponentProps<typeof IndexPageDesktop>['assistantPanel'];
     responsiveSidebarProps: React.ComponentProps<typeof IndexPageDesktop>['responsiveSidebar'];
+    workspaceMetricsProps: React.ComponentProps<typeof IndexPageDesktop>['workspaceMetrics'];
     dialogsProps: React.ComponentProps<typeof IndexDialogs>;
     mobileProps: React.ComponentProps<typeof MobileIndexLayout>;
 }
@@ -22,6 +23,7 @@ export default function IndexPageLayout({
     presentationAreaProps,
     assistantPanelProps,
     responsiveSidebarProps,
+    workspaceMetricsProps,
     dialogsProps,
     mobileProps,
 }: IndexPageLayoutProps) {
@@ -43,6 +45,7 @@ export default function IndexPageLayout({
                 presentationAreaProps={presentationAreaProps}
                 assistantPanel={assistantPanelProps}
                 responsiveSidebar={responsiveSidebarProps}
+                workspaceMetrics={workspaceMetricsProps}
             />
 
             <IndexDialogs {...dialogsProps} />

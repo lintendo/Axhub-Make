@@ -230,14 +230,14 @@ describe('appendCanvasGenerationPromptSettings', () => {
       prompt: '写一份会员增长 PRD',
       settings: {
         format: 'html',
-        templateName: 'write-prd.md',
+        templateName: 'templates/prd.md',
       },
     });
 
     expect(prompt).toContain('写一份会员增长 PRD');
     expect(prompt).toContain('文档生成设置');
     expect(prompt).toContain('- 文档格式：HTML');
-    expect(prompt).toContain('- 文档模板：resources/templates/write-prd.md');
+    expect(prompt).toContain('- 文档模板：templates/prd.md');
     expect(prompt).not.toContain('请按以下模板组织内容');
     expect(prompt).not.toContain('# PRD 模板');
     expect(prompt).not.toContain('## 验收标准');
@@ -250,20 +250,20 @@ describe('appendCanvasGenerationPromptSettings', () => {
       prompt: '生成视觉报告',
       settings: {
         format: 'html',
-        templateName: 'visual-report.html',
+        templateName: 'templates/prototype-spec.html',
       },
     });
     const markdownWithHtmlTemplate = appendDocumentStartPromptSettings({
       prompt: '生成 Markdown 报告',
       settings: {
         format: 'md',
-        templateName: 'visual-report.html',
+        templateName: 'templates/prototype-spec.html',
       },
     });
 
-    expect(htmlWithHtmlTemplate).toContain('- 文档模板：resources/templates/visual-report.html');
+    expect(htmlWithHtmlTemplate).toContain('- 文档模板：templates/prototype-spec.html');
     expect(markdownWithHtmlTemplate).toContain('- 文档格式：Markdown');
-    expect(markdownWithHtmlTemplate).not.toContain('visual-report.html');
+    expect(markdownWithHtmlTemplate).not.toContain('templates/prototype-spec.html');
   });
 
   it('appends selected HTML visual spec skill and PRD planning guidance for document starts', () => {
@@ -314,13 +314,13 @@ describe('appendCanvasGenerationPromptSettings', () => {
       prompt: '整理需求',
       settings: {
         format: 'md',
-        templateName: 'write-prd.md',
+        templateName: 'templates/prd.md',
       },
     });
 
     expect(prompt).toContain('文档生成设置');
     expect(prompt).toContain('- 文档格式：Markdown');
-    expect(prompt).toContain('- 文档模板：resources/templates/write-prd.md');
+    expect(prompt).toContain('- 文档模板：templates/prd.md');
     expect(prompt).not.toContain('请按以下模板组织内容');
   });
 

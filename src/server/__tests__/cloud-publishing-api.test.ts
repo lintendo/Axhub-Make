@@ -8,8 +8,10 @@ import { unzipSync } from 'fflate';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  createServerSecretsStore,
   getConfigPath,
   getGlobalServerConfigPath,
+  getGlobalServerSecretsPath,
   getMakeClientMarkerPath,
   getProjectExportsDir,
   getProjectMetadataPath,
@@ -120,9 +122,25 @@ function getTestServerConfigPath(projectRoot: string): string {
 }
 
 function writeCloudConfig(projectRoot: string, cloudPublishing: unknown) {
+  const source = cloudPublishing && typeof cloudPublishing === 'object'
+    ? structuredClone(cloudPublishing) as Record<string, any>
+    : {};
+  const secretUpdates = {
+    'cloudPublishing.vercel.token': String(source.vercel?.token || ''),
+    'cloudPublishing.cloudflarePages.apiToken': String(source.cloudflarePages?.apiToken || ''),
+    'cloudPublishing.s3.accessKeyId': String(source.s3?.accessKeyId || ''),
+    'cloudPublishing.s3.secretAccessKey': String(source.s3?.secretAccessKey || ''),
+  };
+  if (source.vercel) delete source.vercel.token;
+  if (source.cloudflarePages) delete source.cloudflarePages.apiToken;
+  if (source.s3) {
+    delete source.s3.accessKeyId;
+    delete source.s3.secretAccessKey;
+  }
   writeJson(getTestServerConfigPath(projectRoot), {
-    cloudPublishing,
+    cloudPublishing: source,
   });
+  createServerSecretsStore({ homeDir: getTestMakeHome(projectRoot) }).updateSecrets(secretUpdates);
 }
 
 async function startTestServer(projectRoot: string, extraOptions: Record<string, unknown> = {}) {
@@ -644,7 +662,7 @@ describe('cloud publishing API', () => {
           cloudflarePages: { apiToken: 'cf-token', accountId: 'account-1', projectName: 'axhub-home', productionBranch: 'main' },
           s3: {
             accessKeyId: 'AKIA_TEST',
-            secretAccessKey: 'secret',
+            secretAccessKey: 's3-secret-value',
             region: 'us-east-1',
             bucket: 'axhub-sites',
             prefix: 'home',
@@ -664,13 +682,15 @@ describe('cloud publishing API', () => {
       expect(configResponse.status).toBe(200);
       const projectConfig = JSON.parse(fs.readFileSync(getConfigPath(projectRoot), 'utf8'));
       expect(projectConfig.cloudPublishing).toBeUndefined();
-      const serverConfig = JSON.parse(fs.readFileSync(getTestServerConfigPath(projectRoot), 'utf8'));
+      const serverConfigText = fs.readFileSync(getTestServerConfigPath(projectRoot), 'utf8');
+      const serverConfig = JSON.parse(serverConfigText);
+      for (const secret of ['vercel-token', 'cf-token', 'AKIA_TEST', 's3-secret-value']) {
+        expect(serverConfigText).not.toContain(secret);
+      }
       expect(serverConfig.cloudPublishing).toMatchObject({
-        vercel: { token: 'vercel-token', projectName: 'axhub-home', teamId: 'team_123' },
-        cloudflarePages: { apiToken: 'cf-token', accountId: 'account-1', projectName: 'axhub-home', productionBranch: 'main' },
+        vercel: { projectName: 'axhub-home', teamId: 'team_123' },
+        cloudflarePages: { accountId: 'account-1', projectName: 'axhub-home', productionBranch: 'main' },
         s3: {
-          accessKeyId: 'AKIA_TEST',
-          secretAccessKey: 'secret',
           region: 'us-east-1',
           bucket: 'axhub-sites',
           prefix: 'home',
@@ -681,6 +701,19 @@ describe('cloud publishing API', () => {
           visibleTargets: ['axhub', 's3', 'vercel'],
         },
       });
+      const serverSecrets = JSON.parse(fs.readFileSync(
+        getGlobalServerSecretsPath(getTestMakeHome(projectRoot)),
+        'utf8',
+      ));
+      expect(serverSecrets.cloudPublishing).toEqual({
+        vercel: { token: 'vercel-token' },
+        cloudflarePages: { apiToken: 'cf-token' },
+        s3: { accessKeyId: 'AKIA_TEST', secretAccessKey: 's3-secret-value' },
+      });
+      const configText = JSON.stringify(config);
+      for (const secret of ['vercel-token', 'cf-token', 'AKIA_TEST', 's3-secret-value']) {
+        expect(configText).not.toContain(secret);
+      }
       expect(config.targets.vercel).toMatchObject({
         configured: true,
         tokenConfigured: true,
@@ -807,14 +840,21 @@ describe('cloud publishing API', () => {
 
       const serverConfig = JSON.parse(fs.readFileSync(getTestServerConfigPath(projectRoot), 'utf8'));
       expect(serverConfig.cloudPublishing).toMatchObject({
-        vercel: { token: 'old-vercel-token', projectName: 'axhub-updated' },
-        cloudflarePages: { apiToken: 'old-cf-token', accountId: 'account-2' },
+        vercel: { projectName: 'axhub-updated' },
+        cloudflarePages: { accountId: 'account-2' },
         s3: {
-          accessKeyId: 'NEW_AKIA_TEST',
-          secretAccessKey: 'old-s3-secret',
           region: 'us-west-2',
           bucket: 'axhub-updated',
         },
+      });
+      const serverSecrets = JSON.parse(fs.readFileSync(
+        getGlobalServerSecretsPath(getTestMakeHome(projectRoot)),
+        'utf8',
+      ));
+      expect(serverSecrets.cloudPublishing).toEqual({
+        vercel: { token: 'old-vercel-token' },
+        cloudflarePages: { apiToken: 'old-cf-token' },
+        s3: { accessKeyId: 'NEW_AKIA_TEST', secretAccessKey: 'old-s3-secret' },
       });
     } finally {
       await server.close();

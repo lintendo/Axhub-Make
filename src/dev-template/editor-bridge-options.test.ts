@@ -16,8 +16,10 @@ describe('dev template editor bridge launch options', () => {
     expect(enableSource).not.toContain('integrationWs');
     expect(enableSource).toContain('mobileMode');
     expect(enableSource).toContain('commentPageScope');
-    expect(enableSource).toContain('annotationApiBaseUrl');
+    expect(enableSource).toContain('makeServerOrigin');
+    expect(enableSource).not.toContain('annotationApiBaseUrl');
     expect(enableSource).toContain('annotationProjectId');
+    expect(enableSource).toContain('initialSelectionModeActive');
     expect(enableSource).toContain('readPrototypeEditorBridgeCommentPageScope');
     expect(enableSource).toContain("editorModeManager?.api.enable('webEditorV2'");
   });
@@ -48,5 +50,59 @@ describe('dev template editor bridge launch options', () => {
     expect(source).toContain('modifiedElements?: CommentaryModifiedElementSummary[];');
     expect(source).toContain('editorModeManager?.api.getEditedSnapshot?.()?.modifiedElements ?? []');
     expect(source).toContain('modifiedElements,');
+  });
+
+  it('refreshes persisted voice comments over the parent bridge', () => {
+    const source = readFileSync(resolve(__dirname, './index.tsx'), 'utf8');
+
+    expect(source).toContain("event.data?.type === 'AXHUB_PROTOTYPE_EDITOR_VOICE_REFRESH_COMMENTS'");
+    expect(source).toContain('editorModeManager?.api.refreshPersistedComments?.(deletedCommentIds)');
+  });
+
+  it('validates a persisted voice execution target over the parent bridge', () => {
+    const source = readFileSync(resolve(__dirname, './index.tsx'), 'utf8');
+
+    expect(source).toContain("event.data?.type === 'AXHUB_PROTOTYPE_EDITOR_VALIDATE_EDITING_TARGET'");
+    expect(source).toContain('editorModeManager?.api.validateExternalEditingTarget?.(');
+  });
+
+  it('binds voice bridge requests to the parent origin established at enable time', () => {
+    const source = readFileSync(resolve(__dirname, './index.tsx'), 'utf8');
+
+    expect(source).toContain("import { normalizeMakeServerOrigin } from '../common/makeServerOrigin';");
+    expect(source).toContain('let trustedPrototypeEditorParentOrigin =');
+    expect(source).toContain('event.source !== window.parent');
+    expect(source).toContain('normalizeMakeServerOrigin(launchOptions.makeServerOrigin)');
+    expect(source).toContain('requestedParentOrigin !== event.origin');
+    expect(source).toContain('trustedPrototypeEditorParentOrigin = requestedParentOrigin;');
+    expect(source).toContain('isTrustedPrototypeEditorParentEvent(event)');
+    expect(source).toContain('event.origin === trustedPrototypeEditorParentOrigin');
+  });
+
+  it('rejects every privileged bridge command from an untrusted source or origin', () => {
+    const source = readFileSync(resolve(__dirname, './index.tsx'), 'utf8');
+
+    expect(source).toContain('PROTOTYPE_EDITOR_TRUSTED_PARENT_MESSAGE_TYPES');
+    expect(source).toContain('isTrustedPrototypeEditorParentEvent(event)');
+    expect(source).toContain("'AXHUB_PROTOTYPE_EDITOR_HOST_TOOLBAR_ACTION'");
+    expect(source).toContain("'AXHUB_PROTOTYPE_EDITOR_SAVE_ACTION'");
+    expect(source).toContain("'AXHUB_PROTOTYPE_EDITOR_PREPARE_SAVE'");
+    expect(source).toContain("'AXHUB_PROTOTYPE_EDITOR_PREFLIGHT_SAVE'");
+    expect(source).toContain("'AXHUB_PROTOTYPE_EDITOR_COMMIT_SAVE'");
+    expect(source).toContain("'AXHUB_PROTOTYPE_EDITOR_NODE_EDITING_STATE'");
+    expect(source).toContain("'AXHUB_PROTOTYPE_EDITOR_QUERY_STATE'");
+    expect(source).toMatch(/PROTOTYPE_EDITOR_TRUSTED_PARENT_MESSAGE_TYPES\.has[\s\S]*!isTrustedPrototypeEditorParentEvent\(event\)[\s\S]*return;/u);
+  });
+
+  it('exposes phased quick edit save messages and idempotent commit handling', () => {
+    const source = readFileSync(resolve(__dirname, './index.tsx'), 'utf8');
+
+    expect(source).toContain("event.data.type === 'AXHUB_PROTOTYPE_EDITOR_PREPARE_SAVE'");
+    expect(source).toContain("event.data.type === 'AXHUB_PROTOTYPE_EDITOR_PREFLIGHT_SAVE'");
+    expect(source).toContain("event.data.type === 'AXHUB_PROTOTYPE_EDITOR_COMMIT_SAVE'");
+    expect(source).toContain('quickEditCommitRegistry.run(requestId');
+    expect(source).toContain('saveDraft');
+    expect(source).toContain('savePreflight');
+    expect(source).toContain('saveCommitResult');
   });
 });

@@ -36,7 +36,7 @@ try {
   const source = readFileSync(resolve(temporaryOutput, generatedFile), 'utf8');
   writeFileSync(
     outputPath,
-    `/* Generated from Axhub-owned axhub-export-core official Figma clipboard capture. */\n${source}`,
+    `/* Generated from Axhub-owned axhub-export-core for Figma-compatible clipboard capture. */\n${source}`,
   );
   process.stdout.write(`${outputPath}\n`);
 } finally {

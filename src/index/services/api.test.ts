@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { apiService } from './api';
+import { apiService, resolveMakeApiOrigin } from './api';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -10,6 +10,127 @@ afterEach(() => {
 });
 
 describe('apiService source', () => {
+  it('resolves the injected Make API origin before the page origin', () => {
+    vi.stubGlobal('window', {
+      __AXHUB_MAKE_API_ORIGIN__: 'http://localhost:53817/',
+      location: {
+        origin: 'http://localhost:51720',
+      },
+    });
+
+    expect(resolveMakeApiOrigin()).toBe('http://localhost:53817');
+  });
+
+  it('opens a project-scoped desktop integration with the fixed provider contract', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      provider: 'cursor',
+      status: 'restart-required',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const desktopApi = apiService as typeof apiService & {
+      openDesktopIntegration?: (payload: {
+        projectId: string;
+        provider: 'chatgpt' | 'cursor';
+        action: 'prepare' | 'restart' | 'normal';
+        targetPath?: string;
+      }) => Promise<{ status: 'opened' | 'restart-required' }>;
+    };
+
+    expect(desktopApi.openDesktopIntegration).toBeTypeOf('function');
+    if (!desktopApi.openDesktopIntegration) return;
+
+    await expect(desktopApi.openDesktopIntegration({
+      projectId: 'make-project',
+      provider: 'cursor',
+      action: 'prepare',
+      targetPath: 'prototypes/home',
+    })).resolves.toMatchObject({ status: 'restart-required' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/desktop-integration/open?projectId=make-project',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          projectId: 'make-project',
+          provider: 'cursor',
+          action: 'prepare',
+          targetPath: 'prototypes/home',
+        }),
+      }),
+    );
+  });
+
+  it('publishes LAN HTML and realtime links through project-scoped endpoints', async () => {
+    const responses = [
+        { publishId: 'html-1', resourcePath: 'prototypes/home', version: 2, url: 'http://localhost/published/html/html-1/index.html', createdAt: '2026-08-23T00:00:00.000Z' },
+        {
+            resourcePath: 'prototypes/home',
+            html: { publishId: 'html-1', resourcePath: 'prototypes/home', version: 2, url: 'http://localhost/published/html/html-1/index.html', createdAt: '2026-08-23T00:00:00.000Z' },
+            realtime: { shareId: 'share-1', resourcePath: 'prototypes/home', commentable: true, url: 'http://localhost/published/prototype/share-1', updatedAt: '2026-08-23T00:00:00.000Z' },
+        },
+        {
+          shareId: 'share-1',
+          resourcePath: 'prototypes/home',
+          commentable: true,
+          url: 'http://localhost/published/prototype/share-1',
+          annotationUrl: 'http://localhost/published/prototype/share-1',
+          previewUrl: 'http://localhost/prototypes/home#page=overview',
+        },
+      { shareId: 'share-1', commentable: true, defaultAuthorIp: '10.0.8.42' },
+    ];
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(responses.shift()), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await apiService.publishLanHtml({ path: 'prototypes/home', includeSource: true }, { projectId: 'project-a' });
+    await apiService.getLatestLanPublishing('prototypes/home', { projectId: 'project-a' });
+    await apiService.publishLanRealtime({
+      path: 'prototypes/home',
+      previewUrl: 'http://localhost:51720/prototypes/home#page=overview',
+      commentable: true,
+    }, { projectId: 'project-a' });
+    await apiService.getLanRealtimeContext('share-1');
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+        '/api/local-publishing/html?projectId=project-a',
+        '/api/local-publishing/latest?path=prototypes%2Fhome&projectId=project-a',
+        '/api/local-publishing/realtime?projectId=project-a',
+      '/api/local-publishing/realtime-context?shareId=share-1',
+    ]);
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({ path: 'prototypes/home', includeSource: true }),
+    });
+    expect(fetchMock.mock.calls[1][1]).toEqual({ cache: 'no-store' });
+    expect(fetchMock.mock.calls[2][1]).toMatchObject({
+        method: 'POST',
+        body: JSON.stringify({
+          path: 'prototypes/home',
+          previewUrl: 'http://localhost:51720/prototypes/home#page=overview',
+          commentable: true,
+        }),
+    });
+    expect(fetchMock.mock.calls[3][1]).toEqual({ cache: 'no-store' });
+  });
+
+  it('cancels the current LAN publication through the project-scoped endpoint', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await apiService.cancelLanPublish('html', { path: 'prototypes/home' }, { projectId: 'project-a' });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/local-publishing/html?projectId=project-a', expect.objectContaining({
+      method: 'DELETE',
+      body: JSON.stringify({ path: 'prototypes/home' }),
+    }));
+  });
+
   it('reads project-scoped prototype annotation status without enabling it', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       enabled: true,
@@ -95,7 +216,7 @@ describe('apiService source', () => {
     expect(source).toContain("method: 'POST'");
   });
 
-  it('exposes placeholder prototype generation start endpoint', () => {
+  it('keeps placeholder creation without exposing the obsolete waiting-generation transition', () => {
     const source = readFileSync(resolve(__dirname, './api.ts'), 'utf8');
 
     expect(source).toContain('export interface CreatePlaceholderPrototypeResponse');
@@ -103,10 +224,8 @@ describe('apiService source', () => {
     expect(source).toContain('absoluteCanvasFilePath?: string;');
     expect(source).toContain('async createPlaceholderPrototype(scope: ProjectScope): Promise<CreatePlaceholderPrototypeResponse>');
     expect(source).toContain("fetch(withProjectScope('/api/prototypes/create-placeholder', scope), {");
-    expect(source).toContain('async startPlaceholderPrototypeGeneration(prototypeName: string, scope: ProjectScope)');
-    expect(source).toContain("const encodedPrototypeName = encodeURIComponent(prototypeName);");
-    expect(source).toContain('fetch(withProjectScope(`/api/prototypes/${encodedPrototypeName}/start-generation`, scope), {');
-    expect(source).toContain("method: 'POST'");
+    expect(source).not.toContain('startPlaceholderPrototypeGeneration');
+    expect(source).not.toContain('/start-generation');
   });
 
   it('requires explicit scope when saving project-owned server preferences', () => {

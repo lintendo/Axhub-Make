@@ -185,9 +185,10 @@ describe('resource start prompt selection', () => {
     expect(imageSizeChange).not.toHaveBeenCalled();
   });
 
-  it('keeps the local-AI copy action available while card selection is disabled', async () => {
+  it('keeps the quick-execute action available while card selection is disabled', async () => {
     const { ResourceStartPromptGrid } = await import('./ResourceStartPromptGrid');
     const onCopyPrompt = vi.fn();
+    const onExecutePrompt = vi.fn();
     const selectPrompt = vi.fn();
     const TestIcon = () => React.createElement('svg');
     const card = { id: 'document', scene: 'document' as const, title: 'Document', prompt: 'Document prompt', icon: TestIcon };
@@ -200,18 +201,20 @@ describe('resource start prompt selection', () => {
         disabled: true,
         selectPrompt,
         onCopyPrompt,
+        onExecutePrompt,
         onSceneChange: vi.fn(),
         onImageSizeChange: vi.fn(),
         onPrdPlanningChange: vi.fn(),
       } as any));
     });
 
-    const copyButton = renderer!.root.findByProps({ 'aria-label': '复制提示词给本地 AI 使用' });
+    const executeButton = renderer!.root.findByProps({ 'aria-label': '快速执行' });
     await act(async () => {
-      copyButton.props.onClick();
+      executeButton.props.onClick();
     });
 
-    expect(onCopyPrompt).toHaveBeenCalledWith(card);
+    expect(onExecutePrompt).toHaveBeenCalledWith(card);
+    expect(onCopyPrompt).not.toHaveBeenCalled();
     expect(selectPrompt).not.toHaveBeenCalled();
   });
 });
