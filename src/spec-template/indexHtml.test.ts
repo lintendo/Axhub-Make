@@ -26,4 +26,12 @@ describe('spec-template HTML', () => {
     expect(html).toMatch(/#spec-root\.loading\s*\{[\s\S]*justify-content:\s*center/);
     expect(html).not.toMatch(/\.loading\s*\{[\s\S]*padding:\s*60px 20px/);
   });
+
+  it('allows long documents to extend the page background beyond the viewport', () => {
+    const htmlPath = path.resolve(__dirname, 'index.html');
+    const html = fs.readFileSync(htmlPath, 'utf8');
+
+    expect(html).toMatch(/html,\s*\n\s*body\s*\{[\s\S]*height:\s*auto/);
+    expect(html).toMatch(/html,\s*\n\s*body\s*\{[\s\S]*min-height:\s*100%/);
+  });
 });
